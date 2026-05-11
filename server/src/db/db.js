@@ -69,12 +69,6 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS moment_views (
 )`); } catch {}
 try { db.exec(`CREATE INDEX IF NOT EXISTS idx_moments_user ON moments(user_id, status)`); } catch {}
 
-// Back-fill invite codes for existing users without one
-db.prepare("SELECT id FROM users WHERE invite_code IS NULL").all().forEach(u => {
-  const code = u.id.replace(/-/g,'').slice(0,10).toUpperCase();
-  db.prepare("UPDATE users SET invite_code=? WHERE id=?").run(code, u.id);
-});
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id         TEXT PRIMARY KEY,
@@ -128,6 +122,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, created_at);
 
   CREATE TABLE IF NOT EXISTS calls (
+
     id         TEXT PRIMARY KEY,
     caller_id  TEXT NOT NULL,
     callee_id  TEXT NOT NULL,
@@ -137,6 +132,12 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
 `);
+
+// Back-fill invite codes for existing users without one (safe — users table now exists)
+db.prepare("SELECT id FROM users WHERE invite_code IS NULL").all().forEach(u => {
+  const code = u.id.replace(/-/g,'').slice(0,10).toUpperCase();
+  db.prepare("UPDATE users SET invite_code=? WHERE id=?").run(code, u.id);
+});
 
 function now() { return Math.floor(Date.now() / 1000); }
 
