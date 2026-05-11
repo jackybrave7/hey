@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.a{fill:#fbefd1}.b{fill:#846d9b}.c{fill:#c96fa1;opacity:.5}</style></defs><title>cool</title>
+<circle class="a" cx="32" cy="32" r="29.7"/>
+<ellipse class="c" cx="47.41" cy="36" rx="6.28" ry="4.7"/>
+<ellipse class="c" cx="16.59" cy="36" rx="6.28" ry="4.7"/>
+<rect class="b" x="7" y="21" rx="5" width="21" height="13"/>
+<rect class="b" x="36" y="21" rx="5" width="21" height="13"/>
+<rect class="b" x="28" y="24.5" width="8" height="3"/>
+<rect class="b" x="1.5" y="22.5" rx="1.5" width="6" height="3"/>
+<rect class="b" x="56.5" y="22.5" rx="1.5" width="5" height="3"/>
+<polygon class="b" points="32 43.34 25.11 36.45 27.09 34.47 32 39.37 36.91 34.47 38.89 36.45 32 43.34"/>
+</svg>

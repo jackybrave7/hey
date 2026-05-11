@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.a{fill:#fbefd1}.b{fill:#846d9b}.d{fill:#b8deff}</style></defs><title>nervous</title>
+<circle class="a" cx="32" cy="32" r="29.7"/>
+<circle class="b" cx="17.89" cy="27.47" r="6.28"/>
+<circle class="b" cx="45.82" cy="27.47" r="6.28"/>
+<rect class="b" x="24" y="38.5" rx="1.4" width="16" height="2.8"/>
+<rect class="b" x="21" y="35" rx="1" width="4" height="2.5"/>
+<rect class="b" x="39" y="35" rx="1" width="4" height="2.5"/>
+<ellipse class="d" cx="51" cy="19" rx="3.2" ry="4.2"/>
+<polygon class="d" points="48.3,17 53.7,17 51,11"/>
+</svg>

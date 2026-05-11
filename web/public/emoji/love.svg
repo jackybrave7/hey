@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.a{fill:#fff}.b{fill:#846d9b}.c{fill:#c96fa1}.d{fill:#ff8dd1;opacity:.4}</style></defs><title>love</title>
+<circle class="a" cx="32" cy="32" r="29.7"/>
+<circle class="d" cx="32" cy="32" r="29.7"/>
+<path class="c" d="M17.89,21.5 C19.1,18.3 24.3,18.3 24.3,22.9 C24.3,27.5 17.89,33.5 17.89,33.5 C17.89,33.5 11.48,27.5 11.48,22.9 C11.48,18.3 16.68,18.3 17.89,21.5 Z"/>
+<path class="c" d="M45.82,21.5 C47.03,18.3 52.23,18.3 52.23,22.9 C52.23,27.5 45.82,33.5 45.82,33.5 C45.82,33.5 39.41,27.5 39.41,22.9 C39.41,18.3 44.61,18.3 45.82,21.5 Z"/>
+<ellipse class="b" cx="32" cy="42.5" rx="3.8" ry="2.8"/>
+</svg>

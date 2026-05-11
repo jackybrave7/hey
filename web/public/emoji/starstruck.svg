@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.a{fill:#fbefd1}.b{fill:#846d9b}.c{fill:#c96fa1;opacity:.5}.e{fill:#c96fa1}</style></defs><title>starstruck</title>
+<circle class="a" cx="32" cy="32" r="29.7"/>
+<ellipse class="c" cx="47.41" cy="36" rx="6.28" ry="4.7"/>
+<ellipse class="c" cx="16.59" cy="36" rx="6.28" ry="4.7"/>
+<polygon class="e" points="17.89,21.19 19.66,25.7 24.17,27.47 19.66,29.24 17.89,33.75 16.12,29.24 11.61,27.47 16.12,25.7"/>
+<polygon class="e" points="45.82,21.19 47.59,25.7 52.1,27.47 47.59,29.24 45.82,33.75 44.05,29.24 39.54,27.47 44.05,25.7"/>
+<ellipse class="b" cx="32" cy="42" rx="5" ry="6"/>
+<ellipse class="a" cx="32" cy="42" rx="3" ry="4"/>
+</svg>

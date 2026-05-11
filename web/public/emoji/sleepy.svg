@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><style>.a{fill:#d0e8fe}.b{fill:#846d9b}.c{fill:#c96fa1;opacity:.4}</style></defs><title>sleepy</title>
+<circle class="a" cx="32" cy="32" r="29.7"/>
+<ellipse class="c" cx="47.41" cy="36" rx="5.5" ry="4"/>
+<ellipse class="c" cx="16.59" cy="36" rx="5.5" ry="4"/>
+<rect class="b" x="11.25" y="25.87" rx="1.4" width="13.28" height="2.8"/>
+<rect class="b" x="39.47" y="25.87" rx="1.4" width="13.28" height="2.8"/>
+<rect class="b" x="27.56" y="39.5" rx="1.4" width="8.89" height="2.8"/>
+<circle class="b" cx="49.5" cy="12" r="6.5"/>
+<circle class="a" cx="52" cy="12" r="5"/>
+</svg>

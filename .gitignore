@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+web/node_modules/
+server/node_modules/
+
+# Build output
+web/dist/
+
+# Database & uploads (server data — не коммитим, создаётся на сервере)
+server/data/hey.db
+server/data/hey.db-shm
+server/data/hey.db-wal
+server/data/hey.json
+server/data/uploads/
+server/data/feedback.log
+
+# Environment (секреты — никогда не в git!)
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+.claude/
