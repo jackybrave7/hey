@@ -293,7 +293,8 @@ export default function MomentsFeed({ currentUser }) {
           isMine={selected.user_id === currentUser?.id}
           onClose={() => setSelected(null)}
           onEdit={() => { setEditTarget(selected); setSelected(null); }}
-          onMenu={() => { setMenuTarget(selected); setSelected(null); }}
+          onArchive={() => handleArchive(selected.id)}
+          onDelete={() => { setDeleteTarget(selected); }}
         />
       )}
 

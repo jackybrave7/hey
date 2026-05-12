@@ -1,5 +1,5 @@
 // MomentDetailPopup.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import MoodEmoji from './MoodEmoji';
@@ -15,7 +15,90 @@ const REACTIONS = [
   { id: 'talk',      label: 'Поговорить', icon: '🤝' },
 ];
 
-export default function MomentDetailPopup({ moment: initial, isMine, onClose, onEdit, onMenu }) {
+// Inline contextual menu triggered by ⋯
+function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  function copyLink() {
+    navigator.clipboard.writeText(`${location.origin}/moments/${moment.id}`).catch(() => {});
+    setOpen(false);
+  }
+
+  const menuItems = [
+    {
+      icon: '✎', label: 'Изменить момент', color: 'rgba(255,255,255,.88)',
+      action: () => { setOpen(false); onEdit(); },
+    },
+    {
+      icon: '↗', label: 'Поделиться ссылкой', color: 'rgba(255,255,255,.88)',
+      action: copyLink,
+    },
+    {
+      icon: '📦', label: 'В архив', color: 'rgba(255,255,255,.88)',
+      action: () => { setOpen(false); onArchive(); onClose(); },
+    },
+    {
+      icon: '🗑', label: 'Удалить навсегда', color: 'rgba(255,100,100,.9)',
+      action: () => { setOpen(false); onDelete(); onClose(); },
+    },
+  ];
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          background: open ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.08)',
+          border: 'none', borderRadius: 10,
+          padding: '7px 10px', color: 'rgba(255,255,255,.7)',
+          fontSize: 18, cursor: 'pointer', transition: 'background .15s',
+          lineHeight: 1,
+        }}
+      >⋯</button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
+          background: 'rgba(28,18,58,.98)', backdropFilter: 'blur(20px)',
+          borderRadius: 14, overflow: 'hidden', minWidth: 210,
+          boxShadow: '0 8px 32px rgba(0,0,0,.5)',
+          border: '1px solid rgba(255,255,255,.1)',
+        }}>
+          {menuItems.map(({ icon, label, color, action }) => (
+            <div
+              key={label}
+              onClick={action}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px', cursor: 'pointer',
+                color, fontSize: 14, fontWeight: 500,
+                borderBottom: '1px solid rgba(255,255,255,.05)',
+                transition: 'background .13s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.07)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <span style={{ fontSize: 17 }}>{icon}</span>
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function MomentDetailPopup({ moment: initial, isMine, onClose, onEdit, onArchive, onDelete }) {
   const nav = useNavigate();
   const [moment, setMoment] = useState(initial);
   const [myReaction, setMyReaction] = useState(initial.myReaction || null);
@@ -67,24 +150,25 @@ export default function MomentDetailPopup({ moment: initial, isMine, onClose, on
   }
 
   const hasMedia = !!moment.media_url;
-  const overlay = {
-    position:'fixed',inset:0,zIndex:700,
-    background:'rgba(0,0,0,.72)',backdropFilter:'blur(16px)',
-    display:'flex',alignItems:'center',justifyContent:'center',
-    padding:'20px',
-  };
-  const panel = {
-    background:'rgba(22,15,50,.98)',backdropFilter:'blur(24px)',
-    borderRadius:24,width:'min(100%,520px)',
-    maxHeight:'90vh',display:'flex',flexDirection:'column',
-    boxShadow:'0 8px 48px rgba(0,0,0,.6)',
-    border:'1px solid rgba(255,255,255,.1)',
-    overflow:'hidden',
-  };
 
   return (
-    <div style={overlay} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
-      <div style={panel}>
+    <div
+      style={{
+        position:'fixed',inset:0,zIndex:700,
+        background:'rgba(0,0,0,.72)',backdropFilter:'blur(16px)',
+        display:'flex',alignItems:'center',justifyContent:'center',
+        padding:'20px',
+      }}
+      onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        background:'rgba(22,15,50,.98)',backdropFilter:'blur(24px)',
+        borderRadius:24,width:'min(100%,520px)',
+        maxHeight:'90vh',display:'flex',flexDirection:'column',
+        boxShadow:'0 8px 48px rgba(0,0,0,.6)',
+        border:'1px solid rgba(255,255,255,.1)',
+        overflow:'hidden',
+      }}>
         {/* Media */}
         {hasMedia && (
           <div style={{flexShrink:0,position:'relative',background:'#0a0518',maxHeight:'45vh',overflow:'hidden'}}>
@@ -103,7 +187,6 @@ export default function MomentDetailPopup({ moment: initial, isMine, onClose, on
                 <audio src={moment.media_url} controls style={{width:'100%'}}/>
               </div>
             )}
-            {/* Close btn */}
             <button onClick={onClose} style={{position:'absolute',top:12,right:12,
               background:'rgba(0,0,0,.5)',backdropFilter:'blur(8px)',
               border:'none',borderRadius:'50%',width:36,height:36,
@@ -140,19 +223,15 @@ export default function MomentDetailPopup({ moment: initial, isMine, onClose, on
                   {moment.edited && <span style={{marginLeft:6,opacity:.6}}>· редактировалось</span>}
                 </div>
               </div>
+              {/* ⋯ inline menu for own moments */}
               {isMine && (
-                <div style={{display:'flex',gap:8}}>
-                  <button onClick={onEdit}
-                    style={{background:'rgba(255,255,255,.1)',border:'none',borderRadius:10,
-                      padding:'7px 12px',color:'rgba(255,255,255,.8)',fontSize:13,cursor:'pointer'}}>
-                    ✎ Изменить
-                  </button>
-                  <button onClick={onMenu}
-                    style={{background:'rgba(255,255,255,.08)',border:'none',borderRadius:10,
-                      padding:'7px 10px',color:'rgba(255,255,255,.6)',fontSize:16,cursor:'pointer'}}>
-                    ⋯
-                  </button>
-                </div>
+                <InlineMenu
+                  moment={moment}
+                  onEdit={onEdit}
+                  onArchive={onArchive}
+                  onDelete={onDelete}
+                  onClose={onClose}
+                />
               )}
             </div>
 
@@ -216,24 +295,17 @@ export default function MomentDetailPopup({ moment: initial, isMine, onClose, on
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
-          {isMine ? (
-            <button onClick={onEdit}
-              style={{width:'100%',padding:'13px',borderRadius:14,
-                background:'rgba(100,78,148,.75)',border:'none',
-                color:'white',fontSize:15,fontWeight:600,cursor:'pointer'}}>
-              ✎ Изменить момент
-            </button>
-          ) : (
+        {/* Footer — only for other people's moments */}
+        {!isMine && (
+          <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
             <button onClick={handleChat}
               style={{width:'100%',padding:'13px',borderRadius:14,
                 background:'rgba(100,78,148,.75)',border:'none',
                 color:'white',fontSize:15,fontWeight:600,cursor:'pointer'}}>
               ✉ Написать {moment.author_name?.split(' ')[0]}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
