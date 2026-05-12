@@ -11,6 +11,12 @@ import {
 } from './components/Screens';
 import MomentsFeed from './components/moments/MomentsFeed';
 import BottomNav from './components/BottomNav';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminDashboard from './components/admin/AdminDashboard';
+import AdminUsers from './components/admin/AdminUsers';
+import AdminUserDetail from './components/admin/AdminUserDetail';
+import AdminMoments from './components/admin/AdminMoments';
+import AdminLogs from './components/admin/AdminLogs';
 
 function useNotifications() {
   useEffect(() => {
@@ -39,6 +45,19 @@ function GuestOnly({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   return user ? <Navigate to="/main" replace/> : children;
+}
+
+function RequireAdmin({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--grad)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 16 }}>Загрузка…</div>
+    </div>
+  );
+  if (!user) return <Navigate to="/login" replace/>;
+  if (!user.is_admin) return <Navigate to="/main" replace/>;
+  return children;
 }
 
 // Global unread counter — counts across all conversations
@@ -142,6 +161,33 @@ export default function App() {
           <Route path="/calls"                   element={<Protected><CallsScreen/></Protected>}/>
           <Route path="/calls/:callId"           element={<Protected><CallDetailScreen/></Protected>}/>
           <Route path="/settings"                element={<Protected><SettingsScreen/></Protected>}/>
+
+          {/* Admin panel */}
+          <Route path="/admin" element={
+            <RequireAdmin>
+              <AdminLayout><AdminDashboard/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/users" element={
+            <RequireAdmin>
+              <AdminLayout><AdminUsers/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/users/:id" element={
+            <RequireAdmin>
+              <AdminLayout><AdminUserDetail/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/moments" element={
+            <RequireAdmin>
+              <AdminLayout><AdminMoments/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/logs" element={
+            <RequireAdmin>
+              <AdminLayout><AdminLogs/></AdminLayout>
+            </RequireAdmin>
+          }/>
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace/>}/>

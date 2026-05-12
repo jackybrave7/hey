@@ -22,10 +22,13 @@ export default function BottomNav({ user, unread = 0 }) {
       position:'fixed',bottom:0,left:0,right:0,zIndex:500,
       background:'var(--topbar)',backdropFilter:'blur(24px)',
       borderTop:'1px solid rgba(255,255,255,.08)',
-      display:'flex',alignItems:'center',
       padding:'0 0 env(safe-area-inset-bottom)',
       height:60,
     }}>
+      <div style={{
+        maxWidth:680,margin:'0 auto',height:'100%',
+        display:'flex',alignItems:'center',
+      }}>
       {ITEMS.map(item => {
         const active  = isActive(item);
         const dest    = item.paths[0];
@@ -104,6 +107,7 @@ export default function BottomNav({ user, unread = 0 }) {
           </button>
         );
       })}
+      </div>
     </div>
   );
 }

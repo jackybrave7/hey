@@ -133,6 +133,22 @@ db.exec(`
   );
 `);
 
+// ── Admin columns (safe migrations) ──────────────────────────────────────────
+try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN blocked_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN blocked_by TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0'); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (
+  id               TEXT PRIMARY KEY,
+  admin_id         TEXT NOT NULL,
+  action           TEXT NOT NULL,
+  target_user_id   TEXT,
+  target_moment_id TEXT,
+  reason           TEXT,
+  created_at       INTEGER NOT NULL
+)`); } catch {}
+
 // Back-fill invite codes for existing users without one (safe — users table now exists)
 db.prepare("SELECT id FROM users WHERE invite_code IS NULL").all().forEach(u => {
   const code = u.id.replace(/-/g,'').slice(0,10).toUpperCase();
@@ -392,16 +408,18 @@ function getConversationsForUser(userId) {
     const conv = convsMap[convId];
     if (!conv) return null;
 
-    let name = conv.name, partnerId = null;
+    let name = conv.name, partnerId = null, partnerAvatar = null;
     if (conv.type === 'direct') {
       partnerId = partnerIdMap[convId] || null;
       const partner = partnerId ? usersMap[partnerId] : null;
       name = (partnerId && nickMap[partnerId]) || partner?.name || 'Диалог';
+      partnerAvatar = partner?.avatar || null;
     }
 
     const last = lastMap[convId];
     return { id: convId, type: conv.type, name, icon: conv.icon || null,
       admin_id: conv.admin_id || null, partner_id: partnerId,
+      avatar: partnerAvatar,
       last_text: last?.text || null,
       last_at:   last?.created_at || conv.created_at,
       last_sender_id: last?.sender_id || null,
@@ -744,6 +762,124 @@ function getDisciplinesCloud(userId) {
     .map(([tag, count]) => ({ tag, count }));
 }
 
+// ── Admin ──────────────────────────────────────────────────────────────────
+
+function getAdminStats() {
+  const users   = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
+  const blocked = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_blocked=1').get().c;
+  const admins  = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_admin=1').get().c;
+  const moments = db.prepare("SELECT COUNT(*) as c FROM moments WHERE status != 'deleted'").get().c;
+  const activeMoments = db.prepare("SELECT COUNT(*) as c FROM moments WHERE status='active'").get().c;
+  const reactions = db.prepare('SELECT COUNT(*) as c FROM moment_reactions').get().c;
+  return { users, blocked, admins, moments, activeMoments, reactions };
+}
+
+function getAdminUsers({ search, filter } = {}) {
+  let where = '1=1';
+  const params = [];
+  if (search) {
+    where += ' AND (u.name LIKE ? OR u.phone LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  if (filter === 'blocked')  { where += ' AND u.is_blocked=1'; }
+  if (filter === 'admins')   { where += ' AND u.is_admin=1'; }
+  const rows = db.prepare(
+    `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_blocked,
+            u.blocked_at, u.blocked_by, u.must_change_password,
+            p.online, p.last_seen,
+            (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status='active') AS active_moments,
+            (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status!='deleted') AS total_moments
+     FROM users u
+     LEFT JOIN presence p ON p.user_id=u.id
+     WHERE ${where}
+     ORDER BY u.created_at DESC`
+  ).all(...params);
+  return rows.map(r => ({ ...r, online: !!r.online, is_admin: !!r.is_admin, is_blocked: !!r.is_blocked, must_change_password: !!r.must_change_password }));
+}
+
+function getAdminUserById(id) {
+  const u = db.prepare(
+    `SELECT u.*, p.online, p.last_seen,
+            (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status!='deleted') AS total_moments,
+            (SELECT COUNT(*) FROM moment_reactions mr JOIN moments m ON m.id=mr.moment_id WHERE m.user_id=u.id) AS total_reactions_received
+     FROM users u
+     LEFT JOIN presence p ON p.user_id=u.id
+     WHERE u.id=?`
+  ).get(id);
+  if (!u) return null;
+  const { password: _, ...safe } = u;
+  return { ...safe, online: !!safe.online, is_admin: !!safe.is_admin, is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password };
+}
+
+function adminResetPassword(userId, newHashedPassword) {
+  db.prepare('UPDATE users SET password=?, must_change_password=1 WHERE id=?').run(newHashedPassword, userId);
+}
+
+function adminBlockUser(userId, adminId, reason) {
+  const t = now();
+  db.prepare('UPDATE users SET is_blocked=1, blocked_at=?, blocked_by=? WHERE id=?').run(t, adminId, userId);
+  logAdminAction({ adminId, action: 'block_user', targetUserId: userId, reason });
+}
+
+function adminUnblockUser(userId, adminId) {
+  db.prepare('UPDATE users SET is_blocked=0, blocked_at=NULL, blocked_by=NULL WHERE id=?').run(userId);
+  logAdminAction({ adminId, action: 'unblock_user', targetUserId: userId });
+}
+
+function adminMakeAdmin(userId, adminId) {
+  db.prepare('UPDATE users SET is_admin=1 WHERE id=?').run(userId);
+  logAdminAction({ adminId, action: 'make_admin', targetUserId: userId });
+}
+
+function adminRevokeAdmin(userId, adminId) {
+  db.prepare('UPDATE users SET is_admin=0 WHERE id=?').run(userId);
+  logAdminAction({ adminId, action: 'revoke_admin', targetUserId: userId });
+}
+
+function getAdminMoments({ status, userId } = {}) {
+  let where = "status != 'deleted'";
+  const params = [];
+  if (status && status !== 'all') { where += ' AND m.status=?'; params.push(status); }
+  if (userId) { where += ' AND m.user_id=?'; params.push(userId); }
+  const rows = db.prepare(
+    `SELECT m.*, u.name AS author_name, u.phone AS author_phone
+     FROM moments m JOIN users u ON u.id=m.user_id
+     WHERE ${where}
+     ORDER BY m.created_at DESC LIMIT 200`
+  ).all(...params);
+  return rows.map(r => _withStats(_parseMoment(r)));
+}
+
+function adminDeleteMoment(momentId, adminId, reason) {
+  db.transaction(() => {
+    db.prepare('DELETE FROM moment_reactions WHERE moment_id=?').run(momentId);
+    db.prepare('DELETE FROM moment_views WHERE moment_id=?').run(momentId);
+    db.prepare("UPDATE moments SET status='deleted', updated_at=? WHERE id=?").run(now(), momentId);
+  })();
+  logAdminAction({ adminId, action: 'delete_moment', targetMomentId: momentId, reason });
+}
+
+function logAdminAction({ adminId, action, targetUserId, targetMomentId, reason }) {
+  db.prepare(
+    `INSERT INTO admin_logs (id,admin_id,action,target_user_id,target_moment_id,reason,created_at)
+     VALUES (?,?,?,?,?,?,?)`
+  ).run('log_'+uuid().replace(/-/g,'').slice(0,10), adminId, action,
+        targetUserId||null, targetMomentId||null, reason||null, now());
+}
+
+function getAdminLogs(limit = 100) {
+  return db.prepare(
+    `SELECT al.*, u.name AS admin_name,
+            tu.name AS target_user_name,
+            m.text AS target_moment_text
+     FROM admin_logs al
+     JOIN users u ON u.id=al.admin_id
+     LEFT JOIN users tu ON tu.id=al.target_user_id
+     LEFT JOIN moments m ON m.id=al.target_moment_id
+     ORDER BY al.created_at DESC LIMIT ?`
+  ).all(limit);
+}
+
 function setOnline(userId, online) {
   db.prepare('UPDATE presence SET online=?, last_seen=? WHERE user_id=?')
     .run(online ? 1 : 0, now(), userId);
@@ -773,5 +909,10 @@ module.exports = {
   createMoment, updateMoment, archiveMoment, restoreMoment, deleteMomentForever,
   upsertMomentReaction, deleteMomentReaction, getMomentReactions, getUserMomentReaction,
   addMomentView, getDisciplinesCloud,
-  getOrCreateDirectConversation,
+  // Admin
+  getAdminStats, getAdminUsers, getAdminUserById,
+  adminResetPassword, adminBlockUser, adminUnblockUser,
+  adminMakeAdmin, adminRevokeAdmin,
+  getAdminMoments, adminDeleteMoment,
+  logAdminAction, getAdminLogs,
 };

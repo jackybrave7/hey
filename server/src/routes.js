@@ -7,6 +7,18 @@ const nodemailer = require('nodemailer');
 const { signToken, requireAuth, optionalAuth } = require('./auth');
 const db = require('./db/db');
 const { detectTags, detectMoodEmoji } = require('./auto-tags');
+const storage = require('./storage');
+
+// ── requireAdmin middleware ────────────────────────────────────────────────────
+function requireAdmin(req, res, next) {
+  requireAuth(req, res, () => {
+    const user = db.findUserById(req.user.id);
+    if (!user || !user.is_admin) return res.status(403).json({ error: 'Admin access required' });
+    if (user.is_blocked) return res.status(403).json({ error: 'Account is blocked' });
+    req.adminUser = user;
+    next();
+  });
+}
 
 const MOMENTS_DIR = path.join(__dirname, '../data/uploads/moments');
 fs.mkdirSync(MOMENTS_DIR, { recursive: true });
@@ -103,6 +115,18 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(safe);
   });
 
+  r.post('/me/password', requireAuth, (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) return res.status(400).json({ error: 'Заполните все поля' });
+    if (newPassword.length < 4) return res.status(400).json({ error: 'Пароль минимум 4 символа' });
+    const user = db.findUserById(req.user.id);
+    const bcrypt = require('bcryptjs');
+    if (!bcrypt.compareSync(oldPassword, user.password))
+      return res.status(403).json({ error: 'Неверный текущий пароль' });
+    db.updateUser(req.user.id, { password: bcrypt.hashSync(newPassword, 10) });
+    res.json({ ok: true });
+  });
+
   r.get('/contacts', requireAuth, (req, res) => {
     res.json(db.getContacts(req.user.id));
   });
@@ -159,20 +183,23 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ id: conv.id });
   });
 
-  r.post('/upload', requireAuth, (req, res) => {
-    const { data } = req.body;
-    if (!data) return res.status(400).json({ error: 'No data' });
-    const match = data.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/s);
-    if (!match) return res.status(400).json({ error: 'Invalid format' });
-    const [, mime, b64] = match;
-    if (!ALLOWED_MIME.includes(mime)) return res.status(400).json({ error: 'Unsupported type. Use JPEG, PNG, WebP or GIF' });
-    const buf = Buffer.from(b64, 'base64');
-    if (buf.length > MAX_BYTES) return res.status(400).json({ error: 'Image too large (max 3 MB after compression)' });
-    const ext = mime.split('/')[1].replace('jpeg', 'jpg').replace('+xml', '');
-    const filename = uuid() + '.' + ext;
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    fs.writeFileSync(path.join(UPLOAD_DIR, filename), buf);
-    res.json({ url: '/uploads/' + filename });
+  r.post('/upload', requireAuth, async (req, res) => {
+    try {
+      const { data } = req.body;
+      if (!data) return res.status(400).json({ error: 'No data' });
+      const match = data.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/s);
+      if (!match) return res.status(400).json({ error: 'Invalid format' });
+      const [, mime, b64] = match;
+      if (!ALLOWED_MIME.includes(mime)) return res.status(400).json({ error: 'Unsupported type. Use JPEG, PNG, WebP or GIF' });
+      const buf = Buffer.from(b64, 'base64');
+      if (buf.length > MAX_BYTES) return res.status(400).json({ error: 'Image too large (max 3 MB)' });
+      const baseKey = 'avatars/' + req.user.id;
+      const { fullUrl } = await storage.uploadImage(buf, baseKey);
+      res.json({ url: fullUrl });
+    } catch (e) {
+      console.error('[/upload]', e);
+      res.status(500).json({ error: 'Upload failed' });
+    }
   });
 
   r.get('/conversations/:id/messages', requireAuth, (req, res) => {
@@ -340,49 +367,53 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   // ── Moments Media Upload ──────────────────────────────────────────────────
-  r.post('/moments/upload', requireAuth, (req, res) => {
-    const { data } = req.body;
-    if (!data) return res.status(400).json({ error: 'No data' });
+  r.post('/moments/upload', requireAuth, async (req, res) => {
+    try {
+      const { data } = req.body;
+      if (!data) return res.status(400).json({ error: 'No data' });
 
-    // image
-    const imgMatch = data.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/s);
-    if (imgMatch) {
-      const [, mime, b64] = imgMatch;
-      const ALLOWED = ['image/jpeg','image/png','image/webp','image/gif'];
-      if (!ALLOWED.includes(mime)) return res.status(400).json({ error: 'Unsupported image type' });
-      const buf = Buffer.from(b64, 'base64');
-      if (buf.length > 5 * 1024 * 1024) return res.status(400).json({ error: 'Image too large (max 5 MB)' });
-      const ext = mime.split('/')[1].replace('jpeg','jpg').replace('+xml','');
-      const filename = uuid() + '.' + ext;
-      fs.writeFileSync(path.join(MOMENTS_DIR, filename), buf);
-      return res.json({ url: '/uploads/moments/' + filename, mediaType: 'image' });
+      // image
+      const imgMatch = data.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/s);
+      if (imgMatch) {
+        const [, mime, b64] = imgMatch;
+        const ALLOWED = ['image/jpeg','image/png','image/webp','image/gif'];
+        if (!ALLOWED.includes(mime)) return res.status(400).json({ error: 'Unsupported image type' });
+        const buf = Buffer.from(b64, 'base64');
+        if (buf.length > 5 * 1024 * 1024) return res.status(400).json({ error: 'Image too large (max 5 MB)' });
+        const baseKey = 'moments/' + uuid() + '/media';
+        const { fullKey, fullUrl, thumbKey, thumbUrl } = await storage.uploadImage(buf, baseKey);
+        return res.json({ url: fullUrl, key: fullKey, thumb_url: thumbUrl, thumb_key: thumbKey, mediaType: 'image' });
+      }
+
+      // video
+      const vidMatch = data.match(/^data:(video\/[a-zA-Z0-9]+);base64,(.+)$/s);
+      if (vidMatch) {
+        const [, mime, b64] = vidMatch;
+        const buf = Buffer.from(b64, 'base64');
+        if (buf.length > 20 * 1024 * 1024) return res.status(400).json({ error: 'Video too large (max 20 MB)' });
+        const ext = mime.split('/')[1];
+        const key = 'moments/' + uuid() + '/video.' + ext;
+        const { url } = await storage.uploadFile(key, buf, mime);
+        return res.json({ url, key, mediaType: 'video' });
+      }
+
+      // audio
+      const audMatch = data.match(/^data:(audio\/[a-zA-Z0-9]+);base64,(.+)$/s);
+      if (audMatch) {
+        const [, mime, b64] = audMatch;
+        const buf = Buffer.from(b64, 'base64');
+        if (buf.length > 10 * 1024 * 1024) return res.status(400).json({ error: 'Audio too large (max 10 MB)' });
+        const ext = mime.split('/')[1];
+        const key = 'moments/' + uuid() + '/audio.' + ext;
+        const { url } = await storage.uploadFile(key, buf, mime);
+        return res.json({ url, key, mediaType: 'audio' });
+      }
+
+      return res.status(400).json({ error: 'Unsupported media format' });
+    } catch (e) {
+      console.error('[/moments/upload]', e);
+      res.status(500).json({ error: 'Upload failed' });
     }
-
-    // video
-    const vidMatch = data.match(/^data:(video\/[a-zA-Z0-9]+);base64,(.+)$/s);
-    if (vidMatch) {
-      const [, mime, b64] = vidMatch;
-      const buf = Buffer.from(b64, 'base64');
-      if (buf.length > 20 * 1024 * 1024) return res.status(400).json({ error: 'Video too large (max 20 MB)' });
-      const ext = mime.split('/')[1];
-      const filename = uuid() + '.' + ext;
-      fs.writeFileSync(path.join(MOMENTS_DIR, filename), buf);
-      return res.json({ url: '/uploads/moments/' + filename, mediaType: 'video' });
-    }
-
-    // audio
-    const audMatch = data.match(/^data:(audio\/[a-zA-Z0-9]+);base64,(.+)$/s);
-    if (audMatch) {
-      const [, mime, b64] = audMatch;
-      const buf = Buffer.from(b64, 'base64');
-      if (buf.length > 10 * 1024 * 1024) return res.status(400).json({ error: 'Audio too large (max 10 MB)' });
-      const ext = mime.split('/')[1];
-      const filename = uuid() + '.' + ext;
-      fs.writeFileSync(path.join(MOMENTS_DIR, filename), buf);
-      return res.json({ url: '/uploads/moments/' + filename, mediaType: 'audio' });
-    }
-
-    return res.status(400).json({ error: 'Unsupported media format' });
   });
 
   // ── Moments CRUD ──────────────────────────────────────────────────────────
@@ -538,6 +569,84 @@ module.exports = function makeRouter(db, broadcast) {
   // ── Disciplines cloud ─────────────────────────────────────────────────────
   r.get('/moments/disciplines/:userId', requireAuth, (req, res) => {
     res.json(db.getDisciplinesCloud(req.params.userId));
+  });
+
+  // ── Admin Routes ─────────────────────────────────────────────────────────────
+
+  r.get('/admin/stats', requireAdmin, (req, res) => {
+    res.json(db.getAdminStats());
+  });
+
+  r.get('/admin/users', requireAdmin, (req, res) => {
+    const { search, filter } = req.query;
+    res.json(db.getAdminUsers({ search, filter }));
+  });
+
+  r.get('/admin/users/:id', requireAdmin, (req, res) => {
+    const user = db.getAdminUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    res.json(user);
+  });
+
+  r.post('/admin/users/:id/reset-password', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    // Generate a random 10-char password
+    const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
+    let newPassword = '';
+    for (let i = 0; i < 10; i++) newPassword += chars[Math.floor(Math.random() * chars.length)];
+    db.adminResetPassword(req.params.id, bcrypt.hashSync(newPassword, 10));
+    db.logAdminAction({ adminId: req.user.id, action: 'reset_password', targetUserId: req.params.id });
+    res.json({ ok: true, newPassword });
+  });
+
+  r.post('/admin/users/:id/block', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    if (user.id === req.user.id) return res.status(400).json({ error: 'Cannot block yourself' });
+    db.adminBlockUser(req.params.id, req.user.id, req.body.reason);
+    res.json({ ok: true });
+  });
+
+  r.post('/admin/users/:id/unblock', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    db.adminUnblockUser(req.params.id, req.user.id);
+    res.json({ ok: true });
+  });
+
+  r.post('/admin/users/:id/make-admin', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    db.adminMakeAdmin(req.params.id, req.user.id);
+    res.json({ ok: true });
+  });
+
+  r.post('/admin/users/:id/revoke-admin', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    if (user.id === req.user.id) return res.status(400).json({ error: 'Cannot revoke your own admin' });
+    db.adminRevokeAdmin(req.params.id, req.user.id);
+    res.json({ ok: true });
+  });
+
+  r.get('/admin/moments', requireAdmin, (req, res) => {
+    const { status, userId } = req.query;
+    res.json(db.getAdminMoments({ status, userId }));
+  });
+
+  r.delete('/admin/moments/:id', requireAdmin, (req, res) => {
+    const m = db.getMomentById(req.params.id);
+    if (!m) return res.status(404).json({ error: 'Not found' });
+    db.adminDeleteMoment(req.params.id, req.user.id, req.body?.reason);
+    broadcast(db.getContactOwners(m.user_id), { type: 'moment:deleted', momentId: req.params.id });
+    broadcast([m.user_id], { type: 'moment:deleted', momentId: req.params.id });
+    res.json({ ok: true });
+  });
+
+  r.get('/admin/logs', requireAdmin, (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    res.json(db.getAdminLogs(limit));
   });
 
   r.get('/health', (_, res) => res.json({ ok: true }));

@@ -28,8 +28,9 @@ export const api = {
   login:    (data) => req('POST', '/login', data),
 
   // Profile
-  getMe:    ()     => req('GET', '/me'),
-  updateMe: (data) => req('PATCH', '/me', data),
+  getMe:          ()     => req('GET', '/me'),
+  updateMe:       (data) => req('PATCH', '/me', data),
+  changePassword: (oldPassword, newPassword) => req('POST', '/me/password', { oldPassword, newPassword }),
 
   // Contacts
   getContacts:    ()       => req('GET', '/contacts'),
@@ -88,6 +89,25 @@ export const api = {
   viewMoment:       (id)         => req('POST',   `/moments/${id}/view`),
   getDisciplines:   (userId)     => req('GET',    `/moments/disciplines/${userId}`),
   uploadMomentMedia: (data)      => req('POST',   '/moments/upload', { data }),
+
+  // Admin
+  adminGetStats:           ()              => req('GET',    '/admin/stats'),
+  adminGetUsers:           (params = {})   => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v)).toString();
+    return req('GET', `/admin/users${qs ? '?' + qs : ''}`);
+  },
+  adminGetUser:            (id)            => req('GET',    `/admin/users/${id}`),
+  adminResetPassword:      (id)            => req('POST',   `/admin/users/${id}/reset-password`),
+  adminBlockUser:          (id, reason)    => req('POST',   `/admin/users/${id}/block`, { reason }),
+  adminUnblockUser:        (id)            => req('POST',   `/admin/users/${id}/unblock`),
+  adminMakeAdmin:          (id)            => req('POST',   `/admin/users/${id}/make-admin`),
+  adminRevokeAdmin:        (id)            => req('POST',   `/admin/users/${id}/revoke-admin`),
+  adminGetMoments:         (params = {})   => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v)).toString();
+    return req('GET', `/admin/moments${qs ? '?' + qs : ''}`);
+  },
+  adminDeleteMoment:       (id, reason)    => req('DELETE', `/admin/moments/${id}`, { reason }),
+  adminGetLogs:            (limit)         => req('GET',    `/admin/logs${limit ? '?limit=' + limit : ''}`),
 };
 
 // ── WebSocket ────────────────────────────────────────────────────────────────

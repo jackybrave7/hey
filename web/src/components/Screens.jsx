@@ -52,16 +52,18 @@ function DotsMenu({ items }) {
 function TopBar({ title, onBack, right, avatar, online }) {
   return (
     <div className="topbar">
-      {onBack && <button className="back-btn" onClick={onBack}>‹</button>}
-      {avatar && (
-        <div style={{width:36,height:36,borderRadius:'50%',background:'rgba(210,185,225,.55)',
-          display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>
-          {avatar}
-        </div>
-      )}
-      <span className="topbar-title">{title}</span>
-      {online && <div className="online-dot" />}
-      {right ?? <div className="topbar-dots">{[0,1,2].map(i=><div key={i} className="topbar-dot"/>)}</div>}
+      <div className="topbar-inner">
+        {onBack && <button className="back-btn" onClick={onBack}>‹</button>}
+        {avatar && (
+          <div style={{width:36,height:36,borderRadius:'50%',background:'rgba(210,185,225,.55)',
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>
+            {avatar}
+          </div>
+        )}
+        <span className="topbar-title">{title}</span>
+        {online && <div className="online-dot" />}
+        {right ?? <div className="topbar-dots">{[0,1,2].map(i=><div key={i} className="topbar-dot"/>)}</div>}
+      </div>
     </div>
   );
 }
@@ -194,22 +196,13 @@ function fmtDate(ts) {
 export function SplashScreen() {
   const nav = useNavigate();
   const { user, loading } = useAuth();
-  const [pct, setPct] = useState(0);
-  const done = pct >= 100;
 
   useEffect(() => {
-    if (done) return;
-    const delay = pct < 80 ? 18 : pct < 95 ? 30 : 50;
-    const t = setTimeout(() => setPct(p => p + 1), delay);
-    return () => clearTimeout(t);
-  }, [pct, done]);
+    if (loading) return;
+    nav(user ? '/main' : '/hey', { replace: true });
+  }, [loading, user, nav]);
 
-  useEffect(() => {
-    if (done && !loading) {
-      nav(user ? '/main' : '/hey', { replace: true });
-    }
-  }, [done, loading, user, nav]);
-
+  // While auth is resolving — show the logo blob without any percentage counter
   return (
     <div className="screen"
       style={{justifyContent:'center',alignItems:'center',position:'relative'}}>
@@ -220,7 +213,7 @@ export function SplashScreen() {
         display:'flex', alignItems:'center', justifyContent:'center',
         animation:'blob 4s ease-in-out infinite'
       }}>
-        <span style={{color:'white',fontSize:32,fontWeight:300,letterSpacing:1}}>{pct}%</span>
+        <span style={{color:'white',fontSize:36,fontWeight:700,letterSpacing:3,fontFamily:'Comfortaa,sans-serif'}}>HEY</span>
       </div>
       <style>{`@keyframes blob{0%,100%{border-radius:62% 52% 60% 48%/55% 62% 46% 60%}50%{border-radius:52% 66% 52% 58%/66% 50% 56% 48%}}`}</style>
     </div>
@@ -489,6 +482,31 @@ export function MyProfileScreen() {
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
 
+  // Password change state
+  const [showPwdModal,  setShowPwdModal]  = useState(false);
+  const [oldPwd,        setOldPwd]        = useState('');
+  const [newPwd,        setNewPwd]        = useState('');
+  const [newPwd2,       setNewPwd2]       = useState('');
+  const [pwdErr,        setPwdErr]        = useState('');
+  const [pwdSaving,     setPwdSaving]     = useState(false);
+
+  async function submitPasswordChange() {
+    setPwdErr('');
+    if (!oldPwd || !newPwd || !newPwd2) { setPwdErr('Заполните все поля'); return; }
+    if (newPwd !== newPwd2) { setPwdErr('Новые пароли не совпадают'); return; }
+    if (newPwd.length < 4) { setPwdErr('Пароль минимум 4 символа'); return; }
+    setPwdSaving(true);
+    try {
+      await api.changePassword(oldPwd, newPwd);
+      setShowPwdModal(false);
+      setOldPwd(''); setNewPwd(''); setNewPwd2('');
+      showProfileToast('✓ Пароль изменён');
+    } catch(e) {
+      setPwdErr(e.message || 'Ошибка');
+    }
+    setPwdSaving(false);
+  }
+
   // Moments state
   const [momentsTab,    setMomentsTab]   = useState('active');
   const [myMoments,     setMyMoments]    = useState([]);
@@ -674,6 +692,16 @@ export function MyProfileScreen() {
               color:'white',fontSize:14,fontWeight:500,
             }}>
             <span>⚙️ Настройки</span>
+            <span style={{opacity:.4}}>›</span>
+          </button>
+          <button onClick={() => { setShowPwdModal(true); setPwdErr(''); }}
+            style={{
+              display:'flex',alignItems:'center',justifyContent:'space-between',
+              padding:'13px 18px',borderRadius:14,cursor:'pointer',
+              background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',
+              color:'white',fontSize:14,fontWeight:500,
+            }}>
+            <span>🔑 Сменить пароль</span>
             <span style={{opacity:.4}}>›</span>
           </button>
           <button onClick={async () => {
@@ -899,6 +927,59 @@ export function MyProfileScreen() {
       )}
 
       {confirmModal}
+
+      {/* Password change modal */}
+      {showPwdModal && (
+        <div style={{position:'fixed',inset:0,zIndex:900,background:'rgba(0,0,0,.6)',
+          backdropFilter:'blur(10px)',display:'flex',alignItems:'center',
+          justifyContent:'center',padding:'20px'}}
+          onMouseDown={e=>{ if(e.target===e.currentTarget){ setShowPwdModal(false); }}}>
+          <div style={{background:'rgba(22,15,50,.98)',backdropFilter:'blur(24px)',
+            borderRadius:24,width:'min(100%,420px)',
+            boxShadow:'0 8px 48px rgba(0,0,0,.6)',border:'1px solid rgba(255,255,255,.1)',
+            overflow:'hidden'}}>
+            {/* Header */}
+            <div style={{display:'flex',alignItems:'center',padding:'16px 20px',
+              borderBottom:'1px solid rgba(255,255,255,.08)'}}>
+              <span style={{color:'white',fontSize:17,fontWeight:700,flex:1}}>🔑 Смена пароля</span>
+              <button onClick={()=>setShowPwdModal(false)} style={{background:'none',border:'none',
+                color:'rgba(255,255,255,.4)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
+            </div>
+            {/* Fields */}
+            <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
+              {[
+                { label:'Текущий пароль', value:oldPwd,  set:setOldPwd },
+                { label:'Новый пароль',   value:newPwd,  set:setNewPwd },
+                { label:'Повторите новый',value:newPwd2, set:setNewPwd2 },
+              ].map(f => (
+                <div key={f.label}>
+                  <div style={{color:'rgba(255,255,255,.5)',fontSize:12,marginBottom:5}}>{f.label}</div>
+                  <input type="password" value={f.value} onChange={e=>f.set(e.target.value)}
+                    className="ul-input" placeholder="••••••••"
+                    onKeyDown={e=>e.key==='Enter'&&submitPasswordChange()}/>
+                </div>
+              ))}
+              {pwdErr && (
+                <div style={{color:'rgba(255,140,140,.9)',fontSize:13,
+                  background:'rgba(200,50,50,.12)',borderRadius:10,padding:'8px 12px'}}>
+                  {pwdErr}
+                </div>
+              )}
+            </div>
+            {/* Footer */}
+            <div style={{padding:'4px 20px 20px'}}>
+              <button onClick={submitPasswordChange} disabled={pwdSaving}
+                style={{width:'100%',padding:'13px',borderRadius:50,fontSize:15,fontWeight:700,
+                  cursor:pwdSaving?'not-allowed':'pointer',border:'none',color:'white',
+                  background:pwdSaving?'rgba(255,255,255,.1)':'rgba(120,90,200,.85)',
+                  transition:'all .2s',boxShadow:pwdSaving?'none':'0 4px 20px rgba(120,80,200,.35)'}}>
+                {pwdSaving ? 'Сохраняем…' : 'Сменить пароль'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>{/* end 680 inner wrapper */}
     </div>
   );
@@ -925,7 +1006,7 @@ export function MainScreen() {
           color:'#7A6AAA',cursor:'pointer',marginRight:8}}>Я</div>
         <div className="topbar-dots">{[0,1,2].map(i=><div key={i} className="topbar-dot"/>)}</div>
       </div>
-      <div style={{padding:'28px 26px',display:'flex',flexDirection:'column'}}>
+      <div style={{maxWidth:680,margin:'0 auto',width:'100%',padding:'28px 26px',display:'flex',flexDirection:'column'}}>
         {items.map(item => (
           <div key={item.label}>
             <div onClick={() => nav(item.path)} style={{color:'white',fontSize:21,padding:'24px 0',
@@ -1735,14 +1816,16 @@ export function ConversationsScreen() {
               cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s'}}
             onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
             onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-            <div style={{width:52,height:52,
-              borderRadius: c.type==='group' ? '14px' : '50%',
-              background:'rgba(200,160,210,.35)',
-              display:'flex',alignItems:'center',justifyContent:'center',
-              fontSize: c.type==='group' ? 26 : 20,color:'white',
-              fontWeight:600,flexShrink:0}}>
-              {c.type==='group' ? (c.icon||'👥') : (c.name||'?')[0].toUpperCase()}
-            </div>
+            {c.type === 'group' ? (
+              <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
+                background:'rgba(200,160,210,.35)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:26}}>
+                {c.icon || '👥'}
+              </div>
+            ) : (
+              <AvatarDisplay avatar={c.avatar} name={c.name} size={52}/>
+            )}
             <div style={{flex:1,minWidth:0}}>
               <div style={{color:'white',fontSize:15,fontWeight:600}}>{c.name||'Диалог'}</div>
               <div style={{color:'rgba(255,255,255,.45)',fontSize:13,
@@ -1956,7 +2039,7 @@ export function GroupCreateScreen() {
   return (
     <div className="screen">
       <TopBar title="Новая группа" onBack={() => nav(-1)}/>
-      <div style={{padding:'20px 24px',display:'flex',flexDirection:'column',gap:20}}>
+      <div style={{maxWidth:680,margin:'0 auto',width:'100%',padding:'20px 24px',display:'flex',flexDirection:'column',gap:20}}>
         {/* Icon picker */}
         <div>
           <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:10}}>Иконка группы</div>
@@ -2074,7 +2157,7 @@ export function GroupSettingsScreen() {
   return (
     <div className="screen">
       <TopBar title="Настройки группы" onBack={() => nav(-1)}/>
-      <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
+      <div style={{flex:1,overflowY:'auto',maxWidth:680,margin:'0 auto',width:'100%',padding:'20px 24px'}}>
         {/* Group header */}
         <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:24}}>
           <div style={{width:64,height:64,borderRadius:20,background:'rgba(140,100,200,.5)',
@@ -2176,7 +2259,7 @@ export function ChatScreen() {
   const [text,        setText]        = useState('');
   const [showEmoji,   setShowEmoji]   = useState(false);
   const [typing,      setTyping]      = useState(null);
-  const [partner,     setPartner]     = useState({ name:'Диалог', online:false, id:null, isGroup:false, icon:null, admin_id:null });
+  const [partner,     setPartner]     = useState({ name:'Диалог', online:false, id:null, isGroup:false, icon:null, admin_id:null, avatar:null });
   const [editingMsg,  setEditingMsg]  = useState(null);
   const [msgMenu,     setMsgMenu]     = useState(null);
   const [imgPreview,  setImgPreview]  = useState(null);
@@ -2253,7 +2336,7 @@ export function ChatScreen() {
           isGroup:true, icon:c.icon||'👥', admin_id:c.admin_id });
       } else {
         setPartner(p => ({ ...p, name: c.name||'Диалог', id: c.partner_id||null,
-          isGroup:false }));
+          isGroup:false, avatar: c.avatar||null }));
       }
     }).catch(console.error);
   }, [convId]);
@@ -2551,31 +2634,38 @@ export function ChatScreen() {
     <div className="screen" style={{height:'100dvh',overflow:'hidden'}}>
       {/* TopBar */}
       <div className="topbar">
-        <button className="back-btn" onClick={() => nav(-1)}>‹</button>
-        <div style={{width:36,height:36,borderRadius: partner.isGroup?'12px':'50%',
-          background:'rgba(140,100,200,.5)',display:'flex',alignItems:'center',
-          justifyContent:'center',fontSize:20,flexShrink:0}}>
-          {partner.isGroup ? (partner.icon||'👥') : '👤'}
+        <div className="topbar-inner">
+          <button className="back-btn" onClick={() => nav(-1)}>‹</button>
+          {partner.isGroup ? (
+            <div style={{width:36,height:36,borderRadius:'12px',flexShrink:0,
+              background:'rgba(140,100,200,.5)',display:'flex',alignItems:'center',
+              justifyContent:'center',fontSize:20}}>
+              {partner.icon||'👥'}
+            </div>
+          ) : (
+            <AvatarDisplay avatar={partner.avatar} name={partner.name} size={36}/>
+          )}
+          <div style={{flex:1,marginLeft:8,minWidth:0}}>
+            <div className="topbar-title" style={{flex:'unset'}}>{partner.name}</div>
+            {partner.isGroup && <div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>группа</div>}
+          </div>
+          {partner.online && <div className="online-dot"/>}
+          <DotsMenu items={chatMenuItems}/>
         </div>
-        <div style={{flex:1,marginLeft:8,minWidth:0}}>
-          <div className="topbar-title" style={{flex:'unset'}}>{partner.name}</div>
-          {partner.isGroup && <div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>группа</div>}
-        </div>
-        {partner.online && <div className="online-dot"/>}
-        <DotsMenu items={chatMenuItems}/>
       </div>
 
       {/* Search bar */}
       {searchMode && (
-        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 14px',
-          background:'rgba(60,45,90,.8)',flexShrink:0}}>
-          <input ref={searchRef} value={searchQuery}
-            onChange={e=>handleSearch(e.target.value)}
-            placeholder="Поиск в переписке…"
-            style={{flex:1,background:'rgba(255,255,255,.15)',border:'none',outline:'none',
-              borderRadius:20,padding:'8px 14px',color:'white',fontSize:14,fontFamily:'inherit'}}/>
-          <button onClick={closeSearch}
-            style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',fontSize:20,cursor:'pointer'}}>✕</button>
+        <div style={{background:'rgba(60,45,90,.8)',flexShrink:0}}>
+          <div style={{maxWidth:680,margin:'0 auto',display:'flex',alignItems:'center',gap:8,padding:'8px 14px'}}>
+            <input ref={searchRef} value={searchQuery}
+              onChange={e=>handleSearch(e.target.value)}
+              placeholder="Поиск в переписке…"
+              style={{flex:1,background:'rgba(255,255,255,.15)',border:'none',outline:'none',
+                borderRadius:20,padding:'8px 14px',color:'white',fontSize:14,fontFamily:'inherit'}}/>
+            <button onClick={closeSearch}
+              style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',fontSize:20,cursor:'pointer'}}>✕</button>
+          </div>
         </div>
       )}
 
@@ -2603,8 +2693,8 @@ export function ChatScreen() {
       {/* Messages */}
       <div ref={scrollRef}
         onScroll={e => { if (e.target.scrollTop < 120 && hasMore && !loadingMore) loadOlder(); }}
-        style={{flex:1,overflowY:'auto',padding:'14px 16px 8px',flexDirection:'column',gap:8,
-          display: searchMode && searchResults !== null ? 'none' : 'flex'}}>
+        style={{flex:1,overflowY:'auto',display: searchMode && searchResults !== null ? 'none' : 'block'}}>
+      <div style={{maxWidth:680,margin:'0 auto',padding:'14px 16px 8px',display:'flex',flexDirection:'column',gap:8}}>
         {loadingMore && (
           <div style={{textAlign:'center',padding:'6px 0',color:'rgba(255,255,255,.4)',fontSize:13,flexShrink:0}}>
             Загрузка…
@@ -2747,7 +2837,8 @@ export function ChatScreen() {
           </div>
         )}
         <div ref={bottomRef}/>
-      </div>
+      </div>{/* end maxWidth inner */}
+      </div>{/* end scroll area */}
 
       {/* Image preview bar */}
       {imgPreview && (
@@ -2800,7 +2891,8 @@ export function ChatScreen() {
       )}
 
       {/* Input bar */}
-      <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 14px 14px',flexShrink:0}}>
+      <div style={{flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
         <div style={{
           flex:1, borderRadius:26,
           display:'flex', alignItems:'center', padding:'10px 14px', gap:8,
@@ -2843,7 +2935,8 @@ export function ChatScreen() {
           onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.75)'}>
           ➤
         </button>
-      </div>
+      </div>{/* end maxWidth input wrapper */}
+      </div>{/* end input bar outer */}
 
       {/* Reaction emoji picker */}
       {reactionPicker && (() => {
@@ -2965,7 +3058,7 @@ export function CallsScreen() {
   return (
     <div className="screen">
       <TopBar title="История звонков" onBack={() => nav(-1)}/>
-      <div style={{flex:1,overflowY:'auto',padding:'0 18px'}}>
+      <div style={{flex:1,overflowY:'auto',maxWidth:680,margin:'0 auto',width:'100%',padding:'0 18px'}}>
         {calls.length === 0 && (
           <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:60,fontSize:15}}>
             История звонков пуста
@@ -3049,6 +3142,7 @@ export function CallDetailScreen() {
   return (
     <div className="screen">
       <TopBar title="Детали звонка" onBack={() => nav(-1)}/>
+      <div style={{maxWidth:680,margin:'0 auto',width:'100%',flex:1,display:'flex',flexDirection:'column'}}>
       <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'36px 0 24px'}}>
         <div style={{width:80,height:80,borderRadius:'50%',background:'rgba(200,160,210,.45)',
           display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,marginBottom:14}}>
@@ -3071,6 +3165,7 @@ export function CallDetailScreen() {
           Написать сообщение
         </button>
       </div>
+      </div>{/* /maxWidth wrapper */}
     </div>
   );
 }
@@ -3405,7 +3500,7 @@ export function SettingsScreen() {
   return (
     <div className="screen">
       <TopBar title="Настройки" onBack={() => nav(-1)}/>
-      <div style={{padding:'8px 26px',display:'flex',flexDirection:'column'}}>
+      <div style={{maxWidth:680,margin:'0 auto',width:'100%',padding:'8px 26px',display:'flex',flexDirection:'column'}}>
         {sections.map(s => (
           <div key={s.id}>
             <div onClick={() => toggle(s.id)}
