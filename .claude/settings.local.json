@@ -66,7 +66,22 @@
       "Read(//c/Users/User/.ssh/**)",
       "Bash(ssh-keygen -t ed25519 -f /c/Users/User/.ssh/id_ed25519 -N \"\" -C \"hey-tunnel\")",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git config *)",
+      "Bash(git rm *)",
+      "Bash(git commit *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(scp -i /c/Users/User/.ssh/id_ed25519 -o StrictHostKeyChecking=no -r /c/projects/hey/server/data/uploads/ root@72.56.16.44:/app/server/data/)",
+      "Bash(NODE_ENV=production node /c/projects/hey/server/src/index.js)",
+      "Bash(pkill -f \"node.*server/src/index.js\")",
+      "Bash(node --check C:\\\\projects\\\\hey\\\\server\\\\src\\\\db\\\\db.js)",
+      "Bash(node --check C:\\\\projects\\\\hey\\\\server\\\\src\\\\routes.js)",
+      "Bash(node --check server/src/db/db.js)",
+      "Bash(node --check server/src/routes.js)",
+      "Bash(node --check server/scripts/make-first-admin.js)",
+      "Bash(node -e \"const db = require\\('./server/src/db/db'\\); console.log\\('DB loaded OK'\\); console.log\\('Admin functions:', Object.keys\\(db\\).filter\\(k => k.startsWith\\('admin'\\) || k.startsWith\\('getAdmin'\\) || k.startsWith\\('logAdmin'\\)\\)\\); process.exit\\(0\\);\")"
     ]
   }
 }

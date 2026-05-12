@@ -53,6 +53,7 @@ async function uploadFile(key, buffer, contentType) {
       Key:         key,
       Body:        buffer,
       ContentType: contentType,
+      ACL:         'public-read',
     }));
     // For a private bucket presigned URLs are used at read time.
     // Store the key — URL generated via getReadUrl().
