@@ -35,6 +35,7 @@ export const api = {
   register: (data) => req('POST', '/register', data),
   login:    (data) => req('POST', '/login', data),
   getUserInviteInfo: (id) => req('GET', `/users/${id}/invite-info`),
+  getUserProfile:   (id) => req('GET', `/users/${id}/profile`),
 
   // Profile
   getMe:          ()     => req('GET', '/me'),
@@ -85,7 +86,7 @@ export const api = {
   sendFeedback: (data) => req('POST', '/feedback', data),
 
   // Moments
-  getMomentFeed:    ()           => req('GET',    '/moments'),
+  getMomentFeed:    (before)      => req('GET',    `/moments${before ? '?before=' + before : ''}`),
   getMyMoments:     (status)     => req('GET',    `/moments/my${status ? `?status=${status}` : ''}`),
   getMoment:        (id)         => req('GET',    `/moments/${id}`),
   createMoment:     (data)       => req('POST',   '/moments', data),

@@ -12,6 +12,8 @@ export default function MomentsFeed({ currentUser }) {
   const [feed, setFeed]           = useState([]);
   const [myMoment, setMyMoment]   = useState(null);    // active own moment
   const [loading, setLoading]     = useState(true);
+  const [hasMore, setHasMore]     = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // UI state
   const [selected, setSelected]     = useState(null);  // moment for detail popup
@@ -35,11 +37,28 @@ export default function MomentsFeed({ currentUser }) {
         api.getMomentFeed(),
         api.getMyMoments('active'),
       ]);
-      setFeed(feedData);
+      setFeed(feedData.items);
+      setHasMore(feedData.hasMore);
       setMyMoment(myData[0] || null);
     } catch {}
     setLoading(false);
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || feed.length === 0) return;
+    setLoadingMore(true);
+    try {
+      const oldest = feed[feed.length - 1]?.created_at;
+      const data = await api.getMomentFeed(oldest);
+      setFeed(prev => {
+        const ids = new Set(prev.map(m => m.id));
+        const fresh = data.items.filter(m => !ids.has(m.id));
+        return [...prev, ...fresh];
+      });
+      setHasMore(data.hasMore);
+    } catch {}
+    setLoadingMore(false);
+  }, [feed, hasMore, loadingMore]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
@@ -244,6 +263,23 @@ export default function MomentsFeed({ currentUser }) {
               onClick={() => setSelected(m)}
             />
           ))
+        )}
+
+        {/* Load more */}
+        {hasMore && (
+          <div style={{gridColumn:'span 2', textAlign:'center', paddingTop:8}}>
+            <button onClick={loadMore} disabled={loadingMore}
+              style={{
+                padding:'10px 28px', borderRadius:50, fontSize:13, fontWeight:600,
+                background: loadingMore ? 'rgba(255,255,255,.06)' : 'rgba(120,90,200,.75)',
+                border:'1px solid rgba(180,140,220,.3)', color:'white', cursor:'pointer',
+                transition:'all .18s',
+              }}
+              onMouseEnter={e => { if (!loadingMore) e.currentTarget.style.background='rgba(140,110,220,.9)'; }}
+              onMouseLeave={e => { if (!loadingMore) e.currentTarget.style.background='rgba(120,90,200,.75)'; }}>
+              {loadingMore ? 'Загрузка…' : 'Показать ещё'}
+            </button>
+          </div>
         )}
 
         </div>{/* end grid */}

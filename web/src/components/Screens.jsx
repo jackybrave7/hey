@@ -231,23 +231,64 @@ export function SplashScreen() {
 export function HeyScreen() {
   const nav = useNavigate();
   return (
-    <div className="screen" style={{justifyContent:'center',alignItems:'center',position:'relative'}}>
-      <div onClick={() => nav('/login')} style={{
-        width:240, height:240, borderRadius:'50%',
-        border:'3px solid rgba(255,255,255,.82)',
-        background:'rgba(165,148,195,.38)',
+    <div className="screen" style={{
+      justifyContent:'center', alignItems:'center',
+      padding:'40px 24px', flexDirection:'column', gap:0
+    }}>
+      <style>{`
+        @keyframes heyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes heyFadeIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+      `}</style>
+
+      {/* Logo blob */}
+      <div style={{
+        width:180, height:180,
+        background:'radial-gradient(ellipse at 40% 38%, #c8a8ff 0%, #a888d0 45%, #8060b0)',
+        borderRadius:'62% 52% 60% 48% / 55% 62% 46% 60%',
         display:'flex', alignItems:'center', justifyContent:'center',
-        cursor:'pointer', transition:'transform .2s'
-      }}
-        onMouseEnter={e=>e.currentTarget.style.transform='scale(1.04)'}
-        onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-        <span style={{fontSize:46,fontWeight:300,color:'rgba(75,62,120,.85)',letterSpacing:5}}>HEY</span>
+        marginBottom:32,
+        animation:'heyFloat 4s ease-in-out infinite',
+        boxShadow:'0 20px 60px rgba(120,80,180,.4)'
+      }}>
+        <span style={{
+          color:'white', fontSize:42, fontWeight:700, letterSpacing:3,
+          fontFamily:'Comfortaa,sans-serif',
+          textShadow:'0 2px 12px rgba(0,0,0,.2)'
+        }}>HEY</span>
       </div>
-      <span onClick={() => nav('/login')} style={{
-        position:'absolute', bottom:52, color:'rgba(255,255,255,.5)',
-        fontSize:28, cursor:'pointer', animation:'bounce 2s infinite'
-      }}>⌄</span>
-      <style>{`@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}`}</style>
+
+      {/* Tagline */}
+      <div style={{
+        fontSize:22, fontWeight:700, color:'white', textAlign:'center',
+        marginBottom:10, animation:'heyFadeIn .6s ease-out .2s both'
+      }}>Мессенджер для тех, кто творит</div>
+      <div style={{
+        fontSize:14, color:'rgba(255,255,255,.62)', textAlign:'center',
+        marginBottom:44, lineHeight:1.6,
+        animation:'heyFadeIn .6s ease-out .35s both'
+      }}>
+        Моменты · Чаты · Контакты без лишнего шума
+      </div>
+
+      {/* CTA buttons */}
+      <div style={{
+        display:'flex', flexDirection:'column', gap:12, width:'100%', maxWidth:320,
+        animation:'heyFadeIn .6s ease-out .5s both'
+      }}>
+        <button onClick={() => nav('/login')} className="auth-btn-primary">
+          Войти
+        </button>
+        <button onClick={() => nav('/register')} style={{
+          background:'rgba(255,255,255,.12)', border:'1px solid rgba(255,255,255,.25)',
+          borderRadius:26, padding:15, color:'white', fontSize:15, fontWeight:600,
+          cursor:'pointer', fontFamily:'inherit', transition:'background .15s'
+        }}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.2)'}
+          onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.12)'}
+        >
+          Создать аккаунт
+        </button>
+      </div>
     </div>
   );
 }
@@ -708,11 +749,14 @@ export function MyProfileScreen() {
   const [pwdErr,        setPwdErr]        = useState('');
   const [pwdSaving,     setPwdSaving]     = useState(false);
 
+  // Invite link
+  const [inviteCopied, setInviteCopied] = useState(false);
+
   async function submitPasswordChange() {
     setPwdErr('');
     if (!oldPwd || !newPwd || !newPwd2) { setPwdErr('Заполните все поля'); return; }
     if (newPwd !== newPwd2) { setPwdErr('Новые пароли не совпадают'); return; }
-    if (newPwd.length < 4) { setPwdErr('Пароль минимум 4 символа'); return; }
+    if (newPwd.length < 8) { setPwdErr('Пароль минимум 8 символов'); return; }
     setPwdSaving(true);
     try {
       await api.changePassword(oldPwd, newPwd);
@@ -902,6 +946,34 @@ export function MyProfileScreen() {
       {/* Shortcuts */}
       {!editing && (
         <div style={{padding:'24px 26px 0',display:'flex',flexDirection:'column',gap:10}}>
+          {/* Invite link block */}
+          <div style={{
+            background:'rgba(120,90,200,.12)', border:'1px solid rgba(180,140,220,.25)',
+            borderRadius:14, padding:'14px 18px', display:'flex', alignItems:'center', gap:12,
+          }}>
+            <span style={{fontSize:22}}>🔗</span>
+            <div style={{flex:1}}>
+              <div style={{color:'white',fontSize:14,fontWeight:600}}>Пригласить в HEY</div>
+              <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginTop:2}}>
+                Друг зарегистрируется и увидит тебя в контактах
+              </div>
+            </div>
+            <button onClick={() => {
+              const link = `${location.origin}/register?invite=${user?.id}`;
+              navigator.clipboard.writeText(link).then(() => {
+                setInviteCopied(true);
+                setTimeout(() => setInviteCopied(false), 2500);
+              });
+            }} style={{
+              flexShrink:0, padding:'7px 14px', borderRadius:50, fontSize:12, fontWeight:700,
+              background: inviteCopied ? 'rgba(46,204,113,.35)' : 'rgba(120,90,200,.7)',
+              border: inviteCopied ? '1px solid rgba(46,204,113,.5)' : '1px solid rgba(180,140,220,.4)',
+              color:'white', cursor:'pointer', transition:'all .18s',
+            }}>
+              {inviteCopied ? '✓ Скопировано' : 'Скопировать'}
+            </button>
+          </div>
+
           <button onClick={() => nav('/settings')}
             style={{
               display:'flex',alignItems:'center',justifyContent:'space-between',
@@ -3767,6 +3839,210 @@ export function SettingsScreen() {
       {showBlacklist && <BlacklistModal onClose={() => setShowBlacklist(false)} />}
       {showFeedback  && <FeedbackModal  onClose={() => setShowFeedback(false)}  />}
       {confirmModal}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PublicProfileScreen — /profile/:id
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function PublicProfileScreen() {
+  const { id } = useParams();
+  const nav = useNavigate();
+  const { user: me } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
+
+  useEffect(() => {
+    api.getUserProfile(id)
+      .then(p => { setProfile(p); setAdded(p.is_contact); })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  async function handleAddContact() {
+    if (!profile) return;
+    setAdding(true);
+    try {
+      await api.addContact({ userId: profile.id });
+      setAdded(true);
+    } catch {}
+    setAdding(false);
+  }
+
+  async function openChat() {
+    try {
+      const { id: convId } = await api.openConversation(profile.id);
+      nav(`/chat/${convId}`);
+    } catch {}
+  }
+
+  if (loading) return (
+    <div style={{minHeight:'100vh',background:'var(--grad)',display:'flex',
+      alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,.4)',fontSize:14}}>
+      Загрузка…
+    </div>
+  );
+
+  if (notFound) return (
+    <div style={{minHeight:'100vh',background:'var(--grad)',display:'flex',flexDirection:'column',
+      alignItems:'center',justifyContent:'center',gap:16}}>
+      <div style={{fontSize:48}}>🤷</div>
+      <div style={{color:'white',fontSize:18,fontWeight:700}}>Профиль не найден</div>
+      <button onClick={() => nav(-1)}
+        style={{padding:'10px 24px',borderRadius:50,background:'rgba(255,255,255,.12)',
+          border:'1px solid rgba(255,255,255,.2)',color:'white',fontSize:14,cursor:'pointer'}}>
+        Назад
+      </button>
+    </div>
+  );
+
+  const isOnline = profile?.presence?.online;
+  const lastSeen = profile?.presence?.last_seen;
+  const isMe = profile?.id === me?.id;
+
+  function fmtLastSeen(ts) {
+    if (!ts) return '';
+    const diff = Math.floor((Date.now() - ts * 1000) / 60000);
+    if (diff < 1)  return 'только что';
+    if (diff < 60) return `${diff} мин. назад`;
+    const h = Math.floor(diff / 60);
+    if (h < 24) return `${h} ч. назад`;
+    return new Date(ts * 1000).toLocaleDateString('ru', { day:'numeric', month:'short' });
+  }
+
+  const moment = profile?.active_moment;
+
+  return (
+    <div style={{minHeight:'100vh',background:'var(--grad)',paddingBottom:60}}>
+      {/* Header */}
+      <div style={{
+        position:'sticky',top:0,zIndex:10,
+        background:'var(--topbar)',backdropFilter:'blur(20px)',
+        borderBottom:'1px solid rgba(255,255,255,.06)',
+      }}>
+        <div style={{maxWidth:680,margin:'0 auto',padding:'14px 20px',
+          display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={() => nav(-1)} style={{
+            background:'none',border:'none',color:'white',fontSize:24,
+            cursor:'pointer',lineHeight:1,padding:'0 6px',opacity:.7}}>‹</button>
+          <div style={{color:'white',fontSize:18,fontWeight:700,flex:1}}>{profile?.name}</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <div style={{width:8,height:8,borderRadius:'50%',
+              background: isOnline ? '#4ade80' : 'rgba(255,255,255,.25)'}}/>
+            <div style={{color:'rgba(255,255,255,.45)',fontSize:12}}>
+              {isOnline ? 'онлайн' : lastSeen ? fmtLastSeen(lastSeen) : 'не в сети'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{maxWidth:680,margin:'0 auto',padding:'28px 24px 0'}}>
+
+        {/* Avatar + name */}
+        <div style={{display:'flex',gap:20,alignItems:'center',marginBottom:28}}>
+          <div style={{
+            width:84,height:84,borderRadius:'50%',flexShrink:0,
+            background:'rgba(180,140,220,.35)',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            fontSize:36,overflow:'hidden',
+            boxShadow:'0 4px 20px rgba(120,80,200,.3)',
+          }}>
+            {profile?.avatar
+              ? <img src={profile.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              : (profile?.name?.[0] || '?')}
+          </div>
+          <div>
+            <div style={{color:'white',fontSize:22,fontWeight:800,letterSpacing:-.3}}>{profile?.name}</div>
+            {profile?.created_at && (
+              <div style={{color:'rgba(255,255,255,.35)',fontSize:12,marginTop:4}}>
+                В HEY с {new Date(profile.created_at * 1000).toLocaleDateString('ru',{month:'long',year:'numeric'})}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        {!isMe && (
+          <div style={{display:'flex',gap:10,marginBottom:28}}>
+            <button onClick={openChat} style={{
+              flex:1,padding:'12px',borderRadius:14,fontSize:14,fontWeight:700,cursor:'pointer',
+              background:'rgba(120,90,200,.8)',border:'1px solid rgba(180,140,220,.4)',
+              color:'white',transition:'all .18s',
+            }}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(140,110,220,.9)'}
+              onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.8)'}>
+              💬 Написать
+            </button>
+            {!added && (
+              <button onClick={handleAddContact} disabled={adding} style={{
+                flex:1,padding:'12px',borderRadius:14,fontSize:14,fontWeight:600,cursor:'pointer',
+                background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.15)',
+                color:'white',transition:'all .18s',
+                opacity: adding ? .6 : 1,
+              }}>
+                {adding ? '…' : '➕ Добавить'}
+              </button>
+            )}
+            {added && (
+              <div style={{
+                flex:1,padding:'12px',borderRadius:14,fontSize:14,fontWeight:600,
+                background:'rgba(46,204,113,.15)',border:'1px solid rgba(46,204,113,.35)',
+                color:'rgba(180,255,200,.8)',textAlign:'center',
+              }}>✓ В контактах</div>
+            )}
+          </div>
+        )}
+
+        {/* Active moment */}
+        {moment ? (
+          <div style={{marginBottom:24}}>
+            <div style={{color:'rgba(255,255,255,.4)',fontSize:11,textTransform:'uppercase',
+              letterSpacing:.8,marginBottom:12}}>Активный момент</div>
+            <div style={{
+              background:'rgba(255,255,255,.06)',borderRadius:16,
+              border:'1px solid rgba(255,255,255,.1)',overflow:'hidden',
+            }}>
+              {moment.media_url && moment.media_type === 'image' && (
+                <img src={moment.media_url} alt=""
+                  style={{width:'100%',maxHeight:200,objectFit:'cover',display:'block'}}/>
+              )}
+              <div style={{padding:'14px 16px'}}>
+                {moment.mood_emoji && (
+                  <span style={{fontSize:20,marginRight:8}}>{moment.mood_emoji}</span>
+                )}
+                <span style={{color:'rgba(255,255,255,.85)',fontSize:14,lineHeight:1.6}}>
+                  {moment.text}
+                </span>
+                {moment.auto_tags?.length > 0 && (
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
+                    {moment.auto_tags.map(tag => (
+                      <span key={tag} style={{
+                        border:'1px dashed rgba(255,255,255,.2)',borderRadius:20,
+                        padding:'2px 10px',fontSize:11,color:'rgba(255,255,255,.45)'}}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            background:'rgba(255,255,255,.04)',borderRadius:16,
+            padding:'24px',textAlign:'center',
+            border:'2px dashed rgba(255,255,255,.1)',
+            color:'rgba(255,255,255,.3)',fontSize:13,
+          }}>
+            Нет активного момента
+          </div>
+        )}
+      </div>
     </div>
   );
 }

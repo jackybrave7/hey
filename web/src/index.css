@@ -2,6 +2,11 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 button, input, textarea, select { font-family: inherit; }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 :root {
   --grad: linear-gradient(180deg, #5C4F94 0%, #D0A8A8 66%, #5C4F94 100%);
   --topbar: rgba(74, 63, 130, 0.72);

@@ -106,6 +106,18 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ id: user.id, name: user.name, avatar_url: user.avatar || null });
   });
 
+  // Public profile endpoint (auth required)
+  r.get('/users/:id/profile', requireAuth, (req, res) => {
+    const target = db.findUserById(req.params.id);
+    if (!target || target.is_blocked) return res.status(404).json({ error: 'Not found' });
+    const activeMoment = db.getActiveMoment(target.id);
+    const presence     = db.getPresence(target.id);
+    const contacts     = db.getContacts(req.user.id);
+    const isContact    = contacts.some(c => c.id === target.id);
+    const { password, phone, must_change_password, ...safe } = target;
+    res.json({ ...safe, active_moment: activeMoment || null, presence, is_contact: isContact });
+  });
+
   r.get('/me', requireAuth, (req, res) => {
     const user = db.findUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
@@ -145,12 +157,18 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   r.post('/contacts', requireAuth, (req, res) => {
-    const { phone: rawPhone, nickname } = req.body;
-    const digits = (rawPhone || '').replace(/\D/g, '');
-    const phone = '+' + (digits.startsWith('8') ? '7' + digits.slice(1) : digits);
-    const target = db.findUserByPhone(phone);
+    const { phone: rawPhone, nickname, userId } = req.body;
+    let target;
+    if (userId) {
+      target = db.findUserById(userId);
+    } else {
+      const digits = (rawPhone || '').replace(/\D/g, '');
+      const phone = '+' + (digits.startsWith('8') ? '7' + digits.slice(1) : digits);
+      target = db.findUserByPhone(phone);
+    }
     if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
     if (target.id === req.user.id) return res.status(400).json({ error: 'Нельзя добавить себя' });
+    if (target.is_blocked) return res.status(404).json({ error: 'Пользователь не найден' });
     try { db.addContact(req.user.id, target.id, nickname); }
     catch(e) { return res.status(409).json({ error: e.message }); }
     const { password, ...safe } = target;
@@ -431,9 +449,11 @@ module.exports = function makeRouter(db, broadcast) {
 
   // ── Moments CRUD ──────────────────────────────────────────────────────────
 
-  // Лента моментов от контактов
+  // Лента моментов от контактов (с пагинацией)
   r.get('/moments', requireAuth, (req, res) => {
-    res.json(db.getMomentFeed(req.user.id));
+    const limit  = Math.min(parseInt(req.query.limit) || 20, 50);
+    const before = req.query.before ? parseInt(req.query.before) : null;
+    res.json(db.getMomentFeed(req.user.id, limit, before));
   });
 
   // Мои моменты

@@ -604,20 +604,25 @@ function getBlockedByIds(userId) {
   return [...new Set([...blocked, ...blockedBy])];
 }
 
-function getMomentFeed(userId) {
+function getMomentFeed(userId, limit = 20, before = null) {
   const contactIds = getContactIds(userId);
-  if (!contactIds.length) return [];
+  if (!contactIds.length) return { items: [], hasMore: false };
   const blockedIds = getBlockedByIds(userId);
   const visible = contactIds.filter(id => !blockedIds.includes(id));
-  if (!visible.length) return [];
+  if (!visible.length) return { items: [], hasMore: false };
   const ph = visible.map(() => '?').join(',');
+  const beforeCond = before ? `AND m.created_at < ?` : '';
+  const args = before ? [...visible, before] : visible;
   const rows = db.prepare(
     `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar
      FROM moments m JOIN users u ON u.id=m.user_id
-     WHERE m.user_id IN (${ph}) AND m.status='active' AND u.is_blocked=0
-     ORDER BY m.created_at DESC`
-  ).all(...visible);
-  return rows.map(r => _withStats(_parseMoment(r)));
+     WHERE m.user_id IN (${ph}) AND m.status='active' AND u.is_blocked=0 ${beforeCond}
+     ORDER BY m.created_at DESC
+     LIMIT ?`
+  ).all(...args, limit + 1);
+  const hasMore = rows.length > limit;
+  const items = rows.slice(0, limit).map(r => _withStats(_parseMoment(r)));
+  return { items, hasMore };
 }
 
 function getMyMoments(userId, status = 'active') {

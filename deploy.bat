@@ -29,8 +29,12 @@ if errorlevel 1 (
 
 echo.
 echo [3/4] Update server...
-ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git pull && npm install --silent && npm run build 2>&1 | tail -5"
-if errorlevel 1 ( echo ERROR: server update failed & pause & exit /b 1 )
+ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git -c http.sslVerify=false pull && npm install --silent && npm run build 2>&1 | tail -5"
+if errorlevel 1 (
+    echo Retrying...
+    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git -c http.sslVerify=false pull && npm install --silent && npm run build 2>&1 | tail -5"
+    if errorlevel 1 ( echo ERROR: server update failed & pause & exit /b 1 )
+)
 echo OK
 
 echo.

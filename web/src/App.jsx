@@ -9,7 +9,7 @@ import {
   MyProfileScreen, ContactsScreen, ConversationsScreen,
   ChatScreen, CallsScreen, CallDetailScreen, SettingsScreen,
   GroupCreateScreen, GroupSettingsScreen,
-  ForcePasswordModal,
+  ForcePasswordModal, PublicProfileScreen,
 } from './components/Screens';
 import MomentsFeed from './components/moments/MomentsFeed';
 import BottomNav from './components/BottomNav';
@@ -110,6 +110,7 @@ function MomentsScreen() {
 function GlobalHandlers() {
   const { logout, user } = useAuth();
   const [showMustChangePwd, setShowMustChangePwd] = useState(false);
+  const [blockedOverlay, setBlockedOverlay] = useState(false);
 
   // Check on load — if user already has must_change_password flag
   useEffect(() => {
@@ -118,7 +119,10 @@ function GlobalHandlers() {
 
   // Listen for runtime events from api.js
   useEffect(() => {
-    const onBlocked = () => { logout(); };
+    const onBlocked = () => {
+      setBlockedOverlay(true);
+      setTimeout(() => { logout(); }, 2800);
+    };
     const onMustChange = () => setShowMustChangePwd(true);
     window.addEventListener('hey:blocked', onBlocked);
     window.addEventListener('hey:must-change-password', onMustChange);
@@ -128,8 +132,29 @@ function GlobalHandlers() {
     };
   }, [logout]);
 
-  if (!showMustChangePwd || !user) return null;
-  return <ForcePasswordModal onDone={() => setShowMustChangePwd(false)} />;
+  return (
+    <>
+      {blockedOverlay && (
+        <div style={{
+          position:'fixed', inset:0, zIndex:9999,
+          background:'rgba(10,5,25,.97)', backdropFilter:'blur(24px)',
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+          gap:18, animation:'fadeIn .25s ease',
+        }}>
+          <div style={{fontSize:56}}>🚫</div>
+          <div style={{color:'white', fontSize:22, fontWeight:800, letterSpacing:-.3}}>
+            Аккаунт заблокирован
+          </div>
+          <div style={{color:'rgba(255,255,255,.45)', fontSize:14, textAlign:'center', maxWidth:260, lineHeight:1.6}}>
+            Доступ к аккаунту ограничен администратором
+          </div>
+        </div>
+      )}
+      {showMustChangePwd && user && (
+        <ForcePasswordModal onDone={() => setShowMustChangePwd(false)} />
+      )}
+    </>
+  );
 }
 
 export default function App() {
@@ -182,6 +207,7 @@ export default function App() {
           }/>
 
           {/* Protected — without bottom nav */}
+          <Route path="/profile/:id"             element={<Protected><PublicProfileScreen/></Protected>}/>
           <Route path="/chat/:convId"            element={<Protected><ChatScreen/></Protected>}/>
           <Route path="/groups/new"              element={<Protected><GroupCreateScreen/></Protected>}/>
           <Route path="/groups/:convId/settings" element={<Protected><GroupSettingsScreen/></Protected>}/>
