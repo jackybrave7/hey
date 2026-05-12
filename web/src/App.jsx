@@ -9,7 +9,7 @@ import {
   MyProfileScreen, ContactsScreen, ConversationsScreen,
   ChatScreen, CallsScreen, CallDetailScreen, SettingsScreen,
   GroupCreateScreen, GroupSettingsScreen,
-  ForcePasswordModal, PublicProfileScreen,
+  ForcePasswordModal, PublicProfileScreen, MomentPage,
 } from './components/Screens';
 import MomentsFeed from './components/moments/MomentsFeed';
 import BottomNav from './components/BottomNav';
@@ -207,6 +207,7 @@ export default function App() {
           }/>
 
           {/* Protected — without bottom nav */}
+          <Route path="/moments/:id"             element={<Protected><MomentPage/></Protected>}/>
           <Route path="/profile/:id"             element={<Protected><PublicProfileScreen/></Protected>}/>
           <Route path="/chat/:convId"            element={<Protected><ChatScreen/></Protected>}/>
           <Route path="/groups/new"              element={<Protected><GroupCreateScreen/></Protected>}/>
