@@ -23,7 +23,7 @@ git add -A
 git diff --cached --quiet
 if errorlevel 1 (
     git commit -m "deploy: %date% %time%"
-    git push
+    git -c http.sslVerify=false push
     if errorlevel 1 ( echo ОШИБКА: git push провалился & pause & exit /b 1 )
     echo       OK
 ) else (
@@ -32,7 +32,7 @@ if errorlevel 1 (
 
 echo.
 echo [3/4] Обновление сервера...
-ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git pull && npm install --workspace=server --silent && npm run build 2>&1 | tail -3"
+ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git pull && npm install --silent && npm run build 2>&1 | tail -5"
 if errorlevel 1 ( echo ОШИБКА: обновление сервера провалилось & pause & exit /b 1 )
 echo       OK
 
