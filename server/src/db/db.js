@@ -614,7 +614,7 @@ function getMomentFeed(userId) {
   const rows = db.prepare(
     `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar
      FROM moments m JOIN users u ON u.id=m.user_id
-     WHERE m.user_id IN (${ph}) AND m.status='active'
+     WHERE m.user_id IN (${ph}) AND m.status='active' AND u.is_blocked=0
      ORDER BY m.created_at DESC`
   ).all(...visible);
   return rows.map(r => _withStats(_parseMoment(r)));

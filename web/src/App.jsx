@@ -8,7 +8,8 @@ import {
   WelcomeScreen,
   MyProfileScreen, ContactsScreen, ConversationsScreen,
   ChatScreen, CallsScreen, CallDetailScreen, SettingsScreen,
-  GroupCreateScreen, GroupSettingsScreen
+  GroupCreateScreen, GroupSettingsScreen,
+  ForcePasswordModal,
 } from './components/Screens';
 import MomentsFeed from './components/moments/MomentsFeed';
 import BottomNav from './components/BottomNav';
@@ -67,7 +68,6 @@ function useUnreadCount() {
   const location = useLocation();
   const [unread, setUnread] = useState(0);
 
-  // Initial load
   useEffect(() => {
     if (!user) return;
     api.getConversations()
@@ -75,7 +75,6 @@ function useUnreadCount() {
       .catch(() => {});
   }, [user]);
 
-  // Real-time: new message increments counter (unless we're already on /conversations)
   useEffect(() => {
     return socket.on('message:new', ({ message }) => {
       if (message.sender_id === user?.id) return;
@@ -84,7 +83,6 @@ function useUnreadCount() {
     });
   }, [user?.id, location.pathname]);
 
-  // Reset when user opens conversations
   useEffect(() => {
     if (location.pathname === '/conversations') setUnread(0);
   }, [location.pathname]);
@@ -108,11 +106,38 @@ function MomentsScreen() {
   return <MomentsFeed currentUser={user} />;
 }
 
+// ── Global security event handlers ───────────────────────────────────────────
+function GlobalHandlers() {
+  const { logout, user } = useAuth();
+  const [showMustChangePwd, setShowMustChangePwd] = useState(false);
+
+  // Check on load — if user already has must_change_password flag
+  useEffect(() => {
+    if (user?.must_change_password) setShowMustChangePwd(true);
+  }, [user?.must_change_password]);
+
+  // Listen for runtime events from api.js
+  useEffect(() => {
+    const onBlocked = () => { logout(); };
+    const onMustChange = () => setShowMustChangePwd(true);
+    window.addEventListener('hey:blocked', onBlocked);
+    window.addEventListener('hey:must-change-password', onMustChange);
+    return () => {
+      window.removeEventListener('hey:blocked', onBlocked);
+      window.removeEventListener('hey:must-change-password', onMustChange);
+    };
+  }, [logout]);
+
+  if (!showMustChangePwd || !user) return null;
+  return <ForcePasswordModal onDone={() => setShowMustChangePwd(false)} />;
+}
+
 export default function App() {
   useNotifications();
   return (
     <AuthProvider>
       <BrowserRouter>
+        <GlobalHandlers />
         <Routes>
           {/* Public */}
           <Route path="/"         element={<SplashScreen/>}/>

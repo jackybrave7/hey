@@ -17,6 +17,14 @@ async function req(method, path, body) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
+    // Dispatch special events for specific error codes
+    if (err.code === 'BLOCKED') {
+      localStorage.removeItem('hey_token');
+      window.dispatchEvent(new CustomEvent('hey:blocked'));
+    }
+    if (err.code === 'MUST_CHANGE_PASSWORD') {
+      window.dispatchEvent(new CustomEvent('hey:must-change-password'));
+    }
     throw new Error(err.error || `HTTP ${res.status}`);
   }
   return res.json();

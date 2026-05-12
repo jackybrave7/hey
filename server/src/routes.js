@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuid } = require('uuid');
 const nodemailer = require('nodemailer');
-const { signToken, requireAuth, optionalAuth } = require('./auth');
+const authModule = require('./auth');
+const { signToken, requireAuth, optionalAuth } = authModule;
 const db = require('./db/db');
 const { detectTags, detectMoodEmoji } = require('./auto-tags');
 const storage = require('./storage');
@@ -70,6 +71,7 @@ function rateLimit(max, windowMs) {
 
 module.exports = function makeRouter(db, broadcast) {
   const r = express.Router();
+  authModule.init(db); // inject DB into auth for block checks
 
   r.post('/register', rateLimit(5, 15 * 60 * 1000), (req, res) => {
     const { phone, name, password, birthday, avatar } = req.body;
@@ -88,9 +90,10 @@ module.exports = function makeRouter(db, broadcast) {
   r.post('/login', rateLimit(10, 15 * 60 * 1000), (req, res) => {
     const { phone, password } = req.body;
     const user = db.findUserByPhone(phone);
-    if (!user) return res.status(401).json({ error: 'Пользователь не найден' });
+    if (!user) return res.status(401).json({ error: 'Неверный телефон или пароль' });
     if (!bcrypt.compareSync(password, user.password))
-      return res.status(401).json({ error: 'Неверный пароль' });
+      return res.status(401).json({ error: 'Неверный телефон или пароль' });
+    if (user.is_blocked) return res.status(403).json({ error: 'Неверный телефон или пароль' });
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
     const { password: _, ...safe } = user;
     res.json({ token, user: safe });
@@ -124,13 +127,16 @@ module.exports = function makeRouter(db, broadcast) {
 
   r.post('/me/password', requireAuth, (req, res) => {
     const { oldPassword, newPassword } = req.body;
-    if (!oldPassword || !newPassword) return res.status(400).json({ error: 'Заполните все поля' });
-    if (newPassword.length < 4) return res.status(400).json({ error: 'Пароль минимум 4 символа' });
+    if (!newPassword) return res.status(400).json({ error: 'Заполните все поля' });
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Пароль минимум 8 символов' });
     const user = db.findUserById(req.user.id);
-    const bcrypt = require('bcryptjs');
-    if (!bcrypt.compareSync(oldPassword, user.password))
-      return res.status(403).json({ error: 'Неверный текущий пароль' });
-    db.updateUser(req.user.id, { password: bcrypt.hashSync(newPassword, 10) });
+    // If must_change_password, allow skipping old password verification
+    if (!user.must_change_password) {
+      if (!oldPassword) return res.status(400).json({ error: 'Введите текущий пароль' });
+      if (!bcrypt.compareSync(oldPassword, user.password))
+        return res.status(403).json({ error: 'Неверный текущий пароль' });
+    }
+    db.updateUser(req.user.id, { password: bcrypt.hashSync(newPassword, 10), must_change_password: 0 });
     res.json({ ok: true });
   });
 
