@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { socket, api } from './api';
 import {
   SplashScreen, HeyScreen, LoginScreen, RegisterScreen, SuccessScreen,
+  WelcomeScreen,
   MyProfileScreen, ContactsScreen, ConversationsScreen,
   ChatScreen, CallsScreen, CallDetailScreen, SettingsScreen,
   GroupCreateScreen, GroupSettingsScreen
@@ -119,6 +120,7 @@ export default function App() {
           <Route path="/login"    element={<GuestOnly><LoginScreen/></GuestOnly>}/>
           <Route path="/register" element={<GuestOnly><RegisterScreen/></GuestOnly>}/>
           <Route path="/success"  element={<SuccessScreen/>}/>
+          <Route path="/welcome"  element={<WelcomeScreen/>}/>
 
           {/* Protected — with bottom nav */}
           <Route path="/main" element={

@@ -96,6 +96,13 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ token, user: safe });
   });
 
+  // Public invite info endpoint (no auth required)
+  r.get('/users/:id/invite-info', (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user || user.is_blocked) return res.status(404).json({ error: 'Not found' });
+    res.json({ id: user.id, name: user.name, avatar_url: user.avatar || null });
+  });
+
   r.get('/me', requireAuth, (req, res) => {
     const user = db.findUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Not found' });

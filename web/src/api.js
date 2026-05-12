@@ -26,6 +26,7 @@ export const api = {
   // Auth
   register: (data) => req('POST', '/register', data),
   login:    (data) => req('POST', '/login', data),
+  getUserInviteInfo: (id) => req('GET', `/users/${id}/invite-info`),
 
   // Profile
   getMe:          ()     => req('GET', '/me'),

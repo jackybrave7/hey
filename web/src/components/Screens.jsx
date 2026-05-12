@@ -1,8 +1,12 @@
 // web/src/components/Screens.jsx
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { api, socket } from '../api';
 import { useAuth } from '../AuthContext';
+import {
+  AuthBrand, FloatingInput, PasswordInput,
+  InviteBadge, ForgotPasswordPopup
+} from './auth/AuthComponents';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -258,35 +262,116 @@ export function LoginScreen() {
   const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr]           = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
 
   async function handleLogin() {
     setErr('');
     const pv = validatePhone(phone);
     if (!pv.ok) { setErr(pv.msg); return; }
+    setLoading(true);
     try {
       const res = await api.login({ phone: pv.normalized, password });
       login(res.token, res.user);
       nav('/main');
-    } catch(e) { setErr(e.message); }
+    } catch(e) {
+      setErr('Неверный телефон или пароль');
+    }
+    setLoading(false);
   }
 
   return (
-    <div className="screen" style={{justifyContent:'center',alignItems:'center',position:'relative',padding:'0 32px'}}>
-      <div style={{width:'100%',maxWidth:360,display:'flex',flexDirection:'column',gap:16,alignItems:'center'}}>
-        <span style={{color:'white',fontSize:24,fontWeight:400,marginBottom:12,letterSpacing:.5}}>Вход</span>
-        <input className="glass-input" placeholder="+7 (___) ___-__-__" value={phone}
-          onChange={e=>setPhone(formatPhoneInput(e.target.value))} type="tel"/>
-        <div style={{display:'flex',alignItems:'center',gap:10,width:'100%'}}>
-          <input className="glass-input" placeholder="Пароль" value={password}
-            onChange={e=>setPassword(e.target.value)} type="password"
-            onKeyDown={e=>e.key==='Enter'&&handleLogin()} style={{flex:1}}/>
-          <button onClick={handleLogin}
-            style={{background:'none',border:'none',color:'rgba(255,255,255,.7)',fontSize:28,cursor:'pointer'}}>›</button>
+    <div className="screen" style={{
+      justifyContent: 'center', alignItems: 'center',
+      padding: '40px 24px', overflowY: 'auto'
+    }}>
+      <div style={{ width: '100%', maxWidth: 380 }}>
+        <AuthBrand />
+
+        <div style={{
+          fontSize: 22, fontWeight: 700, textAlign: 'center',
+          color: 'white', marginBottom: 22,
+          animation: 'authFadeUp .6s ease-out .1s both'
+        }}>
+          С возвращением
         </div>
-        {err && <span style={{color:'#ffaaaa',fontSize:13}}>{err}</span>}
+
+        <div style={{ animation: 'authFadeUp .6s ease-out .2s both' }}>
+          <FloatingInput
+            id="login-phone" label="Телефон" type="tel"
+            value={phone}
+            onChange={e => setPhone(formatPhoneInput(e.target.value))}
+            autoComplete="tel"
+          />
+          <PasswordInput
+            id="login-pwd" label="Пароль"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          />
+
+          <div style={{ textAlign: 'right', margin: '-4px 4px 18px' }}>
+            <span
+              onClick={() => setShowForgot(true)}
+              style={{
+                color: 'rgba(255,255,255,.72)', fontSize: 13,
+                textDecoration: 'none', cursor: 'pointer',
+                borderBottom: '1px dashed rgba(255,255,255,.4)',
+                paddingBottom: 1
+              }}
+            >
+              Забыли пароль?
+            </span>
+          </div>
+
+          {err && (
+            <div style={{ color: '#ffaaaa', fontSize: 13, marginBottom: 12, textAlign: 'center' }}>
+              {err}
+            </div>
+          )}
+
+          <button className="auth-btn-primary" onClick={handleLogin} disabled={loading}>
+            {loading ? 'Входим…' : 'Войти'}
+          </button>
+
+          <div style={{ textAlign: 'center', marginTop: 22, color: 'rgba(255,255,255,.68)', fontSize: 14 }}>
+            Нет аккаунта?{' '}
+            <span
+              onClick={() => nav('/register')}
+              style={{ color: 'white', fontWeight: 700, cursor: 'pointer',
+                borderBottom: '1px solid rgba(255,255,255,.5)', paddingBottom: 1 }}
+            >
+              Создать
+            </span>
+          </div>
+        </div>
+
+        {/* Value props */}
+        <div style={{
+          marginTop: 44, display: 'flex', flexDirection: 'column', gap: 8,
+          animation: 'authFadeUp .6s ease-out .4s both'
+        }}>
+          {[
+            { icon: '✦', text: 'Покажи над чем работаешь' },
+            { icon: '🤝', text: 'Найди соавторов и проекты' },
+            { icon: '🔇', text: 'Чаты без рекламы и алгоритмов' },
+          ].map(({ icon, text }) => (
+            <div key={text} style={{
+              fontSize: 13, color: 'rgba(255,255,255,.62)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+            }}>
+              <span style={{ fontSize: 14 }}>{icon}</span>{text}
+            </div>
+          ))}
+        </div>
       </div>
-      <button className="pill" onClick={() => nav('/register')}
-        style={{position:'absolute',bottom:44}}>Регистрация</button>
+
+      {showForgot && (
+        <ForgotPasswordPopup
+          onClose={() => setShowForgot(false)}
+          tgUsername={window.__HEY_TG_SUPPORT__ || 'hey_support'}
+        />
+      )}
     </div>
   );
 }
@@ -370,96 +455,223 @@ function AvatarPicker({ avatar, onChange, size = 136, disabled = false }) {
 export function RegisterScreen() {
   const nav = useNavigate();
   const { login } = useAuth();
+  const [searchParams] = useSearchParams();
+  const inviteCode = searchParams.get('invite');
+
   const [name, setName]         = useState('');
   const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
-  const [avatar, setAvatar]     = useState('');
   const [err, setErr]           = useState('');
-  const [phoneErr, setPhoneErr] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [inviter, setInviter]   = useState(null);
 
-  function handlePhoneChange(e) {
-    const formatted = formatPhoneInput(e.target.value);
-    setPhone(formatted);
-    if (phoneErr) setPhoneErr('');
-  }
+  // Load inviter info if invite code present
+  useEffect(() => {
+    if (!inviteCode) return;
+    api.getUserInviteInfo(inviteCode)
+      .then(setInviter)
+      .catch(() => {});
+  }, [inviteCode]);
 
   async function handleRegister() {
     setErr('');
     if (!name.trim()) { setErr('Введите имя'); return; }
     const pv = validatePhone(phone);
-    if (!pv.ok) { setPhoneErr(pv.msg); return; }
+    if (!pv.ok) { setErr(pv.msg); return; }
     if (password.length < 8) { setErr('Пароль минимум 8 символов'); return; }
-
+    setLoading(true);
     try {
-      const res = await api.register({ name: name.trim(), phone: pv.normalized, password, avatar });
+      const res = await api.register({
+        name: name.trim(), phone: pv.normalized, password,
+        ...(inviteCode ? { invited_by: inviteCode } : {})
+      });
       login(res.token, res.user);
-      nav('/success');
+      nav('/welcome', { state: { isNewUser: true, userName: name.trim() } });
     } catch(e) { setErr(e.message); }
+    setLoading(false);
   }
 
   return (
-    <div className="screen" style={{position:'relative'}}>
-      <div style={{position:'absolute',top:18,left:18,background:'rgba(100,78,148,.55)',
-        borderRadius:22,padding:'9px 20px',color:'white',fontSize:15,fontWeight:600}}>
-        Регистрация
-      </div>
-      <div style={{display:'flex',gap:22,padding:'90px 26px 0',alignItems:'flex-start'}}>
-        <AvatarPicker avatar={avatar} onChange={setAvatar}/>
-        <div style={{flex:1,display:'flex',flexDirection:'column',gap:16,paddingTop:12}}>
+    <div className="screen" style={{
+      justifyContent: 'center', alignItems: 'center',
+      padding: '40px 24px', overflowY: 'auto'
+    }}>
+      <div style={{ width: '100%', maxWidth: 380 }}>
+        <AuthBrand />
 
-          {/* Имя */}
-          <div>
-            <input className="ul-input" placeholder="Имя" value={name}
-              onChange={e=>setName(e.target.value)}/>
-          </div>
+        {inviter && <InviteBadge name={inviter.name} avatar={inviter.avatar_url} />}
 
-          {/* Телефон */}
-          <div>
-            <input className="ul-input" placeholder="+7 (___) ___-__-__" value={phone}
-              onChange={handlePhoneChange} type="tel"/>
-            {phoneErr && <div style={{color:'#ffaaaa',fontSize:12,marginTop:4}}>{phoneErr}</div>}
-          </div>
-
-          {/* Пароль */}
-          <div>
-            <input className="ul-input" placeholder="Пароль (мин. 8 символов)" value={password}
-              onChange={e=>setPassword(e.target.value)} type="password"
-              onKeyDown={e=>e.key==='Enter'&&handleRegister()}/>
-          </div>
-
-          {err && <div style={{color:'#ffaaaa',fontSize:13}}>{err}</div>}
-
-          <button onClick={handleRegister} style={{
-            width:54,height:54,background:'rgba(100,78,148,.62)',
-            border:'none',borderRadius:14,fontSize:30,color:'white',
-            cursor:'pointer',alignSelf:'flex-end',transition:'background .2s'}}
-            onMouseEnter={e=>e.currentTarget.style.background='rgba(120,98,168,.8)'}
-            onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.62)'}>+</button>
+        <div style={{
+          fontSize: 22, fontWeight: 700, textAlign: 'center',
+          color: 'white', marginBottom: 22,
+          animation: 'authFadeUp .6s ease-out .15s both'
+        }}>
+          Создать аккаунт
         </div>
-      </div>
-      <div style={{position:'absolute',bottom:28,left:0,right:0,
-        display:'flex',justifyContent:'space-between',padding:'0 32px'}}>
-        <button onClick={()=>nav(-1)}
-          style={{background:'none',border:'none',color:'rgba(255,255,255,.48)',fontSize:30,cursor:'pointer'}}>‹</button>
-        <button onClick={handleRegister}
-          style={{background:'none',border:'none',color:'rgba(255,255,255,.48)',fontSize:30,cursor:'pointer'}}>›</button>
+
+        <div style={{ animation: 'authFadeUp .6s ease-out .25s both' }}>
+          <FloatingInput id="reg-name" label="Имя" value={name}
+            onChange={e => setName(e.target.value)} autoComplete="name" />
+          <FloatingInput id="reg-phone" label="Телефон" type="tel" value={phone}
+            onChange={e => setPhone(formatPhoneInput(e.target.value))} autoComplete="tel" />
+          <PasswordInput id="reg-pwd" label="Придумай пароль" value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleRegister()} />
+
+          <div style={{ color: 'rgba(255,255,255,.52)', fontSize: 12, margin: '-4px 4px 18px', lineHeight: 1.5 }}>
+            Минимум 8 символов. Аватар и день рождения добавишь потом в профиле.
+          </div>
+
+          {err && (
+            <div style={{ color: '#ffaaaa', fontSize: 13, marginBottom: 12, textAlign: 'center' }}>{err}</div>
+          )}
+
+          <button className="auth-btn-primary" onClick={handleRegister} disabled={loading}>
+            {loading ? 'Создаём…' : inviteCode ? 'Принять приглашение' : 'Создать аккаунт'}
+          </button>
+
+          <div style={{ textAlign: 'center', marginTop: 22, color: 'rgba(255,255,255,.68)', fontSize: 14 }}>
+            Уже есть аккаунт?{' '}
+            <span
+              onClick={() => nav('/login')}
+              style={{ color: 'white', fontWeight: 700, cursor: 'pointer',
+                borderBottom: '1px solid rgba(255,255,255,.5)', paddingBottom: 1 }}
+            >
+              Войти
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SuccessScreen
+// SuccessScreen (legacy — kept for backward compat)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function SuccessScreen() {
   const nav = useNavigate();
-  useEffect(() => { const t = setTimeout(() => nav('/profile/me'), 2500); return () => clearTimeout(t); }, []);
+  useEffect(() => { const t = setTimeout(() => nav('/main'), 2000); return () => clearTimeout(t); }, []);
   return (
     <div className="screen" style={{justifyContent:'center',alignItems:'center',gap:16}}>
       <span style={{fontSize:44}}>🙂</span>
       <span style={{color:'white',fontSize:19}}>Профиль успешно создан!</span>
-      <button className="pill" onClick={() => nav('/profile/me')} style={{marginTop:28}}>Продолжить</button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WelcomeScreen — shown after registration
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function WelcomeScreen() {
+  const nav = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+
+  // Guard: if arrived without isNewUser flag, redirect to main
+  useEffect(() => {
+    if (!location.state?.isNewUser) nav('/main', { replace: true });
+  }, []);
+
+  const name = location.state?.userName || user?.name || '';
+  const initial = name ? name[0].toUpperCase() : '?';
+
+  const steps = [
+    { icon: '✦', title: 'Создать свой первый момент', sub: 'Покажи над чем работаешь', action: () => nav('/main') },
+    { icon: '👥', title: 'Добавить контакты',          sub: 'По номеру или импорт из телефона', action: () => nav('/contacts') },
+    { icon: '🎨', title: 'Заполнить профиль',          sub: 'Аватар, имя, день рождения', action: () => nav('/profile/me') },
+  ];
+
+  return (
+    <div className="screen" style={{
+      justifyContent: 'center', alignItems: 'center',
+      padding: '40px 24px', overflowY: 'auto'
+    }}>
+      <div style={{ width: '100%', maxWidth: 420, textAlign: 'center' }}>
+        {/* Avatar circle */}
+        <div style={{
+          width: 100, height: 100, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #a888d0, #7858b0)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'white', fontSize: 42, fontWeight: 700,
+          margin: '0 auto 22px',
+          boxShadow: '0 8px 24px rgba(0,0,0,.25)',
+          animation: 'authFadeUp .5s ease-out both'
+        }}>
+          {initial}
+        </div>
+
+        <div style={{
+          fontSize: 30, fontWeight: 700, color: 'white', marginBottom: 8,
+          animation: 'authFadeUp .5s ease-out .1s both'
+        }}>
+          Привет, {name}!
+        </div>
+        <div style={{
+          fontSize: 15, color: 'rgba(255,255,255,.72)', marginBottom: 30, lineHeight: 1.55,
+          animation: 'authFadeUp .5s ease-out .15s both'
+        }}>
+          Ты в HEY. Что хочешь сделать первым?
+        </div>
+
+        {/* Next steps */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28,
+          animation: 'authFadeUp .5s ease-out .2s both'
+        }}>
+          {steps.map(({ icon, title, sub, action }) => (
+            <div key={title} onClick={action} style={{
+              background: 'rgba(255,255,255,.1)',
+              border: '1px solid rgba(255,255,255,.18)',
+              borderRadius: 16, padding: '14px 18px',
+              display: 'flex', alignItems: 'center', gap: 14,
+              cursor: 'pointer', textAlign: 'left',
+              transition: 'all .15s'
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.18)'; e.currentTarget.style.transform = 'translateX(2px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.1)'; e.currentTarget.style.transform = 'none'; }}
+            >
+              <div style={{
+                width: 42, height: 42, borderRadius: '50%',
+                background: 'rgba(255,255,255,.18)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, flexShrink: 0
+              }}>
+                {icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 2 }}>{title}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.58)' }}>{sub}</div>
+              </div>
+              <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 18 }}>›</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div style={{
+          display: 'flex', gap: 10,
+          animation: 'authFadeUp .5s ease-out .3s both'
+        }}>
+          <button onClick={() => nav('/main')} style={{
+            flex: 1, background: 'rgba(255,255,255,.1)',
+            border: '1px solid rgba(255,255,255,.22)',
+            borderRadius: 26, padding: 15, color: 'white',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            fontFamily: 'inherit', transition: 'background .15s'
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.18)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+          >
+            Пропустить
+          </button>
+          <button className="auth-btn-primary" onClick={() => nav('/main')} style={{ flex: 1 }}>
+            Создать момент
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
