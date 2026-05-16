@@ -172,23 +172,11 @@ export default function MomentsFeed({ currentUser }) {
           padding:'16px 20px 12px',
           display:'flex',alignItems:'center',justifyContent:'space-between',
         }}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{color:'white',fontSize:20,fontWeight:800,letterSpacing:-.3}}>✦ Моменты</span>
-          </div>
-          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-            {[{key:'feed',label:'Лента'},{key:'saved',label:'🤝 Поговорить'}].map(t => (
-              <button key={t.key} onClick={() => setTab(t.key)} style={{
-                padding:'6px 14px',borderRadius:50,fontSize:12,fontWeight:700,cursor:'pointer',
-                background: tab===t.key ? 'rgba(120,90,200,.85)' : 'rgba(255,255,255,.08)',
-                border: tab===t.key ? '1px solid rgba(180,140,255,.4)' : '1px solid rgba(255,255,255,.1)',
-                color: tab===t.key ? 'white' : 'rgba(255,255,255,.5)',
-                transition:'all .18s',
-              }}>{t.label}</button>
-            ))}
+          <div style={{color:'white',fontSize:20,fontWeight:800,letterSpacing:-.3}}>
+            ✦ Моменты
           </div>
           <button onClick={handleNewMomentClick}
             style={{
-              display: tab==='saved' ? 'none' : undefined,
               padding:'8px 16px',borderRadius:50,fontSize:13,fontWeight:700,cursor:'pointer',
               background:'rgba(120,90,200,.85)',border:'none',color:'white',
               boxShadow:'0 2px 12px rgba(120,80,200,.4)',transition:'all .18s',
@@ -200,31 +188,8 @@ export default function MomentsFeed({ currentUser }) {
         </div>
       </div>
 
-      {/* ── Сохранённые (Поговорить) ───────────────────────────────────────── */}
-      {tab === 'saved' && (
-        <div style={{padding:'14px 20px',maxWidth:680,margin:'0 auto'}}>
-          {savedLoading ? (
-            <div style={{textAlign:'center',padding:'40px 0',color:'rgba(255,255,255,.35)',fontSize:14}}>Загрузка…</div>
-          ) : saved.length === 0 ? (
-            <div style={{textAlign:'center',padding:'60px 20px'}}>
-              <div style={{fontSize:44,marginBottom:14}}>🤝</div>
-              <div style={{color:'rgba(255,255,255,.6)',fontSize:15,fontWeight:600,marginBottom:8}}>Список пуст</div>
-              <div style={{color:'rgba(255,255,255,.35)',fontSize:13,lineHeight:1.6}}>
-                Отмечай моменты реакцией 🤝 — они сохраняются здесь
-              </div>
-            </div>
-          ) : (
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-              {saved.map(m => (
-                <MomentCard key={m.id} moment={m} isMine={false} onClick={() => setSelected(m)}/>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* 2-column grid — inner content limited to 680 */}
-      {tab === 'feed' && <div style={{padding:'14px 20px',maxWidth:680,margin:'0 auto'}}>
+      <div style={{padding:'14px 20px',maxWidth:680,margin:'0 auto'}}>
         <div style={{
           display:'grid',
           gridTemplateColumns:'1fr 1fr',
@@ -318,7 +283,7 @@ export default function MomentsFeed({ currentUser }) {
         )}
 
         </div>{/* end grid */}
-      </div>}{/* end feed tab */}
+      </div>
 
       {/* ─── Overlays ─────────────────────────────────────────────────────── */}
 

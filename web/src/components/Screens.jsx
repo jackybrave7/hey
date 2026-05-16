@@ -7,6 +7,7 @@ import {
   AuthBrand, FloatingInput, PasswordInput,
   InviteBadge, ForgotPasswordPopup
 } from './auth/AuthComponents';
+import MomentDetailPopup from './moments/MomentDetailPopup';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -752,6 +753,27 @@ export function MyProfileScreen() {
   // Invite link
   const [inviteCopied, setInviteCopied] = useState(false);
 
+  // Saved moments (Поговорить)
+  const [savedMoments, setSavedMoments]     = useState([]);
+  const [savedLoading, setSavedLoading]     = useState(false);
+  const [savedLoaded,  setSavedLoaded]      = useState(false);
+  const [savedOpen,    setSavedOpen]        = useState(false);
+  const [savedSelected, setSavedSelected]  = useState(null);
+
+  function toggleSaved() {
+    setSavedOpen(v => {
+      if (!v && !savedLoaded) {
+        setSavedLoading(true);
+        api.getSavedMoments().then(items => {
+          setSavedMoments(items);
+          setSavedLoading(false);
+          setSavedLoaded(true);
+        }).catch(() => setSavedLoading(false));
+      }
+      return !v;
+    });
+  }
+
   async function submitPasswordChange() {
     setPwdErr('');
     if (!oldPwd || !newPwd || !newPwd2) { setPwdErr('Заполните все поля'); return; }
@@ -972,6 +994,57 @@ export function MyProfileScreen() {
             }}>
               {inviteCopied ? '✓ Скопировано' : 'Скопировать'}
             </button>
+          </div>
+
+          {/* Поговорить — сохранённые моменты */}
+          <div style={{borderRadius:14,overflow:'hidden',border:'1px solid rgba(255,255,255,.08)'}}>
+            <button onClick={toggleSaved} style={{
+              width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',
+              padding:'13px 18px',background:'rgba(255,255,255,.06)',border:'none',
+              color:'white',fontSize:14,fontWeight:600,cursor:'pointer',
+            }}>
+              <span>🤝 Поговорить</span>
+              <span style={{opacity:.4,fontSize:12,transition:'transform .2s',
+                transform: savedOpen ? 'rotate(90deg)' : 'none'}}>›</span>
+            </button>
+            {savedOpen && (
+              <div style={{background:'rgba(255,255,255,.03)',padding:'12px 14px'}}>
+                {savedLoading ? (
+                  <div style={{textAlign:'center',padding:'20px 0',
+                    color:'rgba(255,255,255,.3)',fontSize:13}}>Загрузка…</div>
+                ) : savedMoments.length === 0 ? (
+                  <div style={{textAlign:'center',padding:'24px 0'}}>
+                    <div style={{fontSize:32,marginBottom:8}}>🤝</div>
+                    <div style={{color:'rgba(255,255,255,.4)',fontSize:13}}>
+                      Отмечай моменты реакцией 🤝 — они появятся здесь
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    {savedMoments.map(m => (
+                      <div key={m.id} onClick={() => setSavedSelected(m)}
+                        style={{
+                          borderRadius:10,overflow:'hidden',cursor:'pointer',
+                          background:'#1a0a30',aspectRatio:'3/4',position:'relative',
+                        }}>
+                        {m.media_url && m.media_type==='image'
+                          ? <img src={m.media_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                          : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',
+                              justifyContent:'center',fontSize:28,
+                              background:'linear-gradient(135deg,#1e0a40,#3a1060)'}}>✦</div>
+                        }
+                        <div style={{position:'absolute',bottom:0,left:0,right:0,
+                          background:'rgba(0,0,0,.55)',backdropFilter:'blur(8px)',
+                          padding:'6px 8px',fontSize:11,color:'rgba(255,255,255,.8)',
+                          overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {m.author_name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <button onClick={() => nav('/settings')}
@@ -1231,6 +1304,19 @@ export function MyProfileScreen() {
       )}
 
       {confirmModal}
+
+      {/* Saved moment popup */}
+      {savedSelected && (
+        <MomentDetailPopup
+          moment={savedSelected}
+          isMine={savedSelected.user_id === user?.id}
+          currentUser={user}
+          onClose={() => setSavedSelected(null)}
+          onEdit={() => {}}
+          onArchive={() => {}}
+          onDelete={() => {}}
+        />
+      )}
 
       {/* Password change modal */}
       {showPwdModal && (
@@ -2611,6 +2697,8 @@ export function ChatScreen() {
   const [loadingMore,  setLoadingMore]  = useState(false);
   // Message request state
   const [requestLock,  setRequestLock]  = useState(null); // { requester: {id,name,avatar} } | null
+  const [accepting,    setAccepting]    = useState(false);
+  const [declining,    setDeclining]    = useState(false);
   const [hoveredMsg,   setHoveredMsg]   = useState(null);
   const [reactionPicker,setReactionPicker] = useState(null); // { msgId, x, y }
   const [customConfirm, confirmModal] = useConfirm();
@@ -3261,96 +3349,87 @@ export function ChatScreen() {
       )}
 
       {/* ── Request lock overlay ─────────────────────────────────────── */}
-      {requestLock && (() => {
-        const req = requestLock.requester;
-        const [accepting, setAccepting] = useState(false);
-        const [declining, setDeclining] = useState(false);
-
-        async function accept() {
-          setAccepting(true);
-          try {
-            await api.acceptRequest(convId);
-            setRequestLock(null);
-            // Reload messages now that it's unlocked
-            const msgs = await api.getMessages(convId);
-            setMessages(Array.isArray(msgs) ? msgs : []);
-          } catch {}
-          setAccepting(false);
-        }
-        async function decline() {
-          setDeclining(true);
-          try {
-            await api.declineRequest(convId);
-            nav('/conversations');
-          } catch {}
-          setDeclining(false);
-        }
-
-        return (
+      {requestLock && (
+        <div style={{
+          flex:1, display:'flex', flexDirection:'column',
+          alignItems:'center', justifyContent:'center',
+          padding:'28px 24px', gap:20,
+        }}>
+          {/* Avatar */}
           <div style={{
-            flex:1, display:'flex', flexDirection:'column',
-            alignItems:'center', justifyContent:'center',
-            padding:'28px 24px', gap:20,
+            width:80, height:80, borderRadius:'50%',
+            background:'rgba(180,140,220,.35)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:34, color:'white', fontWeight:700, overflow:'hidden',
+            boxShadow:'0 4px 20px rgba(120,80,200,.3)',
           }}>
-            {/* Avatar */}
-            <div style={{
-              width:80, height:80, borderRadius:'50%',
-              background:'rgba(180,140,220,.35)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:34, color:'white', fontWeight:700, overflow:'hidden',
-              boxShadow:'0 4px 20px rgba(120,80,200,.3)',
-            }}>
-              {req?.avatar
-                ? <img src={req.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                : (req?.name?.[0] || '?')}
+            {requestLock.requester?.avatar
+              ? <img src={requestLock.requester.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              : (requestLock.requester?.name?.[0] || '?')}
+          </div>
+
+          {/* Name + hint */}
+          <div style={{textAlign:'center'}}>
+            <div style={{color:'white', fontSize:20, fontWeight:700, marginBottom:6}}>
+              {requestLock.requester?.name || 'Пользователь'}
             </div>
-
-            {/* Name */}
-            <div style={{textAlign:'center'}}>
-              <div style={{color:'white', fontSize:20, fontWeight:700, marginBottom:6}}>
-                {req?.name || 'Пользователь'}
-              </div>
-              <div style={{color:'rgba(255,255,255,.45)', fontSize:14, lineHeight:1.6}}>
-                хочет начать с вами переписку.<br/>
-                Добавьте в контакты, чтобы видеть сообщения.
-              </div>
-            </div>
-
-            {/* Profile link */}
-            {req?.id && (
-              <button onClick={() => nav(`/profile/${req.id}`)}
-                style={{
-                  background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.15)',
-                  borderRadius:50, padding:'7px 18px', color:'rgba(255,255,255,.7)',
-                  fontSize:13, cursor:'pointer',
-                }}>
-                Посмотреть профиль →
-              </button>
-            )}
-
-            {/* Actions */}
-            <div style={{display:'flex', gap:12, width:'100%', maxWidth:320}}>
-              <button onClick={decline} disabled={declining}
-                style={{
-                  flex:1, padding:'13px', borderRadius:14, fontSize:14, fontWeight:600,
-                  background:'rgba(255,80,80,.15)', border:'1px solid rgba(255,120,120,.35)',
-                  color:'rgba(255,180,180,.9)', cursor:'pointer', opacity: declining ? .6 : 1,
-                }}>
-                {declining ? '…' : 'Удалить'}
-              </button>
-              <button onClick={accept} disabled={accepting}
-                style={{
-                  flex:2, padding:'13px', borderRadius:14, fontSize:14, fontWeight:700,
-                  background:'rgba(120,90,200,.8)', border:'1px solid rgba(180,140,220,.4)',
-                  color:'white', cursor:'pointer', opacity: accepting ? .6 : 1,
-                  boxShadow:'0 2px 12px rgba(120,80,200,.35)',
-                }}>
-                {accepting ? '…' : '✓ Добавить в контакты'}
-              </button>
+            <div style={{color:'rgba(255,255,255,.45)', fontSize:14, lineHeight:1.6}}>
+              хочет начать с вами переписку.<br/>
+              Добавьте в контакты, чтобы видеть сообщения.
             </div>
           </div>
-        );
-      })()}
+
+          {/* Profile link */}
+          {requestLock.requester?.id && (
+            <button onClick={() => nav(`/profile/${requestLock.requester.id}`)}
+              style={{
+                background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.15)',
+                borderRadius:50, padding:'7px 18px', color:'rgba(255,255,255,.7)',
+                fontSize:13, cursor:'pointer',
+              }}>
+              Посмотреть профиль →
+            </button>
+          )}
+
+          {/* Actions */}
+          <div style={{display:'flex', gap:12, width:'100%', maxWidth:320}}>
+            <button
+              disabled={declining}
+              onClick={async () => {
+                setDeclining(true);
+                try { await api.declineRequest(convId); nav('/conversations'); } catch {}
+                setDeclining(false);
+              }}
+              style={{
+                flex:1, padding:'13px', borderRadius:14, fontSize:14, fontWeight:600,
+                background:'rgba(255,80,80,.15)', border:'1px solid rgba(255,120,120,.35)',
+                color:'rgba(255,180,180,.9)', cursor:'pointer', opacity: declining ? .6 : 1,
+              }}>
+              {declining ? '…' : 'Удалить'}
+            </button>
+            <button
+              disabled={accepting}
+              onClick={async () => {
+                setAccepting(true);
+                try {
+                  await api.acceptRequest(convId);
+                  setRequestLock(null);
+                  const msgs = await api.getMessages(convId);
+                  setMessages(Array.isArray(msgs) ? msgs : []);
+                } catch {}
+                setAccepting(false);
+              }}
+              style={{
+                flex:2, padding:'13px', borderRadius:14, fontSize:14, fontWeight:700,
+                background:'rgba(120,90,200,.8)', border:'1px solid rgba(180,140,220,.4)',
+                color:'white', cursor:'pointer', opacity: accepting ? .6 : 1,
+                boxShadow:'0 2px 12px rgba(120,80,200,.35)',
+              }}>
+              {accepting ? '…' : '✓ Добавить в контакты'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Input bar */}
       {!requestLock && <div style={{flexShrink:0}}>
