@@ -122,11 +122,12 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
   );
 }
 
-export default function MomentDetailPopup({ moment: initial, isMine, onClose, onEdit, onArchive, onDelete }) {
+export default function MomentDetailPopup({ moment: initial, isMine, currentUser, onClose, onEdit, onArchive, onDelete }) {
   const nav = useNavigate();
   const [moment, setMoment] = useState(initial);
   const [myReaction, setMyReaction] = useState(initial.myReaction || null);
   const [reacting, setReacting] = useState(false);
+  const [reactors, setReactors] = useState(null); // null = not loaded yet
 
   // Register view
   useEffect(() => {
@@ -143,6 +144,13 @@ export default function MomentDetailPopup({ moment: initial, isMine, onClose, on
     }).catch(() => {});
   }, [moment.id]);
 
+  // Load reactors list for Super authors
+  useEffect(() => {
+    if (isMine && moment.author_is_super) {
+      api.getMomentReactors(moment.id).then(setReactors).catch(() => {});
+    }
+  }, [moment.id, isMine, moment.author_is_super]);
+
   async function handleReact(reaction) {
     if (reacting) return;
     setReacting(true);
@@ -151,13 +159,8 @@ export default function MomentDetailPopup({ moment: initial, isMine, onClose, on
         await api.unreactMoment(moment.id);
         setMyReaction(null);
       } else {
-        const res = await api.reactMoment(moment.id, reaction);
+        await api.reactMoment(moment.id, reaction);
         setMyReaction(reaction);
-        if (reaction === 'talk' && res.chatId) {
-          onClose();
-          nav(`/chat/${res.chatId}`);
-          return;
-        }
       }
       const fresh = await api.getMoment(moment.id);
       setMoment(fresh);
@@ -289,12 +292,46 @@ export default function MomentDetailPopup({ moment: initial, isMine, onClose, on
 
             {/* Analytics (own) or Reactions (other) */}
             {isMine ? (
-              <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
-                display:'flex',gap:20}}>
-                <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>👁 {moment.views || 0}</span>
-                <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0}</span>
-                <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>🤝 {moment.stats?.talk || 0}</span>
-              </div>
+              <>
+                <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
+                  display:'flex',gap:20}}>
+                  <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>👁 {moment.views || 0}</span>
+                  <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0}</span>
+                  <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>🤝 {moment.stats?.talk || 0}</span>
+                </div>
+                {/* Reactors list — Super only */}
+                {moment.author_is_super && reactors && reactors.length > 0 && (
+                  <div>
+                    <div style={{color:'rgba(255,255,255,.35)',fontSize:11,fontWeight:600,
+                      textTransform:'uppercase',letterSpacing:.5,marginBottom:8}}>
+                      ⭐ Кто отреагировал
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                      {reactors.map(r => (
+                        <div key={r.user_id + r.reaction} style={{
+                          display:'flex',alignItems:'center',gap:10,
+                          background:'rgba(255,255,255,.05)',borderRadius:10,padding:'8px 12px',
+                        }}>
+                          <div style={{
+                            width:30,height:30,borderRadius:'50%',flexShrink:0,
+                            background:'rgba(180,140,220,.3)',
+                            display:'flex',alignItems:'center',justifyContent:'center',
+                            fontSize:13,color:'white',fontWeight:600,overflow:'hidden',
+                          }}>
+                            {r.avatar
+                              ? <img src={r.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                              : (r.name||'?')[0].toUpperCase()}
+                          </div>
+                          <span style={{color:'rgba(255,255,255,.8)',fontSize:13,flex:1}}>{r.name}</span>
+                          <span style={{fontSize:16}}>
+                            {r.reaction === 'see' ? '👁' : r.reaction === 'resonate' ? '✨' : '🤝'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div>
                 <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginBottom:10,

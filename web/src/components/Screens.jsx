@@ -526,7 +526,7 @@ export function RegisterScreen() {
     try {
       const res = await api.register({
         name: name.trim(), phone: pv.normalized, password,
-        ...(inviteCode ? { invited_by: inviteCode } : {})
+        ...(inviteCode ? { inviteUserId: inviteCode } : {})
       });
       login(res.token, res.user);
       nav('/welcome', { state: { isNewUser: true, userName: name.trim() } });
@@ -994,6 +994,20 @@ export function MyProfileScreen() {
             <span>🔑 Сменить пароль</span>
             <span style={{opacity:.4}}>›</span>
           </button>
+          {user?.is_admin && (
+            <button onClick={() => nav('/admin')} style={{
+              display:'flex',alignItems:'center',justifyContent:'space-between',
+              padding:'13px 18px',borderRadius:14,cursor:'pointer',
+              background:'rgba(120,90,200,.18)',border:'1px solid rgba(180,140,255,.3)',
+              color:'rgba(200,180,255,.95)',fontSize:14,fontWeight:600,
+              transition:'background .15s',
+            }}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(120,90,200,.32)'}
+              onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.18)'}>
+              <span>⚙️ Панель администратора</span>
+              <span style={{opacity:.5}}>›</span>
+            </button>
+          )}
           <button onClick={async () => {
             if (await customConfirm('Выйти из аккаунта?')) { logout(); nav('/login'); }
           }} style={{

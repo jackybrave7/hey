@@ -139,6 +139,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0'); } ca
 try { db.exec('ALTER TABLE users ADD COLUMN blocked_at INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN blocked_by TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN is_super INTEGER DEFAULT 0'); } catch {}
 // ── Message requests ──────────────────────────────────────────────────────────
 try { db.exec('ALTER TABLE conversations ADD COLUMN request_from TEXT'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (
@@ -695,8 +696,33 @@ function _withStats(m) {
   const views = db.prepare('SELECT COUNT(*) as cnt FROM moment_views WHERE moment_id=?').get(m.id)?.cnt ?? 0;
   const stats = { see: 0, resonate: 0, talk: 0 };
   reactions.forEach(r => { stats[r.reaction] = r.cnt; });
-  return { ...m, stats, views };
+  const author = db.prepare('SELECT is_super FROM users WHERE id=?').get(m.user_id);
+  return { ...m, stats, views, author_is_super: !!(author?.is_super) };
 }
+
+// ── Saved moments (talk reaction = bookmark) ──────────────────────────────────
+function getSavedMoments(userId) {
+  const rows = db.prepare(
+    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar
+     FROM moment_reactions mr
+     JOIN moments m ON m.id = mr.moment_id
+     JOIN users u ON u.id = m.user_id
+     WHERE mr.user_id=? AND mr.reaction='talk' AND m.status='active' AND u.is_blocked=0
+     ORDER BY mr.created_at DESC`
+  ).all(userId);
+  return rows.map(r => _withStats(_parseMoment(r)));
+}
+
+function getMomentReactorsList(momentId) {
+  return db.prepare(
+    `SELECT mr.user_id, mr.reaction, mr.created_at, u.name, u.avatar
+     FROM moment_reactions mr JOIN users u ON u.id=mr.user_id
+     WHERE mr.moment_id=? ORDER BY mr.created_at DESC`
+  ).all(momentId);
+}
+
+function makeUserSuper(userId) { db.prepare('UPDATE users SET is_super=1 WHERE id=?').run(userId); }
+function revokeUserSuper(userId) { db.prepare('UPDATE users SET is_super=0 WHERE id=?').run(userId); }
 
 function getMomentById(id) {
   const m = db.prepare(
@@ -840,7 +866,7 @@ function getAdminUsers({ search, filter } = {}) {
   if (filter === 'blocked')  { where += ' AND u.is_blocked=1'; }
   if (filter === 'admins')   { where += ' AND u.is_admin=1'; }
   const rows = db.prepare(
-    `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_blocked,
+    `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_super, u.is_blocked,
             u.blocked_at, u.blocked_by, u.must_change_password,
             p.online, p.last_seen,
             (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status='active') AS active_moments,
@@ -850,7 +876,7 @@ function getAdminUsers({ search, filter } = {}) {
      WHERE ${where}
      ORDER BY u.created_at DESC`
   ).all(...params);
-  return rows.map(r => ({ ...r, online: !!r.online, is_admin: !!r.is_admin, is_blocked: !!r.is_blocked, must_change_password: !!r.must_change_password }));
+  return rows.map(r => ({ ...r, online: !!r.online, is_admin: !!r.is_admin, is_super: !!r.is_super, is_blocked: !!r.is_blocked, must_change_password: !!r.must_change_password }));
 }
 
 function getAdminUserById(id) {
@@ -864,7 +890,7 @@ function getAdminUserById(id) {
   ).get(id);
   if (!u) return null;
   const { password: _, ...safe } = u;
-  return { ...safe, online: !!safe.online, is_admin: !!safe.is_admin, is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password };
+  return { ...safe, online: !!safe.online, is_admin: !!safe.is_admin, is_super: !!safe.is_super, is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password };
 }
 
 function adminResetPassword(userId, newHashedPassword) {
@@ -965,11 +991,12 @@ module.exports = {
   getMomentFeed, getMyMoments, getMomentById, getActiveMoment, getActiveMomentCount,
   createMoment, updateMoment, archiveMoment, restoreMoment, deleteMomentForever,
   upsertMomentReaction, deleteMomentReaction, getMomentReactions, getUserMomentReaction,
+  getSavedMoments, getMomentReactorsList,
   addMomentView, getDisciplinesCloud,
   // Admin
   getAdminStats, getAdminUsers, getAdminUserById,
   adminResetPassword, adminBlockUser, adminUnblockUser,
-  adminMakeAdmin, adminRevokeAdmin,
+  adminMakeAdmin, adminRevokeAdmin, makeUserSuper, revokeUserSuper,
   getAdminMoments, adminDeleteMoment,
   logAdminAction, getAdminLogs,
 };

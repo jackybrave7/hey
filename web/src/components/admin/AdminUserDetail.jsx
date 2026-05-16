@@ -91,6 +91,24 @@ export default function AdminUserDetail() {
     } catch (e) { showMsg('Ошибка: ' + e.message); }
   }
 
+  async function handleMakeSuper() {
+    if (!confirm('Назначить статус Супер?')) return;
+    try {
+      await api.adminMakeSuper(id);
+      await reload();
+      showMsg('Статус Супер назначен');
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+
+  async function handleRevokeSuper() {
+    if (!confirm('Снять статус Супер?')) return;
+    try {
+      await api.adminRevokeSuper(id);
+      await reload();
+      showMsg('Статус Супер снят');
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+
   if (loading) return <div style={{ padding: 32, color: 'rgba(255,255,255,.4)' }}>Загрузка…</div>;
   if (error)   return <div style={{ padding: 32, color: 'rgba(255,140,140,.9)' }}>Ошибка: {error}</div>;
   if (!user)   return <div style={{ padding: 32, color: 'rgba(255,255,255,.4)' }}>Не найдено</div>;
@@ -117,8 +135,10 @@ export default function AdminUserDetail() {
         <div>
           <h1 style={{ color: 'white', fontSize: 22, fontWeight: 800, margin: 0 }}>
             {user.name}
-            {user.is_admin && <span style={{ marginLeft: 10, fontSize: 13, color: 'rgba(180,140,255,.8)',
+            {user.is_admin && <span style={{ marginLeft: 8, fontSize: 13, color: 'rgba(180,140,255,.8)',
               background: 'rgba(120,90,200,.2)', borderRadius: 6, padding: '2px 8px' }}>admin</span>}
+            {user.is_super && <span style={{ marginLeft: 8, fontSize: 13, color: 'rgba(255,200,80,.9)',
+              background: 'rgba(255,180,50,.12)', borderRadius: 6, padding: '2px 8px' }}>⭐ super</span>}
           </h1>
           <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 14 }}>{user.phone}</div>
         </div>
@@ -167,6 +187,16 @@ export default function AdminUserDetail() {
               👑 Назначить admin
             </button>
           )
+        )}
+
+        {user.is_super ? (
+          <button onClick={handleRevokeSuper} style={btnStyle('rgba(255,180,50,.2)')}>
+            ⭐ Снять Super
+          </button>
+        ) : (
+          <button onClick={handleMakeSuper} style={btnStyle('rgba(80,160,255,.25)')}>
+            ⭐ Назначить Super
+          </button>
         )}
       </div>
 

@@ -90,7 +90,9 @@ export const api = {
   // Moments
   getMomentFeed:    (before)      => req('GET',    `/moments${before ? '?before=' + before : ''}`),
   getMyMoments:     (status)     => req('GET',    `/moments/my${status ? `?status=${status}` : ''}`),
+  getSavedMoments:  ()           => req('GET',    '/moments/saved'),
   getMoment:        (id)         => req('GET',    `/moments/${id}`),
+  getMomentReactors:(id)         => req('GET',    `/moments/${id}/reactors`),
   createMoment:     (data)       => req('POST',   '/moments', data),
   updateMoment:     (id, data)   => req('PATCH',  `/moments/${id}`, data),
   archiveMoment:    (id)         => req('POST',   `/moments/${id}/archive`),
@@ -114,6 +116,8 @@ export const api = {
   adminUnblockUser:        (id)            => req('POST',   `/admin/users/${id}/unblock`),
   adminMakeAdmin:          (id)            => req('POST',   `/admin/users/${id}/make-admin`),
   adminRevokeAdmin:        (id)            => req('POST',   `/admin/users/${id}/revoke-admin`),
+  adminMakeSuper:          (id)            => req('POST',   `/admin/users/${id}/make-super`),
+  adminRevokeSuper:        (id)            => req('POST',   `/admin/users/${id}/revoke-super`),
   adminGetMoments:         (params = {})   => {
     const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v)).toString();
     return req('GET', `/admin/moments${qs ? '?' + qs : ''}`);

@@ -39,6 +39,7 @@ function requireAuth(req, res, next) {
       req.user = {
         ...decoded,
         is_admin: !!user.is_admin,
+        is_super: !!user.is_super,
         must_change_password: !!user.must_change_password,
       };
     } else {

@@ -121,6 +121,7 @@ export default function AdminUsers() {
                       <div>
                         <div style={{ color: 'white', fontWeight: 600 }}>{u.name}</div>
                         {u.is_admin && <div style={{ color: 'rgba(180,140,255,.8)', fontSize: 11 }}>admin</div>}
+                        {u.is_super && <div style={{ color: 'rgba(255,200,80,.9)', fontSize: 11 }}>⭐ super</div>}
                       </div>
                     </div>
                   </td>

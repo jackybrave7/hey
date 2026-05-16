@@ -74,7 +74,7 @@ module.exports = function makeRouter(db, broadcast) {
   authModule.init(db); // inject DB into auth for block checks
 
   r.post('/register', rateLimit(5, 15 * 60 * 1000), (req, res) => {
-    const { phone, name, password, birthday, avatar } = req.body;
+    const { phone, name, password, birthday, avatar, inviteUserId } = req.body;
     if (!phone || !name || !password)
       return res.status(400).json({ error: 'phone, name, password required' });
     if (password.length < 8)
@@ -82,6 +82,16 @@ module.exports = function makeRouter(db, broadcast) {
     if (db.findUserByPhone(phone))
       return res.status(409).json({ error: 'Телефон уже зарегистрирован' });
     const user = db.createUser({ phone, name, password, birthday, avatar });
+
+    // Auto-add mutual contacts if registered via invite link
+    if (inviteUserId) {
+      const inviter = db.findUserById(inviteUserId);
+      if (inviter && !inviter.is_blocked) {
+        try { db.addContact(user.id, inviter.id, null); } catch {}
+        try { db.addContact(inviter.id, user.id, null); } catch {}
+      }
+    }
+
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
     const { password: _, ...safe } = user;
     res.json({ token, user: safe });
@@ -495,6 +505,21 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getMyMoments(req.user.id, status));
   });
 
+  // Закладки (talk reaction)
+  r.get('/moments/saved', requireAuth, (req, res) => {
+    const items = db.getSavedMoments(req.user.id);
+    res.json(items.map(m => ({ ...m, myReaction: 'talk' })));
+  });
+
+  // Список реагировавших (только для Super-автора)
+  r.get('/moments/:id/reactors', requireAuth, (req, res) => {
+    const m = db.getMomentById(req.params.id);
+    if (!m) return res.status(404).json({ error: 'Not found' });
+    if (m.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    if (!req.user.is_super) return res.status(403).json({ error: 'Super required' });
+    res.json(db.getMomentReactorsList(req.params.id));
+  });
+
   // Один момент
   r.get('/moments/:id', requireAuth, (req, res) => {
     const m = db.getMomentById(req.params.id);
@@ -605,12 +630,7 @@ module.exports = function makeRouter(db, broadcast) {
     // Notify author
     broadcast([m.user_id], { type: 'moment:reaction', momentId: req.params.id, userId: req.user.id, reaction });
 
-    let chatId = null;
-    if (reaction === 'talk') {
-      const conv = db.getOrCreateDirectConversation(req.user.id, m.user_id);
-      chatId = conv.id;
-    }
-    res.json({ ok: true, chatId });
+    res.json({ ok: true });
   });
 
   r.delete('/moments/:id/react', requireAuth, (req, res) => {
@@ -696,6 +716,20 @@ module.exports = function makeRouter(db, broadcast) {
     if (!user) return res.status(404).json({ error: 'Not found' });
     if (user.id === req.user.id) return res.status(400).json({ error: 'Cannot revoke your own admin' });
     db.adminRevokeAdmin(req.params.id, req.user.id);
+    res.json({ ok: true });
+  });
+
+  r.post('/admin/users/:id/make-super', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    db.makeUserSuper(req.params.id);
+    res.json({ ok: true });
+  });
+
+  r.post('/admin/users/:id/revoke-super', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    db.revokeUserSuper(req.params.id);
     res.json({ ok: true });
   });
 
