@@ -162,6 +162,20 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  // Delete own account — anonymise data, kick WS
+  r.delete('/me', requireAuth, (req, res) => {
+    const { password } = req.body || {};
+    if (!password) return res.status(400).json({ error: 'Введите пароль для подтверждения' });
+    const user = db.findUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    if (!bcrypt.compareSync(password, user.password))
+      return res.status(403).json({ error: 'Неверный пароль' });
+    db.deleteUserAccount(req.user.id);
+    // Notify the deleted user's own WS connections so the client logs out
+    broadcast([req.user.id], { type: 'account:deleted' });
+    res.json({ ok: true });
+  });
+
   r.get('/contacts', requireAuth, (req, res) => {
     res.json(db.getContacts(req.user.id));
   });

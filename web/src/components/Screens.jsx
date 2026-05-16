@@ -8,6 +8,7 @@ import {
   InviteBadge, ForgotPasswordPopup
 } from './auth/AuthComponents';
 import MomentDetailPopup from './moments/MomentDetailPopup';
+import SuperStatusCard from './super/SuperStatusCard';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -730,8 +731,7 @@ export function WelcomeScreen() {
 
 export function MyProfileScreen() {
   const nav = useNavigate();
-  const { user, setUser, logout } = useAuth();
-  const [customConfirm, confirmModal] = useConfirm();
+  const { user, setUser } = useAuth();
 
   const [editing, setEditing]   = useState(false);
   const [name, setName]         = useState('');
@@ -741,14 +741,6 @@ export function MyProfileScreen() {
   const [phoneErr, setPhoneErr] = useState('');
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
-
-  // Password change state
-  const [showPwdModal,  setShowPwdModal]  = useState(false);
-  const [oldPwd,        setOldPwd]        = useState('');
-  const [newPwd,        setNewPwd]        = useState('');
-  const [newPwd2,       setNewPwd2]       = useState('');
-  const [pwdErr,        setPwdErr]        = useState('');
-  const [pwdSaving,     setPwdSaving]     = useState(false);
 
   // Invite link
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -775,23 +767,6 @@ export function MyProfileScreen() {
       }
       return !v;
     });
-  }
-
-  async function submitPasswordChange() {
-    setPwdErr('');
-    if (!oldPwd || !newPwd || !newPwd2) { setPwdErr('Заполните все поля'); return; }
-    if (newPwd !== newPwd2) { setPwdErr('Новые пароли не совпадают'); return; }
-    if (newPwd.length < 8) { setPwdErr('Пароль минимум 8 символов'); return; }
-    setPwdSaving(true);
-    try {
-      await api.changePassword(oldPwd, newPwd);
-      setShowPwdModal(false);
-      setOldPwd(''); setNewPwd(''); setNewPwd2('');
-      showProfileToast('✓ Пароль изменён');
-    } catch(e) {
-      setPwdErr(e.message || 'Ошибка');
-    }
-    setPwdSaving(false);
   }
 
   // Moments state
@@ -968,9 +943,22 @@ export function MyProfileScreen() {
         </div>
       )}
 
+      {/* SUPER status card */}
+      {!editing && (
+        <div style={{padding:'16px 26px 0'}}>
+          <SuperStatusCard user={user} onInvite={() => {
+            const link = `${location.origin}/register?invite=${user?.id}`;
+            navigator.clipboard?.writeText(link).then(() => {
+              setInviteCopied(true);
+              setTimeout(() => setInviteCopied(false), 2500);
+            });
+          }}/>
+        </div>
+      )}
+
       {/* Shortcuts */}
       {!editing && (
-        <div style={{padding:'24px 26px 0',display:'flex',flexDirection:'column',gap:10}}>
+        <div style={{padding:'16px 26px 0',display:'flex',flexDirection:'column',gap:10}}>
           {/* Invite link block */}
           <div style={{
             background:'rgba(120,90,200,.12)', border:'1px solid rgba(180,140,220,.25)',
@@ -1060,16 +1048,6 @@ export function MyProfileScreen() {
             <span>⚙️ Настройки</span>
             <span style={{opacity:.4}}>›</span>
           </button>
-          <button onClick={() => { setShowPwdModal(true); setPwdErr(''); }}
-            style={{
-              display:'flex',alignItems:'center',justifyContent:'space-between',
-              padding:'13px 18px',borderRadius:14,cursor:'pointer',
-              background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',
-              color:'white',fontSize:14,fontWeight:500,
-            }}>
-            <span>🔑 Сменить пароль</span>
-            <span style={{opacity:.4}}>›</span>
-          </button>
           {user?.is_admin && (
             <button onClick={() => nav('/admin')} style={{
               display:'flex',alignItems:'center',justifyContent:'space-between',
@@ -1084,18 +1062,6 @@ export function MyProfileScreen() {
               <span style={{opacity:.5}}>›</span>
             </button>
           )}
-          <button onClick={async () => {
-            if (await customConfirm('Выйти из аккаунта?')) { logout(); nav('/login'); }
-          }} style={{
-            display:'flex',alignItems:'center',
-            background:'rgba(255,90,90,.18)', border:'1px solid rgba(255,120,120,.4)',
-            borderRadius:14, padding:'13px 18px', color:'rgba(255,200,200,.95)',
-            fontSize:14, cursor:'pointer', transition:'background .15s',
-          }}
-            onMouseEnter={e=>e.currentTarget.style.background='rgba(255,90,90,.32)'}
-            onMouseLeave={e=>e.currentTarget.style.background='rgba(255,90,90,.18)'}>
-            Выйти из аккаунта
-          </button>
         </div>
       )}
 
@@ -1254,29 +1220,18 @@ export function MyProfileScreen() {
           {/* Disciplines cloud */}
           {disciplines.length > 0 && (
             <div style={{marginTop:24,padding:'14px 16px',
-              background:'rgba(255,255,255,.05)',borderRadius:16,
-              border:'1px solid rgba(255,255,255,.08)'}}>
-              <div style={{color:'rgba(255,255,255,.4)',fontSize:11,
+              background:'rgba(255,255,255,.07)',borderRadius:16,
+              border:'1px solid rgba(255,255,255,.12)'}}>
+              <div style={{color:'rgba(255,255,255,.55)',fontSize:11,
                 textTransform:'uppercase',letterSpacing:.8,marginBottom:10}}>
                 Дисциплины
               </div>
-              <div style={{color:'rgba(255,255,255,.7)',fontSize:14,lineHeight:1.8}}>
-                Чаще всего публикует{' '}
-                {disciplines.slice(0,3).map((d, i) => (
-                  <span key={d.tag}>
-                    {i > 0 && (i === disciplines.slice(0,3).length - 1 ? ' и ' : ', ')}
-                    <strong style={{color:'rgba(200,160,255,.9)'}}>{d.tag}</strong>
-                    {' '}
-                    <span style={{color:'rgba(255,255,255,.35)',fontSize:12}}>({d.count})</span>
-                  </span>
-                ))}
-              </div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
+              <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
                 {disciplines.map(d => (
                   <span key={d.tag} style={{
-                    background:'rgba(120,90,200,.2)',border:'1px solid rgba(180,140,255,.2)',
-                    borderRadius:20,padding:'4px 12px',fontSize:12,
-                    color:'rgba(200,170,255,.8)',
+                    background:'rgba(140,100,220,.35)',border:'1px solid rgba(200,160,255,.35)',
+                    borderRadius:20,padding:'5px 13px',fontSize:13,
+                    color:'rgba(235,215,255,.95)',fontWeight:500,
                   }}>
                     {d.tag} · {d.count}
                   </span>
@@ -1300,8 +1255,6 @@ export function MyProfileScreen() {
           {profileToast}
         </div>
       )}
-
-      {confirmModal}
 
       {/* Saved moment popup */}
       {savedSelected && (
@@ -1342,58 +1295,6 @@ export function MyProfileScreen() {
             } catch(e) { showProfileToast('Ошибка: ' + e.message); }
           }}
         />
-      )}
-
-      {/* Password change modal */}
-      {showPwdModal && (
-        <div style={{position:'fixed',inset:0,zIndex:900,background:'rgba(0,0,0,.6)',
-          backdropFilter:'blur(10px)',display:'flex',alignItems:'center',
-          justifyContent:'center',padding:'20px'}}
-          onMouseDown={e=>{ if(e.target===e.currentTarget){ setShowPwdModal(false); }}}>
-          <div style={{background:'rgba(22,15,50,.98)',backdropFilter:'blur(24px)',
-            borderRadius:24,width:'min(100%,420px)',
-            boxShadow:'0 8px 48px rgba(0,0,0,.6)',border:'1px solid rgba(255,255,255,.1)',
-            overflow:'hidden'}}>
-            {/* Header */}
-            <div style={{display:'flex',alignItems:'center',padding:'16px 20px',
-              borderBottom:'1px solid rgba(255,255,255,.08)'}}>
-              <span style={{color:'white',fontSize:17,fontWeight:700,flex:1}}>🔑 Смена пароля</span>
-              <button onClick={()=>setShowPwdModal(false)} style={{background:'none',border:'none',
-                color:'rgba(255,255,255,.4)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
-            </div>
-            {/* Fields */}
-            <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
-              {[
-                { label:'Текущий пароль', value:oldPwd,  set:setOldPwd },
-                { label:'Новый пароль',   value:newPwd,  set:setNewPwd },
-                { label:'Повторите новый',value:newPwd2, set:setNewPwd2 },
-              ].map(f => (
-                <div key={f.label}>
-                  <div style={{color:'rgba(255,255,255,.5)',fontSize:12,marginBottom:5}}>{f.label}</div>
-                  <input type="password" value={f.value} onChange={e=>f.set(e.target.value)}
-                    className="ul-input" placeholder="••••••••"
-                    onKeyDown={e=>e.key==='Enter'&&submitPasswordChange()}/>
-                </div>
-              ))}
-              {pwdErr && (
-                <div style={{color:'rgba(255,140,140,.9)',fontSize:13,
-                  background:'rgba(200,50,50,.12)',borderRadius:10,padding:'8px 12px'}}>
-                  {pwdErr}
-                </div>
-              )}
-            </div>
-            {/* Footer */}
-            <div style={{padding:'4px 20px 20px'}}>
-              <button onClick={submitPasswordChange} disabled={pwdSaving}
-                style={{width:'100%',padding:'13px',borderRadius:50,fontSize:15,fontWeight:700,
-                  cursor:pwdSaving?'not-allowed':'pointer',border:'none',color:'white',
-                  background:pwdSaving?'rgba(255,255,255,.1)':'rgba(120,90,200,.85)',
-                  transition:'all .2s',boxShadow:pwdSaving?'none':'0 4px 20px rgba(120,80,200,.35)'}}>
-                {pwdSaving ? 'Сохраняем…' : 'Сменить пароль'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       </div>{/* end 680 inner wrapper */}
@@ -2103,12 +2004,18 @@ export function ContactsScreen() {
             </div>
             {/* Name → opens chat */}
             <div style={{flex:1,minWidth:0}} onClick={() => openChat(c.id)}>
-              <div style={{color:'white',fontSize:15,fontWeight:600,display:'flex',alignItems:'center',gap:8}}>
+              <div style={{color:'white',fontSize:15,fontWeight:600,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                 {c.nickname || c.name}
-                {c.online ? <div className="online-dot"/> : null}
+                {c.online && !c.is_deleted ? <div className="online-dot"/> : null}
+                {c.is_deleted && (
+                  <span style={{fontSize:11,color:'rgba(255,255,255,.35)',fontWeight:400,
+                    background:'rgba(255,255,255,.08)',borderRadius:6,padding:'2px 8px',fontStyle:'italic'}}>
+                    удалил аккаунт
+                  </span>
+                )}
               </div>
-              <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>
-              {c.notes && <div style={{color:'rgba(255,255,255,.3)',fontSize:12,marginTop:2,
+              {!c.is_deleted && <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>}
+              {c.notes && !c.is_deleted && <div style={{color:'rgba(255,255,255,.3)',fontSize:12,marginTop:2,
                 overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
             </div>
             {/* Open card */}
@@ -2214,6 +2121,10 @@ export function ConversationsScreen() {
           <div style={{color:'white',fontSize:15,fontWeight:600}}>{c.name||'Диалог'}</div>
           {isRequest ? (
             <div style={{color:'rgba(180,140,220,.8)',fontSize:13}}>хочет написать вам</div>
+          ) : c.partner_is_deleted ? (
+            <div style={{color:'rgba(255,255,255,.3)',fontSize:13,fontStyle:'italic'}}>
+              Пользователь удалил аккаунт
+            </div>
           ) : (
             <div style={{color:'rgba(255,255,255,.45)',fontSize:13,
               whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -2710,7 +2621,7 @@ export function ChatScreen() {
   const [text,        setText]        = useState('');
   const [showEmoji,   setShowEmoji]   = useState(false);
   const [typing,      setTyping]      = useState(null);
-  const [partner,     setPartner]     = useState({ name:'Диалог', online:false, id:null, isGroup:false, icon:null, admin_id:null, avatar:null });
+  const [partner,     setPartner]     = useState({ name:'Диалог', online:false, id:null, isGroup:false, icon:null, admin_id:null, avatar:null, isDeleted:false });
   const [editingMsg,  setEditingMsg]  = useState(null);
   const [msgMenu,     setMsgMenu]     = useState(null);
   const [imgPreview,  setImgPreview]  = useState(null);
@@ -2728,6 +2639,7 @@ export function ChatScreen() {
   const [hoveredMsg,   setHoveredMsg]   = useState(null);
   const [reactionPicker,setReactionPicker] = useState(null); // { msgId, x, y }
   const [customConfirm, confirmModal] = useConfirm();
+  const [isContact,    setIsContact]    = useState(false); // is partner in my contacts?
   const bottomRef          = useRef();
   const typingTimer        = useRef();
   const textareaRef        = useRef();
@@ -2792,15 +2704,19 @@ export function ChatScreen() {
       if (data.length < 50) setHasMore(false);
       markVisibleAsRead(data);
     }).catch(console.error);
-    api.getConversations().then(convs => {
+    setIsContact(false);
+    Promise.all([api.getConversations(), api.getContacts()]).then(([convs, contacts]) => {
       const c = convs.find(c => c.id === convId);
       if (!c) return;
       if (c.type === 'group') {
         setPartner({ name: c.name||'Группа', online:false, id:null,
-          isGroup:true, icon:c.icon||'👥', admin_id:c.admin_id });
+          isGroup:true, icon:c.icon||'👥', admin_id:c.admin_id, isDeleted:false });
       } else {
         setPartner(p => ({ ...p, name: c.name||'Диалог', id: c.partner_id||null,
-          isGroup:false, avatar: c.avatar||null }));
+          isGroup:false, avatar: c.avatar||null, isDeleted:!!c.partner_is_deleted }));
+        if (c.partner_id) {
+          setIsContact(contacts.some(ct => ct.id === c.partner_id));
+        }
       }
     }).catch(console.error);
   }, [convId]);
@@ -3087,12 +3003,25 @@ export function ChatScreen() {
     setSearchResults(null);
   }
 
+  async function handleAddContact() {
+    if (!partner.id) return;
+    try {
+      await api.addContact({ userId: partner.id });
+      setIsContact(true);
+    } catch(e) {
+      alert(e.message || 'Не удалось добавить в контакты');
+    }
+  }
+
   const chatMenuItems = [
     { label: 'Поиск в чате',            icon: '🔍', danger: false, onClick: () => { setSearchMode(true); setTimeout(()=>searchRef.current?.focus(),50); } },
     { label: 'Медиа и ссылки',          icon: '🖼️', danger: false, onClick: () => setShowMedia(true) },
     ...(partner.isGroup ? [
       { label: 'Настройки группы',      icon: '⚙️', danger: false, onClick: () => nav(`/groups/${convId}/settings`) },
     ] : [
+      ...(!isContact && partner.id && !partner.isDeleted ? [
+        { label: 'Добавить в контакты', icon: '👤', danger: false, onClick: handleAddContact },
+      ] : []),
       { label: 'Экспортировать чат',    icon: '📥', danger: false, onClick: handleExportChat },
     ]),
     { label: 'Удалить содержимое чата', icon: '🗑️', danger: true,  onClick: handleClearChat },
@@ -3457,8 +3386,21 @@ export function ChatScreen() {
         </div>
       )}
 
+      {/* Deleted user banner */}
+      {partner.isDeleted && (
+        <div style={{
+          flexShrink:0, padding:'12px 20px',
+          background:'rgba(255,255,255,.05)',
+          borderTop:'1px solid rgba(255,255,255,.08)',
+          textAlign:'center',
+          color:'rgba(255,255,255,.45)', fontSize:13,
+        }}>
+          🚫 Этот пользователь удалил аккаунт
+        </div>
+      )}
+
       {/* Input bar */}
-      {!requestLock && <div style={{flexShrink:0}}>
+      {!requestLock && !partner.isDeleted && <div style={{flexShrink:0}}>
       <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
         <div style={{
           flex:1, borderRadius:26,
@@ -3993,14 +3935,42 @@ export function SettingsScreen() {
   const nav = useNavigate();
   const { user, logout } = useAuth();
   const [customConfirm, confirmModal] = useConfirm();
-  const [open,          setOpen]         = useState(null);
   const [showBlacklist, setShowBlacklist] = useState(false);
   const [showFeedback,  setShowFeedback]  = useState(false);
-  const [notifPerm,  setNotifPerm] = useState(() =>
+  const [showNotif,     setShowNotif]     = useState(false);
+  const [notifPerm, setNotifPerm] = useState(() =>
     'Notification' in window ? Notification.permission : 'unsupported'
   );
 
-  function toggle(id) { setOpen(o => o === id ? null : id); }
+  // Password change
+  const [showPwdModal, setShowPwdModal] = useState(false);
+  const [oldPwd,   setOldPwd]   = useState('');
+  const [newPwd,   setNewPwd]   = useState('');
+  const [newPwd2,  setNewPwd2]  = useState('');
+  const [pwdErr,   setPwdErr]   = useState('');
+  const [pwdSaving,setPwdSaving]= useState(false);
+  const [toast,    setToast]    = useState('');
+
+  // Delete account
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword,    setDeletePassword]    = useState('');
+  const [deleteErr,         setDeleteErr]         = useState('');
+  const [deleting,          setDeleting]          = useState(false);
+
+  async function submitDeleteAccount() {
+    setDeleteErr('');
+    if (!deletePassword) { setDeleteErr('Введите пароль'); return; }
+    setDeleting(true);
+    try {
+      await api.deleteAccount(deletePassword);
+      // WS event 'account:deleted' will trigger logout in AuthContext
+    } catch(e) {
+      setDeleteErr(e.message || 'Ошибка');
+      setDeleting(false);
+    }
+  }
+
+  function showSettingsToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000); }
 
   async function requestNotifications() {
     if (!('Notification' in window)) return;
@@ -4008,114 +3978,330 @@ export function SettingsScreen() {
     setNotifPerm(perm);
   }
 
-  const sections = [
-    {
-      id: 'notifications', label: 'Оповещения',
-      content: (
-        <div style={{paddingBottom:16,display:'flex',flexDirection:'column',gap:12}}>
-          <div style={{color:'rgba(255,255,255,.55)',fontSize:13}}>
-            Получайте уведомления о новых сообщениях, когда приложение свёрнуто.
-          </div>
-          {notifPerm === 'unsupported' && (
-            <div style={{color:'rgba(255,200,100,.7)',fontSize:13}}>Браузер не поддерживает уведомления</div>
-          )}
-          {notifPerm === 'granted' && (
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <div style={{width:8,height:8,borderRadius:'50%',background:'#2ecc71'}}/>
-              <span style={{color:'white',fontSize:14}}>Уведомления включены</span>
-            </div>
-          )}
-          {notifPerm === 'denied' && (
-            <div style={{color:'rgba(255,120,120,.8)',fontSize:13}}>
-              Уведомления заблокированы — разрешите их в настройках браузера.
-            </div>
-          )}
-          {notifPerm === 'default' && (
-            <button onClick={requestNotifications}
-              style={{alignSelf:'flex-start',background:'rgba(100,78,148,.75)',border:'none',
-                borderRadius:12,padding:'10px 20px',color:'white',fontSize:14,cursor:'pointer'}}>
-              Включить уведомления
-            </button>
-          )}
+  async function submitPasswordChange() {
+    setPwdErr('');
+    if (!oldPwd || !newPwd || !newPwd2) { setPwdErr('Заполните все поля'); return; }
+    if (newPwd !== newPwd2) { setPwdErr('Новые пароли не совпадают'); return; }
+    if (newPwd.length < 8) { setPwdErr('Пароль минимум 8 символов'); return; }
+    setPwdSaving(true);
+    try {
+      await api.changePassword(oldPwd, newPwd);
+      setShowPwdModal(false);
+      setOldPwd(''); setNewPwd(''); setNewPwd2('');
+      showSettingsToast('✓ Пароль изменён');
+    } catch(e) { setPwdErr(e.message || 'Ошибка'); }
+    setPwdSaving(false);
+  }
+
+  // Shared row style
+  function Row({ icon, label, sub, onClick, chevron = true, danger = false }) {
+    return (
+      <button onClick={onClick} style={{
+        width:'100%', display:'flex', alignItems:'center', gap:14,
+        padding:'13px 18px', background:'none', border:'none',
+        color: danger ? 'rgba(255,160,160,.9)' : 'white',
+        fontSize:14, fontWeight:500, cursor:'pointer', textAlign:'left', fontFamily:'inherit',
+        transition:'background .12s',
+      }}
+        onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
+        onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+        <span style={{fontSize:20,flexShrink:0,lineHeight:1}}>{icon}</span>
+        <div style={{flex:1}}>
+          <div>{label}</div>
+          {sub && <div style={{fontSize:12,color:'rgba(255,255,255,.4)',marginTop:1}}>{sub}</div>}
         </div>
-      )
-    },
-    {
-      id: 'display', label: 'Экран',
-      content: (
-        <div style={{paddingBottom:16,color:'rgba(255,255,255,.4)',fontSize:13}}>
-          Настройки темы и размера шрифта. Скоро.
-        </div>
-      )
-    },
-    {
-      id: 'data', label: 'Данные',
-      content: (
-        <div style={{paddingBottom:16,display:'flex',flexDirection:'column',gap:12}}>
-          <div style={{color:'rgba(255,255,255,.55)',fontSize:13}}>Аккаунт: {user?.phone}</div>
-          <button onClick={async () => { if(await customConfirm('Очистить все локальные данные и выйти из аккаунта?', { danger: true, requireWord: 'удалить' })) { localStorage.clear(); logout(); nav('/login'); } }}
-            style={{alignSelf:'flex-start',background:'rgba(220,60,60,.2)',
-              border:'1px solid rgba(220,60,60,.3)',borderRadius:12,padding:'10px 20px',
-              color:'rgba(255,120,120,.9)',fontSize:14,cursor:'pointer'}}>
-            Очистить данные и выйти
-          </button>
-        </div>
-      )
-    },
-  ];
+        {chevron && <span style={{color:'rgba(255,255,255,.3)',fontSize:18}}>›</span>}
+      </button>
+    );
+  }
+
+  const cardStyle = {
+    background:'rgba(255,255,255,.06)', borderRadius:16,
+    border:'1px solid rgba(255,255,255,.08)', overflow:'hidden',
+  };
+  const dividerStyle = { borderBottom:'1px solid rgba(255,255,255,.05)' };
+  const sectionLabelStyle = {
+    color:'rgba(255,255,255,.35)', fontSize:11, fontWeight:700,
+    textTransform:'uppercase', letterSpacing:.8, marginBottom:8, paddingLeft:4,
+  };
 
   return (
-    <div className="screen">
-      <TopBar title="Настройки" onBack={() => nav(-1)}/>
-      <div style={{maxWidth:680,margin:'0 auto',width:'100%',padding:'8px 26px',display:'flex',flexDirection:'column'}}>
-        {sections.map(s => (
-          <div key={s.id}>
-            <div onClick={() => toggle(s.id)}
-              style={{color:'white',fontSize:19,padding:'20px 0',cursor:'pointer',
-                display:'flex',justifyContent:'space-between',alignItems:'center'}}
-              onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
-              onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-              {s.label}
-              <span style={{color:'rgba(255,255,255,.4)',fontSize:18,
-                display:'inline-block',transition:'transform .2s',
-                transform: open===s.id ? 'rotate(90deg)' : 'rotate(0deg)'}}>›</span>
-            </div>
-            {open === s.id && s.content}
-            <div className="divider"/>
-          </div>
-        ))}
+    <div style={{minHeight:'100vh', background:'var(--grad)', paddingBottom:80}}>
 
-        {/* Чёрный список — открывает попап */}
-        <div onClick={() => setShowBlacklist(true)}
-          style={{color:'white',fontSize:19,padding:'20px 0',cursor:'pointer',
-            display:'flex',justifyContent:'space-between',alignItems:'center'}}
-          onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
-          onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-          Чёрный список
-          <span style={{color:'rgba(255,255,255,.4)',fontSize:18}}>›</span>
-        </div>
-        <div className="divider"/>
-
-        {/* Написать разработчику */}
-        <div onClick={() => setShowFeedback(true)}
-          style={{color:'white',fontSize:19,padding:'20px 0',cursor:'pointer',
-            display:'flex',justifyContent:'space-between',alignItems:'center'}}
-          onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
-          onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-          Написать разработчику
-          <span style={{color:'rgba(255,255,255,.4)',fontSize:18}}>›</span>
-        </div>
-        <div className="divider"/>
-
-        <div onClick={logout}
-          style={{color:'rgba(255,160,160,.8)',fontSize:18,padding:'24px 0',cursor:'pointer',marginTop:8}}>
-          Выйти из аккаунта
+      {/* Sticky header */}
+      <div style={{
+        position:'sticky', top:0, zIndex:10,
+        background:'var(--topbar)', backdropFilter:'blur(20px)',
+        borderBottom:'1px solid rgba(255,255,255,.06)',
+      }}>
+        <div style={{maxWidth:680, margin:'0 auto', padding:'14px 20px',
+          display:'flex', alignItems:'center', gap:12}}>
+          <button onClick={() => nav(-1)} style={{
+            background:'rgba(255,255,255,.1)', border:'none', borderRadius:50,
+            width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center',
+            color:'white', fontSize:20, cursor:'pointer', flexShrink:0, lineHeight:1,
+            fontFamily:'inherit',
+          }}>‹</button>
+          <div style={{color:'white', fontSize:20, fontWeight:800, letterSpacing:-.3}}>Настройки</div>
         </div>
       </div>
+
+      <div style={{maxWidth:680, margin:'0 auto', padding:'16px 20px', display:'flex', flexDirection:'column', gap:20}}>
+
+        {/* Аккаунт */}
+        <div>
+          <div style={sectionLabelStyle}>Аккаунт</div>
+          <div style={cardStyle}>
+            <div style={dividerStyle}>
+              <Row icon="📱" label="Телефон" sub={user?.phone || '—'} onClick={() => {}} chevron={false}/>
+            </div>
+            <Row icon="🔑" label="Сменить пароль"
+              onClick={() => { setShowPwdModal(true); setPwdErr(''); }}/>
+          </div>
+        </div>
+
+        {/* Приложение */}
+        <div>
+          <div style={sectionLabelStyle}>Приложение</div>
+          <div style={cardStyle}>
+
+            {/* Оповещения — раскрываемая строка */}
+            <div style={dividerStyle}>
+              <button onClick={() => setShowNotif(v => !v)} style={{
+                width:'100%', display:'flex', alignItems:'center', gap:14,
+                padding:'13px 18px', background:'none', border:'none',
+                color:'white', fontSize:14, fontWeight:500, cursor:'pointer',
+                textAlign:'left', fontFamily:'inherit', transition:'background .12s',
+              }}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                <span style={{fontSize:20,lineHeight:1}}>🔔</span>
+                <div style={{flex:1}}>
+                  <div>Оповещения</div>
+                  <div style={{fontSize:12, marginTop:1,
+                    color: notifPerm==='granted' ? 'rgba(80,220,130,.85)' :
+                           notifPerm==='denied'  ? 'rgba(255,140,140,.75)' : 'rgba(255,255,255,.4)'}}>
+                    {notifPerm==='granted' ? 'Включены' :
+                     notifPerm==='denied'  ? 'Заблокированы в браузере' : 'Не настроены'}
+                  </div>
+                </div>
+                <span style={{color:'rgba(255,255,255,.3)', fontSize:18, transition:'transform .2s',
+                  display:'inline-block',
+                  transform: showNotif ? 'rotate(90deg)' : 'none'}}>›</span>
+              </button>
+              {showNotif && (
+                <div style={{padding:'4px 18px 14px', display:'flex', flexDirection:'column', gap:10}}>
+                  <div style={{color:'rgba(255,255,255,.45)', fontSize:13, lineHeight:1.6}}>
+                    Получайте уведомления о новых сообщениях, когда приложение свёрнуто.
+                  </div>
+                  {notifPerm === 'unsupported' && (
+                    <div style={{color:'rgba(255,200,100,.7)', fontSize:13}}>Браузер не поддерживает уведомления</div>
+                  )}
+                  {notifPerm === 'denied' && (
+                    <div style={{color:'rgba(255,140,140,.8)', fontSize:13}}>
+                      Разрешите уведомления в настройках браузера и перезагрузите страницу.
+                    </div>
+                  )}
+                  {notifPerm === 'default' && (
+                    <button onClick={requestNotifications} style={{
+                      alignSelf:'flex-start', background:'rgba(120,90,200,.75)', border:'none',
+                      borderRadius:50, padding:'9px 20px', color:'white',
+                      fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                    }}>
+                      Включить уведомления
+                    </button>
+                  )}
+                  {notifPerm === 'granted' && (
+                    <div style={{display:'flex', alignItems:'center', gap:8}}>
+                      <div style={{width:8, height:8, borderRadius:'50%', background:'#2ecc71'}}/>
+                      <span style={{color:'rgba(255,255,255,.7)', fontSize:13}}>Уведомления включены</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div style={dividerStyle}>
+              <Row icon="⚫" label="Чёрный список" onClick={() => setShowBlacklist(true)}/>
+            </div>
+            <Row icon="💬" label="Написать разработчику" onClick={() => setShowFeedback(true)}/>
+          </div>
+        </div>
+
+        {/* Данные */}
+        <div>
+          <div style={sectionLabelStyle}>Данные</div>
+          <div style={cardStyle}>
+            <Row icon="🗑" label="Очистить данные и выйти" danger
+              onClick={async () => {
+                if (await customConfirm('Очистить все локальные данные?', { danger:true, requireWord:'удалить' })) {
+                  localStorage.clear(); logout(); nav('/login');
+                }
+              }}/>
+          </div>
+        </div>
+
+        {/* Выйти */}
+        <button onClick={async () => {
+          if (await customConfirm('Выйти из аккаунта?')) { logout(); nav('/login'); }
+        }} style={{
+          padding:'14px', borderRadius:14, cursor:'pointer',
+          background:'rgba(255,60,60,.15)', border:'1px solid rgba(255,100,100,.3)',
+          color:'rgba(255,180,180,.9)', fontSize:15, fontWeight:600,
+          transition:'background .15s', fontFamily:'inherit',
+        }}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,60,60,.27)'}
+          onMouseLeave={e=>e.currentTarget.style.background='rgba(255,60,60,.15)'}>
+          Выйти из аккаунта
+        </button>
+
+        {/* Удалить аккаунт */}
+        <button onClick={() => { setShowDeleteAccount(true); setDeletePassword(''); setDeleteErr(''); }}
+          style={{
+            padding:'14px', borderRadius:14, cursor:'pointer',
+            background:'transparent', border:'1px solid rgba(255,80,80,.2)',
+            color:'rgba(255,120,120,.5)', fontSize:13, fontWeight:500,
+            transition:'all .15s', fontFamily:'inherit',
+          }}
+          onMouseEnter={e=>{ e.currentTarget.style.background='rgba(255,50,50,.08)'; e.currentTarget.style.color='rgba(255,120,120,.75)'; }}
+          onMouseLeave={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='rgba(255,120,120,.5)'; }}>
+          Удалить аккаунт и все данные
+        </button>
+
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position:'fixed', bottom:80, left:'50%', transform:'translateX(-50%)',
+          background:'rgba(30,20,60,.95)', backdropFilter:'blur(20px)',
+          border:'1px solid rgba(255,255,255,.15)',
+          borderRadius:50, padding:'10px 20px',
+          color:'white', fontSize:14, fontWeight:600,
+          zIndex:1000, whiteSpace:'nowrap',
+        }}>
+          {toast}
+        </div>
+      )}
 
       {showBlacklist && <BlacklistModal onClose={() => setShowBlacklist(false)} />}
       {showFeedback  && <FeedbackModal  onClose={() => setShowFeedback(false)}  />}
       {confirmModal}
+
+      {/* Delete account modal */}
+      {showDeleteAccount && (
+        <div style={{position:'fixed',inset:0,zIndex:900,background:'rgba(0,0,0,.72)',
+          backdropFilter:'blur(16px)',display:'flex',alignItems:'center',
+          justifyContent:'center',padding:'20px'}}
+          onMouseDown={e=>{ if(e.target===e.currentTarget) setShowDeleteAccount(false); }}>
+          <div style={{background:'rgba(22,15,50,.98)',backdropFilter:'blur(24px)',
+            borderRadius:22,width:'min(100%,420px)',padding:'28px 24px',
+            boxShadow:'0 8px 48px rgba(0,0,0,.6)',border:'1px solid rgba(255,100,100,.2)'}}>
+            <div style={{textAlign:'center',marginBottom:20}}>
+              <div style={{fontSize:36,marginBottom:10}}>⚠️</div>
+              <div style={{color:'rgba(255,140,140,.95)',fontSize:18,fontWeight:700,marginBottom:8}}>
+                Удалить аккаунт?
+              </div>
+              <div style={{color:'rgba(255,255,255,.5)',fontSize:13,lineHeight:1.6}}>
+                Все данные будут удалены навсегда — сообщения, моменты, профиль.
+                Те, кто с тобой общался, увидят «Пользователь удалил аккаунт».
+              </div>
+            </div>
+            <div style={{marginBottom:14}}>
+              <div style={{color:'rgba(255,255,255,.5)',fontSize:12,marginBottom:6}}>
+                Введите пароль для подтверждения:
+              </div>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={e => { setDeletePassword(e.target.value); setDeleteErr(''); }}
+                placeholder="Пароль"
+                autoFocus
+                style={{
+                  width:'100%', boxSizing:'border-box',
+                  background:'rgba(255,255,255,.07)',
+                  border:`1px solid ${deleteErr ? 'rgba(255,100,100,.6)' : 'rgba(255,255,255,.14)'}`,
+                  borderRadius:12, padding:'11px 14px', color:'white', fontSize:14,
+                  fontFamily:'inherit', outline:'none',
+                }}
+              />
+              {deleteErr && (
+                <div style={{color:'rgba(255,140,140,.85)',fontSize:12,marginTop:6}}>{deleteErr}</div>
+              )}
+            </div>
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={() => setShowDeleteAccount(false)} style={{
+                flex:1, padding:'12px', borderRadius:12,
+                background:'rgba(255,255,255,.08)', border:'none',
+                color:'rgba(255,255,255,.6)', fontSize:14, fontWeight:600, cursor:'pointer',
+                fontFamily:'inherit',
+              }}>
+                Отмена
+              </button>
+              <button onClick={submitDeleteAccount} disabled={!deletePassword || deleting} style={{
+                flex:1, padding:'12px', borderRadius:12,
+                background: deletePassword && !deleting ? 'rgba(220,50,50,.85)' : 'rgba(255,255,255,.07)',
+                border:'none',
+                color: deletePassword && !deleting ? 'white' : 'rgba(255,255,255,.3)',
+                fontSize:14, fontWeight:700, cursor: deletePassword && !deleting ? 'pointer' : 'not-allowed',
+                fontFamily:'inherit',
+              }}>
+                {deleting ? 'Удаляем…' : 'Удалить навсегда'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password change modal */}
+      {showPwdModal && (
+        <div style={{position:'fixed',inset:0,zIndex:900,background:'rgba(0,0,0,.6)',
+          backdropFilter:'blur(10px)',display:'flex',alignItems:'center',
+          justifyContent:'center',padding:'20px'}}
+          onMouseDown={e=>{ if(e.target===e.currentTarget) setShowPwdModal(false); }}>
+          <div style={{background:'rgba(22,15,50,.98)',backdropFilter:'blur(24px)',
+            borderRadius:24,width:'min(100%,420px)',
+            boxShadow:'0 8px 48px rgba(0,0,0,.6)',border:'1px solid rgba(255,255,255,.1)',
+            overflow:'hidden'}}>
+            <div style={{display:'flex',alignItems:'center',padding:'16px 20px',
+              borderBottom:'1px solid rgba(255,255,255,.08)'}}>
+              <span style={{color:'white',fontSize:17,fontWeight:700,flex:1}}>🔑 Смена пароля</span>
+              <button onClick={()=>setShowPwdModal(false)} style={{background:'none',border:'none',
+                color:'rgba(255,255,255,.4)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
+            </div>
+            <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
+              {[
+                { label:'Текущий пароль', value:oldPwd,  set:setOldPwd  },
+                { label:'Новый пароль',   value:newPwd,  set:setNewPwd  },
+                { label:'Повторите новый',value:newPwd2, set:setNewPwd2 },
+              ].map(f => (
+                <div key={f.label}>
+                  <div style={{color:'rgba(255,255,255,.5)',fontSize:12,marginBottom:5}}>{f.label}</div>
+                  <input type="password" value={f.value} onChange={e=>f.set(e.target.value)}
+                    className="ul-input" placeholder="••••••••"
+                    onKeyDown={e=>e.key==='Enter'&&submitPasswordChange()}/>
+                </div>
+              ))}
+              {pwdErr && (
+                <div style={{color:'rgba(255,140,140,.9)',fontSize:13,
+                  background:'rgba(200,50,50,.12)',borderRadius:10,padding:'8px 12px'}}>
+                  {pwdErr}
+                </div>
+              )}
+            </div>
+            <div style={{padding:'4px 20px 20px'}}>
+              <button onClick={submitPasswordChange} disabled={pwdSaving}
+                style={{width:'100%',padding:'13px',borderRadius:50,fontSize:15,fontWeight:700,
+                  cursor:pwdSaving?'not-allowed':'pointer',border:'none',color:'white',
+                  background:pwdSaving?'rgba(255,255,255,.1)':'rgba(120,90,200,.85)',
+                  transition:'all .2s',fontFamily:'inherit',
+                  boxShadow:pwdSaving?'none':'0 4px 20px rgba(120,80,200,.35)'}}>
+                {pwdSaving ? 'Сохраняем…' : 'Сменить пароль'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

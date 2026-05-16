@@ -20,6 +20,17 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Force logout when server confirms account deletion
+  useEffect(() => {
+    const unsub = socket.on('account:deleted', () => {
+      localStorage.removeItem('hey_token');
+      socket.disconnect();
+      setUser(null);
+      window.location.href = '/login';
+    });
+    return unsub;
+  }, []);
+
   function login(token, userData) {
     localStorage.setItem('hey_token', token);
     setUser(userData);

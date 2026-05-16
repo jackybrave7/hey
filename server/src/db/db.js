@@ -140,6 +140,8 @@ try { db.exec('ALTER TABLE users ADD COLUMN blocked_at INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN blocked_by TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_super INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER'); } catch {}
 // ── Message requests ──────────────────────────────────────────────────────────
 try { db.exec('ALTER TABLE conversations ADD COLUMN request_from TEXT'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (
@@ -226,7 +228,27 @@ function getContacts(ownerId) {
      LEFT JOIN presence p ON p.user_id = c.contact_id
      WHERE c.owner_id = ?`
   ).all(ownerId);
-  return rows.map(({ password, ...r }) => ({ ...r, online: !!r.online }));
+  return rows.map(({ password, ...r }) => ({ ...r, online: !!r.online, is_deleted: !!r.is_deleted }));
+}
+
+function deleteUserAccount(userId) {
+  const t = now();
+  db.transaction(() => {
+    // Anonymise personal data
+    db.prepare(
+      `UPDATE users SET
+         is_deleted=1, deleted_at=?,
+         name='Удалённый пользователь',
+         phone=NULL,
+         avatar=NULL,
+         password=?
+       WHERE id=?`
+    ).run(t, `DELETED_${userId}_${t}`, userId);
+    // Archive all active moments so they vanish from feeds
+    db.prepare(
+      `UPDATE moments SET status='archived' WHERE user_id=? AND status='active'`
+    ).run(userId);
+  })();
 }
 
 function addContact(ownerId, contactId, nickname) {
@@ -461,10 +483,12 @@ function getConversationsForUser(userId) {
     const isRecipient = isRequest && conv.request_from !== userId;
     const last = lastMap[convId];
 
+    const partnerUser = conv.type === 'direct' && partnerId ? usersMap[partnerId] : null;
     return {
       id: convId, type: conv.type, name, icon: conv.icon || null,
       admin_id: conv.admin_id || null, partner_id: partnerId,
       avatar: partnerAvatar,
+      partner_is_deleted: !!(partnerUser?.is_deleted),
       last_text: isRecipient ? null : (last?.text || null),
       last_at:   last?.created_at || conv.created_at,
       last_sender_id: isRecipient ? null : (last?.sender_id || null),
@@ -974,7 +998,7 @@ function getPresence(userId) {
 
 module.exports = {
   now,
-  createUser, findUserByPhone, findUserById, updateUser,
+  createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount,
   getContacts, addContact, removeContact, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   getOrCreateDirectConversation, acceptRequest, declineRequest,

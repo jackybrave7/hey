@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import MoodEmoji from './MoodEmoji';
+import SuperInfoScreen from '../super/SuperInfoScreen';
 
 function fmtDate(ts) {
   if (!ts) return '';
@@ -92,7 +93,7 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
 
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
+          position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, zIndex: 50,
           background: 'rgba(28,18,58,.98)', backdropFilter: 'blur(20px)',
           borderRadius: 14, overflow: 'hidden', minWidth: 210,
           boxShadow: '0 8px 32px rgba(0,0,0,.5)',
@@ -128,6 +129,8 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
   const [myReaction, setMyReaction] = useState(initial.myReaction || null);
   const [reacting, setReacting] = useState(false);
   const [reactors, setReactors] = useState(null); // null = not loaded yet
+  const [showAnalyticsPromo, setShowAnalyticsPromo] = useState(false);
+  const [showSuperInfo, setShowSuperInfo] = useState(false);
 
   // Register view
   useEffect(() => {
@@ -179,6 +182,7 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
   const hasMedia = !!moment.media_url;
 
   return (
+    <>
     <div
       style={{
         position:'fixed',inset:0,zIndex:700,
@@ -240,8 +244,19 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
               <div style={{width:40,height:40,borderRadius:'50%',
                 background:'rgba(180,140,220,.35)',flexShrink:0,
                 display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:18,color:'white',fontWeight:600}}>
+                fontSize:18,color:'white',fontWeight:600,
+                position:'relative'}}>
                 {(moment.author_name||'?')[0].toUpperCase()}
+                {moment.author_is_super && (
+                  <div style={{
+                    position:'absolute',bottom:0,right:0,
+                    width:14,height:14,borderRadius:'50%',
+                    background:'linear-gradient(135deg,#c8a8ff,#7858b0)',
+                    border:'2px solid rgba(22,15,50,.98)',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    fontSize:7,color:'white',fontWeight:700,
+                  }}>✦</div>
+                )}
               </div>
               <div style={{flex:1}}>
                 <div style={{color:'white',fontSize:15,fontWeight:600}}>{moment.author_name}</div>
@@ -293,11 +308,19 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
             {/* Analytics (own) or Reactions (other) */}
             {isMine ? (
               <>
-                <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
-                  display:'flex',gap:20}}>
+                {/* Stats counters — tappable for free users (promo), shows reactors for Super */}
+                <div
+                  onClick={() => { if (!moment.author_is_super) setShowAnalyticsPromo(true); }}
+                  style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
+                    display:'flex',gap:20,
+                    cursor: moment.author_is_super ? 'default' : 'pointer',
+                  }}>
                   <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>👁 {moment.views || 0}</span>
                   <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0}</span>
                   <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>🤝 {moment.stats?.talk || 0}</span>
+                  {!moment.author_is_super && (
+                    <span style={{marginLeft:'auto',color:'rgba(255,255,255,.25)',fontSize:12}}>кто? ›</span>
+                  )}
                 </div>
                 {/* Reactors list — Super only */}
                 {moment.author_is_super && reactors && reactors.length > 0 && (
@@ -378,5 +401,58 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
         ) : null}
       </div>
     </div>
+
+    {/* Analytics promo popup for free users */}
+    {showAnalyticsPromo && (
+      <div style={{
+        position:'fixed',inset:0,zIndex:800,
+        background:'rgba(0,0,0,.6)',backdropFilter:'blur(12px)',
+        display:'flex',alignItems:'center',justifyContent:'center',
+        padding:'20px',
+      }}
+        onMouseDown={e=>{ if(e.target===e.currentTarget) setShowAnalyticsPromo(false); }}
+      >
+        <div style={{
+          background:'rgba(22,15,50,.98)',backdropFilter:'blur(24px)',
+          borderRadius:22,width:'min(100%,380px)',
+          padding:'28px 24px',
+          boxShadow:'0 8px 48px rgba(0,0,0,.6)',
+          border:'1px solid rgba(255,255,255,.1)',
+          textAlign:'center',
+        }}>
+          <div style={{fontSize:32,marginBottom:14}}>📊</div>
+          <div style={{color:'white',fontSize:17,fontWeight:700,marginBottom:8}}>
+            Хочешь увидеть кто именно?
+          </div>
+          <div style={{color:'rgba(255,255,255,.5)',fontSize:14,lineHeight:1.5,marginBottom:20}}>
+            В СУПЕР видно каждого кто отреагировал — с аватаром и временем
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button onClick={() => setShowAnalyticsPromo(false)} style={{
+              flex:1,padding:'12px',borderRadius:13,
+              background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.1)',
+              color:'rgba(255,255,255,.6)',fontSize:14,fontWeight:600,cursor:'pointer',
+            }}>
+              Понятно
+            </button>
+            <button onClick={() => { setShowAnalyticsPromo(false); setShowSuperInfo(true); }} style={{
+              flex:2,padding:'12px',borderRadius:13,
+              background:'rgba(120,90,200,.85)',border:'1px solid rgba(180,140,255,.3)',
+              color:'white',fontSize:14,fontWeight:700,cursor:'pointer',
+            }}>
+              ✦ Узнать больше
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showSuperInfo && (
+      <SuperInfoScreen
+        onClose={() => setShowSuperInfo(false)}
+        onInvite={() => setShowSuperInfo(false)}
+      />
+    )}
+    </>
   );
 }

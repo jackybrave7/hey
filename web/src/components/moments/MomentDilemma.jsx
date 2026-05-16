@@ -1,13 +1,14 @@
 // MomentDilemma.jsx — конфликт при создании нового Момента (уже есть активный)
 import { useState } from 'react';
 import { api } from '../../api';
+import SuperPromoBanner from '../super/SuperPromoBanner';
 
 function fmtDate(ts) {
   if (!ts) return '';
   return new Date(ts * 1000).toLocaleDateString('ru', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
 }
 
-export default function MomentDilemma({ existing, pendingData, onResolved, onClose }) {
+export default function MomentDilemma({ existing, pendingData, onResolved, onClose, currentUser }) {
   const [loading, setLoading] = useState(null); // 'archive' | 'delete'
   const [deleteWord, setDeleteWord] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -179,23 +180,8 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
             </div>
           )}
 
-          {/* SUPER promo */}
-          <div style={{
-            background:'linear-gradient(135deg,rgba(120,80,200,.3),rgba(200,120,50,.25))',
-            border:'1px solid rgba(200,150,80,.3)',
-            borderRadius:16,padding:'14px 16px',
-            display:'flex',alignItems:'center',gap:12,
-          }}>
-            <div style={{fontSize:28}}>⚡</div>
-            <div>
-              <div style={{color:'rgba(255,200,100,.9)',fontSize:14,fontWeight:700}}>
-                СУПЕР — до 3 моментов одновременно
-              </div>
-              <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginTop:3}}>
-                Расскажи о нескольких проектах сразу
-              </div>
-            </div>
-          </div>
+          {/* SUPER promo — only for non-super users */}
+          {!currentUser?.is_super && <SuperPromoBanner />}
         </div>
       </div>
     </div>

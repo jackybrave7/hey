@@ -333,6 +333,7 @@ export default function MomentsFeed({ currentUser }) {
         <MomentDilemma
           existing={conflictExisting}
           pendingData={pendingData}
+          currentUser={currentUser}
           onResolved={handleDilemmaResolved}
           onClose={() => { setShowDilemma(false); setPendingData(null); setConflictExisting(null); }}
         />

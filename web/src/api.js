@@ -41,6 +41,7 @@ export const api = {
   getMe:          ()     => req('GET', '/me'),
   updateMe:       (data) => req('PATCH', '/me', data),
   changePassword: (oldPassword, newPassword) => req('POST', '/me/password', { oldPassword, newPassword }),
+  deleteAccount:  (password) => req('DELETE', '/me', { password }),
 
   // Contacts
   getContacts:    ()       => req('GET', '/contacts'),

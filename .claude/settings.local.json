@@ -83,7 +83,11 @@
       "Bash(node --check server/scripts/make-first-admin.js)",
       "Bash(node -e \"const db = require\\('./server/src/db/db'\\); console.log\\('DB loaded OK'\\); console.log\\('Admin functions:', Object.keys\\(db\\).filter\\(k => k.startsWith\\('admin'\\) || k.startsWith\\('getAdmin'\\) || k.startsWith\\('logAdmin'\\)\\)\\); process.exit\\(0\\);\")",
       "WebFetch(domain:hey-messenger.ru)",
-      "Bash(curl -v --max-time 15 https://hey-messenger.ru)"
+      "Bash(curl -v --max-time 15 https://hey-messenger.ru)",
+      "Bash(node -e \"const db = require\\('./src/db/db'\\); const u = db.findUserByPhone\\('+79067549992'\\); console.log\\(JSON.stringify\\(u, null, 2\\)\\);\")",
+      "Read(//c/Users/User/projects/hey/**)",
+      "Read(//c//**)",
+      "Bash(curl -v https://hey-messenger.ru/api/admin/users -H \"Authorization: Bearer invalid\")"
     ]
   }
 }
