@@ -753,6 +753,9 @@ export function MyProfileScreen() {
   // Invite link
   const [inviteCopied, setInviteCopied] = useState(false);
 
+  // Archive popup
+  const [archiveSelected, setArchiveSelected] = useState(null);
+
   // Saved moments (Поговорить)
   const [savedMoments, setSavedMoments]     = useState([]);
   const [savedLoading, setSavedLoading]     = useState(false);
@@ -1213,40 +1216,35 @@ export function MyProfileScreen() {
                 </div>
               ) : (
                 myMoments.filter(m => m.status === 'archived').map(m => (
-                  <div key={m.id} style={{background:'rgba(255,255,255,.05)',borderRadius:14,
-                    padding:'12px 14px',border:'1px solid rgba(255,255,255,.08)',
-                    display:'flex',alignItems:'center',gap:12}}>
-                    {m.media_url && m.media_type === 'image' && (
+                  <div key={m.id}
+                    onClick={() => setArchiveSelected(m)}
+                    style={{background:'rgba(255,255,255,.05)',borderRadius:14,
+                      padding:'12px 14px',border:'1px solid rgba(255,255,255,.08)',
+                      display:'flex',alignItems:'center',gap:12,
+                      cursor:'pointer',transition:'background .15s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.09)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}>
+                    {m.media_url && m.media_type === 'image' ? (
                       <img src={m.media_url} alt=""
-                        style={{width:48,height:48,borderRadius:10,objectFit:'cover',flexShrink:0}}/>
+                        style={{width:52,height:52,borderRadius:10,objectFit:'cover',flexShrink:0}}/>
+                    ) : (
+                      <div style={{width:52,height:52,borderRadius:10,flexShrink:0,
+                        background:'linear-gradient(135deg,#1e0a40,#3a1060)',
+                        display:'flex',alignItems:'center',justifyContent:'center',
+                        fontSize:22,color:'rgba(255,255,255,.4)'}}>✦</div>
                     )}
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{color:'rgba(255,255,255,.75)',fontSize:13,lineHeight:1.5,
+                      <div style={{color:'rgba(255,255,255,.8)',fontSize:13,lineHeight:1.5,
                         overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                         {m.text}
                       </div>
                       <div style={{color:'rgba(255,255,255,.3)',fontSize:11,marginTop:3}}>
-                        {m.archived_at
+                        📦 {m.archived_at
                           ? new Date(m.archived_at * 1000).toLocaleDateString('ru', {day:'numeric',month:'short'})
-                          : ''}
+                          : 'в архиве'}
                       </div>
                     </div>
-                    <button onClick={async () => {
-                      const active = myMoments.find(x => x.status === 'active');
-                      if (active) {
-                        showProfileToast('Сначала отправь текущий момент в архив');
-                        return;
-                      }
-                      try {
-                        const restored = await api.restoreMoment(m.id);
-                        setMyMoments(prev => prev.map(x => x.id === m.id ? {...x, status:'active'} : x));
-                        showProfileToast('✦ Момент восстановлен');
-                      } catch(e) { showProfileToast('Ошибка: ' + e.message); }
-                    }} style={{background:'rgba(120,90,200,.6)',border:'none',borderRadius:10,
-                      padding:'7px 12px',color:'white',fontSize:12,fontWeight:600,cursor:'pointer',
-                      flexShrink:0}}>
-                      ↩ Вернуть
-                    </button>
+                    <span style={{color:'rgba(255,255,255,.25)',fontSize:18,flexShrink:0}}>›</span>
                   </div>
                 ))
               )}
@@ -1315,6 +1313,34 @@ export function MyProfileScreen() {
           onEdit={() => {}}
           onArchive={() => {}}
           onDelete={() => {}}
+        />
+      )}
+
+      {/* Archive moment popup */}
+      {archiveSelected && (
+        <MomentDetailPopup
+          moment={{ ...archiveSelected, author_name: user?.name, author_avatar: user?.avatar }}
+          isMine={true}
+          currentUser={user}
+          onClose={() => setArchiveSelected(null)}
+          onEdit={() => {}}
+          onArchive={() => {}}
+          onDelete={() => {}}
+          onRestore={async () => {
+            const active = myMoments.find(x => x.status === 'active');
+            if (active) {
+              showProfileToast('Сначала отправь текущий момент в архив');
+              return;
+            }
+            try {
+              await api.restoreMoment(archiveSelected.id);
+              setMyMoments(prev => prev.map(x =>
+                x.id === archiveSelected.id ? { ...x, status: 'active' } : x
+              ));
+              setArchiveSelected(null);
+              showProfileToast('✦ Момент восстановлен');
+            } catch(e) { showProfileToast('Ошибка: ' + e.message); }
+          }}
         />
       )}
 

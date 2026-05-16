@@ -122,7 +122,7 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
   );
 }
 
-export default function MomentDetailPopup({ moment: initial, isMine, currentUser, onClose, onEdit, onArchive, onDelete }) {
+export default function MomentDetailPopup({ moment: initial, isMine, currentUser, onClose, onEdit, onArchive, onDelete, onRestore }) {
   const nav = useNavigate();
   const [moment, setMoment] = useState(initial);
   const [myReaction, setMyReaction] = useState(initial.myReaction || null);
@@ -356,8 +356,17 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
           </div>
         </div>
 
-        {/* Footer — only for other people's moments */}
-        {!isMine && (
+        {/* Footer — restore (archived) or write message (others') */}
+        {onRestore ? (
+          <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
+            <button onClick={onRestore}
+              style={{width:'100%',padding:'13px',borderRadius:14,
+                background:'rgba(120,90,200,.75)',border:'none',
+                color:'white',fontSize:15,fontWeight:600,cursor:'pointer'}}>
+              ↩ Вернуть в активные
+            </button>
+          </div>
+        ) : !isMine ? (
           <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
             <button onClick={handleChat}
               style={{width:'100%',padding:'13px',borderRadius:14,
@@ -366,7 +375,7 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
               ✉ Написать {moment.author_name?.split(' ')[0]}
             </button>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
