@@ -142,6 +142,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT
 try { db.exec('ALTER TABLE users ADD COLUMN is_super INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN bio TEXT'); } catch {}
 // ── Message requests ──────────────────────────────────────────────────────────
 try { db.exec('ALTER TABLE conversations ADD COLUMN request_from TEXT'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (

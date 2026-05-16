@@ -136,12 +136,13 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   r.patch('/me', requireAuth, (req, res) => {
-    const { name, phone, birthday, avatar } = req.body;
+    const { name, phone, birthday, avatar, bio } = req.body;
     const updates = {};
     if (name) updates.name = name;
     if (phone) updates.phone = phone;
     if (birthday !== undefined) updates.birthday = birthday;
-    if (avatar !== undefined) updates.avatar = avatar;
+    if (avatar  !== undefined) updates.avatar = avatar;
+    if (bio     !== undefined) updates.bio = bio.slice(0, 200); // hard cap 200 chars
     const user = db.updateUser(req.user.id, updates);
     const { password, ...safe } = user;
     res.json(safe);

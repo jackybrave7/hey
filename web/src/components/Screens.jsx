@@ -738,6 +738,7 @@ export function MyProfileScreen() {
   const [phone, setPhone]       = useState('');
   const [birthday, setBirthday] = useState('');
   const [avatar, setAvatar]     = useState('');
+  const [bio, setBio]           = useState('');
   const [phoneErr, setPhoneErr] = useState('');
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
@@ -788,6 +789,7 @@ export function MyProfileScreen() {
       setPhone(user.phone || '');
       setBirthday(user.birthday || '');
       setAvatar(user.avatar || '');
+      setBio(user.bio || '');
     }
   }, [user]);
 
@@ -821,6 +823,7 @@ export function MyProfileScreen() {
     setPhone(user.phone || '');
     setBirthday(user.birthday || '');
     setAvatar(user.avatar || '');
+    setBio(user.bio || '');
   }
 
   async function saveProfile() {
@@ -833,7 +836,8 @@ export function MyProfileScreen() {
         name: name.trim(),
         phone: pv.normalized,
         birthday: birthday || null,
-        avatar: avatar || null
+        avatar: avatar || null,
+        bio: bio.trim() || null,
       });
       setUser(updated);
       setEditing(false);
@@ -936,9 +940,44 @@ export function MyProfileScreen() {
         </div>
       </div>
 
+      {/* Bio — full-width row below avatar block */}
+      <div style={{padding:'16px 26px 0'}}>
+        {editing ? (
+          <div>
+            <div style={{color:'rgba(255,255,255,.6)',fontSize:12,marginBottom:6,display:'flex',justifyContent:'space-between'}}>
+              <span>О себе</span>
+              <span style={{color: bio.length > 180 ? 'rgba(255,180,100,.8)' : 'rgba(255,255,255,.25)'}}>{bio.length}/200</span>
+            </div>
+            <textarea
+              value={bio}
+              onChange={e => setBio(e.target.value.slice(0, 200))}
+              placeholder="Расскажи о себе — пару строк о том, чем занимаешься…"
+              rows={3}
+              style={{
+                width:'100%', boxSizing:'border-box',
+                background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.15)',
+                borderRadius:12, padding:'10px 13px', color:'white', fontSize:14,
+                fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.6,
+                transition:'border-color .15s',
+              }}
+              onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.6)'}
+              onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.15)'}
+            />
+          </div>
+        ) : user?.bio ? (
+          <div style={{
+            background:'rgba(255,255,255,.05)', borderRadius:14,
+            border:'1px solid rgba(255,255,255,.08)', padding:'12px 16px',
+            color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.6,
+          }}>
+            {user.bio}
+          </div>
+        ) : null}
+      </div>
+
       {/* Hint when not editing */}
       {!editing && (
-        <div style={{padding:'24px 26px 0',color:'rgba(255,255,255,.4)',fontSize:13}}>
+        <div style={{padding:'12px 26px 0',color:'rgba(255,255,255,.4)',fontSize:13}}>
           Нажмите ✎ чтобы редактировать профиль
         </div>
       )}
@@ -1432,6 +1471,16 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
 
         {/* Body */}
         <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:16}}>
+          {/* Bio */}
+          {contact.bio && (
+            <div style={{
+              background:'rgba(255,255,255,.06)', borderRadius:12,
+              border:'1px solid rgba(255,255,255,.1)', padding:'11px 14px',
+              color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.6,
+            }}>
+              {contact.bio}
+            </div>
+          )}
           {/* Notes */}
           <div>
             <div style={{color:'rgba(255,255,255,.5)',fontSize:12,marginBottom:6,
@@ -2071,6 +2120,10 @@ export function ConversationsScreen() {
   const nav = useNavigate();
   const { user } = useAuth();
   const [convs, setConvs] = useState([]);
+  // Popup for incoming request — shows requester's profile card
+  const [requestCard, setRequestCard] = useState(null); // { conv, profile } | null
+  const [requestCardLoading, setRequestCardLoading] = useState(false);
+  const [requestCardAction, setRequestCardAction] = useState(null); // 'accept' | 'decline' | null
 
   const reload = () => api.getConversations().then(setConvs).catch(console.error);
 
@@ -2099,11 +2152,28 @@ export function ConversationsScreen() {
   const requestConvs = convs.filter(c => c.is_request && c.request_from !== user?.id);
 
   function ConvRow({ c, isRequest }) {
-    return (
-      <div onClick={() => {
-        if (!isRequest) setConvs(prev => prev.map(x => x.id === c.id ? { ...x, unread_count: 0 } : x));
+    async function handleRowClick() {
+      if (isRequest) {
+        // Show profile card instead of navigating directly
+        if (!c.partner_id) { nav(`/chat/${c.id}`); return; }
+        setRequestCardLoading(true);
+        try {
+          const profile = await api.getUserProfile(c.partner_id);
+          setRequestCard({ conv: c, profile });
+        } catch {
+          // Fallback — just open chat
+          nav(`/chat/${c.id}`);
+        } finally {
+          setRequestCardLoading(false);
+        }
+      } else {
+        setConvs(prev => prev.map(x => x.id === c.id ? { ...x, unread_count: 0 } : x));
         nav(`/chat/${c.id}`);
-      }}
+      }
+    }
+
+    return (
+      <div onClick={handleRowClick}
         style={{display:'flex',alignItems:'center',gap:12,padding:'12px 20px',
           cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s'}}
         onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
@@ -2216,6 +2286,151 @@ export function ConversationsScreen() {
         )}
 
       </div>
+
+      {/* Loading spinner while fetching profile */}
+      {requestCardLoading && (
+        <div style={{
+          position:'fixed',inset:0,zIndex:600,
+          background:'rgba(0,0,0,.5)',backdropFilter:'blur(8px)',
+          display:'flex',alignItems:'center',justifyContent:'center',
+        }}>
+          <div style={{color:'rgba(255,255,255,.6)',fontSize:14}}>Загрузка…</div>
+        </div>
+      )}
+
+      {/* Request profile card popup */}
+      {requestCard && (
+        <div
+          style={{
+            position:'fixed',inset:0,zIndex:600,
+            background:'rgba(0,0,0,.65)',backdropFilter:'blur(14px)',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            padding:'20px',
+          }}
+          onMouseDown={e=>{ if(e.target===e.currentTarget) setRequestCard(null); }}
+        >
+          <div style={{
+            background:'rgba(28,18,58,.98)',backdropFilter:'blur(24px)',
+            borderRadius:24,width:'min(100%,400px)',
+            boxShadow:'0 12px 56px rgba(0,0,0,.6)',
+            border:'1px solid rgba(255,255,255,.1)',
+            overflow:'hidden',
+          }}>
+            {/* Header with avatar */}
+            <div style={{
+              background:'linear-gradient(160deg,rgba(92,60,160,.8),rgba(140,80,180,.6))',
+              padding:'32px 24px 24px',
+              display:'flex',flexDirection:'column',alignItems:'center',gap:14,
+              position:'relative',
+            }}>
+              <button onClick={() => setRequestCard(null)} style={{
+                position:'absolute',top:14,right:14,
+                background:'rgba(255,255,255,.12)',border:'none',borderRadius:'50%',
+                width:30,height:30,color:'white',fontSize:16,cursor:'pointer',
+                display:'flex',alignItems:'center',justifyContent:'center',
+              }}>✕</button>
+
+              <AvatarDisplay
+                avatar={requestCard.profile.avatar}
+                name={requestCard.profile.name}
+                size={90} fontSize={38}
+                style={{boxShadow:'0 8px 24px rgba(0,0,0,.35)',border:'3px solid rgba(255,255,255,.2)'}}
+              />
+              <div style={{textAlign:'center'}}>
+                <div style={{color:'white',fontSize:20,fontWeight:700,marginBottom:4}}>
+                  {requestCard.profile.name}
+                </div>
+                <div style={{
+                  display:'inline-block',
+                  background:'rgba(120,90,200,.45)',border:'1px solid rgba(180,140,255,.3)',
+                  borderRadius:20,padding:'3px 12px',fontSize:12,color:'rgba(220,200,255,.9)',
+                }}>
+                  хочет написать вам
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:14}}>
+              {/* Bio */}
+              {requestCard.profile.bio && (
+                <div style={{
+                  background:'rgba(255,255,255,.06)',borderRadius:12,
+                  border:'1px solid rgba(255,255,255,.09)',padding:'12px 14px',
+                  color:'rgba(255,255,255,.75)',fontSize:14,lineHeight:1.6,
+                }}>
+                  {requestCard.profile.bio}
+                </div>
+              )}
+
+              {/* Active moment preview if any */}
+              {requestCard.profile.active_moment && (
+                <div style={{
+                  background:'rgba(255,255,255,.06)',borderRadius:12,
+                  border:'1px solid rgba(255,255,255,.09)',padding:'12px 14px',
+                }}>
+                  <div style={{color:'rgba(255,255,255,.35)',fontSize:10,textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}>
+                    Текущий момент
+                  </div>
+                  <div style={{color:'rgba(255,255,255,.8)',fontSize:13,lineHeight:1.5,
+                    overflow:'hidden',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>
+                    {requestCard.profile.active_moment.text}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div style={{display:'flex',gap:10,marginTop:4}}>
+                <button
+                  disabled={!!requestCardAction}
+                  onClick={async () => {
+                    setRequestCardAction('decline');
+                    try {
+                      await api.declineRequest(requestCard.conv.id);
+                      setConvs(prev => prev.filter(c => c.id !== requestCard.conv.id));
+                      setRequestCard(null);
+                    } catch {}
+                    setRequestCardAction(null);
+                  }}
+                  style={{
+                    flex:1,padding:'13px',borderRadius:14,fontSize:14,fontWeight:600,
+                    background:'rgba(255,80,80,.15)',border:'1px solid rgba(255,120,120,.3)',
+                    color:'rgba(255,180,180,.9)',cursor:'pointer',
+                    opacity: requestCardAction === 'decline' ? .6 : 1,
+                    fontFamily:'inherit',
+                  }}>
+                  {requestCardAction === 'decline' ? '…' : 'Отклонить'}
+                </button>
+                <button
+                  disabled={!!requestCardAction}
+                  onClick={async () => {
+                    setRequestCardAction('accept');
+                    try {
+                      await api.acceptRequest(requestCard.conv.id);
+                      setConvs(prev => prev.map(c =>
+                        c.id === requestCard.conv.id ? { ...c, is_request: false } : c
+                      ));
+                      const convId = requestCard.conv.id;
+                      setRequestCard(null);
+                      nav(`/chat/${convId}`);
+                    } catch {}
+                    setRequestCardAction(null);
+                  }}
+                  style={{
+                    flex:2,padding:'13px',borderRadius:14,fontSize:14,fontWeight:700,
+                    background:'rgba(120,90,200,.85)',border:'1px solid rgba(180,140,255,.4)',
+                    color:'white',cursor:'pointer',
+                    opacity: requestCardAction === 'accept' ? .6 : 1,
+                    boxShadow:'0 2px 12px rgba(120,80,200,.35)',
+                    fontFamily:'inherit',
+                  }}>
+                  {requestCardAction === 'accept' ? '…' : '👤 Добавить и начать переписку'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2634,6 +2849,7 @@ export function ChatScreen() {
   const [loadingMore,  setLoadingMore]  = useState(false);
   // Message request state
   const [requestLock,  setRequestLock]  = useState(null); // { requester: {id,name,avatar} } | null
+  const [requesterProfile, setRequesterProfile] = useState(null);
   const [accepting,    setAccepting]    = useState(false);
   const [declining,    setDeclining]    = useState(false);
   const [hoveredMsg,   setHoveredMsg]   = useState(null);
@@ -2649,6 +2865,7 @@ export function ChatScreen() {
   const savedScrollHeight  = useRef(0);   // set before prepend, cleared after layout
   const skipBottomScroll   = useRef(false); // true while restoring scroll after prepend
   const isInitialLoad      = useRef(true);  // true until first messages batch is rendered
+  const forceScrollBottom  = useRef(false); // true after user sends a message
 
   // Close context menu on outside click
   useEffect(() => {
@@ -2686,6 +2903,14 @@ export function ChatScreen() {
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [convId, user?.id]);
+
+  // Load requester profile when request lock is set
+  useEffect(() => {
+    if (!requestLock?.requester?.id) { setRequesterProfile(null); return; }
+    api.getUserProfile(requestLock.requester.id)
+      .then(p => setRequesterProfile(p))
+      .catch(() => setRequesterProfile(null));
+  }, [requestLock?.requester?.id]);
 
   // Load history + partner info
   useEffect(() => {
@@ -2751,20 +2976,27 @@ export function ChatScreen() {
     }
   }, [messages]);
 
-  // Scroll to bottom — instant on first load, smart on new messages
+  // Scroll to bottom — instant on first load, forced after send, smart otherwise
   useEffect(() => {
     if (skipBottomScroll.current) { skipBottomScroll.current = false; return; }
+    if (messages.length === 0) return; // ignore the initial [] reset
+    const el = scrollRef.current;
+    if (!el) return;
     if (isInitialLoad.current) {
-      // First batch: jump instantly to bottom, no animation
-      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+      // First real batch: jump instantly to bottom
+      el.scrollTop = el.scrollHeight;
       isInitialLoad.current = false;
       return;
     }
-    // New message or typing indicator: only auto-scroll if user is near the bottom
-    const el = scrollRef.current;
-    if (!el) return;
+    if (forceScrollBottom.current) {
+      // User just sent a message — always scroll to bottom
+      forceScrollBottom.current = false;
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      return;
+    }
+    // Incoming message / typing indicator: only scroll if already near bottom
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 180;
-    if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (nearBottom) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages, typing]);
 
   // Real-time events
@@ -2887,6 +3119,7 @@ export function ChatScreen() {
         return;
       }
       const tempId = 'tmp-' + Date.now();
+      forceScrollBottom.current = true;
       setMessages(prev => [...prev, {
         id: tempId, text: capturedText || null, attachment, sender_id: user.id,
         sender_name: user.name, status: 'sent',
@@ -2910,6 +3143,7 @@ export function ChatScreen() {
     }
 
     const tempId = 'tmp-' + Date.now();
+    forceScrollBottom.current = true;
     setMessages(prev => [...prev, {
       id: tempId, text: t, sender_id: user.id,
       sender_name: user.name, status:'sent',
@@ -3333,6 +3567,18 @@ export function ChatScreen() {
               Добавьте в контакты, чтобы видеть сообщения.
             </div>
           </div>
+
+          {/* Bio */}
+          {requesterProfile?.bio && (
+            <div style={{
+              background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.1)',
+              borderRadius:12, padding:'10px 14px',
+              color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.5,
+              maxWidth:300, textAlign:'center',
+            }}>
+              {requesterProfile.bio}
+            </div>
+          )}
 
           {/* Profile link */}
           {requestLock.requester?.id && (
