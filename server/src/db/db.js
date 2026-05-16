@@ -139,6 +139,8 @@ try { db.exec('ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0'); } ca
 try { db.exec('ALTER TABLE users ADD COLUMN blocked_at INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN blocked_by TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0'); } catch {}
+// ── Message requests ──────────────────────────────────────────────────────────
+try { db.exec('ALTER TABLE conversations ADD COLUMN request_from TEXT'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (
   id               TEXT PRIMARY KEY,
   admin_id         TEXT NOT NULL,
@@ -313,7 +315,7 @@ function searchMessages(convId, query) {
 
 function getOrCreateDirectConversation(userId1, userId2) {
   const existing = db.prepare(
-    `SELECT c.id FROM conversations c
+    `SELECT c.id, c.request_from FROM conversations c
      JOIN members m1 ON m1.conversation_id=c.id AND m1.user_id=?
      JOIN members m2 ON m2.conversation_id=c.id AND m2.user_id=?
      WHERE c.type='direct'
@@ -322,13 +324,45 @@ function getOrCreateDirectConversation(userId1, userId2) {
   ).get(userId1, userId2);
   if (existing) return existing;
 
+  // Determine if this is a request (neither is in the other's contacts)
+  const u1inU2 = !!db.prepare('SELECT 1 FROM contacts WHERE owner_id=? AND contact_id=?').get(userId2, userId1);
+  const u2inU1 = !!db.prepare('SELECT 1 FROM contacts WHERE owner_id=? AND contact_id=?').get(userId1, userId2);
+  const requestFrom = (u1inU2 || u2inU1) ? null : userId1;
+
   const id = uuid();
   db.transaction(() => {
-    db.prepare(`INSERT INTO conversations (id,type,created_at) VALUES (?,?,?)`).run(id,'direct',now());
+    db.prepare(`INSERT INTO conversations (id,type,created_at,request_from) VALUES (?,?,?,?)`)
+      .run(id, 'direct', now(), requestFrom);
     db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at) VALUES (?,?,?)`).run(id,userId1,now());
     db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at) VALUES (?,?,?)`).run(id,userId2,now());
   })();
-  return { id };
+  return { id, request_from: requestFrom };
+}
+
+// Accept a message request: add requester as contact, unlock conversation
+function acceptRequest(convId, acceptorId) {
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
+  if (!conv || !conv.request_from) return false;
+  const requesterId = conv.request_from;
+  if (requesterId === acceptorId) return false; // can't accept own request
+  // Add requester to acceptor's contacts
+  try { addContact(acceptorId, requesterId, null); } catch {}
+  // Unlock conversation
+  db.prepare('UPDATE conversations SET request_from=NULL WHERE id=?').run(convId);
+  return requesterId;
+}
+
+// Decline a request: delete the whole conversation
+function declineRequest(convId, userId) {
+  // Only the recipient can decline
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
+  if (!conv || !conv.request_from || conv.request_from === userId) return false;
+  db.transaction(() => {
+    db.prepare('DELETE FROM messages WHERE conversation_id=?').run(convId);
+    db.prepare('DELETE FROM members  WHERE conversation_id=?').run(convId);
+    db.prepare('DELETE FROM conversations WHERE id=?').run(convId);
+  })();
+  return true;
 }
 
 function getUnreadCounts(userId, convIds) {
@@ -404,6 +438,9 @@ function getConversationsForUser(userId) {
   // 1 query: unread counts
   const unreadMap = getUnreadCounts(userId, convIds);
 
+  // Collect blocked ids (both directions)
+  const blockedIds = new Set(getBlockedByIds(userId));
+
   return convIds.map(convId => {
     const conv = convsMap[convId];
     if (!conv) return null;
@@ -411,20 +448,34 @@ function getConversationsForUser(userId) {
     let name = conv.name, partnerId = null, partnerAvatar = null;
     if (conv.type === 'direct') {
       partnerId = partnerIdMap[convId] || null;
+      // Hide conversations with blocked users
+      if (partnerId && blockedIds.has(partnerId)) return null;
       const partner = partnerId ? usersMap[partnerId] : null;
       name = (partnerId && nickMap[partnerId]) || partner?.name || 'Диалог';
       partnerAvatar = partner?.avatar || null;
     }
 
+    const isRequest = !!conv.request_from;
+    // Recipient of a request: hide message preview
+    const isRecipient = isRequest && conv.request_from !== userId;
     const last = lastMap[convId];
-    return { id: convId, type: conv.type, name, icon: conv.icon || null,
+
+    return {
+      id: convId, type: conv.type, name, icon: conv.icon || null,
       admin_id: conv.admin_id || null, partner_id: partnerId,
       avatar: partnerAvatar,
-      last_text: last?.text || null,
+      last_text: isRecipient ? null : (last?.text || null),
       last_at:   last?.created_at || conv.created_at,
-      last_sender_id: last?.sender_id || null,
-      unread_count: unreadMap[convId] || 0 };
+      last_sender_id: isRecipient ? null : (last?.sender_id || null),
+      unread_count: isRecipient ? 0 : (unreadMap[convId] || 0),
+      is_request: isRequest,
+      request_from: conv.request_from || null,
+    };
   }).filter(Boolean).sort((a, b) => b.last_at - a.last_at);
+}
+
+function getConversationById(convId) {
+  return db.prepare('SELECT * FROM conversations WHERE id=?').get(convId) || null;
 }
 
 function getConversationMembers(convId) {
@@ -900,7 +951,8 @@ module.exports = {
   createUser, findUserByPhone, findUserById, updateUser,
   getContacts, addContact, removeContact, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
-  getOrCreateDirectConversation, getConversationsForUser, getConversationMembers, isMember,
+  getOrCreateDirectConversation, acceptRequest, declineRequest,
+  getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getMessages, createMessage, updateMessageStatus, getMessageById,
   clearConversationMessages, editMessage, deleteMessage,
   getMediaMessages, searchMessages,

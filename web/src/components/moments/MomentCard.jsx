@@ -158,11 +158,14 @@ export default function MomentCard({ moment, isMine, onClick }) {
         </div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
           <span style={{color:'rgba(255,255,255,.35)',fontSize:10}}>{fmtTime(moment.created_at)}</span>
-          {isMine && (
-            <span style={{color:'rgba(255,255,255,.35)',fontSize:10}}>
-              👁 {moment.views || 0}
-            </span>
-          )}
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            {isMine && (
+              <span style={{color:'rgba(255,255,255,.35)',fontSize:10}}>👁 {moment.views || 0}</span>
+            )}
+            {moment.stats?.see      > 0 && <span style={{fontSize:12,lineHeight:1}}>👁</span>}
+            {moment.stats?.resonate > 0 && <span style={{fontSize:12,lineHeight:1}}>✨</span>}
+            {moment.stats?.talk     > 0 && <span style={{fontSize:12,lineHeight:1}}>🤝</span>}
+          </div>
         </div>
       </div>
     </div>

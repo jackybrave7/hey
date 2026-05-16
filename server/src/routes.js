@@ -210,8 +210,30 @@ module.exports = function makeRouter(db, broadcast) {
   r.post('/conversations', requireAuth, (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId required' });
+    const target = db.findUserById(userId);
+    if (!target || target.is_blocked) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (db.isBlocked(req.user.id, userId) || db.isBlocked(userId, req.user.id))
+      return res.status(403).json({ error: 'Переписка недоступна' });
     const conv = db.getOrCreateDirectConversation(req.user.id, userId);
-    res.json({ id: conv.id });
+    res.json({ id: conv.id, is_request: !!conv.request_from });
+  });
+
+  // Accept a message request
+  r.post('/conversations/:id/accept', requireAuth, (req, res) => {
+    if (!db.isMember(req.params.id, req.user.id))
+      return res.status(403).json({ error: 'Forbidden' });
+    const requesterId = db.acceptRequest(req.params.id, req.user.id);
+    if (!requesterId) return res.status(400).json({ error: 'Нет активного запроса' });
+    res.json({ ok: true, requesterId });
+  });
+
+  // Decline a message request
+  r.delete('/conversations/:id/request', requireAuth, (req, res) => {
+    if (!db.isMember(req.params.id, req.user.id))
+      return res.status(403).json({ error: 'Forbidden' });
+    const ok = db.declineRequest(req.params.id, req.user.id);
+    if (!ok) return res.status(400).json({ error: 'Нет активного запроса' });
+    res.json({ ok: true });
   });
 
   r.post('/upload', requireAuth, async (req, res) => {
@@ -224,7 +246,7 @@ module.exports = function makeRouter(db, broadcast) {
       if (!ALLOWED_MIME.includes(mime)) return res.status(400).json({ error: 'Unsupported type. Use JPEG, PNG, WebP or GIF' });
       const buf = Buffer.from(b64, 'base64');
       if (buf.length > MAX_BYTES) return res.status(400).json({ error: 'Image too large (max 3 MB)' });
-      const baseKey = 'avatars/' + req.user.id;
+      const baseKey = 'chat/' + uuid();
       const { fullUrl } = await storage.uploadImage(buf, baseKey);
       res.json({ url: fullUrl });
     } catch (e) {
@@ -236,6 +258,17 @@ module.exports = function makeRouter(db, broadcast) {
   r.get('/conversations/:id/messages', requireAuth, (req, res) => {
     if (!db.isMember(req.params.id, req.user.id))
       return res.status(403).json({ error: 'Not a member' });
+    // Lock messages for the recipient of an unaccepted request
+    const conv = db.getConversationById(req.params.id);
+    if (conv?.request_from && conv.request_from !== req.user.id) {
+      const requester = db.findUserById(conv.request_from);
+      return res.json({
+        locked: true,
+        requester: requester
+          ? { id: requester.id, name: requester.name, avatar: requester.avatar || null }
+          : null,
+      });
+    }
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const before = req.query.before ? parseInt(req.query.before) : db.now() + 1;
     const msgs = db.getMessages(req.params.id, before, limit);
@@ -505,12 +538,15 @@ module.exports = function makeRouter(db, broadcast) {
     const m = db.getMomentById(req.params.id);
     if (!m || m.status === 'deleted') return res.status(404).json({ error: 'Not found' });
     if (m.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
-    const { text, mediaUrl, mediaType, mediaDuration, isSearch } = req.body;
+    const { text, isSearch } = req.body;
     const newText = text?.trim() ?? m.text;
-    const newMediaType = mediaType !== undefined ? mediaType : m.media_type;
-    const autoTags = detectTags(newText, newMediaType);
+    const autoTags = detectTags(newText, m.media_type);
     const updated = db.updateMoment(req.params.id, {
-      text: newText, mediaUrl, mediaType, mediaDuration, autoTags,
+      text: newText,
+      mediaUrl: m.media_url,
+      mediaType: m.media_type,
+      mediaDuration: m.media_duration,
+      autoTags,
       isSearch: isSearch !== undefined ? isSearch : m.is_search,
     });
     const moodEmoji = detectMoodEmoji(newText, updated.is_search);

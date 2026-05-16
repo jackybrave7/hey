@@ -15,9 +15,27 @@ const REACTIONS = [
   { id: 'talk',      label: 'Поговорить', icon: '🤝' },
 ];
 
+// Clipboard helper — works on HTTP too
+function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  // Fallback for non-HTTPS
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); } catch {}
+  document.body.removeChild(ta);
+  return Promise.resolve();
+}
+
 // Inline contextual menu triggered by ⋯
 function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const ref = useRef();
 
   useEffect(() => {
@@ -30,8 +48,12 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
   }, [open]);
 
   function copyLink() {
-    navigator.clipboard.writeText(`${location.origin}/moments/${moment.id}`).catch(() => {});
-    setOpen(false);
+    copyText(`${location.origin}/moments/${moment.id}`)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => { setCopied(false); setOpen(false); }, 1800);
+      })
+      .catch(() => setOpen(false));
   }
 
   const menuItems = [
@@ -40,7 +62,9 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
       action: () => { setOpen(false); onEdit(); },
     },
     {
-      icon: '↗', label: 'Поделиться ссылкой', color: 'rgba(255,255,255,.88)',
+      icon: copied ? '✓' : '↗',
+      label: copied ? 'Ссылка скопирована!' : 'Поделиться ссылкой',
+      color: copied ? 'rgba(80,220,140,.9)' : 'rgba(255,255,255,.88)',
       action: copyLink,
     },
     {
@@ -268,7 +292,7 @@ export default function MomentDetailPopup({ moment: initial, isMine, onClose, on
               <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
                 display:'flex',gap:20}}>
                 <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>👁 {moment.views || 0}</span>
-                <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0} резонирует</span>
+                <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0}</span>
                 <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>🤝 {moment.stats?.talk || 0}</span>
               </div>
             ) : (

@@ -43,7 +43,10 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
     if (!text.trim()) { setError('Напишите что-нибудь'); return; }
     setSaving(true);
     setError('');
-    const payload = { text: text.trim(), mediaUrl: mediaPreview, mediaType, isSearch };
+    // When editing — only text and isSearch are sent; media stays unchanged
+    const payload = isEdit
+      ? { text: text.trim(), isSearch }
+      : { text: text.trim(), mediaUrl: mediaPreview, mediaType, isSearch };
     try {
       if (isEdit) {
         const result = await api.updateMoment(existing.id, payload);
@@ -113,42 +116,69 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
         <div style={{flex:1,overflowY:'auto',padding:'18px 20px',display:'flex',flexDirection:'column',gap:18}}>
           {/* Media zone */}
           <div>
-            {mediaPreview ? (
-              <div style={{position:'relative',borderRadius:16,overflow:'hidden',
-                background:'#0a0518',maxHeight:200}}>
-                {mediaType==='image' && <img src={mediaPreview} alt="" style={{width:'100%',maxHeight:200,objectFit:'cover'}}/>}
-                {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
-                {mediaType==='audio' && (
-                  <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:8,
-                    background:'linear-gradient(135deg,#1a0a38,#2a1858)'}}>
-                    <div style={{fontSize:24,textAlign:'center'}}>🎵</div>
-                    <audio src={mediaPreview} controls style={{width:'100%'}}/>
-                  </div>
-                )}
-                <button onClick={removeMedia} style={{
-                  position:'absolute',top:8,right:8,background:'rgba(0,0,0,.55)',
-                  backdropFilter:'blur(6px)',border:'none',borderRadius:'50%',
-                  width:30,height:30,color:'white',fontSize:16,cursor:'pointer',
-                  display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
-              </div>
+            {isEdit ? (
+              /* Edit mode — media is read-only, cannot be changed */
+              mediaPreview ? (
+                <div style={{position:'relative',borderRadius:16,overflow:'hidden',
+                  background:'#0a0518',maxHeight:200}}>
+                  {mediaType==='image' && <img src={mediaPreview} alt="" style={{width:'100%',maxHeight:200,objectFit:'cover'}}/>}
+                  {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
+                  {mediaType==='audio' && (
+                    <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:8,
+                      background:'linear-gradient(135deg,#1a0a38,#2a1858)'}}>
+                      <div style={{fontSize:24,textAlign:'center'}}>🎵</div>
+                      <audio src={mediaPreview} controls style={{width:'100%'}}/>
+                    </div>
+                  )}
+                  <div style={{
+                    position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+                    background:'rgba(0,0,0,.55)',backdropFilter:'blur(6px)',
+                    borderRadius:20,padding:'4px 12px',
+                    color:'rgba(255,255,255,.55)',fontSize:11,whiteSpace:'nowrap',
+                  }}>медиа нельзя изменить</div>
+                </div>
+              ) : null
             ) : (
-              <button onClick={() => fileRef.current?.click()}
-                style={{
-                  width:'100%',padding:'20px',borderRadius:16,cursor:'pointer',
-                  border:'2px dashed rgba(255,255,255,.18)',background:'rgba(255,255,255,.04)',
-                  color:'rgba(255,255,255,.45)',fontSize:14,display:'flex',
-                  flexDirection:'column',alignItems:'center',gap:8,transition:'all .15s'
-                }}
-                onMouseEnter={e=>{ e.currentTarget.style.borderColor='rgba(180,140,220,.5)'; e.currentTarget.style.background='rgba(100,78,148,.08)'; }}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor='rgba(255,255,255,.18)'; e.currentTarget.style.background='rgba(255,255,255,.04)'; }}>
-                <span style={{fontSize:28}}>📎</span>
-                <span>Добавить фото, видео или аудио</span>
-                <span style={{fontSize:12,opacity:.6}}>JPG/PNG/WebP до 5 МБ · MP4 до 20 МБ · MP3 до 10 МБ</span>
-              </button>
+              /* Create mode — full upload zone */
+              mediaPreview ? (
+                <div style={{position:'relative',borderRadius:16,overflow:'hidden',
+                  background:'#0a0518',maxHeight:200}}>
+                  {mediaType==='image' && <img src={mediaPreview} alt="" style={{width:'100%',maxHeight:200,objectFit:'cover'}}/>}
+                  {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
+                  {mediaType==='audio' && (
+                    <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:8,
+                      background:'linear-gradient(135deg,#1a0a38,#2a1858)'}}>
+                      <div style={{fontSize:24,textAlign:'center'}}>🎵</div>
+                      <audio src={mediaPreview} controls style={{width:'100%'}}/>
+                    </div>
+                  )}
+                  <button onClick={removeMedia} style={{
+                    position:'absolute',top:8,right:8,background:'rgba(0,0,0,.55)',
+                    backdropFilter:'blur(6px)',border:'none',borderRadius:'50%',
+                    width:30,height:30,color:'white',fontSize:16,cursor:'pointer',
+                    display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                </div>
+              ) : (
+                <button onClick={() => fileRef.current?.click()}
+                  style={{
+                    width:'100%',padding:'20px',borderRadius:16,cursor:'pointer',
+                    border:'2px dashed rgba(255,255,255,.18)',background:'rgba(255,255,255,.04)',
+                    color:'rgba(255,255,255,.45)',fontSize:14,display:'flex',
+                    flexDirection:'column',alignItems:'center',gap:8,transition:'all .15s'
+                  }}
+                  onMouseEnter={e=>{ e.currentTarget.style.borderColor='rgba(180,140,220,.5)'; e.currentTarget.style.background='rgba(100,78,148,.08)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor='rgba(255,255,255,.18)'; e.currentTarget.style.background='rgba(255,255,255,.04)'; }}>
+                  <span style={{fontSize:28}}>📎</span>
+                  <span>Добавить фото, видео или аудио</span>
+                  <span style={{fontSize:12,opacity:.6}}>JPG/PNG/WebP до 5 МБ · MP4 до 20 МБ · MP3 до 10 МБ</span>
+                </button>
+              )
             )}
-            <input ref={fileRef} type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,audio/mpeg,audio/mp3,audio/ogg"
-              onChange={handleFile} style={{display:'none'}}/>
+            {!isEdit && (
+              <input ref={fileRef} type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,audio/mpeg,audio/mp3,audio/ogg"
+                onChange={handleFile} style={{display:'none'}}/>
+            )}
           </div>
 
           {/* Text */}

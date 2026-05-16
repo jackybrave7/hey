@@ -2047,29 +2047,89 @@ export function ConversationsScreen() {
       const exists = prev.find(c => c.id === message.conversationId);
       if (!exists) { reload(); return prev; }
       return prev
-        .map(c => c.id === message.conversationId
-          ? { ...c,
-              last_text: message.text || null,
-              last_at: message.created_at,
-              last_sender_id: message.sender_id,
-              unread_count: message.sender_id === user?.id ? c.unread_count : c.unread_count + 1 }
-          : c)
+        .map(c => {
+          if (c.id !== message.conversationId) return c;
+          if (c.is_request && c.request_from !== user?.id) return c; // don't update locked request
+          return {
+            ...c,
+            last_text: message.text || null,
+            last_at: message.created_at,
+            last_sender_id: message.sender_id,
+            unread_count: message.sender_id === user?.id ? c.unread_count : c.unread_count + 1,
+          };
+        })
         .sort((a, b) => b.last_at - a.last_at);
     });
   }), [user?.id]);
 
+  const normalConvs  = convs.filter(c => !c.is_request);
+  const requestConvs = convs.filter(c => c.is_request && c.request_from !== user?.id);
+
+  function ConvRow({ c, isRequest }) {
+    return (
+      <div onClick={() => {
+        if (!isRequest) setConvs(prev => prev.map(x => x.id === c.id ? { ...x, unread_count: 0 } : x));
+        nav(`/chat/${c.id}`);
+      }}
+        style={{display:'flex',alignItems:'center',gap:12,padding:'12px 20px',
+          cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s'}}
+        onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
+        onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+        {c.type === 'group' ? (
+          <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
+            background:'rgba(200,160,210,.35)',
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>
+            {c.icon || '👥'}
+          </div>
+        ) : (
+          <AvatarDisplay avatar={c.avatar} name={c.name} size={52}/>
+        )}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{color:'white',fontSize:15,fontWeight:600}}>{c.name||'Диалог'}</div>
+          {isRequest ? (
+            <div style={{color:'rgba(180,140,220,.8)',fontSize:13}}>хочет написать вам</div>
+          ) : (
+            <div style={{color:'rgba(255,255,255,.45)',fontSize:13,
+              whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+              {c.last_sender_id===user?.id ? 'Вы: ' : ''}{c.last_text||'…'}
+            </div>
+          )}
+        </div>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
+          {isRequest ? (
+            <div style={{
+              background:'rgba(120,90,200,.5)',border:'1px solid rgba(180,140,220,.4)',
+              borderRadius:20,padding:'3px 10px',fontSize:11,color:'rgba(220,200,255,.9)',fontWeight:600,
+            }}>Запрос</div>
+          ) : (
+            <>
+              {c.last_at && (
+                <div style={{color:'rgba(255,255,255,.35)',fontSize:11}}>{fmtTime(c.last_at)}</div>
+              )}
+              {c.unread_count > 0 && (
+                <div style={{
+                  minWidth:20,height:20,borderRadius:10,padding:'0 6px',
+                  background:'rgba(140,100,200,.9)',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:11,color:'white',fontWeight:700,
+                }}>
+                  {c.unread_count > 99 ? '99+' : c.unread_count}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{
-      minHeight:'100vh',
-      background:'var(--grad)',
-      paddingBottom:80,
-    }}>
-      {/* Sticky header — full-width bg, content limited to 680 */}
+    <div style={{ minHeight:'100vh', background:'var(--grad)', paddingBottom:80 }}>
+      {/* Sticky header */}
       <div style={{
         position:'sticky',top:0,zIndex:10,
         background:'var(--topbar)',backdropFilter:'blur(20px)',
         borderBottom:'1px solid rgba(255,255,255,.06)',
-        flexShrink:0,
       }}>
         <div style={{maxWidth:680,margin:'0 auto',padding:'16px 20px 12px',
           display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -2089,61 +2149,36 @@ export function ConversationsScreen() {
         </div>
       </div>
 
-      {/* List — content limited to 680 */}
       <div style={{maxWidth:680,margin:'0 auto',width:'100%'}}>
-      <div style={{flex:1}}>
-        {convs.length === 0 && (
+
+        {/* Normal chats */}
+        {normalConvs.length === 0 && requestConvs.length === 0 && (
           <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:60,fontSize:15,padding:'0 20px'}}>
             Нет активных диалогов.<br/>Перейди в Контакты, чтобы начать переписку.
           </div>
         )}
-        {convs.map(c => (
-          <div key={c.id} onClick={() => {
-            setConvs(prev => prev.map(x => x.id === c.id ? { ...x, unread_count: 0 } : x));
-            nav(`/chat/${c.id}`);
-          }}
-            style={{display:'flex',alignItems:'center',gap:12,padding:'12px 20px',
-              cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s'}}
-            onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
-            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-            {c.type === 'group' ? (
-              <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
-                background:'rgba(200,160,210,.35)',
-                display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:26}}>
-                {c.icon || '👥'}
-              </div>
-            ) : (
-              <AvatarDisplay avatar={c.avatar} name={c.name} size={52}/>
-            )}
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{color:'white',fontSize:15,fontWeight:600}}>{c.name||'Диалог'}</div>
-              <div style={{color:'rgba(255,255,255,.45)',fontSize:13,
-                whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                {c.last_sender_id===user?.id ? 'Вы: ' : ''}{c.last_text||'…'}
-              </div>
+        {normalConvs.map(c => <ConvRow key={c.id} c={c} isRequest={false}/>)}
+
+        {/* Requests section */}
+        {requestConvs.length > 0 && (
+          <>
+            <div style={{
+              padding:'16px 20px 8px',
+              color:'rgba(255,255,255,.4)',fontSize:11,fontWeight:600,
+              textTransform:'uppercase',letterSpacing:'1px',
+              display:'flex',alignItems:'center',gap:8,
+            }}>
+              Запросы на переписку
+              <span style={{
+                background:'rgba(120,90,200,.6)',borderRadius:20,
+                padding:'1px 8px',fontSize:11,color:'white',
+              }}>{requestConvs.length}</span>
             </div>
-            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
-              {c.last_at && (
-                <div style={{color:'rgba(255,255,255,.35)',fontSize:11}}>
-                  {fmtTime(c.last_at)}
-                </div>
-              )}
-              {c.unread_count > 0 && (
-                <div style={{
-                  minWidth:20,height:20,borderRadius:10,padding:'0 6px',
-                  background:'rgba(140,100,200,.9)',
-                  display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:11,color:'white',fontWeight:700
-                }}>
-                  {c.unread_count > 99 ? '99+' : c.unread_count}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+            {requestConvs.map(c => <ConvRow key={c.id} c={c} isRequest={true}/>)}
+          </>
+        )}
+
       </div>
-      </div>{/* end 680 wrapper */}
     </div>
   );
 }
@@ -2560,6 +2595,8 @@ export function ChatScreen() {
   const [searchResults,setSearchResults] = useState(null); // null = not searched
   const [hasMore,      setHasMore]      = useState(true);
   const [loadingMore,  setLoadingMore]  = useState(false);
+  // Message request state
+  const [requestLock,  setRequestLock]  = useState(null); // { requester: {id,name,avatar} } | null
   const [hoveredMsg,   setHoveredMsg]   = useState(null);
   const [reactionPicker,setReactionPicker] = useState(null); // { msgId, x, y }
   const [customConfirm, confirmModal] = useConfirm();
@@ -2571,6 +2608,7 @@ export function ChatScreen() {
   const scrollRef          = useRef();
   const savedScrollHeight  = useRef(0);   // set before prepend, cleared after layout
   const skipBottomScroll   = useRef(false); // true while restoring scroll after prepend
+  const isInitialLoad      = useRef(true);  // true until first messages batch is rendered
 
   // Close context menu on outside click
   useEffect(() => {
@@ -2611,12 +2649,20 @@ export function ChatScreen() {
 
   // Load history + partner info
   useEffect(() => {
+    isInitialLoad.current = true;
+    setMessages([]);
     setHasMore(true);
     setLoadingMore(false);
-    api.getMessages(convId).then(msgs => {
-      setMessages(msgs);
-      if (msgs.length < 50) setHasMore(false);
-      markVisibleAsRead(msgs);
+    api.getMessages(convId).then(data => {
+      if (data?.locked) {
+        setRequestLock({ requester: data.requester });
+        setHasMore(false);
+        return;
+      }
+      setRequestLock(null);
+      setMessages(data);
+      if (data.length < 50) setHasMore(false);
+      markVisibleAsRead(data);
     }).catch(console.error);
     api.getConversations().then(convs => {
       const c = convs.find(c => c.id === convId);
@@ -2661,10 +2707,20 @@ export function ChatScreen() {
     }
   }, [messages]);
 
-  // Scroll to bottom — skip when we just prepended older messages
+  // Scroll to bottom — instant on first load, smart on new messages
   useEffect(() => {
     if (skipBottomScroll.current) { skipBottomScroll.current = false; return; }
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isInitialLoad.current) {
+      // First batch: jump instantly to bottom, no animation
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+      isInitialLoad.current = false;
+      return;
+    }
+    // New message or typing indicator: only auto-scroll if user is near the bottom
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 180;
+    if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typing]);
 
   // Real-time events
@@ -2773,10 +2829,13 @@ export function ChatScreen() {
 
     if (imgPreview) {
       if (imgPreview.uploading) return;
+      // Capture dataUrl NOW before any async — prevents race with file re-selection
+      const capturedDataUrl = imgPreview.dataUrl;
+      const capturedText = t;
       setImgPreview(p => ({ ...p, uploading: true }));
       let attachment;
       try {
-        const { url } = await api.uploadImage(imgPreview.dataUrl);
+        const { url } = await api.uploadImage(capturedDataUrl);
         attachment = { type: 'image', url };
       } catch (err) {
         alert(err.message);
@@ -2785,11 +2844,11 @@ export function ChatScreen() {
       }
       const tempId = 'tmp-' + Date.now();
       setMessages(prev => [...prev, {
-        id: tempId, text: t || null, attachment, sender_id: user.id,
+        id: tempId, text: capturedText || null, attachment, sender_id: user.id,
         sender_name: user.name, status: 'sent',
         created_at: Math.floor(Date.now() / 1000)
       }]);
-      socket.sendMessage(convId, t || '', tempId, attachment);
+      socket.sendMessage(convId, capturedText || '', tempId, attachment);
       setImgPreview(null);
       setText('');
       return;
@@ -2921,7 +2980,11 @@ export function ChatScreen() {
   }, []);
 
   return (
-    <div className="screen" style={{height:'100dvh',overflow:'hidden'}}>
+    <div style={{
+      position:'fixed', top:0, left:0, right:0, bottom:0,
+      display:'flex', flexDirection:'column', overflow:'hidden',
+      background:'var(--grad)',
+    }}>
       {/* TopBar */}
       <div className="topbar">
         <div className="topbar-inner">
@@ -2983,7 +3046,10 @@ export function ChatScreen() {
       {/* Messages */}
       <div ref={scrollRef}
         onScroll={e => { if (e.target.scrollTop < 120 && hasMore && !loadingMore) loadOlder(); }}
-        style={{flex:1,overflowY:'auto',display: searchMode && searchResults !== null ? 'none' : 'block'}}>
+        style={{
+          flex:1, overflowY:'auto', overscrollBehavior:'contain',
+          display: (requestLock || (searchMode && searchResults !== null)) ? 'none' : 'block',
+        }}>
       <div style={{maxWidth:680,margin:'0 auto',padding:'14px 16px 8px',display:'flex',flexDirection:'column',gap:8}}>
         {loadingMore && (
           <div style={{textAlign:'center',padding:'6px 0',color:'rgba(255,255,255,.4)',fontSize:13,flexShrink:0}}>
@@ -3180,8 +3246,100 @@ export function ChatScreen() {
         </div>
       )}
 
+      {/* ── Request lock overlay ─────────────────────────────────────── */}
+      {requestLock && (() => {
+        const req = requestLock.requester;
+        const [accepting, setAccepting] = useState(false);
+        const [declining, setDeclining] = useState(false);
+
+        async function accept() {
+          setAccepting(true);
+          try {
+            await api.acceptRequest(convId);
+            setRequestLock(null);
+            // Reload messages now that it's unlocked
+            const msgs = await api.getMessages(convId);
+            setMessages(Array.isArray(msgs) ? msgs : []);
+          } catch {}
+          setAccepting(false);
+        }
+        async function decline() {
+          setDeclining(true);
+          try {
+            await api.declineRequest(convId);
+            nav('/conversations');
+          } catch {}
+          setDeclining(false);
+        }
+
+        return (
+          <div style={{
+            flex:1, display:'flex', flexDirection:'column',
+            alignItems:'center', justifyContent:'center',
+            padding:'28px 24px', gap:20,
+          }}>
+            {/* Avatar */}
+            <div style={{
+              width:80, height:80, borderRadius:'50%',
+              background:'rgba(180,140,220,.35)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:34, color:'white', fontWeight:700, overflow:'hidden',
+              boxShadow:'0 4px 20px rgba(120,80,200,.3)',
+            }}>
+              {req?.avatar
+                ? <img src={req.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                : (req?.name?.[0] || '?')}
+            </div>
+
+            {/* Name */}
+            <div style={{textAlign:'center'}}>
+              <div style={{color:'white', fontSize:20, fontWeight:700, marginBottom:6}}>
+                {req?.name || 'Пользователь'}
+              </div>
+              <div style={{color:'rgba(255,255,255,.45)', fontSize:14, lineHeight:1.6}}>
+                хочет начать с вами переписку.<br/>
+                Добавьте в контакты, чтобы видеть сообщения.
+              </div>
+            </div>
+
+            {/* Profile link */}
+            {req?.id && (
+              <button onClick={() => nav(`/profile/${req.id}`)}
+                style={{
+                  background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.15)',
+                  borderRadius:50, padding:'7px 18px', color:'rgba(255,255,255,.7)',
+                  fontSize:13, cursor:'pointer',
+                }}>
+                Посмотреть профиль →
+              </button>
+            )}
+
+            {/* Actions */}
+            <div style={{display:'flex', gap:12, width:'100%', maxWidth:320}}>
+              <button onClick={decline} disabled={declining}
+                style={{
+                  flex:1, padding:'13px', borderRadius:14, fontSize:14, fontWeight:600,
+                  background:'rgba(255,80,80,.15)', border:'1px solid rgba(255,120,120,.35)',
+                  color:'rgba(255,180,180,.9)', cursor:'pointer', opacity: declining ? .6 : 1,
+                }}>
+                {declining ? '…' : 'Удалить'}
+              </button>
+              <button onClick={accept} disabled={accepting}
+                style={{
+                  flex:2, padding:'13px', borderRadius:14, fontSize:14, fontWeight:700,
+                  background:'rgba(120,90,200,.8)', border:'1px solid rgba(180,140,220,.4)',
+                  color:'white', cursor:'pointer', opacity: accepting ? .6 : 1,
+                  boxShadow:'0 2px 12px rgba(120,80,200,.35)',
+                }}>
+                {accepting ? '…' : '✓ Добавить в контакты'}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Input bar */}
-      <div style={{flexShrink:0}}>
+      {!requestLock && <div style={{flexShrink:0}}>
       <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
         <div style={{
           flex:1, borderRadius:26,
@@ -3226,7 +3384,7 @@ export function ChatScreen() {
           ➤
         </button>
       </div>{/* end maxWidth input wrapper */}
-      </div>{/* end input bar outer */}
+      </div>}{/* end input bar outer (hidden when requestLock) */}
 
       {/* Reaction emoji picker */}
       {reactionPicker && (() => {

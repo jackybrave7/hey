@@ -34,6 +34,13 @@ module.exports = function setupWS(server) {
           const { conversationId, text, attachment, tempId } = msg;
           if (!conversationId || (!text?.trim() && !attachment)) return;
           if (!db.isMember(conversationId, user.id)) return;
+          // Block if any member has blocked the sender
+          const conv = db.getConversationById(conversationId);
+          if (conv?.type === 'direct') {
+            const members = db.getConversationMembers(conversationId);
+            const recipientId = members.find(id => id !== user.id);
+            if (recipientId && (db.isBlocked(recipientId, user.id) || db.isBlocked(user.id, recipientId))) return;
+          }
           const saved = db.createMessage({ conversationId, senderId: user.id, text: text?.trim() || null, attachment: attachment || null });
           const full = { ...saved, sender_name: user.name, tempId, conversationId };
           const members = db.getConversationMembers(conversationId);
