@@ -9,9 +9,13 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const db = new Database(path.join(DATA_DIR, 'hey.db'));
 
-// WAL mode: concurrent reads, non-blocking writes
+// WAL mode + performance PRAGMAs
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('synchronous = NORMAL');   // safe with WAL, much faster than FULL
+db.pragma('cache_size = -32000');    // 32 MB page cache
+db.pragma('temp_store = MEMORY');    // temp tables in RAM
+db.pragma('mmap_size = 268435456'); // 256 MB memory-mapped I/O
 
 // Safe migrations for existing DBs
 try { db.exec('ALTER TABLE conversations ADD COLUMN admin_id TEXT'); }  catch {}
@@ -67,7 +71,17 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS moment_views (
   viewed_at  INTEGER NOT NULL,
   PRIMARY KEY (moment_id, user_id)
 )`); } catch {}
-try { db.exec(`CREATE INDEX IF NOT EXISTS idx_moments_user ON moments(user_id, status)`); } catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_moments_user        ON moments(user_id, status)`); }          catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_moments_status_ts   ON moments(status, created_at DESC)`); }   catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_mrx_moment          ON moment_reactions(moment_id)`); }        catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_mrx_user            ON moment_reactions(user_id)`); }          catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_mviews_moment       ON moment_views(moment_id)`); }            catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_blocks_user         ON blocks(user_id)`); }                    catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_blocks_blocked      ON blocks(blocked_id)`); }                 catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_contacts_owner      ON contacts(owner_id)`); }                 catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_contacts_contact    ON contacts(contact_id)`); }               catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_members_user        ON members(user_id)`); }                   catch {}
+try { db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_sender     ON messages(sender_id)`); }                catch {}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -547,6 +561,21 @@ function updateMessageStatus(id, status) {
   db.prepare('UPDATE messages SET status=? WHERE id=?').run(status, id);
 }
 
+// Mark all unread incoming messages up to (and including) the given message as read.
+// Returns array of {id, sender_id} for broadcast.
+function markMessagesReadUpTo(conversationId, readerId, upToMessageId) {
+  const ref = db.prepare('SELECT created_at FROM messages WHERE id=?').get(upToMessageId);
+  if (!ref) return [];
+  const toUpdate = db.prepare(
+    `SELECT id, sender_id FROM messages
+     WHERE conversation_id=? AND sender_id!=? AND status!='read' AND created_at<=?`
+  ).all(conversationId, readerId, ref.created_at);
+  if (!toUpdate.length) return [];
+  const ph = toUpdate.map(() => '?').join(',');
+  db.prepare(`UPDATE messages SET status='read' WHERE id IN (${ph})`).run(...toUpdate.map(m => m.id));
+  return toUpdate;
+}
+
 function getMessageById(id) {
   return _parseMsg(db.prepare('SELECT * FROM messages WHERE id=?').get(id));
 }
@@ -691,51 +720,82 @@ function getMomentFeed(userId, limit = 20, before = null) {
   const beforeCond = before ? `AND m.created_at < ?` : '';
   const args = before ? [...visible, before] : visible;
   const rows = db.prepare(
-    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar
+    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar, u.is_super AS author_is_super
      FROM moments m JOIN users u ON u.id=m.user_id
      WHERE m.user_id IN (${ph}) AND m.status='active' AND u.is_blocked=0 ${beforeCond}
      ORDER BY m.created_at DESC
      LIMIT ?`
   ).all(...args, limit + 1);
   const hasMore = rows.length > limit;
-  const items = rows.slice(0, limit).map(r => _withStats(_parseMoment(r)));
+  const items = _withStatsBatch(rows.slice(0, limit).map(_parseMoment));
   return { items, hasMore };
 }
 
 function getMyMoments(userId, status = 'active') {
   let where = status === 'all' ? '' : `AND m.status='${status}'`;
   const rows = db.prepare(
-    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar
+    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar, u.is_super AS author_is_super
      FROM moments m JOIN users u ON u.id=m.user_id
      WHERE m.user_id=? ${where}
      ORDER BY m.created_at DESC`
   ).all(userId);
-  return rows.map(r => _withStats(_parseMoment(r)));
+  return _withStatsBatch(rows.map(_parseMoment));
 }
 
+// Attach stats to a single moment (used when only one moment is available)
 function _withStats(m) {
   if (!m) return null;
-  const reactions = db.prepare(
-    `SELECT reaction, COUNT(*) as cnt FROM moment_reactions WHERE moment_id=? GROUP BY reaction`
-  ).all(m.id);
-  const views = db.prepare('SELECT COUNT(*) as cnt FROM moment_views WHERE moment_id=?').get(m.id)?.cnt ?? 0;
-  const stats = { see: 0, resonate: 0, talk: 0 };
-  reactions.forEach(r => { stats[r.reaction] = r.cnt; });
-  const author = db.prepare('SELECT is_super FROM users WHERE id=?').get(m.user_id);
-  return { ...m, stats, views, author_is_super: !!(author?.is_super) };
+  return _withStatsBatch([m])[0];
+}
+
+// Batch version: 2 queries regardless of how many moments — eliminates N+1
+function _withStatsBatch(moments) {
+  if (!moments.length) return [];
+  const ids = moments.map(m => m.id);
+  const ph  = ids.map(() => '?').join(',');
+
+  // All reaction counts in one query
+  const rxRows = db.prepare(
+    `SELECT moment_id, reaction, COUNT(*) as cnt
+     FROM moment_reactions WHERE moment_id IN (${ph})
+     GROUP BY moment_id, reaction`
+  ).all(...ids);
+
+  // All view counts in one query
+  const viewRows = db.prepare(
+    `SELECT moment_id, COUNT(*) as cnt
+     FROM moment_views WHERE moment_id IN (${ph})
+     GROUP BY moment_id`
+  ).all(...ids);
+
+  // Build lookup maps
+  const rxMap   = {};  // moment_id → { see, resonate, talk }
+  const viewMap = {};  // moment_id → count
+  rxRows.forEach(r => {
+    if (!rxMap[r.moment_id]) rxMap[r.moment_id] = { see: 0, resonate: 0, talk: 0 };
+    rxMap[r.moment_id][r.reaction] = r.cnt;
+  });
+  viewRows.forEach(r => { viewMap[r.moment_id] = r.cnt; });
+
+  return moments.map(m => ({
+    ...m,
+    stats:          rxMap[m.id]   ?? { see: 0, resonate: 0, talk: 0 },
+    views:          viewMap[m.id] ?? 0,
+    author_is_super: !!(m.author_is_super), // already JOINed in the SELECT below
+  }));
 }
 
 // ── Saved moments (talk reaction = bookmark) ──────────────────────────────────
 function getSavedMoments(userId) {
   const rows = db.prepare(
-    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar
+    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar, u.is_super AS author_is_super
      FROM moment_reactions mr
      JOIN moments m ON m.id = mr.moment_id
      JOIN users u ON u.id = m.user_id
      WHERE mr.user_id=? AND mr.reaction='talk' AND m.status='active' AND u.is_blocked=0
      ORDER BY mr.created_at DESC`
   ).all(userId);
-  return rows.map(r => _withStats(_parseMoment(r)));
+  return _withStatsBatch(rows.map(_parseMoment));
 }
 
 function getMomentReactorsList(momentId) {
@@ -751,7 +811,7 @@ function revokeUserSuper(userId) { db.prepare('UPDATE users SET is_super=0 WHERE
 
 function getMomentById(id) {
   const m = db.prepare(
-    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar
+    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar, u.is_super AS author_is_super
      FROM moments m JOIN users u ON u.id=m.user_id WHERE m.id=?`
   ).get(id);
   return _withStats(_parseMoment(m));
@@ -763,7 +823,7 @@ function getActiveMomentCount(userId) {
 
 function getActiveMoment(userId) {
   const m = db.prepare(
-    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar
+    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar, u.is_super AS author_is_super
      FROM moments m JOIN users u ON u.id=m.user_id
      WHERE m.user_id=? AND m.status='active' LIMIT 1`
   ).get(userId);
@@ -894,11 +954,13 @@ function getAdminUsers({ search, filter } = {}) {
     `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_super, u.is_blocked,
             u.blocked_at, u.blocked_by, u.must_change_password,
             p.online, p.last_seen,
-            (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status='active') AS active_moments,
-            (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status!='deleted') AS total_moments
+            SUM(CASE WHEN m.status='active'   THEN 1 ELSE 0 END) AS active_moments,
+            SUM(CASE WHEN m.status!='deleted' THEN 1 ELSE 0 END) AS total_moments
      FROM users u
-     LEFT JOIN presence p ON p.user_id=u.id
+     LEFT JOIN presence p  ON p.user_id=u.id
+     LEFT JOIN moments  m  ON m.user_id=u.id
      WHERE ${where}
+     GROUP BY u.id
      ORDER BY u.created_at DESC`
   ).all(...params);
   return rows.map(r => ({ ...r, online: !!r.online, is_admin: !!r.is_admin, is_super: !!r.is_super, is_blocked: !!r.is_blocked, must_change_password: !!r.must_change_password }));
@@ -944,17 +1006,17 @@ function adminRevokeAdmin(userId, adminId) {
 }
 
 function getAdminMoments({ status, userId } = {}) {
-  let where = "status != 'deleted'";
+  let where = "m.status != 'deleted'";
   const params = [];
   if (status && status !== 'all') { where += ' AND m.status=?'; params.push(status); }
   if (userId) { where += ' AND m.user_id=?'; params.push(userId); }
   const rows = db.prepare(
-    `SELECT m.*, u.name AS author_name, u.phone AS author_phone
+    `SELECT m.*, u.name AS author_name, u.phone AS author_phone, u.is_super AS author_is_super
      FROM moments m JOIN users u ON u.id=m.user_id
      WHERE ${where}
      ORDER BY m.created_at DESC LIMIT 200`
   ).all(...params);
-  return rows.map(r => _withStats(_parseMoment(r)));
+  return _withStatsBatch(rows.map(_parseMoment));
 }
 
 function adminDeleteMoment(momentId, adminId, reason) {
@@ -1004,7 +1066,7 @@ module.exports = {
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   getOrCreateDirectConversation, acceptRequest, declineRequest,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
-  getMessages, createMessage, updateMessageStatus, getMessageById,
+  getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
   clearConversationMessages, editMessage, deleteMessage,
   getMediaMessages, searchMessages,
   getCalls, createCall,

@@ -11,6 +11,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.24.1",
+    "react-virtuoso": "^4.18.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

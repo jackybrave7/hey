@@ -139,6 +139,7 @@ class HeySocket {
     this.token = null;
     this.queue = [];        // pending outbound messages while disconnected
     this.intentionalClose = false;
+    this.reconnectDelay = 1000; // exponential backoff: 1s → 2s → 4s … 30s
   }
 
   connect(token) {
@@ -153,6 +154,7 @@ class HeySocket {
 
     this.ws.onopen = () => {
       this.connected = true;
+      this.reconnectDelay = 1000; // reset on successful connect
       this._emit('connected');
       // Flush queued messages
       while (this.queue.length && this.ws?.readyState === WebSocket.OPEN) {
@@ -173,7 +175,13 @@ class HeySocket {
       this._emit('disconnected');
       if (!this.intentionalClose && this.token) {
         clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = setTimeout(() => this.connect(this.token), 1000);
+        // Exponential backoff with jitter — prevents thundering herd on server restart
+        const jitter = Math.random() * 500;
+        this.reconnectTimer = setTimeout(
+          () => this.connect(this.token),
+          this.reconnectDelay + jitter
+        );
+        this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
       }
     };
 
@@ -183,6 +191,7 @@ class HeySocket {
   disconnect() {
     this.intentionalClose = true;
     this.token = null;
+    this.reconnectDelay = 1000;
     clearTimeout(this.reconnectTimer);
     this.queue = [];
     try { this.ws?.close(); } catch {}
@@ -208,11 +217,14 @@ class HeySocket {
     this.send('message:send', { conversationId, text, tempId, attachment });
   }
 
+  // Send "read up to this message" — server marks all prior unread as read in one query
   markRead(messageId, conversationId) {
     this.send('message:read', { messageId, conversationId });
   }
 
   startTyping(conversationId) {
+    // Skip typing events when tab is in the background (Discord-style passive sessions)
+    if (document.visibilityState === 'hidden') return;
     this.send('typing:start', { conversationId });
   }
 

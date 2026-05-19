@@ -1,6 +1,7 @@
 // web/src/components/Screens.jsx
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
+import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
 import { useAuth } from '../AuthContext';
 import {
@@ -2826,6 +2827,135 @@ export function GroupSettingsScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MessageRow — memoized so hover/typing state changes don't re-render siblings
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MessageRow = memo(function MessageRow({
+  m, isOut, isGroup, editingMsgId, reactionPickerMsgId,
+  partnerName, currentUserId,
+  onOpenMenu, onLightbox, onToggleReaction, onSetReactionPicker,
+  statusIcon, renderText,
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
+
+  return (
+    <div
+      style={{display:'flex', alignItems:'flex-end', gap:4,
+        justifyContent: isOut ? 'flex-end':'flex-start',
+        marginBottom: hasReactions ? 8 : 2}}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onContextMenu={isOut ? (e) => onOpenMenu(e, m) : undefined}>
+
+      {/* Reaction button — left side for incoming */}
+      {!isOut && (
+        <button
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            onSetReactionPicker(p => p?.msgId === m.id ? null : { msgId: m.id, x: rect.right + 6, y: rect.top });
+          }}
+          style={{background: isHovered ? 'rgba(100,78,148,.55)' : 'transparent',
+            border:'none', borderRadius:'50%', width:28, height:28, cursor:'pointer',
+            flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+            padding:4, transition:'background .15s', marginBottom:6,
+            opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none'}}>
+          <img src="/emoji/smiling.svg" alt="react"
+            style={{width:16, height:16, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
+        </button>
+      )}
+
+      <div style={{display:'flex', flexDirection:'column',
+        alignItems: isOut ? 'flex-end' : 'flex-start', maxWidth:'80%'}}>
+        <div style={{
+          background: editingMsgId === m.id
+            ? 'rgba(160,120,210,.85)'
+            : isOut ? 'rgba(110,80,155,.70)' : 'rgba(255,255,255,.90)',
+          borderRadius: isOut ? '20px 20px 5px 20px' : '20px 20px 20px 5px',
+          padding:'10px 13px 6px',
+          color: isOut ? 'white' : '#2a2040',
+          fontSize:14, lineHeight:'1.5',
+          transition:'background .2s'
+        }}>
+          {isGroup && !isOut && (
+            <div style={{fontSize:11,fontWeight:700,color:'rgba(200,160,240,.8)',marginBottom:4}}>
+              {m.sender_name}
+            </div>
+          )}
+          {m.attachment?.type === 'image' && (() => {
+            const src = m.attachment.url;
+            if (!src) return (
+              <div style={{padding:'10px 0',fontSize:13,opacity:.5}}>
+                🖼 Изображение недоступно
+              </div>
+            );
+            return (
+              <img src={src} alt=""
+                onClick={() => onLightbox(src)}
+                style={{maxWidth:'100%',maxHeight:300,borderRadius:10,
+                  display:'block',marginBottom: m.text ? 6 : 2,
+                  cursor:'zoom-in'}}/>
+            );
+          })()}
+          {m.text && <div style={{wordBreak:'break-word',whiteSpace:'pre-wrap'}}>{renderText(m.text)}</div>}
+          <div style={{fontSize:11,opacity:.6,textAlign:'right',marginTop:3,display:'flex',justifyContent:'flex-end',gap:4}}>
+            {m.edited_at && <span>изм.</span>}
+            <span>{fmtTime(m.created_at)}</span>
+            {isOut && statusIcon(m.status)}
+          </div>
+        </div>
+
+        {/* Reaction chips */}
+        {hasReactions && (
+          <div style={{display:'flex', flexWrap:'wrap', gap:4, marginTop:5}}>
+            {Object.entries(m.reactions).map(([emoji, userIds]) => {
+              const iReacted = userIds.includes(currentUserId);
+              return (
+                <button key={emoji} onClick={() => onToggleReaction(m.id, emoji)}
+                  title={emoji}
+                  style={{
+                    background: iReacted ? 'rgba(130,100,190,.6)' : 'rgba(255,255,255,.18)',
+                    border: iReacted ? '1px solid rgba(170,130,220,.75)' : '1px solid rgba(255,255,255,.12)',
+                    borderRadius:14, padding:'2px 8px', cursor:'pointer',
+                    display:'flex', alignItems:'center', gap:4, fontSize:12,
+                    color:'white', transition:'background .15s'
+                  }}>
+                  <img src={`/emoji/${encodeURIComponent(emoji)}.svg`} alt={emoji}
+                    style={{width:16, height:16,
+                      filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
+                  <span style={{fontWeight:600}}>{userIds.length}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Reaction button — right side for outgoing */}
+      {isOut && (
+        <button
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            onSetReactionPicker(p => p?.msgId === m.id ? null : { msgId: m.id, x: rect.left - 210, y: rect.top });
+          }}
+          style={{background: isHovered ? 'rgba(100,78,148,.55)' : 'transparent',
+            border:'none', borderRadius:'50%', width:28, height:28, cursor:'pointer',
+            flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+            padding:4, transition:'background .15s', marginBottom:6,
+            opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none'}}>
+          <img src="/emoji/smiling.svg" alt="react"
+            style={{width:16, height:16, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
+        </button>
+      )}
+    </div>
+  );
+}, (prev, next) =>
+  prev.m === next.m &&
+  prev.editingMsgId === next.editingMsgId &&
+  prev.reactionPickerMsgId === next.reactionPickerMsgId
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function ChatScreen() {
   const nav = useNavigate();
@@ -2852,20 +2982,19 @@ export function ChatScreen() {
   const [requesterProfile, setRequesterProfile] = useState(null);
   const [accepting,    setAccepting]    = useState(false);
   const [declining,    setDeclining]    = useState(false);
-  const [hoveredMsg,   setHoveredMsg]   = useState(null);
   const [reactionPicker,setReactionPicker] = useState(null); // { msgId, x, y }
   const [customConfirm, confirmModal] = useConfirm();
   const [isContact,    setIsContact]    = useState(false); // is partner in my contacts?
-  const bottomRef          = useRef();
+  const [firstItemIndex, setFirstItemIndex] = useState(1_000_000); // Virtuoso prepend index
+  const virtuosoRef        = useRef();
+  const atBottomRef        = useRef(true);  // tracks whether list is scrolled to bottom
   const typingTimer        = useRef();
   const textareaRef        = useRef();
   const fileInputRef       = useRef();
   const searchRef          = useRef();
-  const scrollRef          = useRef();
-  const savedScrollHeight  = useRef(0);   // set before prepend, cleared after layout
-  const skipBottomScroll   = useRef(false); // true while restoring scroll after prepend
   const isInitialLoad      = useRef(true);  // true until first messages batch is rendered
   const forceScrollBottom  = useRef(false); // true after user sends a message
+  const readDebounceTimer  = useRef(null);  // debounce read receipts
 
   // Close context menu on outside click
   useEffect(() => {
@@ -2886,13 +3015,16 @@ export function ChatScreen() {
   }, [reactionPicker]);
 
 
-  // Mark all currently unread incoming messages as read (only if tab is focused)
+  // Debounced read receipt — sends only the LAST unread message ID (one DB query on server)
   function markVisibleAsRead(msgs) {
     if (!document.hasFocus()) return;
-    msgs.forEach(m => {
-      if (m.sender_id !== user.id && m.status !== 'read')
-        socket.markRead(m.id, convId);
-    });
+    // Find the latest incoming unread message
+    const lastUnread = [...msgs].reverse().find(m => m.sender_id !== user?.id && m.status !== 'read');
+    if (!lastUnread) return;
+    clearTimeout(readDebounceTimer.current);
+    readDebounceTimer.current = setTimeout(() => {
+      socket.markRead(lastUnread.id, convId);
+    }, 300);
   }
 
   // When tab regains focus — mark all loaded unread messages as read
@@ -2901,7 +3033,7 @@ export function ChatScreen() {
       setMessages(prev => { markVisibleAsRead(prev); return prev; });
     }
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    return () => { window.removeEventListener('focus', onFocus); clearTimeout(readDebounceTimer.current); };
   }, [convId, user?.id]);
 
   // Load requester profile when request lock is set
@@ -2918,6 +3050,7 @@ export function ChatScreen() {
     setMessages([]);
     setHasMore(true);
     setLoadingMore(false);
+    setFirstItemIndex(1_000_000); // reset Virtuoso prepend index on conv change
     api.getMessages(convId).then(data => {
       if (data?.locked) {
         setRequestLock({ requester: data.requester });
@@ -2946,57 +3079,35 @@ export function ChatScreen() {
     }).catch(console.error);
   }, [convId]);
 
-  // Load older messages (prepend)
+  // Load older messages (prepend) — Virtuoso handles scroll position via firstItemIndex
   async function loadOlder() {
     if (!hasMore || loadingMore || !messages.length) return;
     setLoadingMore(true);
-    const oldest = messages[0].created_at;
-    savedScrollHeight.current = scrollRef.current?.scrollHeight ?? 0;
-    skipBottomScroll.current = true;
     try {
-      const older = await api.getMessages(convId, oldest);
+      const older = await api.getMessages(convId, messages[0].created_at);
+      if (!Array.isArray(older) || !older.length) { setHasMore(false); return; }
       if (older.length < 50) setHasMore(false);
-      if (older.length) {
-        setMessages(prev => [...older, ...prev]);
-      } else {
-        skipBottomScroll.current = false;
-      }
-    } catch {
-      skipBottomScroll.current = false;
-    } finally {
-      setLoadingMore(false);
-    }
+      setFirstItemIndex(prev => prev - older.length);
+      setMessages(prev => [...older, ...prev]);
+    } catch {}
+    finally { setLoadingMore(false); }
   }
 
-  // Restore scroll position after prepend (runs synchronously before paint)
-  useLayoutEffect(() => {
-    if (savedScrollHeight.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight - savedScrollHeight.current;
-      savedScrollHeight.current = 0;
-    }
-  }, [messages]);
-
-  // Scroll to bottom — instant on first load, forced after send, smart otherwise
+  // Scroll to bottom on initial load or after send — Virtuoso's followOutput handles the rest
   useEffect(() => {
-    if (skipBottomScroll.current) { skipBottomScroll.current = false; return; }
-    if (messages.length === 0) return; // ignore the initial [] reset
-    const el = scrollRef.current;
-    if (!el) return;
+    if (messages.length === 0) return;
     if (isInitialLoad.current) {
-      // First real batch: jump instantly to bottom
-      el.scrollTop = el.scrollHeight;
       isInitialLoad.current = false;
+      // Jump to last item instantly after first render
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'instant' });
+      });
       return;
     }
     if (forceScrollBottom.current) {
-      // User just sent a message — always scroll to bottom
       forceScrollBottom.current = false;
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-      return;
+      virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'smooth' });
     }
-    // Incoming message / typing indicator: only scroll if already near bottom
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 180;
-    if (nearBottom) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages, typing]);
 
   // Real-time events
@@ -3024,8 +3135,13 @@ export function ChatScreen() {
     const u3 = socket.on('typing:stop', msg => {
       if (msg.conversationId === convId) setTyping(null);
     });
-    const u4 = socket.on('message:status', ({ id, status }) => {
+    const u4  = socket.on('message:status', ({ id, status }) => {
       setMessages(prev => prev.map(m => m.id===id ? { ...m, status } : m));
+    });
+    // Batch read receipts — server sends one event for N messages
+    const u4b = socket.on('message:status_batch', ({ ids, status }) => {
+      const idSet = new Set(ids);
+      setMessages(prev => prev.map(m => idSet.has(m.id) ? { ...m, status } : m));
     });
     const u5 = socket.on('presence:change', ({ userId, online }) => {
       setPartner(p => p.id === userId ? { ...p, online } : p);
@@ -3043,7 +3159,7 @@ export function ChatScreen() {
     const u9 = socket.on('reaction:update', ({ messageId, reactions }) => {
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
     });
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
+    return () => { u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u7(); u8(); u9(); };
   }, [convId, user?.id]);
 
   function handleInput(e) {
@@ -3261,14 +3377,30 @@ export function ChatScreen() {
     { label: 'Удалить содержимое чата', icon: '🗑️', danger: true,  onClick: handleClearChat },
   ];
 
-  // Group messages by date
-  const grouped = messages.reduce((acc, m) => {
-    const day = new Date(m.created_at*1000).toDateString();
-    if (!acc.length || acc[acc.length-1].day !== day)
-      acc.push({ day, label: fmtDate(m.created_at), messages:[] });
-    acc[acc.length-1].messages.push(m);
-    return acc;
-  }, []);
+  // Flat item list for Virtuoso: date separators interleaved with messages + typing
+  const flatItems = useMemo(() => {
+    const result = [];
+    let lastDay = null;
+    for (const m of messages) {
+      const day = new Date(m.created_at * 1000).toDateString();
+      if (day !== lastDay) {
+        result.push({ type: 'date', id: 'date-' + day, day, label: fmtDate(m.created_at) });
+        lastDay = day;
+      }
+      result.push({ type: 'msg', ...m });
+    }
+    if (typing) result.push({ type: 'typing', id: 'typing' });
+    return result;
+  }, [messages, typing]);
+
+  // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
+  const handleOpenMenu  = useCallback((e, m) => openMsgMenu(e, m), []);
+  const handleLightbox  = useCallback((src) => setLightbox(src), []);
+  const handleToggleRxn = useCallback((msgId, emoji) => {
+    socket.send('reaction:toggle', { messageId: msgId, conversationId: convId, emoji });
+    setReactionPicker(null);
+  }, [convId]);
+  const handleSetRxnPicker = useCallback((fn) => setReactionPicker(fn), []);
 
   return (
     <div style={{
@@ -3334,158 +3466,69 @@ export function ChatScreen() {
         </div>
       )}
 
-      {/* Messages */}
-      <div ref={scrollRef}
-        onScroll={e => { if (e.target.scrollTop < 120 && hasMore && !loadingMore) loadOlder(); }}
-        style={{
-          flex:1, overflowY:'auto', overscrollBehavior:'contain',
-          display: (requestLock || (searchMode && searchResults !== null)) ? 'none' : 'block',
-        }}>
-      <div style={{maxWidth:680,margin:'0 auto',padding:'14px 16px 8px',display:'flex',flexDirection:'column',gap:8}}>
-        {loadingMore && (
-          <div style={{textAlign:'center',padding:'6px 0',color:'rgba(255,255,255,.4)',fontSize:13,flexShrink:0}}>
-            Загрузка…
-          </div>
-        )}
-        {grouped.map(group => (
-          <div key={group.day}>
-            <div style={{display:'flex',justifyContent:'center',margin:'8px 0'}}>
-              <div style={{background:'rgba(100,72,140,.38)',borderRadius:14,padding:'4px 14px',
-                color:'rgba(255,255,255,.7)',fontSize:13,fontWeight:600}}>
-                {group.label}
+      {/* Messages — virtualized list, DOM nodes fixed at ~50 regardless of history size */}
+      {!requestLock && !(searchMode && searchResults !== null) && (
+        <Virtuoso
+          ref={virtuosoRef}
+          style={{ flex: 1, overscrollBehavior: 'contain' }}
+          firstItemIndex={firstItemIndex}
+          data={flatItems}
+          startReached={loadOlder}
+          atBottomStateChange={bottom => { atBottomRef.current = bottom; }}
+          followOutput={(atBottom) => {
+            if (forceScrollBottom.current) return 'smooth';
+            return atBottom ? 'smooth' : false;
+          }}
+          components={{
+            Header: () => loadingMore ? (
+              <div style={{textAlign:'center',padding:'8px 0',color:'rgba(255,255,255,.4)',fontSize:13}}>
+                Загрузка…
               </div>
-            </div>
-            {group.messages.map(m => {
-              const isOut = m.sender_id === user?.id;
-              const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
-              const isHovered = hoveredMsg === m.id;
-              return (
-                <div key={m.id}
-                  style={{display:'flex', alignItems:'flex-end', gap:4,
-                    justifyContent: isOut ? 'flex-end':'flex-start',
-                    marginBottom: hasReactions ? 8 : 2}}
-                  onMouseEnter={() => setHoveredMsg(m.id)}
-                  onMouseLeave={() => setHoveredMsg(null)}
-                  onContextMenu={isOut ? (e) => openMsgMenu(e, m) : undefined}>
-
-                  {/* Reaction button — left side for incoming */}
-                  {!isOut && (
-                    <button
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setReactionPicker(p => p?.msgId === m.id ? null : { msgId: m.id, x: rect.right + 6, y: rect.top });
-                      }}
-                      style={{background: isHovered ? 'rgba(100,78,148,.55)' : 'transparent',
-                        border:'none', borderRadius:'50%', width:28, height:28, cursor:'pointer',
-                        flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-                        padding:4, transition:'background .15s', marginBottom:6,
-                        opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none'}}>
-                      <img src="/emoji/smiling.svg" alt="react"
-                        style={{width:16, height:16, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
-                    </button>
-                  )}
-
-                  <div style={{display:'flex', flexDirection:'column',
-                    alignItems: isOut ? 'flex-end' : 'flex-start', maxWidth:'80%'}}>
-                    <div style={{
-                      background: editingMsg?.id === m.id
-                        ? 'rgba(160,120,210,.85)'
-                        : isOut ? 'rgba(110,80,155,.70)' : 'rgba(255,255,255,.90)',
-                      borderRadius: isOut ? '20px 20px 5px 20px' : '20px 20px 20px 5px',
-                      padding:'10px 13px 6px',
-                      color: isOut ? 'white' : '#2a2040',
-                      fontSize:14, lineHeight:'1.5',
-                      transition:'background .2s'
-                    }}>
-                      {partner.isGroup && !isOut && (
-                        <div style={{fontSize:11,fontWeight:700,color:'rgba(200,160,240,.8)',marginBottom:4}}>
-                          {m.sender_name}
-                        </div>
-                      )}
-                      {m.attachment?.type === 'image' && (() => {
-                        const src = m.attachment.url;
-                        if (!src) return (
-                          <div style={{padding:'10px 0',fontSize:13,opacity:.5}}>
-                            🖼 Изображение недоступно
-                          </div>
-                        );
-                        return (
-                          <img src={src} alt=""
-                            onClick={() => setLightbox(src)}
-                            style={{maxWidth:'100%',maxHeight:300,borderRadius:10,
-                              display:'block',marginBottom: m.text ? 6 : 2,
-                              cursor:'zoom-in'}}/>
-                        );
-                      })()}
-                      {m.text && <div style={{wordBreak:'break-word',whiteSpace:'pre-wrap'}}>{renderText(m.text)}</div>}
-                      <div style={{fontSize:11,opacity:.6,textAlign:'right',marginTop:3,display:'flex',justifyContent:'flex-end',gap:4}}>
-                        {m.edited_at && <span>изм.</span>}
-                        <span>{fmtTime(m.created_at)}</span>
-                        {isOut && statusIcon(m.status)}
-                      </div>
-                    </div>
-
-                    {/* Reaction chips */}
-                    {hasReactions && (
-                      <div style={{display:'flex', flexWrap:'wrap', gap:4, marginTop:5}}>
-                        {Object.entries(m.reactions).map(([emoji, userIds]) => {
-                          const iReacted = userIds.includes(user?.id);
-                          return (
-                            <button key={emoji} onClick={() => toggleReaction(m.id, emoji)}
-                              title={emoji}
-                              style={{
-                                background: iReacted ? 'rgba(130,100,190,.6)' : 'rgba(255,255,255,.18)',
-                                border: iReacted ? '1px solid rgba(170,130,220,.75)' : '1px solid rgba(255,255,255,.12)',
-                                borderRadius:14, padding:'2px 8px', cursor:'pointer',
-                                display:'flex', alignItems:'center', gap:4, fontSize:12,
-                                color:'white', transition:'background .15s'
-                              }}>
-                              <img src={`/emoji/${encodeURIComponent(emoji)}.svg`} alt={emoji}
-                                style={{width:16, height:16,
-                                  filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
-                              <span style={{fontWeight:600}}>{userIds.length}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Reaction button — right side for outgoing */}
-                  {isOut && (
-                    <button
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setReactionPicker(p => p?.msgId === m.id ? null : { msgId: m.id, x: rect.left - 210, y: rect.top });
-                      }}
-                      style={{background: isHovered ? 'rgba(100,78,148,.55)' : 'transparent',
-                        border:'none', borderRadius:'50%', width:28, height:28, cursor:'pointer',
-                        flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-                        padding:4, transition:'background .15s', marginBottom:6,
-                        opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none'}}>
-                      <img src="/emoji/smiling.svg" alt="react"
-                        style={{width:16, height:16, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
-                    </button>
-                  )}
+            ) : null,
+          }}
+          itemContent={(_index, item) => {
+            if (item.type === 'date') return (
+              <div style={{display:'flex',justifyContent:'center',margin:'8px 16px'}}>
+                <div style={{background:'rgba(100,72,140,.38)',borderRadius:14,padding:'4px 14px',
+                  color:'rgba(255,255,255,.7)',fontSize:13,fontWeight:600}}>
+                  {item.label}
                 </div>
-              );
-            })}
-          </div>
-        ))}
-        {typing && (
-          <div style={{display:'flex',gap:4,alignItems:'center',padding:'4px 8px'}}>
-            <div style={{color:'rgba(255,255,255,.6)',fontSize:13}}>{typing} печатает</div>
-            <div style={{display:'flex',gap:3}}>
-              {[0,1,2].map(i=>(
-                <div key={i} style={{width:6,height:6,borderRadius:'50%',
-                  background:'rgba(255,255,255,.5)',animation:`typing 1.2s ${i*.2}s infinite`}}/>
-              ))}
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef}/>
-      </div>{/* end maxWidth inner */}
-      </div>{/* end scroll area */}
+              </div>
+            );
+            if (item.type === 'typing') return (
+              <div style={{display:'flex',gap:4,alignItems:'center',padding:'4px 24px 8px'}}>
+                <div style={{color:'rgba(255,255,255,.6)',fontSize:13}}>{typing} печатает</div>
+                <div style={{display:'flex',gap:3}}>
+                  {[0,1,2].map(i=>(
+                    <div key={i} style={{width:6,height:6,borderRadius:'50%',
+                      background:'rgba(255,255,255,.5)',animation:`typing 1.2s ${i*.2}s infinite`}}/>
+                  ))}
+                </div>
+              </div>
+            );
+            // Regular message
+            const isOut = item.sender_id === user?.id;
+            return (
+              <div style={{maxWidth:680,margin:'0 auto',padding:'0 16px'}}>
+                <MessageRow
+                  m={item}
+                  isOut={isOut}
+                  isGroup={partner.isGroup}
+                  editingMsgId={editingMsg?.id}
+                  reactionPickerMsgId={reactionPicker?.msgId}
+                  currentUserId={user?.id}
+                  onOpenMenu={handleOpenMenu}
+                  onLightbox={handleLightbox}
+                  onToggleReaction={handleToggleRxn}
+                  onSetReactionPicker={handleSetRxnPicker}
+                  statusIcon={statusIcon}
+                  renderText={renderText}
+                />
+              </div>
+            );
+          }}
+        />
+      )}
 
       {/* Image preview bar */}
       {imgPreview && (
