@@ -159,4 +159,31 @@ async function uploadImage(buffer, baseKey) {
   }
 }
 
-module.exports = { uploadFile, uploadImage, deleteFile, deleteByPrefix, getReadUrl, MODE };
+// ── getPresignedUploadUrl ─────────────────────────────────────────────────────
+// Returns a presigned PUT URL so the client uploads directly to S3.
+// The client MUST send Content-Type and x-amz-acl headers that match the signature.
+// Set S3_NO_ACL=1 if your S3 provider doesn't support per-object ACL.
+async function getPresignedUploadUrl(key, contentType, expiresIn = 300) {
+  if (MODE !== 's3') {
+    // Local dev — no presigned URL; client falls back to base64 endpoint
+    return { uploadUrl: null, headers: {}, key, publicUrl: '/uploads/' + key };
+  }
+  const { PutObjectCommand } = require('@aws-sdk/client-s3');
+  const { getSignedUrl }     = require('@aws-sdk/s3-request-presigner');
+  const noAcl = !!process.env.S3_NO_ACL;
+  const cmd = new PutObjectCommand({
+    Bucket:      BUCKET(),
+    Key:         key,
+    ContentType: contentType,
+    ...(noAcl ? {} : { ACL: 'public-read' }),
+  });
+  const uploadUrl = await getSignedUrl(getS3(), cmd, { expiresIn });
+  return {
+    uploadUrl,
+    headers: noAcl ? {} : { 'x-amz-acl': 'public-read' },
+    key,
+    publicUrl: `${PUBLIC_BASE()}/${key}`,
+  };
+}
+
+module.exports = { uploadFile, uploadImage, deleteFile, deleteByPrefix, getReadUrl, getPresignedUploadUrl, MODE };

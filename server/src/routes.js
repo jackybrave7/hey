@@ -261,6 +261,34 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  // ── Presigned upload URL (client uploads directly to S3) ────────────────────
+  r.post('/upload/presign', requireAuth, async (req, res) => {
+    const { category, contentType } = req.body;
+    const allowed = {
+      'chat-image':    ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+      'moment-image':  ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+      'moment-video':  ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'],
+      'moment-audio':  ['audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/webm'],
+    };
+    if (!allowed[category]?.includes(contentType))
+      return res.status(400).json({ error: 'Unsupported type' });
+
+    const ext   = contentType.split('/')[1].split(';')[0].replace('quicktime','mov').replace('x-matroska','mkv');
+    const keyMap = {
+      'chat-image':   `chat/${uuid()}.${ext}`,
+      'moment-image': `moments/${uuid()}/media.${ext}`,
+      'moment-video': `moments/${uuid()}/video.${ext}`,
+      'moment-audio': `moments/${uuid()}/audio.${ext}`,
+    };
+    try {
+      const result = await storage.getPresignedUploadUrl(keyMap[category], contentType);
+      res.json(result);
+    } catch (e) {
+      console.error('[/upload/presign]', e);
+      res.status(500).json({ error: 'Presign failed' });
+    }
+  });
+
   r.post('/upload', requireAuth, async (req, res) => {
     try {
       const { data } = req.body;

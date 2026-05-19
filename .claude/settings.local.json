@@ -114,7 +114,8 @@
       "WebFetch(domain:virtuoso.dev)",
       "WebFetch(domain:www.sqlprostudio.com)",
       "WebFetch(domain:news.ycombinator.com)",
-      "Bash(node -e \"require\\('./src/db/db.js'\\); require\\('./src/ws.js'\\); console.log\\('Server modules OK'\\)\")"
+      "Bash(node -e \"require\\('./src/db/db.js'\\); require\\('./src/ws.js'\\); console.log\\('Server modules OK'\\)\")",
+      "Bash(node -e \"const s = require\\('./src/storage'\\); console.log\\(typeof s.getPresignedUploadUrl\\); const r = require\\('./src/routes'\\); console.log\\('routes OK'\\)\")"
     ]
   }
 }

@@ -34,19 +34,37 @@ function copyText(text) {
 }
 
 // Inline contextual menu triggered by ⋯
+// Uses position:fixed so it's never clipped by overflow:hidden parents
 function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
   const [copied, setCopied] = useState(false);
-  const ref = useRef();
+  const btnRef = useRef();
+  const menuRef = useRef();
 
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (
+        btnRef.current && !btnRef.current.contains(e.target) &&
+        menuRef.current && !menuRef.current.contains(e.target)
+      ) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
+
+  function openMenu() {
+    if (open) { setOpen(false); return; }
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) {
+      setMenuPos({
+        top: rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen(true);
+  }
 
   function copyLink() {
     copyText(`${location.origin}/moments/${moment.id}`)
@@ -79,9 +97,10 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
   ];
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={openMenu}
         style={{
           background: open ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.08)',
           border: 'none', borderRadius: 10,
@@ -92,8 +111,11 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
       >⋯</button>
 
       {open && (
-        <div style={{
-          position: 'absolute', bottom: 'calc(100% + 6px)', right: 0, zIndex: 50,
+        <div ref={menuRef} style={{
+          position: 'fixed',
+          top: menuPos.top,
+          right: menuPos.right,
+          zIndex: 9999,
           background: 'rgba(28,18,58,.98)', backdropFilter: 'blur(20px)',
           borderRadius: 14, overflow: 'hidden', minWidth: 210,
           boxShadow: '0 8px 32px rgba(0,0,0,.5)',
@@ -119,7 +141,7 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -131,6 +153,7 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
   const [reactors, setReactors] = useState(null); // null = not loaded yet
   const [showAnalyticsPromo, setShowAnalyticsPromo] = useState(false);
   const [showSuperInfo, setShowSuperInfo] = useState(false);
+  const [imgLightbox, setImgLightbox] = useState(false);
 
   // Register view
   useEffect(() => {
@@ -205,7 +228,12 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
           <div style={{flexShrink:0,position:'relative',background:'#0a0518',maxHeight:'45vh',overflow:'hidden'}}>
             {moment.media_type === 'image' && (
               <img src={moment.media_url} alt=""
-                style={{width:'100%',maxHeight:'45vh',objectFit:'contain',display:'block'}}/>
+                onClick={() => setImgLightbox(true)}
+                style={{width:'100%',maxHeight:'45vh',objectFit:'contain',display:'block',
+                  cursor:'zoom-in',transition:'opacity .15s'}}
+                onMouseEnter={e => e.currentTarget.style.opacity='.88'}
+                onMouseLeave={e => e.currentTarget.style.opacity='1'}
+              />
             )}
             {moment.media_type === 'video' && (
               <video src={moment.media_url} controls
@@ -452,6 +480,41 @@ export default function MomentDetailPopup({ moment: initial, isMine, currentUser
         onClose={() => setShowSuperInfo(false)}
         onInvite={() => setShowSuperInfo(false)}
       />
+    )}
+
+    {/* Image lightbox */}
+    {imgLightbox && (
+      <div
+        onClick={() => setImgLightbox(false)}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 1200,
+          background: 'rgba(0,0,0,.92)', backdropFilter: 'blur(20px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'zoom-out', padding: 16,
+          animation: 'fadeIn .18s ease',
+        }}
+      >
+        <img
+          src={moment.media_url} alt=""
+          style={{
+            maxWidth: '100%', maxHeight: '100%',
+            objectFit: 'contain', borderRadius: 12,
+            boxShadow: '0 8px 60px rgba(0,0,0,.7)',
+            pointerEvents: 'none',
+          }}
+        />
+        <button
+          onClick={() => setImgLightbox(false)}
+          style={{
+            position: 'fixed', top: 18, right: 18,
+            background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(8px)',
+            border: 'none', borderRadius: '50%',
+            width: 40, height: 40, color: 'white',
+            fontSize: 20, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >✕</button>
+      </div>
     )}
     </>
   );

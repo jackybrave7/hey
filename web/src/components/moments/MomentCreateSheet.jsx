@@ -1,6 +1,7 @@
 // MomentCreateSheet.jsx — шторка создания / редактирования Момента
 import { useState, useRef, useEffect } from 'react';
 import { api } from '../../api';
+import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 
 export default function MomentCreateSheet({ existing, onClose, onSaved, onConflict }) {
   const isEdit = !!existing;
@@ -9,28 +10,46 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
   const [mediaPreview, setMediaPreview] = useState(existing?.media_url || null);
   const [mediaType, setMediaType] = useState(existing?.media_type || null);
   const [saving,    setSaving]    = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error,     setError]     = useState('');
   const fileRef = useRef();
   const textRef = useRef();
+  // Keep local object URL for preview; revoke on unmount / media removal
+  const previewObjUrl = useRef(null);
 
   useEffect(() => { setTimeout(() => textRef.current?.focus(), 80); }, []);
+  useEffect(() => () => { if (previewObjUrl.current) URL.revokeObjectURL(previewObjUrl.current); }, []);
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     setError('');
-    const reader = new FileReader();
-    reader.onload = async ev => {
-      const data = ev.target.result;
-      try {
-        const res = await api.uploadMomentMedia(data);
-        setMediaPreview(res.url);
-        setMediaType(res.mediaType);
-      } catch(err) {
-        setError(err.message || 'Ошибка загрузки файла');
-      }
-    };
-    reader.readAsDataURL(file);
+
+    // Show instant local preview
+    if (previewObjUrl.current) URL.revokeObjectURL(previewObjUrl.current);
+    previewObjUrl.current = previewUrl(file);
+    setMediaPreview(previewObjUrl.current);
+    setMediaType(file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'audio');
+
+    // Upload directly to S3 (or base64 fallback for local dev)
+    setUploading(true);
+    try {
+      const category = file.type.startsWith('image/') ? 'moment-image'
+                     : file.type.startsWith('video/') ? 'moment-video'
+                     : 'moment-audio';
+      const res = await uploadMedia(file, category, {
+        getPresignUrl:     api.getPresignUrl,
+        uploadMomentMedia: api.uploadMomentMedia,
+      });
+      setMediaPreview(res.url);   // replace local preview with final S3 URL
+      setMediaType(res.mediaType);
+    } catch(err) {
+      setMediaPreview(null);
+      setMediaType(null);
+      setError(err.message || 'Ошибка загрузки файла');
+    } finally {
+      setUploading(false);
+    }
   }
 
   function removeMedia() {
@@ -40,6 +59,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
   }
 
   async function save() {
+    if (uploading) { setError('Подождите, файл ещё загружается'); return; }
     if (!text.trim()) { setError('Напишите что-нибудь'); return; }
     setSaving(true);
     setError('');
@@ -152,11 +172,25 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                       <audio src={mediaPreview} controls style={{width:'100%'}}/>
                     </div>
                   )}
-                  <button onClick={removeMedia} style={{
-                    position:'absolute',top:8,right:8,background:'rgba(0,0,0,.55)',
-                    backdropFilter:'blur(6px)',border:'none',borderRadius:'50%',
-                    width:30,height:30,color:'white',fontSize:16,cursor:'pointer',
-                    display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                  {/* Upload progress overlay */}
+                  {uploading && (
+                    <div style={{
+                      position:'absolute',inset:0,
+                      background:'rgba(10,5,25,.65)',backdropFilter:'blur(4px)',
+                      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+                      gap:8,color:'white',fontSize:13,fontWeight:600,
+                    }}>
+                      <div style={{fontSize:24,animation:'spin 1s linear infinite'}}>⏳</div>
+                      Загрузка…
+                    </div>
+                  )}
+                  {!uploading && (
+                    <button onClick={removeMedia} style={{
+                      position:'absolute',top:8,right:8,background:'rgba(0,0,0,.55)',
+                      backdropFilter:'blur(6px)',border:'none',borderRadius:'50%',
+                      width:30,height:30,color:'white',fontSize:16,cursor:'pointer',
+                      display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                  )}
                 </div>
               ) : (
                 <button onClick={() => fileRef.current?.click()}
@@ -238,10 +272,10 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
 
         {/* Footer */}
         <div style={{padding:'14px 20px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
-          <button onClick={save} disabled={saving || !text.trim()}
+          <button onClick={save} disabled={saving || uploading || !text.trim()}
             style={{
               width:'100%',padding:'14px',borderRadius:50,fontSize:15,fontWeight:700,
-              cursor: saving || !text.trim() ? 'not-allowed' : 'pointer',
+              cursor: saving || uploading || !text.trim() ? 'not-allowed' : 'pointer',
               background: !text.trim() ? 'rgba(255,255,255,.08)' : 'rgba(120,90,200,.85)',
               border:'none',color: !text.trim() ? 'rgba(255,255,255,.3)' : 'white',
               transition:'all .2s',boxShadow: text.trim() ? '0 4px 20px rgba(120,80,200,.35)' : 'none'

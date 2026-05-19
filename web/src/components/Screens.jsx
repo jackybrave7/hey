@@ -3,6 +3,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, useCallbac
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
+import { uploadMedia, previewUrl } from '../lib/uploadMedia';
 import { useAuth } from '../AuthContext';
 import {
   AuthBrand, FloatingInput, PasswordInput,
@@ -3169,51 +3170,16 @@ export function ChatScreen() {
     typingTimer.current = setTimeout(() => socket.stopTyping(convId), 1500);
   }
 
-  async function compressImage(file) {
-    const MAX_SIDE = 1280, QUALITY = 0.82;
-    const MAX_RAW = 10 * 1024 * 1024;
-    if (!file.type.startsWith('image/')) throw new Error('Не изображение');
-    if (file.size > MAX_RAW) throw new Error('Файл слишком большой (макс. 10 МБ)');
-    // GIF — не сжимаем (потеряем анимацию), отдаём как есть
-    if (file.type === 'image/gif') {
-      return new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = e => res(e.target.result);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
-    }
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = reject;
-      reader.onload = e => {
-        const img = new Image();
-        img.onerror = reject;
-        img.onload = () => {
-          let { width: w, height: h } = img;
-          if (w > MAX_SIDE || h > MAX_SIDE) {
-            const r = Math.min(MAX_SIDE / w, MAX_SIDE / h);
-            w = Math.round(w * r); h = Math.round(h * r);
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', QUALITY));
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
   async function handleFileSelect(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    try {
-      const dataUrl = await compressImage(file);
-      setImgPreview({ dataUrl, uploading: false });
-    } catch(err) { alert(err.message); }
+    if (!file.type.startsWith('image/')) { alert('Только изображения'); return; }
+    if (file.size > 10 * 1024 * 1024) { alert('Файл слишком большой (макс. 10 МБ)'); return; }
+
+    // Instant local preview — no FileReader needed
+    const localUrl = previewUrl(file);
+    setImgPreview({ dataUrl: localUrl, file, uploading: false });
   }
 
   async function send() {
@@ -3221,13 +3187,16 @@ export function ChatScreen() {
 
     if (imgPreview) {
       if (imgPreview.uploading) return;
-      // Capture dataUrl NOW before any async — prevents race with file re-selection
-      const capturedDataUrl = imgPreview.dataUrl;
-      const capturedText = t;
+      const capturedFile    = imgPreview.file;
+      const capturedPreview = imgPreview.dataUrl; // local object URL for optimistic msg
+      const capturedText    = t;
       setImgPreview(p => ({ ...p, uploading: true }));
       let attachment;
       try {
-        const { url } = await api.uploadImage(capturedDataUrl);
+        const { url } = await uploadMedia(capturedFile, 'chat-image', {
+          getPresignUrl: api.getPresignUrl,
+          uploadImage:   api.uploadImage,
+        });
         attachment = { type: 'image', url };
       } catch (err) {
         alert(err.message);
