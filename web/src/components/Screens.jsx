@@ -264,7 +264,6 @@ export function HeyScreen() {
       padding:'0', flexDirection:'column', overflowY:'auto',
     }}>
       <style>{`
-        @keyframes heyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
         @keyframes heyFadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         .hey-feat-card { transition: transform .18s, background .18s; }
         .hey-feat-card:hover { transform: translateY(-3px); background: rgba(255,255,255,.11) !important; }
@@ -286,39 +285,41 @@ export function HeyScreen() {
       {/* Hero */}
       <div style={{
         width:'100%', display:'flex', flexDirection:'column', alignItems:'center',
-        padding:'52px 24px 36px',
-        background:'linear-gradient(180deg, rgba(80,30,140,.0) 0%, rgba(40,10,80,.35) 100%)',
+        padding:'56px 24px 32px',
       }}>
-        {/* Logo blob */}
+        {/* Logo — same style as LoginScreen AuthBrand */}
         <div style={{
-          width:160, height:160,
-          background:'radial-gradient(ellipse at 38% 35%, #d0b0ff 0%, #a878e0 45%, #7040b8)',
-          borderRadius:'62% 52% 60% 48% / 55% 62% 46% 60%',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          marginBottom:28,
-          animation:'heyFloat 4s ease-in-out infinite',
-          boxShadow:'0 24px 64px rgba(110,60,190,.5), 0 0 0 1px rgba(255,255,255,.08)',
+          animation:'heyFadeUp .5s ease-out both',
+          textAlign:'center', marginBottom:32,
         }}>
-          <span style={{
-            color:'white', fontSize:38, fontWeight:700, letterSpacing:3,
+          <div style={{
+            fontSize:62, fontWeight:700, letterSpacing:-2,
+            display:'flex', alignItems:'center', justifyContent:'center', gap:14,
+            marginBottom:10,
+            background:'linear-gradient(135deg,#ffffff 0%,#e8d8ff 100%)',
+            WebkitBackgroundClip:'text', backgroundClip:'text',
+            WebkitTextFillColor:'transparent',
             fontFamily:'Comfortaa,sans-serif',
-            textShadow:'0 2px 16px rgba(0,0,0,.3)'
-          }}>HEY</span>
+            lineHeight:1,
+          }}>
+            <span style={{
+              background:'linear-gradient(135deg,#ffffff,#c8a8ff)',
+              WebkitBackgroundClip:'text', backgroundClip:'text',
+              WebkitTextFillColor:'transparent',
+            }}>✦</span>
+            HEY
+          </div>
+          <div style={{fontSize:15, color:'rgba(255,255,255,.7)', fontWeight:400, letterSpacing:.3}}>
+            Мессенджер для тех, кто творит
+          </div>
         </div>
 
         <div style={{
-          fontSize:24, fontWeight:700, color:'white', textAlign:'center',
-          lineHeight:1.3, marginBottom:10,
-          animation:'heyFadeUp .55s ease-out .15s both',
+          fontSize:13, color:'rgba(255,255,255,.45)', textAlign:'center',
+          lineHeight:1.7, maxWidth:260,
+          animation:'heyFadeUp .5s ease-out .12s both',
         }}>
-          Мессенджер для тех,<br/>кто творит
-        </div>
-        <div style={{
-          fontSize:14, color:'rgba(255,255,255,.55)', textAlign:'center',
-          lineHeight:1.7, maxWidth:280,
-          animation:'heyFadeUp .55s ease-out .28s both',
-        }}>
-          Пространство для настоящих связей,<br/>без лишнего шума
+          Моменты · Чаты · Контакты без лишнего шума
         </div>
       </div>
 
