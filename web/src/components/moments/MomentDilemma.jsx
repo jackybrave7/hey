@@ -10,8 +10,6 @@ function fmtDate(ts) {
 
 export default function MomentDilemma({ existing, pendingData, onResolved, onClose, currentUser }) {
   const [loading, setLoading] = useState(null); // 'archive' | 'delete'
-  const [deleteWord, setDeleteWord] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState('');
 
   async function handleArchiveAndCreate() {
@@ -28,7 +26,6 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
   }
 
   async function handleDeleteAndCreate() {
-    if (deleteWord.trim().toLowerCase() !== 'удалить') return;
     setLoading('delete');
     setError('');
     try {
@@ -114,64 +111,24 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
           </button>
 
           {/* Option 2: Delete permanently */}
-          {!showDeleteConfirm ? (
-            <button onClick={() => setShowDeleteConfirm(true)} disabled={!!loading}
-              style={{
-                width:'100%',padding:'16px',borderRadius:16,cursor: loading ? 'not-allowed' : 'pointer',
-                background:'rgba(200,50,50,.15)',
-                border:'1px solid rgba(255,80,80,.25)',
-                color:'rgba(255,120,120,.9)',fontSize:15,fontWeight:600,
-                display:'flex',alignItems:'center',gap:12,
-                transition:'all .2s',opacity: loading ? 0.5 : 1,
-              }}>
-              <span style={{fontSize:22}}>🗑</span>
-              <div style={{textAlign:'left'}}>
-                <div>Удалить старый навсегда</div>
-                <div style={{fontSize:12,fontWeight:400,opacity:.7,marginTop:2}}>
-                  Это действие нельзя отменить
-                </div>
-              </div>
-            </button>
-          ) : (
-            <div style={{background:'rgba(200,50,50,.12)',borderRadius:16,padding:'14px 16px',
-              border:'1px solid rgba(255,80,80,.2)'}}>
-              <div style={{color:'rgba(255,120,120,.9)',fontSize:14,fontWeight:600,marginBottom:10}}>
-                Введи <strong>удалить</strong> для подтверждения:
-              </div>
-              <input
-                value={deleteWord}
-                onChange={e => setDeleteWord(e.target.value)}
-                placeholder="удалить"
-                autoFocus
-                style={{
-                  width:'100%',boxSizing:'border-box',
-                  background:'rgba(255,255,255,.08)',
-                  border:`1px solid ${deleteWord.trim().toLowerCase() === 'удалить' ? 'rgba(255,100,100,.6)' : 'rgba(255,255,255,.14)'}`,
-                  borderRadius:10,padding:'10px 13px',color:'white',fontSize:14,
-                  fontFamily:'inherit',outline:'none',marginBottom:10,
-                }}
-              />
-              <div style={{display:'flex',gap:8}}>
-                <button onClick={() => { setShowDeleteConfirm(false); setDeleteWord(''); }}
-                  style={{flex:1,padding:'11px',borderRadius:12,background:'rgba(255,255,255,.08)',
-                    border:'none',color:'rgba(255,255,255,.6)',fontSize:14,fontWeight:600,cursor:'pointer'}}>
-                  Отмена
-                </button>
-                <button onClick={handleDeleteAndCreate}
-                  disabled={deleteWord.trim().toLowerCase() !== 'удалить' || !!loading}
-                  style={{
-                    flex:1,padding:'11px',borderRadius:12,
-                    background: deleteWord.trim().toLowerCase() === 'удалить' ? 'rgba(200,50,50,.85)' : 'rgba(255,255,255,.07)',
-                    border:'none',
-                    color: deleteWord.trim().toLowerCase() === 'удалить' ? 'white' : 'rgba(255,255,255,.3)',
-                    fontSize:14,fontWeight:700,
-                    cursor: deleteWord.trim().toLowerCase() === 'удалить' && !loading ? 'pointer' : 'not-allowed',
-                  }}>
-                  {loading === 'delete' ? 'Удаляем…' : 'Удалить и создать'}
-                </button>
+          <button onClick={handleDeleteAndCreate} disabled={!!loading}
+            style={{
+              width:'100%',padding:'16px',borderRadius:16,cursor: loading ? 'not-allowed' : 'pointer',
+              background: loading === 'delete' ? 'rgba(160,40,40,.7)' : 'rgba(200,50,50,.15)',
+              border:'1px solid rgba(255,80,80,.25)',
+              color: loading === 'delete' ? 'white' : 'rgba(255,120,120,.9)',
+              fontSize:15,fontWeight:600,
+              display:'flex',alignItems:'center',gap:12,
+              transition:'all .2s',opacity: loading && loading !== 'delete' ? 0.5 : 1,
+            }}>
+            <span style={{fontSize:22}}>🗑</span>
+            <div style={{textAlign:'left'}}>
+              <div>{loading === 'delete' ? 'Удаляем…' : 'Удалить старый и создать новый'}</div>
+              <div style={{fontSize:12,fontWeight:400,opacity:.7,marginTop:2}}>
+                Это действие нельзя отменить
               </div>
             </div>
-          )}
+          </button>
 
           {error && (
             <div style={{color:'rgba(255,140,140,.85)',fontSize:13,
