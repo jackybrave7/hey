@@ -102,3 +102,22 @@ export async function uploadMedia(file, category, apiFns) {
 export function previewUrl(file) {
   return URL.createObjectURL(file);
 }
+
+/**
+ * Upload avatar directly to S3.
+ * Falls back to base64 data URL (for local dev) — caller passes it to PATCH /me as-is.
+ *
+ * @param {File} file
+ * @param {{ getPresignUrl }} apiFns
+ * @returns {Promise<string>} — S3 URL or base64 data URL
+ */
+export async function uploadAvatar(file, apiFns) {
+  const { blob, contentType } = await resizeToBlob(file, 512); // avatars don't need to be huge
+  const presign = await apiFns.getPresignUrl('avatar', contentType);
+  if (presign.uploadUrl) {
+    await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});
+    return presign.publicUrl;
+  }
+  // Local fallback: return data URL (stored in SQLite as before)
+  return blobToDataUrl(blob);
+}

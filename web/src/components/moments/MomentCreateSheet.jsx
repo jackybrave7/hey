@@ -53,8 +53,10 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
   }
 
   function removeMedia() {
+    if (previewObjUrl.current) { URL.revokeObjectURL(previewObjUrl.current); previewObjUrl.current = null; }
     setMediaPreview(null);
     setMediaType(null);
+    setUploading(false);
     if (fileRef.current) fileRef.current.value = '';
   }
 

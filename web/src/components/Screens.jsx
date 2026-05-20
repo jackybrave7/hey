@@ -3,7 +3,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, useCallbac
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
-import { uploadMedia, previewUrl } from '../lib/uploadMedia';
+import { uploadMedia, previewUrl, uploadAvatar } from '../lib/uploadMedia';
 import { useAuth } from '../AuthContext';
 import {
   AuthBrand, FloatingInput, PasswordInput,
@@ -449,16 +449,16 @@ function formatPhoneInput(val) {
 // AvatarPicker — shared between Register and MyProfile
 // ─────────────────────────────────────────────────────────────────────────────
 
+// onChange(previewUrl, file) — previewUrl for display, file for upload on save
 function AvatarPicker({ avatar, onChange, size = 136, disabled = false }) {
   const fileRef = useRef();
 
   function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Файл больше 5 МБ'); return; }
-    const reader = new FileReader();
-    reader.onload = ev => onChange(ev.target.result);
-    reader.readAsDataURL(file);
+    if (file.size > 10 * 1024 * 1024) { alert('Файл больше 10 МБ'); return; }
+    const localUrl = URL.createObjectURL(file);
+    onChange(localUrl, file);
   }
 
   return (
@@ -740,6 +740,7 @@ export function MyProfileScreen() {
   const [phone, setPhone]       = useState('');
   const [birthday, setBirthday] = useState('');
   const [avatar, setAvatar]     = useState('');
+  const [avatarFile, setAvatarFile] = useState(null); // pending File to upload on save
   const [bio, setBio]           = useState('');
   const [phoneErr, setPhoneErr] = useState('');
   const [saving, setSaving]     = useState(false);
@@ -825,6 +826,7 @@ export function MyProfileScreen() {
     setPhone(user.phone || '');
     setBirthday(user.birthday || '');
     setAvatar(user.avatar || '');
+    setAvatarFile(null);
     setBio(user.bio || '');
   }
 
@@ -834,11 +836,17 @@ export function MyProfileScreen() {
     if (!name.trim()) return;
     setSaving(true);
     try {
+      // Upload avatar to S3 if a new file was selected
+      let finalAvatar = avatar || null;
+      if (avatarFile) {
+        finalAvatar = await uploadAvatar(avatarFile, { getPresignUrl: api.getPresignUrl });
+        setAvatarFile(null);
+      }
       const updated = await api.updateMe({
         name: name.trim(),
         phone: pv.normalized,
         birthday: birthday || null,
-        avatar: avatar || null,
+        avatar: finalAvatar,
         bio: bio.trim() || null,
       });
       setUser(updated);
@@ -900,7 +908,7 @@ export function MyProfileScreen() {
 
       {/* Avatar + fields */}
       <div style={{display:'flex',gap:22,padding:'0 26px',alignItems:'flex-start'}}>
-        <AvatarPicker avatar={avatar} onChange={v => { setAvatar(v); }} size={130} disabled={!editing}/>
+        <AvatarPicker avatar={avatar} onChange={(url, file) => { setAvatar(url); setAvatarFile(file); }} size={130} disabled={!editing}/>
 
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:16,paddingTop:8}}>
 
@@ -3188,7 +3196,7 @@ export function ChatScreen() {
     if (imgPreview) {
       if (imgPreview.uploading) return;
       const capturedFile    = imgPreview.file;
-      const capturedPreview = imgPreview.dataUrl; // local object URL for optimistic msg
+      const capturedObjUrl  = imgPreview.dataUrl; // object URL to revoke after send
       const capturedText    = t;
       setImgPreview(p => ({ ...p, uploading: true }));
       let attachment;
@@ -3211,6 +3219,7 @@ export function ChatScreen() {
         created_at: Math.floor(Date.now() / 1000)
       }]);
       socket.sendMessage(convId, capturedText || '', tempId, attachment);
+      URL.revokeObjectURL(capturedObjUrl);
       setImgPreview(null);
       setText('');
       return;
@@ -3508,7 +3517,7 @@ export function ChatScreen() {
           <span style={{flex:1,color:'rgba(255,255,255,.7)',fontSize:13}}>
             {imgPreview.uploading ? 'Отправка…' : 'Добавьте подпись или нажмите ➤'}
           </span>
-          <button onClick={() => setImgPreview(null)} disabled={imgPreview.uploading}
+          <button onClick={() => { URL.revokeObjectURL(imgPreview.dataUrl); setImgPreview(null); }} disabled={imgPreview.uploading}
             style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
               fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
         </div>

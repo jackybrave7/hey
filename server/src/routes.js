@@ -269,6 +269,7 @@ module.exports = function makeRouter(db, broadcast) {
       'moment-image':  ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
       'moment-video':  ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'],
       'moment-audio':  ['audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/webm'],
+      'avatar':        ['image/jpeg', 'image/png', 'image/webp'],
     };
     if (!allowed[category]?.includes(contentType))
       return res.status(400).json({ error: 'Unsupported type' });
@@ -279,6 +280,7 @@ module.exports = function makeRouter(db, broadcast) {
       'moment-image': `moments/${uuid()}/media.${ext}`,
       'moment-video': `moments/${uuid()}/video.${ext}`,
       'moment-audio': `moments/${uuid()}/audio.${ext}`,
+      'avatar':       `avatars/${req.user.id}.${ext}`,
     };
     try {
       const result = await storage.getPresignedUploadUrl(keyMap[category], contentType);
