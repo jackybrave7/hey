@@ -170,18 +170,16 @@ export default function MomentsFeed({ currentUser }) {
           <div style={{ color: 'white', fontSize: 20, fontWeight: 800, letterSpacing: -.3 }}>
             ✦ Моменты
           </div>
-          {(canAddMore || !hasMyMoments) && (
-            <button onClick={() => setShowCreate(true)}
-              style={{
-                padding: '8px 16px', borderRadius: 50, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: 'rgba(120,90,200,.85)', border: 'none', color: 'white',
-                boxShadow: '0 2px 12px rgba(120,80,200,.4)', transition: 'all .18s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,110,220,.9)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(120,90,200,.85)'}>
-              {hasMyMoments ? '+ Добавить' : '+ Мой момент'}
-            </button>
-          )}
+          <button onClick={() => setShowCreate(true)}
+            style={{
+              padding: '8px 16px', borderRadius: 50, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(120,90,200,.85)', border: 'none', color: 'white',
+              boxShadow: '0 2px 12px rgba(120,80,200,.4)', transition: 'all .18s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,110,220,.9)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(120,90,200,.85)'}>
+            {canAddMore && hasMyMoments ? '+ Добавить' : '+ Мой момент'}
+          </button>
         </div>
       </div>
 
