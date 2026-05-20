@@ -234,64 +234,136 @@ export function SplashScreen() {
 
 export function HeyScreen() {
   const nav = useNavigate();
+
+  const features = [
+    {
+      icon: '✦',
+      title: 'Моменты',
+      desc: 'Делись тем, что тебя занимает прямо сейчас. Находи людей на одной волне.',
+    },
+    {
+      icon: '💬',
+      title: 'Чаты без шума',
+      desc: 'Личные и групповые беседы. Только те, кому доверяешь — без ботов и спама.',
+    },
+    {
+      icon: '🤝',
+      title: 'Живые контакты',
+      desc: 'Добавляй по инвайту. Сохраняй заметки о людях. Строй настоящий круг.',
+    },
+    {
+      icon: '✨',
+      title: 'Super-режим',
+      desc: 'До 3 активных моментов, приоритет в ленте и аналитика просмотров.',
+    },
+  ];
+
   return (
     <div className="screen" style={{
-      justifyContent:'center', alignItems:'center',
-      padding:'40px 24px', flexDirection:'column', gap:0
+      justifyContent:'flex-start', alignItems:'center',
+      padding:'0', flexDirection:'column', overflowY:'auto',
     }}>
       <style>{`
-        @keyframes heyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-        @keyframes heyFadeIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes heyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+        @keyframes heyFadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        .hey-feat-card { transition: transform .18s, background .18s; }
+        .hey-feat-card:hover { transform: translateY(-3px); background: rgba(255,255,255,.11) !important; }
+        .hey-cta-login {
+          width:100%; background:#7858b0; border:none; border-radius:26px;
+          padding:15px; color:white; font-size:15px; font-weight:700;
+          cursor:pointer; font-family:inherit; transition:all .15s;
+          box-shadow:0 8px 24px rgba(120,88,176,.45);
+        }
+        .hey-cta-login:hover { background:#8868c0; transform:translateY(-1px); box-shadow:0 12px 32px rgba(120,88,176,.55); }
+        .hey-cta-reg {
+          width:100%; background:rgba(255,255,255,.11); border:1px solid rgba(255,255,255,.28);
+          border-radius:26px; padding:15px; color:white; font-size:15px; font-weight:600;
+          cursor:pointer; font-family:inherit; transition:background .15s;
+        }
+        .hey-cta-reg:hover { background:rgba(255,255,255,.2); }
       `}</style>
 
-      {/* Logo blob */}
+      {/* Hero */}
       <div style={{
-        width:180, height:180,
-        background:'radial-gradient(ellipse at 40% 38%, #c8a8ff 0%, #a888d0 45%, #8060b0)',
-        borderRadius:'62% 52% 60% 48% / 55% 62% 46% 60%',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        marginBottom:32,
-        animation:'heyFloat 4s ease-in-out infinite',
-        boxShadow:'0 20px 60px rgba(120,80,180,.4)'
+        width:'100%', display:'flex', flexDirection:'column', alignItems:'center',
+        padding:'52px 24px 36px',
+        background:'linear-gradient(180deg, rgba(80,30,140,.0) 0%, rgba(40,10,80,.35) 100%)',
       }}>
-        <span style={{
-          color:'white', fontSize:42, fontWeight:700, letterSpacing:3,
-          fontFamily:'Comfortaa,sans-serif',
-          textShadow:'0 2px 12px rgba(0,0,0,.2)'
-        }}>HEY</span>
+        {/* Logo blob */}
+        <div style={{
+          width:160, height:160,
+          background:'radial-gradient(ellipse at 38% 35%, #d0b0ff 0%, #a878e0 45%, #7040b8)',
+          borderRadius:'62% 52% 60% 48% / 55% 62% 46% 60%',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          marginBottom:28,
+          animation:'heyFloat 4s ease-in-out infinite',
+          boxShadow:'0 24px 64px rgba(110,60,190,.5), 0 0 0 1px rgba(255,255,255,.08)',
+        }}>
+          <span style={{
+            color:'white', fontSize:38, fontWeight:700, letterSpacing:3,
+            fontFamily:'Comfortaa,sans-serif',
+            textShadow:'0 2px 16px rgba(0,0,0,.3)'
+          }}>HEY</span>
+        </div>
+
+        <div style={{
+          fontSize:24, fontWeight:700, color:'white', textAlign:'center',
+          lineHeight:1.3, marginBottom:10,
+          animation:'heyFadeUp .55s ease-out .15s both',
+        }}>
+          Мессенджер для тех,<br/>кто творит
+        </div>
+        <div style={{
+          fontSize:14, color:'rgba(255,255,255,.55)', textAlign:'center',
+          lineHeight:1.7, maxWidth:280,
+          animation:'heyFadeUp .55s ease-out .28s both',
+        }}>
+          Пространство для настоящих связей,<br/>без лишнего шума
+        </div>
       </div>
 
-      {/* Tagline */}
+      {/* Feature cards */}
       <div style={{
-        fontSize:22, fontWeight:700, color:'white', textAlign:'center',
-        marginBottom:10, animation:'heyFadeIn .6s ease-out .2s both'
-      }}>Мессенджер для тех, кто творит</div>
-      <div style={{
-        fontSize:14, color:'rgba(255,255,255,.62)', textAlign:'center',
-        marginBottom:44, lineHeight:1.6,
-        animation:'heyFadeIn .6s ease-out .35s both'
+        width:'100%', maxWidth:480, padding:'0 16px',
+        display:'grid', gridTemplateColumns:'1fr 1fr', gap:10,
+        animation:'heyFadeUp .55s ease-out .42s both',
       }}>
-        Моменты · Чаты · Контакты без лишнего шума
+        {features.map((f, i) => (
+          <div key={i} className="hey-feat-card" style={{
+            background:'rgba(255,255,255,.07)',
+            border:'1px solid rgba(255,255,255,.12)',
+            borderRadius:18, padding:'16px 14px',
+          }}>
+            <div style={{fontSize:26, marginBottom:8, lineHeight:1}}>{f.icon}</div>
+            <div style={{
+              color:'white', fontWeight:700, fontSize:14,
+              marginBottom:5,
+            }}>{f.title}</div>
+            <div style={{
+              color:'rgba(255,255,255,.48)', fontSize:12, lineHeight:1.55,
+            }}>{f.desc}</div>
+          </div>
+        ))}
       </div>
 
-      {/* CTA buttons */}
+      {/* CTA */}
       <div style={{
-        display:'flex', flexDirection:'column', gap:12, width:'100%', maxWidth:320,
-        animation:'heyFadeIn .6s ease-out .5s both'
+        width:'100%', maxWidth:480, padding:'20px 16px 40px',
+        display:'flex', flexDirection:'column', gap:12,
+        animation:'heyFadeUp .55s ease-out .56s both',
       }}>
-        <button onClick={() => nav('/login')} className="auth-btn-primary">
+        <button className="hey-cta-login" onClick={() => nav('/login')}>
           Войти
         </button>
-        <button onClick={() => nav('/register')} style={{
-          background:'rgba(255,255,255,.12)', border:'1px solid rgba(255,255,255,.25)',
-          borderRadius:26, padding:15, color:'white', fontSize:15, fontWeight:600,
-          cursor:'pointer', fontFamily:'inherit', transition:'background .15s'
-        }}
-          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.2)'}
-          onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.12)'}
-        >
+        <button className="hey-cta-reg" onClick={() => nav('/register')}>
           Создать аккаунт
         </button>
+        <div style={{
+          textAlign:'center', fontSize:12, color:'rgba(255,255,255,.25)',
+          marginTop:4, lineHeight:1.5,
+        }}>
+          Вход только по инвайту от участника сообщества
+        </div>
       </div>
     </div>
   );
