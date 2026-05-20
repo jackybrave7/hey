@@ -590,8 +590,7 @@ module.exports = function makeRouter(db, broadcast) {
     if (!text?.trim()) return res.status(400).json({ error: 'text required' });
     if (text.length > 2000) return res.status(400).json({ error: 'Текст слишком длинный (макс. 2000 символов)' });
 
-    const creator = db.findUserById(req.user.id);
-    const MAX_ACTIVE = creator?.is_super ? 3 : 1;
+    const MAX_ACTIVE = req.user.is_super ? 3 : 1;
     const activeCount = db.getActiveMomentCount(req.user.id);
     if (activeCount >= MAX_ACTIVE) {
       const existing = db.getActiveMoment(req.user.id);
@@ -652,10 +651,8 @@ module.exports = function makeRouter(db, broadcast) {
     const m = db.getMomentById(req.params.id);
     if (!m) return res.status(404).json({ error: 'Not found' });
     if (m.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
-    const restorer = db.findUserById(req.user.id);
-    const restoreMax = restorer?.is_super ? 3 : 1;
     const activeCount = db.getActiveMomentCount(req.user.id);
-    if (activeCount >= restoreMax) return res.status(409).json({ error: 'already_has_active' });
+    if (activeCount >= (req.user.is_super ? 3 : 1)) return res.status(409).json({ error: 'already_has_active' });
     db.restoreMoment(req.params.id);
     const restored = db.getMomentById(req.params.id);
     broadcast(db.getContactOwners(req.user.id), { type: 'moment:new', moment: restored });

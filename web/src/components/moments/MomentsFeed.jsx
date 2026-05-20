@@ -27,7 +27,7 @@ export default function MomentsFeed({ currentUser }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast, setToast]           = useState('');
 
-  const isSuper = !!currentUser?.is_super;
+  const isSuper = !!(currentUser?.is_super);
 
   const showToast = (msg) => {
     setToast(msg);
