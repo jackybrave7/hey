@@ -3,16 +3,26 @@ import { useState, useRef, useEffect } from 'react';
 import { api } from '../../api';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 
-const YT_RE    = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
-const VIMEO_RE = /vimeo\.com\/(?:video\/)?(\d+)/;
+const YT_RE        = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+const VIMEO_RE     = /vimeo\.com\/(?:video\/)?(\d+)/;
+const RUTUBE_RE    = /rutube\.ru\/video\/([a-f0-9]{32})/i;
+const KINESCOPE_RE = /kinescope\.io\/(?:embed\/)?([a-zA-Z0-9]+)/;
 
 function detectVideoUrl(text) {
   const urls = text.match(/https?:\/\/[^\s]+/g);
   if (!urls) return null;
   for (const u of urls) {
-    if (YT_RE.test(u) || VIMEO_RE.test(u)) return u;
+    if (YT_RE.test(u) || VIMEO_RE.test(u) || RUTUBE_RE.test(u) || KINESCOPE_RE.test(u)) return u;
   }
   return null;
+}
+
+function videoProviderName(url) {
+  if (YT_RE.test(url))        return 'YouTube';
+  if (VIMEO_RE.test(url))     return 'Vimeo';
+  if (RUTUBE_RE.test(url))    return 'RuTube';
+  if (KINESCOPE_RE.test(url)) return 'Kinescope';
+  return 'Видео';
 }
 
 export default function MomentCreateSheet({ existing, onClose, onSaved, onConflict }) {
@@ -273,7 +283,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               <span style={{fontSize:18,flexShrink:0}}>🎬</span>
               <div>
                 <div style={{color:'rgba(200,180,255,.9)',fontSize:13,fontWeight:600,marginBottom:3}}>
-                  Видео распознано
+                  🎬 {videoProviderName(detectedVideoUrl)} распознан
                 </div>
                 <div style={{color:'rgba(255,255,255,.4)',fontSize:11,wordBreak:'break-all'}}>
                   {detectedVideoUrl}

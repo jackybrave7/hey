@@ -2655,20 +2655,36 @@ const URL_RE = /https?:\/\/[^\s]+/g;
 
 // ── Chat video card helpers ───────────────────────────────────────────────────
 
-const CHAT_YT_RE    = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
-const CHAT_VIMEO_RE = /vimeo\.com\/(?:video\/)?(\d+)/;
+const CHAT_YT_RE        = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+const CHAT_VIMEO_RE     = /vimeo\.com\/(?:video\/)?(\d+)/;
+const CHAT_RUTUBE_RE    = /rutube\.ru\/video\/([a-f0-9]{32})/i;
+const CHAT_KINESCOPE_RE = /kinescope\.io\/(?:embed\/)?([a-zA-Z0-9]+)/;
+
+function isChatVideoUrl(url) {
+  return CHAT_YT_RE.test(url) || CHAT_VIMEO_RE.test(url) ||
+         CHAT_RUTUBE_RE.test(url) || CHAT_KINESCOPE_RE.test(url);
+}
 
 function ChatVideoCard({ url }) {
-  const ytMatch    = url.match(CHAT_YT_RE);
-  const vimeoMatch = url.match(CHAT_VIMEO_RE);
-  const isYT       = !!ytMatch;
+  const ytMatch        = url.match(CHAT_YT_RE);
+  const kinescopeMatch = url.match(CHAT_KINESCOPE_RE);
+  const isYT           = !!ytMatch;
+  const isKinescope    = !!kinescopeMatch;
+  const isRutube       = CHAT_RUTUBE_RE.test(url);
 
   const thumbnail = isYT
     ? `https://i.ytimg.com/vi/${ytMatch[1]}/hqdefault.jpg`
+    : isKinescope
+    ? `https://kinescope.io/${kinescopeMatch[1]}/thumbnail`
     : null;
 
-  const label       = isYT ? '▶ YouTube' : '● Vimeo';
-  const labelColor  = isYT ? '#ff4444'   : '#1ab7ea';
+  const { label, labelColor } = isYT
+    ? { label: '▶ YouTube',   labelColor: '#ff4444' }
+    : isRutube
+    ? { label: '▶ RuTube',   labelColor: '#ff6600' }
+    : isKinescope
+    ? { label: '▶ Kinescope', labelColor: '#9b6ecc' }
+    : { label: '● Vimeo',    labelColor: '#1ab7ea' };
 
   function open(e) {
     e.stopPropagation();
@@ -2758,7 +2774,7 @@ function renderText(text) {
     if (m.index > last) result.push(text.slice(last, m.index));
     if (m[1]) {
       const url = m[1];
-      if (CHAT_YT_RE.test(url) || CHAT_VIMEO_RE.test(url)) {
+      if (isChatVideoUrl(url)) {
         // Video URL — render as card
         result.push(<ChatVideoCard key={i++} url={url}/>);
       } else {

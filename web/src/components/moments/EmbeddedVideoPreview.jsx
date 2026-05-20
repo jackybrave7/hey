@@ -11,16 +11,21 @@ function fmtDuration(seconds) {
 export default function EmbeddedVideoPreview({ data, size = 'full' }) {
   if (!data) return null;
 
-  const isYT    = data.provider === 'youtube';
-  const isVimeo = data.provider === 'vimeo';
+  const PROVIDERS = {
+    youtube:   { label: '▶ YouTube',   color: '#ff3333' },
+    vimeo:     { label: '● Vimeo',     color: '#1ab7ea' },
+    rutube:    { label: '▶ RuTube',    color: '#ff6600' },
+    kinescope: { label: '▶ Kinescope', color: '#7b5ea7' },
+  };
 
   function open(e) {
     e.stopPropagation();
     window.open(data.url, '_blank', 'noopener');
   }
 
-  const providerLabel = isYT ? '▶ YouTube' : isVimeo ? '● Vimeo' : data.provider;
-  const providerColor = isYT ? '#ff0000' : isVimeo ? '#1ab7ea' : '#888';
+  const p = PROVIDERS[data.provider] || { label: '▶ Видео', color: '#aaa' };
+  const providerLabel = p.label;
+  const providerColor = p.color;
   const hasThumbnail  = !!data.thumbnail_url;
 
   const isCard = size === 'card';
