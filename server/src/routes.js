@@ -89,6 +89,26 @@ module.exports = function makeRouter(db, broadcast) {
       if (inviter && !inviter.is_blocked) {
         try { db.addContact(user.id, inviter.id, null); } catch {}
         try { db.addContact(inviter.id, user.id, null); } catch {}
+        // Реферальная механика
+        try {
+          const referral = db.processReferral(inviteUserId);
+          if (referral.superGranted) {
+            const expiryDate = new Date(referral.superExpiresAt * 1000).toLocaleDateString('ru', {day:'numeric',month:'long',year:'numeric'});
+            broadcast([inviteUserId], {
+              type: 'system:notification',
+              text: `✨ Поздравляем! Ты пригласил 3 друзей и получил HEY СУПЕР на 3 месяца. До ${expiryDate}.`,
+              kind: 'super_granted',
+            });
+          }
+          if (referral.newBadge) {
+            broadcast([inviteUserId], {
+              type: 'system:notification',
+              text: `🏅 Получен значок «${referral.newBadge.label}» за ${referral.newBadge.count} приглашённых.`,
+              kind: 'badge_granted',
+              badge: referral.newBadge.key,
+            });
+          }
+        } catch(e) { console.error('[REFERRAL]', e.message); }
       }
     }
 
@@ -124,15 +144,18 @@ module.exports = function makeRouter(db, broadcast) {
     const presence      = db.getPresence(target.id);
     const contacts      = db.getContacts(req.user.id);
     const isContact     = contacts.some(c => c.id === target.id);
-    const { password, phone, must_change_password, ...safe } = target;
-    res.json({ ...safe, active_moments: activeMoments, active_moment: activeMoments[0] || null, presence, is_contact: isContact });
+    const { password, phone, must_change_password, achievements: achRaw, ...safe } = target;
+    const achievements = (() => { try { return JSON.parse(achRaw || '[]'); } catch { return []; } })();
+    res.json({ ...safe, achievements, active_moments: activeMoments, active_moment: activeMoments[0] || null, presence, is_contact: isContact });
   });
 
   r.get('/me', requireAuth, (req, res) => {
+    db.checkAndExpireSuper(req.user.id);
     const user = db.findUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
-    const { password, ...safe } = user;
-    res.json(safe);
+    const { password, achievements: achRaw, ...safe } = user;
+    const achievements = (() => { try { return JSON.parse(achRaw || '[]'); } catch { return []; } })();
+    res.json({ ...safe, achievements });
   });
 
   r.patch('/me', requireAuth, (req, res) => {

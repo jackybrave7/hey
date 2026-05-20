@@ -108,9 +108,10 @@ function MomentsScreen() {
 
 // ── Global security event handlers ───────────────────────────────────────────
 function GlobalHandlers() {
-  const { logout, user } = useAuth();
+  const { logout, user, setUser } = useAuth();
   const [showMustChangePwd, setShowMustChangePwd] = useState(false);
   const [blockedOverlay, setBlockedOverlay] = useState(false);
+  const [sysToast, setSysToast] = useState('');
 
   // Check on load — if user already has must_change_password flag
   useEffect(() => {
@@ -132,6 +133,18 @@ function GlobalHandlers() {
     };
   }, [logout]);
 
+  // System notifications: Super granted, badge awarded
+  useEffect(() => {
+    return socket.on('system:notification', ({ text, kind }) => {
+      setSysToast(text);
+      setTimeout(() => setSysToast(''), 5000);
+      // Refresh user data so SuperStatusCard updates immediately
+      if (kind === 'super_granted' || kind === 'badge_granted') {
+        api.getMe().then(u => setUser && setUser(u)).catch(() => {});
+      }
+    });
+  }, [setUser]);
+
   return (
     <>
       {blockedOverlay && (
@@ -152,6 +165,20 @@ function GlobalHandlers() {
       )}
       {showMustChangePwd && user && (
         <ForcePasswordModal onDone={() => setShowMustChangePwd(false)} />
+      )}
+      {sysToast && (
+        <div style={{
+          position:'fixed', bottom:90, left:'50%', transform:'translateX(-50%)',
+          background:'linear-gradient(135deg,rgba(100,60,180,.97),rgba(60,20,120,.97))',
+          backdropFilter:'blur(20px)', border:'1px solid rgba(200,160,255,.3)',
+          borderRadius:50, padding:'12px 22px', color:'white',
+          fontSize:14, fontWeight:600, zIndex:9998,
+          whiteSpace:'nowrap', maxWidth:'90vw', textAlign:'center',
+          boxShadow:'0 8px 32px rgba(80,40,160,.5)',
+          animation:'fadeIn .3s ease',
+        }}>
+          {sysToast}
+        </div>
       )}
     </>
   );

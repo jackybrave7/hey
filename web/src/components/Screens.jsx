@@ -11,6 +11,7 @@ import {
 } from './auth/AuthComponents';
 import MomentDetailPopup from './moments/MomentDetailPopup';
 import SuperStatusCard from './super/SuperStatusCard';
+import AchievementBadges from './super/AchievementBadges';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -1077,6 +1078,7 @@ export function MyProfileScreen() {
               setTimeout(() => setInviteCopied(false), 2500);
             });
           }}/>
+          <AchievementBadges achievements={user?.achievements} />
         </div>
       )}
 
@@ -5123,6 +5125,7 @@ export function PublicProfileScreen() {
                 В HEY с {new Date(profile.created_at * 1000).toLocaleDateString('ru',{month:'long',year:'numeric'})}
               </div>
             )}
+            <AchievementBadges achievements={profile?.achievements} />
           </div>
         </div>
 

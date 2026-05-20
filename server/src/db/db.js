@@ -177,11 +177,24 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (
   created_at       INTEGER NOT NULL
 )`); } catch {}
 
+// ── Referral / Super bonus migrations ─────────────────────────────────────────
+try { db.exec('ALTER TABLE users ADD COLUMN invited_count INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN super_bonus_claimed INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN super_expires_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN achievements TEXT DEFAULT \'[]\''); } catch {}
+
 // Back-fill invite codes for existing users without one (safe — users table now exists)
 db.prepare("SELECT id FROM users WHERE invite_code IS NULL").all().forEach(u => {
   const code = u.id.replace(/-/g,'').slice(0,10).toUpperCase();
   db.prepare("UPDATE users SET invite_code=? WHERE id=?").run(code, u.id);
 });
+
+// Back-fill invited_count from referrals table (one-time, safe)
+db.prepare(`
+  UPDATE users SET invited_count = (
+    SELECT COUNT(*) FROM referrals WHERE inviter_id = users.id
+  ) WHERE invited_count = 0
+`).run();
 
 function now() { return Math.floor(Date.now() / 1000); }
 
@@ -1110,6 +1123,57 @@ function getPresence(userId) {
   return p ? { ...p, online: !!p.online } : { online: false, last_seen: null };
 }
 
+// ── Referral mechanics ─────────────────────────────────────────────────────────
+
+function extendSuper(userId, months) {
+  const user = findUserById(userId);
+  const n = now();
+  const base = (user.super_expires_at && user.super_expires_at > n) ? user.super_expires_at : n;
+  const newExpiry = base + months * 30 * 24 * 3600;
+  db.prepare('UPDATE users SET is_super=1, super_expires_at=? WHERE id=?').run(newExpiry, userId);
+  return newExpiry;
+}
+
+function processReferral(inviterId) {
+  db.prepare('UPDATE users SET invited_count = invited_count + 1 WHERE id=?').run(inviterId);
+  const inviter = findUserById(inviterId);
+  const count = inviter.invited_count;
+  const result = { superGranted: false, newBadge: null, invitedCount: count };
+
+  // 3-й приглашённый — разовый бонус 3 мес СУПЕР
+  if (count === 3 && !inviter.super_bonus_claimed) {
+    const expiresAt = extendSuper(inviterId, 3);
+    db.prepare('UPDATE users SET super_bonus_claimed=1 WHERE id=?').run(inviterId);
+    result.superGranted = true;
+    result.superExpiresAt = expiresAt;
+  }
+
+  // Ачивки
+  const achievements = JSON.parse(inviter.achievements || '[]');
+  const milestones = [
+    { count: 5,  key: 'connector',          label: 'Связной' },
+    { count: 10, key: 'circle_keeper',       label: 'Хранитель круга' },
+    { count: 25, key: 'community_founder',   label: 'Основатель сообщества' },
+  ];
+  for (const m of milestones) {
+    if (count === m.count && !achievements.includes(m.key)) {
+      achievements.push(m.key);
+      result.newBadge = m;
+    }
+  }
+  if (result.newBadge) {
+    db.prepare("UPDATE users SET achievements=? WHERE id=?").run(JSON.stringify(achievements), inviterId);
+  }
+  return result;
+}
+
+function checkAndExpireSuper(userId) {
+  const user = findUserById(userId);
+  if (user?.is_super && user.super_expires_at && user.super_expires_at < now()) {
+    db.prepare('UPDATE users SET is_super=0 WHERE id=?').run(userId);
+  }
+}
+
 module.exports = {
   now,
   createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount,
@@ -1126,6 +1190,7 @@ module.exports = {
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes,
   getReferralCount, findUserByInviteCode,
+  extendSuper, processReferral, checkAndExpireSuper,
   // Moments
   getMomentFeed, getMyMoments, getMomentById, getActiveMoment, getActiveMoments, getActiveMomentCount,
   createMoment, updateMoment, archiveMoment, restoreMoment, deleteMomentForever, reorderMoments,
