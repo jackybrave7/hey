@@ -201,6 +201,12 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  r.get('/users/search', requireAuth, (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (q.length < 3) return res.json([]);
+    res.json(db.searchUsers(q, req.user.id));
+  });
+
   r.get('/contacts', requireAuth, (req, res) => {
     res.json(db.getContacts(req.user.id));
   });

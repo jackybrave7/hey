@@ -2058,15 +2058,108 @@ function InviteModal({ onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// InviteByPhoneModal — номер не найден, предлагаем пригласить
+// ─────────────────────────────────────────────────────────────────────────────
+
+function InviteByPhoneModal({ phone, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const { user } = useAuth();
+
+  const inviteLink = `${location.origin}/register?invite=${user?.id || ''}`;
+  const waText = `Привет! Я пользуюсь HEY Messenger — быстрый и стильный мессенджер. Вступай: ${inviteLink}`;
+  const waHref = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(waText)}`;
+
+  function copyLink() {
+    navigator.clipboard.writeText(inviteLink).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }
+
+  const overlay = { position:'fixed',inset:0,zIndex:600,background:'rgba(0,0,0,.65)',
+    backdropFilter:'blur(12px)',display:'flex',alignItems:'center',justifyContent:'center',padding:20 };
+  const panel = { background:'rgba(28,18,56,.97)',backdropFilter:'blur(24px)',
+    borderRadius:24,width:'min(94vw,400px)',
+    boxShadow:'0 24px 64px rgba(0,0,0,.55)',border:'1px solid rgba(255,255,255,.13)',overflow:'hidden' };
+
+  return (
+    <div style={overlay} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+      <div style={panel}>
+        {/* Header */}
+        <div style={{padding:'22px 24px 16px',display:'flex',alignItems:'center',gap:12,
+          borderBottom:'1px solid rgba(255,255,255,.1)'}}>
+          <span style={{fontSize:28}}>📲</span>
+          <div style={{flex:1}}>
+            <div style={{color:'white',fontSize:16,fontWeight:700}}>Пользователь не найден</div>
+            <div style={{color:'rgba(255,255,255,.45)',fontSize:13,marginTop:2}}>
+              Пригласи {phone} в HEY
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',
+            color:'rgba(255,255,255,.4)',fontSize:22,cursor:'pointer',lineHeight:1}}>×</button>
+        </div>
+
+        <div style={{padding:'20px 24px',display:'flex',flexDirection:'column',gap:16}}>
+          {/* Invite link */}
+          <div>
+            <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginBottom:8}}>
+              Твоя персональная ссылка для приглашения
+            </div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <div style={{flex:1,background:'rgba(255,255,255,.07)',borderRadius:12,
+                padding:'10px 14px',color:'rgba(200,180,255,.9)',fontSize:12,
+                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
+                border:'1px solid rgba(255,255,255,.12)',userSelect:'all'}}>
+                {inviteLink}
+              </div>
+              <button onClick={copyLink}
+                style={{padding:'10px 16px',borderRadius:12,whiteSpace:'nowrap',flexShrink:0,
+                  background: linkCopied ? 'rgba(60,180,100,.7)' : 'rgba(120,90,200,.7)',
+                  border:'none',color:'white',fontSize:13,fontWeight:600,cursor:'pointer',
+                  transition:'background .2s'}}>
+                {linkCopied ? '✓' : '📋'}
+              </button>
+            </div>
+          </div>
+
+          {/* WhatsApp button */}
+          <a href={waHref} target="_blank" rel="noopener noreferrer"
+            style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+              padding:'14px',borderRadius:16,textDecoration:'none',
+              background:'rgba(37,211,102,.18)',border:'1px solid rgba(37,211,102,.3)',
+              color:'rgba(80,230,120,.9)',fontSize:15,fontWeight:600}}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+            Написать в WhatsApp
+          </a>
+
+          <button onClick={onClose}
+            style={{padding:'12px',borderRadius:16,border:'1px solid rgba(255,255,255,.15)',
+              background:'none',color:'rgba(255,255,255,.5)',fontSize:14,cursor:'pointer'}}>
+            Отмена
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ContactsScreen
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function ContactsScreen() {
   const nav = useNavigate();
+  const { user } = useAuth();
   const [contacts,      setContacts]      = useState([]);
-  const [blocked,       setBlocked]       = useState([]);  // [{id, ...}] — только id для фильтрации
-  const [phone,         setPhone]         = useState('');
-  const [card,          setCard]          = useState(null); // contact object
+  const [blocked,       setBlocked]       = useState([]);
+  const [query,         setQuery]         = useState('');
+  const [searchResults, setSearchResults] = useState(null); // null = not searching
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [inviteTarget,  setInviteTarget]  = useState(null); // phone not found — show invite popup
+  const [card,          setCard]          = useState(null);
   const [showImport,    setShowImport]    = useState(false);
   const [showInvite,    setShowInvite]    = useState(false);
   const [customConfirm, confirmModal]     = useConfirm();
@@ -2076,15 +2169,56 @@ export function ContactsScreen() {
     api.getBlocked().then(setBlocked).catch(console.error);
   }, []);
 
+  // ── Live search ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 3) { setSearchResults(null); return; }
+    setSearchLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.searchUsers(q);
+        setSearchResults(res);
+      } catch { setSearchResults([]); }
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // ── Add contact by phone (+ button) ─────────────────────────────────────
   async function addContact() {
-    if (!phone.trim()) return;
-    const pv = validatePhone(phone);
-    if (!pv.ok) { alert(pv.msg); return; }
+    const q = query.trim();
+    if (!q) return;
+    // If looks like a phone number — try to add directly
+    const looksLikePhone = /^[\d\s\-\+\(\)]{7,}$/.test(q);
+    if (looksLikePhone) {
+      const pv = validatePhone(q);
+      if (!pv.ok) { alert(pv.msg); return; }
+      try {
+        const c = await api.addContact({ phone: pv.normalized });
+        setContacts(prev => prev.find(x => x.id === c.id) ? prev : [...prev, c]);
+        setQuery('');
+        setSearchResults(null);
+      } catch(e) {
+        // User not found — offer invite
+        if (e.message?.includes('не найден') || e.message?.includes('404') || e.status === 404) {
+          setInviteTarget(pv.normalized);
+        } else {
+          alert(e.message);
+        }
+      }
+    } else if (searchResults?.length === 1) {
+      // Single search result — add it directly
+      await addFromSearch(searchResults[0]);
+    }
+  }
+
+  async function addFromSearch(user) {
     try {
-      const c = await api.addContact({ phone: pv.normalized });
-      setContacts(prev => [...prev, c]);
-      setPhone('');
-    } catch(e) { alert(e.message); }
+      const c = await api.addContact({ userId: user.id });
+      setContacts(prev => prev.find(x => x.id === c.id) ? prev : [...prev, c]);
+      setQuery('');
+      setSearchResults(null);
+    } catch(e) { alert(e.message || 'Не удалось добавить'); }
   }
 
   async function openChat(contactId) {
@@ -2144,17 +2278,69 @@ export function ContactsScreen() {
 
       {/* Content limited to 680 */}
       <div style={{maxWidth:680,margin:'0 auto',width:'100%',flex:1,display:'flex',flexDirection:'column'}}>
-      {/* Add by phone */}
+      {/* Search / Add input */}
       <div style={{padding:'12px 20px',display:'flex',gap:8,flexShrink:0}}>
-        <input className="glass-input" placeholder="Добавить по номеру телефона"
-          value={phone} onChange={e=>setPhone(e.target.value)}
+        <input className="glass-input" placeholder="Поиск или номер телефона"
+          value={query} onChange={e=>setQuery(e.target.value)}
           onKeyDown={e=>e.key==='Enter'&&addContact()} style={{flex:1}}/>
         <button className="pill" onClick={addContact} style={{padding:'13px 20px',fontSize:20}}>+</button>
       </div>
 
+      {/* Search results */}
+      {searchResults !== null && (
+        <div style={{flexShrink:0,paddingBottom:8}}>
+          {searchLoading && (
+            <div style={{color:'rgba(255,255,255,.35)',fontSize:13,textAlign:'center',padding:'12px 20px'}}>
+              Поиск…
+            </div>
+          )}
+          {!searchLoading && searchResults.length === 0 && (
+            <div style={{color:'rgba(255,255,255,.35)',fontSize:13,textAlign:'center',padding:'12px 20px'}}>
+              Не найдено. Попробуй номер телефона.
+            </div>
+          )}
+          {!searchLoading && searchResults.map(u => {
+            const alreadyAdded = contacts.some(c => c.id === u.id);
+            return (
+              <div key={u.id} style={{
+                display:'flex',alignItems:'center',gap:12,padding:'10px 20px',
+                borderBottom:'1px solid rgba(255,255,255,.06)',
+                background:'rgba(255,255,255,.025)',
+              }}>
+                <AvatarDisplay avatar={u.avatar} name={u.name} size={42} fontSize={16}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:'white',fontSize:15,fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
+                    {u.name}
+                    {u.online && <div className="online-dot"/>}
+                  </div>
+                  <div style={{color:'rgba(255,255,255,.4)',fontSize:12}}>{u.phone}</div>
+                </div>
+                {alreadyAdded ? (
+                  <span style={{color:'rgba(255,255,255,.3)',fontSize:12}}>уже добавлен</span>
+                ) : (
+                  <button onClick={() => addFromSearch(u)}
+                    style={{
+                      background:'rgba(100,78,148,.7)',border:'none',borderRadius:20,
+                      color:'white',fontSize:13,fontWeight:600,padding:'7px 16px',
+                      cursor:'pointer',flexShrink:0,
+                    }}>
+                    + Добавить
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Invite popup when phone not found */}
+      {inviteTarget && (
+        <InviteByPhoneModal phone={inviteTarget} onClose={() => setInviteTarget(null)} />
+      )}
+
       {/* List */}
       <div style={{flex:1}}>
-        {visibleContacts.length === 0 && (
+        {visibleContacts.length === 0 && !searchResults && (
           <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:60,fontSize:15}}>
             Контакты не найдены.<br/>Добавьте первый по номеру телефона.
           </div>

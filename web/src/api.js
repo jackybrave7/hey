@@ -44,6 +44,9 @@ export const api = {
   deleteAccount:    (password) => req('DELETE', '/me', { password }),
   getUserProfile:   (userId)  => req('GET', `/users/${userId}/profile`),
 
+  // User search
+  searchUsers: (q) => req('GET', `/users/search?q=${encodeURIComponent(q)}`),
+
   // Contacts
   getContacts:    ()       => req('GET', '/contacts'),
   addContact:     (data)   => req('POST', '/contacts', data),

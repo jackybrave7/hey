@@ -1014,6 +1014,23 @@ function getAdminStats() {
   return { users, blocked, admins, moments, activeMoments, reactions };
 }
 
+// Search users by name or phone (for contacts search, returns safe public fields only)
+function searchUsers(query, excludeUserId) {
+  const q = `%${query}%`;
+  const rows = db.prepare(
+    `SELECT u.id, u.name, u.avatar, u.phone,
+            p.online
+     FROM users u
+     LEFT JOIN presence p ON p.user_id = u.id
+     WHERE (u.name LIKE ? OR u.phone LIKE ?)
+       AND u.is_blocked = 0
+       AND u.id != ?
+     ORDER BY u.name ASC
+     LIMIT 20`
+  ).all(q, q, excludeUserId || 0);
+  return rows.map(r => ({ ...r, online: !!r.online }));
+}
+
 function getAdminUsers({ search, filter } = {}) {
   let where = '1=1';
   const params = [];
@@ -1206,6 +1223,8 @@ module.exports = {
   upsertMomentReaction, deleteMomentReaction, getMomentReactions, getUserMomentReaction,
   getSavedMoments, getMomentReactorsList,
   addMomentView, getDisciplinesCloud,
+  // Admin
+  searchUsers,
   // Admin
   getAdminStats, getAdminUsers, getAdminUserById,
   adminResetPassword, adminBlockUser, adminUnblockUser,

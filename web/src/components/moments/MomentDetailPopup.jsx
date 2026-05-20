@@ -333,23 +333,25 @@ export default function MomentDetailPopup({
           <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
             {/* Author + time */}
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:40,height:40,borderRadius:'50%',
-                background:'rgba(180,140,220,.35)',flexShrink:0,
-                display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:18,color:'white',fontWeight:600,position:'relative',overflow:'hidden'}}>
-                {moment.author_avatar
-                  ? <img src={moment.author_avatar} alt={moment.author_name||''}
-                      style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%',display:'block'}}/>
-                  : (moment.author_name||'?')[0].toUpperCase()
-                }
+              <div style={{width:40,height:40,flexShrink:0,position:'relative'}}>
+                <div style={{width:40,height:40,borderRadius:'50%',
+                  background:'rgba(180,140,220,.35)',overflow:'hidden',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:18,color:'white',fontWeight:600}}>
+                  {moment.author_avatar
+                    ? <img src={moment.author_avatar} alt={moment.author_name||''}
+                        style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+                    : (moment.author_name||'?')[0].toUpperCase()
+                  }
+                </div>
                 {moment.author_is_super && (
                   <div style={{
-                    position:'absolute',bottom:0,right:0,
+                    position:'absolute',bottom:-1,right:-1,
                     width:14,height:14,borderRadius:'50%',
                     background:'linear-gradient(135deg,#c8a8ff,#7858b0)',
                     border:'2px solid rgba(22,15,50,.98)',
                     display:'flex',alignItems:'center',justifyContent:'center',
-                    fontSize:7,color:'white',fontWeight:700,zIndex:1,
+                    fontSize:7,color:'white',fontWeight:700,
                   }}>✦</div>
                 )}
               </div>
