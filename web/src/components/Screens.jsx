@@ -3289,6 +3289,9 @@ export function ChatScreen() {
   const audioChunksRef    = useRef([]);
   const recTimerRef       = useRef(null);
   const recStreamRef      = useRef(null);
+  const analyserRef       = useRef(null);
+  const waveCanvasRef     = useRef(null);
+  const waveRafRef        = useRef(null);
   const [firstItemIndex, setFirstItemIndex] = useState(1_000_000); // Virtuoso prepend index
   const virtuosoRef        = useRef();
   const atBottomRef        = useRef(true);  // tracks whether list is scrolled to bottom
@@ -3504,6 +3507,50 @@ export function ChatScreen() {
         recStreamRef.current = null;
       };
       mr.start(200); // collect every 200ms
+
+      // ── Web Audio: waveform analyser ──
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source   = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.6;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+
+        const draw = () => {
+          waveRafRef.current = requestAnimationFrame(draw);
+          const canvas = waveCanvasRef.current;
+          if (!canvas) return;
+          const ctx2d = canvas.getContext('2d');
+          const W = canvas.width, H = canvas.height;
+          const bufLen = analyser.frequencyBinCount;
+          const data   = new Uint8Array(bufLen);
+          analyser.getByteFrequencyData(data);
+
+          ctx2d.clearRect(0, 0, W, H);
+
+          const barCount = 28;
+          const barW     = 3;
+          const gap      = (W - barCount * barW) / (barCount + 1);
+          for (let i = 0; i < barCount; i++) {
+            // Sample from lower half of freq bins (voice range)
+            const binIdx  = Math.floor((i / barCount) * (bufLen * 0.5));
+            const raw     = data[binIdx] / 255;
+            const minH    = 3;
+            const barH    = Math.max(minH, raw * (H - 4));
+            const x       = gap + i * (barW + gap);
+            const y       = (H - barH) / 2;
+            const alpha   = 0.4 + raw * 0.6;
+            ctx2d.fillStyle = `rgba(220,180,255,${alpha})`;
+            ctx2d.beginPath();
+            ctx2d.roundRect(x, y, barW, barH, 2);
+            ctx2d.fill();
+          }
+        };
+        draw();
+      } catch { /* Web Audio not available — graceful degradation */ }
+
       setVoiceState('recording');
       setRecTime(0);
 
@@ -3522,8 +3569,15 @@ export function ChatScreen() {
     }
   }
 
+  function stopWaveform() {
+    cancelAnimationFrame(waveRafRef.current);
+    waveRafRef.current  = null;
+    analyserRef.current = null;
+  }
+
   function stopRecording() {
     clearInterval(recTimerRef.current);
+    stopWaveform();
     if (mediaRecorderRef.current?.state !== 'inactive') {
       mediaRecorderRef.current?.stop();
     }
@@ -3531,6 +3585,7 @@ export function ChatScreen() {
 
   function cancelVoice() {
     clearInterval(recTimerRef.current);
+    stopWaveform();
     if (mediaRecorderRef.current?.state !== 'inactive') {
       mediaRecorderRef.current?.stop();
     }
@@ -4074,36 +4129,44 @@ export function ChatScreen() {
 
         {/* ── Voice: recording bar ── */}
         {voiceState === 'recording' && (
-          <div style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px 10px',
-            maxWidth:680,margin:'0 auto',}}>
-            <button onClick={cancelVoice} title="Отменить"
-              style={{width:36,height:36,borderRadius:'50%',flexShrink:0,background:'rgba(255,80,80,.15)',
-                border:'1px solid rgba(255,120,120,.35)',color:'rgba(255,180,180,.9)',
-                fontSize:18,cursor:'pointer',lineHeight:1}}>✕</button>
-            <div style={{flex:1,display:'flex',alignItems:'center',gap:10,
-              background:'rgba(255,255,255,.07)',borderRadius:26,padding:'8px 16px',
-              border:'1px solid rgba(255,255,255,.12)'}}>
-              <span style={{width:10,height:10,borderRadius:'50%',background:'#e74c3c',flexShrink:0,
+          <div style={{padding:'8px 14px 10px',maxWidth:680,margin:'0 auto'}}>
+            <div style={{
+              display:'flex',alignItems:'center',gap:10,
+              borderRadius:26,padding:'8px 10px 8px 14px',
+              backgroundImage:'url(/input-bg.jpg)',backgroundSize:'cover',backgroundPosition:'center',
+              border:'1px solid rgba(255,255,255,0.5)',
+              boxShadow:'inset 0 1px 0 rgba(255,255,255,0.7), 0 4px 18px rgba(0,0,0,0.15)',
+            }}>
+              {/* Red dot */}
+              <span style={{width:9,height:9,borderRadius:'50%',background:'#e74c3c',flexShrink:0,
                 animation:'pulse 1s ease-in-out infinite',boxShadow:'0 0 6px #e74c3c'}}/>
-              <span style={{color:'rgba(255,255,255,.9)',fontSize:15,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>
+              {/* Timer */}
+              <span style={{color:'rgba(255,255,255,.9)',fontSize:14,fontWeight:600,
+                fontVariantNumeric:'tabular-nums',flexShrink:0}}>
                 {fmtRecTime(recTime)}
               </span>
-              <span style={{color:'rgba(255,255,255,.35)',fontSize:12,flex:1}}>
-                🎙 Говорите…
-              </span>
+              {/* Waveform canvas */}
+              <canvas ref={waveCanvasRef} width={160} height={36}
+                style={{flex:1,minWidth:0,height:36,display:'block'}}/>
+              {/* Remaining time for free users */}
               {!user?.is_super && (
-                <span style={{color:'rgba(255,200,100,.6)',fontSize:11}}>
+                <span style={{color:'rgba(255,200,100,.65)',fontSize:11,flexShrink:0}}>
                   {MAX_VOICE_SEC - recTime}с
                 </span>
               )}
+              {/* Cancel */}
+              <button onClick={cancelVoice} title="Отменить"
+                style={{width:28,height:28,borderRadius:'50%',flexShrink:0,
+                  background:'rgba(255,80,80,.18)',border:'1px solid rgba(255,120,120,.3)',
+                  color:'rgba(255,180,180,.85)',fontSize:14,cursor:'pointer',lineHeight:1,
+                  display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+              {/* Stop → preview */}
+              <button onClick={stopRecording} title="Остановить"
+                style={{width:36,height:36,borderRadius:18,flexShrink:0,
+                  background:'rgba(100,78,148,.85)',border:'none',
+                  color:'white',fontSize:14,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center'}}>■</button>
             </div>
-            <button onClick={stopRecording} title="Остановить"
-              style={{width:44,height:44,borderRadius:12,flexShrink:0,
-                background:'rgba(100,78,148,.85)',border:'none',
-                color:'white',fontSize:16,cursor:'pointer',
-                display:'flex',alignItems:'center',justifyContent:'center'}}>
-              ■
-            </button>
           </div>
         )}
 
