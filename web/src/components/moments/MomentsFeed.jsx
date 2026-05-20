@@ -254,14 +254,23 @@ export default function MomentsFeed({ currentUser }) {
           ) : (
             feedGroups.map(group => {
               const showGallery = group.isSuper && group.moments.length > 1;
-              if (showGallery) {
+              // Super users always full-width (span 2)
+              if (group.isSuper) {
                 return (
                   <div key={group.userId} style={{ gridColumn: 'span 2' }}>
-                    <SuperMomentGallery
-                      moments={group.moments}
-                      isMine={false}
-                      onSelect={m => setSelected({ moments: group.moments, index: group.moments.findIndex(x => x.id === m.id) })}
-                    />
+                    {showGallery ? (
+                      <SuperMomentGallery
+                        moments={group.moments}
+                        isMine={false}
+                        onSelect={m => setSelected({ moments: group.moments, index: group.moments.findIndex(x => x.id === m.id) })}
+                      />
+                    ) : (
+                      <MomentCard
+                        moment={group.moments[0]}
+                        isMine={false}
+                        onClick={() => setSelected({ moments: otherMoments, index: otherMoments.findIndex(x => x.id === group.moments[0].id) })}
+                      />
+                    )}
                   </div>
                 );
               }
