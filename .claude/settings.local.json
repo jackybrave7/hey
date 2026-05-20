@@ -115,7 +115,8 @@
       "WebFetch(domain:www.sqlprostudio.com)",
       "WebFetch(domain:news.ycombinator.com)",
       "Bash(node -e \"require\\('./src/db/db.js'\\); require\\('./src/ws.js'\\); console.log\\('Server modules OK'\\)\")",
-      "Bash(node -e \"const s = require\\('./src/storage'\\); console.log\\(typeof s.getPresignedUploadUrl\\); const r = require\\('./src/routes'\\); console.log\\('routes OK'\\)\")"
+      "Bash(node -e \"const s = require\\('./src/storage'\\); console.log\\(typeof s.getPresignedUploadUrl\\); const r = require\\('./src/routes'\\); console.log\\('routes OK'\\)\")",
+      "PowerShell($key = \"$env:USERPROFILE\\\\.ssh\\\\id_ed25519\"; ssh -i $key -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git pull && npm install --silent && npm run build 2>&1 | tail -5 && pm2 restart hey && sleep 1 && pm2 list | grep hey\")"
     ]
   }
 }

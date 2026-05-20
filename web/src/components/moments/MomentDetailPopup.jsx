@@ -445,7 +445,7 @@ export default function MomentDetailPopup({
         {/* Footer */}
         {onRestore ? (
           <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
-            <button onClick={onRestore}
+            <button onClick={() => onRestore(moment)}
               style={{width:'100%',padding:'13px',borderRadius:14,
                 background:'rgba(120,90,200,.75)',border:'none',
                 color:'white',fontSize:15,fontWeight:600,cursor:'pointer'}}>

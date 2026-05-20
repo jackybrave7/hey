@@ -751,6 +751,8 @@ export function MyProfileScreen() {
 
   // Archive popup
   const [archiveSelected, setArchiveSelected] = useState(null);
+  // Active moment popup
+  const [activePopupIdx, setActivePopupIdx] = useState(null);
 
   // Saved moments (Поговорить)
   const [savedMoments, setSavedMoments]     = useState([]);
@@ -1121,10 +1123,15 @@ export function MyProfileScreen() {
             letterSpacing:.8,marginBottom:14}}>Мои моменты</div>
 
           {/* Tabs */}
+          {(() => {
+            const activeMoments = myMoments.filter(m => m.status === 'active');
+            const archivedMoments = myMoments.filter(m => m.status === 'archived');
+            const maxActive = user?.is_super ? 3 : 1;
+            return (<>
           <div style={{display:'flex',gap:8,marginBottom:14}}>
             {[
-              { key:'active',   label:`Активный` },
-              { key:'archived', label:`Архив (${myMoments.filter(m=>m.status==='archived').length})` },
+              { key:'active',   label: activeMoments.length > 0 ? `Активные (${activeMoments.length})` : 'Активные' },
+              { key:'archived', label:`Архив (${archivedMoments.length})` },
             ].map(tab => (
               <button key={tab.key} onClick={() => setMomentsTab(tab.key)}
                 style={{
@@ -1142,84 +1149,73 @@ export function MyProfileScreen() {
           {/* Active tab */}
           {momentsTab === 'active' && (
             <div>
-              {(() => {
-                const active = myMoments.find(m => m.status === 'active');
-                if (!active) return (
-                  <div style={{background:'rgba(255,255,255,.04)',borderRadius:16,
-                    padding:'24px',textAlign:'center',border:'2px dashed rgba(255,255,255,.1)'}}>
-                    <div style={{fontSize:28,marginBottom:10}}>✦</div>
-                    <div style={{color:'rgba(255,255,255,.6)',fontSize:14,fontWeight:600}}>
-                      Нет активного момента
-                    </div>
-                    <div style={{color:'rgba(255,255,255,.35)',fontSize:12,marginTop:6}}>
-                      Опубликуй первый момент на главном экране
-                    </div>
+              {activeMoments.length === 0 ? (
+                <div style={{background:'rgba(255,255,255,.04)',borderRadius:16,
+                  padding:'24px',textAlign:'center',border:'2px dashed rgba(255,255,255,.1)'}}>
+                  <div style={{fontSize:28,marginBottom:10}}>✦</div>
+                  <div style={{color:'rgba(255,255,255,.6)',fontSize:14,fontWeight:600}}>
+                    Нет активных моментов
                   </div>
-                );
-                return (
-                  <div style={{background:'rgba(255,255,255,.06)',borderRadius:16,
-                    border:'1px solid rgba(255,255,255,.1)',overflow:'hidden'}}>
-                    {active.media_url && active.media_type === 'image' && (
-                      <img src={active.media_url} alt=""
-                        style={{width:'100%',height:140,objectFit:'cover',display:'block'}}/>
-                    )}
-                    <div style={{padding:'14px 16px'}}>
-                      <div style={{color:'rgba(255,255,255,.85)',fontSize:14,lineHeight:1.6,
-                        overflow:'hidden',display:'-webkit-box',WebkitLineClamp:4,WebkitBoxOrient:'vertical'}}>
-                        {active.text}
-                      </div>
-                      {active.auto_tags?.length > 0 && (
-                        <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
-                          {active.auto_tags.map(tag => (
-                            <span key={tag} style={{border:'1px dashed rgba(255,255,255,.2)',
-                              borderRadius:20,padding:'2px 10px',fontSize:11,
-                              color:'rgba(255,255,255,.45)'}}>
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
+                  <div style={{color:'rgba(255,255,255,.35)',fontSize:12,marginTop:6}}>
+                    Опубликуй первый момент на главном экране
+                  </div>
+                </div>
+              ) : (
+                <div style={{display:'grid',gridTemplateColumns: activeMoments.length > 1 ? '1fr 1fr' : '1fr',gap:10}}>
+                  {activeMoments.map((active, i) => (
+                    <div key={active.id}
+                      onClick={() => setActivePopupIdx(i)}
+                      style={{background:'rgba(255,255,255,.06)',borderRadius:16,
+                        border:'1px solid rgba(255,255,255,.1)',overflow:'hidden',
+                        cursor:'pointer',transition:'background .15s'}}
+                      onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.1)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.06)'}>
+                      {active.media_url && active.media_type === 'image' ? (
+                        <img src={active.media_url} alt=""
+                          style={{width:'100%',height: activeMoments.length > 1 ? 100 : 140,objectFit:'cover',display:'block'}}/>
+                      ) : (
+                        <div style={{width:'100%',height: activeMoments.length > 1 ? 80 : 0,
+                          background:'linear-gradient(135deg,rgba(80,40,140,.4),rgba(120,60,200,.3))',
+                          display: activeMoments.length > 1 ? 'flex' : 'none',
+                          alignItems:'center',justifyContent:'center',fontSize:28,color:'rgba(255,255,255,.2)'}}>✦</div>
                       )}
-                      <div style={{display:'flex',gap:8,marginTop:14}}>
-                        <div style={{flex:1,background:'rgba(255,255,255,.06)',borderRadius:12,
-                          padding:'10px',textAlign:'center'}}>
-                          <div style={{color:'rgba(255,255,255,.6)',fontSize:13}}>
-                            👁 {active.views || 0}
-                          </div>
-                          <div style={{color:'rgba(255,255,255,.3)',fontSize:10,marginTop:2}}>просмотров</div>
+                      <div style={{padding: activeMoments.length > 1 ? '10px 12px' : '14px 16px'}}>
+                        <div style={{color:'rgba(255,255,255,.85)',fontSize: activeMoments.length > 1 ? 12 : 14,lineHeight:1.5,
+                          overflow:'hidden',display:'-webkit-box',
+                          WebkitLineClamp: activeMoments.length > 1 ? 3 : 4,WebkitBoxOrient:'vertical'}}>
+                          {active.text}
                         </div>
-                        <div style={{flex:1,background:'rgba(255,255,255,.06)',borderRadius:12,
-                          padding:'10px',textAlign:'center'}}>
-                          <div style={{color:'rgba(255,255,255,.6)',fontSize:13}}>
-                            ✨ {active.stats?.resonate || 0}
-                          </div>
-                          <div style={{color:'rgba(255,255,255,.3)',fontSize:10,marginTop:2}}>резонирует</div>
+                        <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>👁 {active.views || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>✨ {active.stats?.resonate || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>🤝 {active.stats?.talk || 0}</span>
                         </div>
-                        <div style={{flex:1,background:'rgba(255,255,255,.06)',borderRadius:12,
-                          padding:'10px',textAlign:'center'}}>
-                          <div style={{color:'rgba(255,255,255,.6)',fontSize:13}}>
-                            🤝 {active.stats?.talk || 0}
-                          </div>
-                          <div style={{color:'rgba(255,255,255,.3)',fontSize:10,marginTop:2}}>поговорить</div>
-                        </div>
-                      </div>
-                      <div style={{display:'flex',gap:8,marginTop:10}}>
-                        <button onClick={async () => {
+                        <button onClick={async e => {
+                          e.stopPropagation();
                           try {
                             await api.archiveMoment(active.id);
                             setMyMoments(prev => prev.map(m => m.id === active.id ? {...m, status:'archived'} : m));
                             showProfileToast('📦 Момент отправлен в архив');
-                          } catch(e) { showProfileToast('Ошибка: ' + e.message); }
-                        }} style={{flex:1,padding:'10px',borderRadius:12,background:'rgba(255,255,255,.08)',
-                          border:'none',color:'rgba(255,255,255,.6)',fontSize:13,fontWeight:600,cursor:'pointer'}}>
+                          } catch(e2) { showProfileToast('Ошибка: ' + e2.message); }
+                        }} style={{marginTop:8,width:'100%',padding:'7px',borderRadius:10,
+                          background:'rgba(255,255,255,.07)',border:'none',
+                          color:'rgba(255,255,255,.5)',fontSize:12,fontWeight:600,cursor:'pointer'}}>
                           📦 В архив
                         </button>
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  ))}
+                </div>
+              )}
+              {activeMoments.length < maxActive && activeMoments.length > 0 && (
+                <div style={{marginTop:10,color:'rgba(255,255,255,.3)',fontSize:12,textAlign:'center'}}>
+                  {user?.is_super
+                    ? `Можно добавить ещё ${maxActive - activeMoments.length} момент(а) — перейди в ленту`
+                    : null}
+                </div>
+              )}
             </div>
-          )}
+          )}</>) })()}
 
           {/* Archive tab */}
           {momentsTab === 'archived' && (
@@ -1305,11 +1301,37 @@ export function MyProfileScreen() {
         </div>
       )}
 
+      {/* Active moment popup */}
+      {activePopupIdx !== null && (() => {
+        const activeMoments = myMoments.filter(m => m.status === 'active')
+          .map(m => ({ ...m, author_name: user?.name, author_avatar: user?.avatar }));
+        if (!activeMoments.length) return null;
+        return (
+          <MomentDetailPopup
+            moments={activeMoments}
+            initialIndex={activePopupIdx}
+            currentUser={user}
+            onClose={() => setActivePopupIdx(null)}
+            onEdit={() => {}}
+            onArchive={(m) => {
+              setMyMoments(prev => prev.map(x => x.id === m.id ? {...x, status:'archived'} : x));
+              setActivePopupIdx(null);
+              showProfileToast('📦 Момент отправлен в архив');
+            }}
+            onDelete={(m) => {
+              setMyMoments(prev => prev.filter(x => x.id !== m.id));
+              setActivePopupIdx(null);
+              showProfileToast('Момент удалён');
+            }}
+          />
+        );
+      })()}
+
       {/* Saved moment popup */}
       {savedSelected && (
         <MomentDetailPopup
-          moment={savedSelected}
-          isMine={savedSelected.user_id === user?.id}
+          moments={[savedSelected]}
+          initialIndex={0}
           currentUser={user}
           onClose={() => setSavedSelected(null)}
           onEdit={() => {}}
@@ -1319,32 +1341,45 @@ export function MyProfileScreen() {
       )}
 
       {/* Archive moment popup */}
-      {archiveSelected && (
-        <MomentDetailPopup
-          moment={{ ...archiveSelected, author_name: user?.name, author_avatar: user?.avatar }}
-          isMine={true}
-          currentUser={user}
-          onClose={() => setArchiveSelected(null)}
-          onEdit={() => {}}
-          onArchive={() => {}}
-          onDelete={() => {}}
-          onRestore={async () => {
-            const active = myMoments.find(x => x.status === 'active');
-            if (active) {
-              showProfileToast('Сначала отправь текущий момент в архив');
-              return;
-            }
-            try {
-              await api.restoreMoment(archiveSelected.id);
-              setMyMoments(prev => prev.map(x =>
-                x.id === archiveSelected.id ? { ...x, status: 'active' } : x
-              ));
+      {archiveSelected && (() => {
+        const archivedMoments = myMoments.filter(m => m.status === 'archived')
+          .map(m => ({ ...m, author_name: user?.name, author_avatar: user?.avatar }));
+        const archIdx = archivedMoments.findIndex(m => m.id === archiveSelected.id);
+        const maxActive = user?.is_super ? 3 : 1;
+        const activeCount = myMoments.filter(m => m.status === 'active').length;
+        return (
+          <MomentDetailPopup
+            moments={archivedMoments}
+            initialIndex={archIdx >= 0 ? archIdx : 0}
+            currentUser={user}
+            onClose={() => setArchiveSelected(null)}
+            onEdit={() => {}}
+            onArchive={() => {}}
+            onDelete={(m) => {
+              setMyMoments(prev => prev.filter(x => x.id !== m.id));
               setArchiveSelected(null);
-              showProfileToast('✦ Момент восстановлен');
-            } catch(e) { showProfileToast('Ошибка: ' + e.message); }
-          }}
-        />
-      )}
+              showProfileToast('Момент удалён');
+            }}
+            onRestore={async (m) => {
+              const curActive = myMoments.filter(x => x.status === 'active').length;
+              if (curActive >= maxActive) {
+                showProfileToast(maxActive === 1
+                  ? 'Сначала отправь текущий момент в архив'
+                  : `Достигнут лимит (${maxActive} активных)`);
+                return;
+              }
+              try {
+                await api.restoreMoment(m.id);
+                setMyMoments(prev => prev.map(x =>
+                  x.id === m.id ? { ...x, status: 'active' } : x
+                ));
+                setArchiveSelected(null);
+                showProfileToast('✦ Момент восстановлен');
+              } catch(e) { showProfileToast('Ошибка: ' + e.message); }
+            }}
+          />
+        );
+      })()}
 
       </div>{/* end 680 inner wrapper */}
     </div>
