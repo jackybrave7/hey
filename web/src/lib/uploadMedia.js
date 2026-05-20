@@ -104,8 +104,8 @@ export async function uploadMedia(file, category, apiFns) {
  * @returns {Promise<string>}  - public URL of uploaded audio
  */
 export async function uploadAudioBlob(blob, apiFns) {
-  // Prefer webm; fall back to whatever the browser produced
-  const contentType = blob.type || 'audio/webm';
+  // Normalize MIME type — strip codec suffix ("audio/webm;codecs=opus" → "audio/webm")
+  const contentType = (blob.type || 'audio/webm').split(';')[0].trim();
   const presign = await apiFns.getPresignUrl('chat-audio', contentType);
   if (presign.uploadUrl) {
     await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});

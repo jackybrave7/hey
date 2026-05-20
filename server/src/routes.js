@@ -303,7 +303,9 @@ module.exports = function makeRouter(db, broadcast) {
 
   // ── Presigned upload URL (client uploads directly to S3) ────────────────────
   r.post('/upload/presign', requireAuth, async (req, res) => {
-    const { category, contentType } = req.body;
+    const { category, contentType: rawContentType } = req.body;
+    // Normalize: strip codec suffix ("audio/webm;codecs=opus" → "audio/webm")
+    const contentType = (rawContentType || '').split(';')[0].trim();
     const allowed = {
       'chat-image':    ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
       'chat-audio':    ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'],
