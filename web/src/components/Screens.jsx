@@ -3,7 +3,8 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, useCallbac
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
-import { uploadMedia, previewUrl, uploadAvatar } from '../lib/uploadMedia';
+import { uploadMedia, previewUrl, uploadAvatar, uploadAudioBlob } from '../lib/uploadMedia';
+import SuperLimitPopup from './super/SuperLimitPopup';
 import { useAuth } from '../AuthContext';
 import {
   AuthBrand, FloatingInput, PasswordInput,
@@ -3105,6 +3106,13 @@ const MessageRow = memo(function MessageRow({
                   cursor:'zoom-in'}}/>
             );
           })()}
+          {m.attachment?.type === 'audio' && (
+            <AudioPlayer
+              url={m.attachment.url}
+              duration={m.attachment.duration}
+              isOut={isOut}
+            />
+          )}
           {m.text && <div style={{wordBreak:'break-word',whiteSpace:'pre-wrap'}}>{renderText(m.text)}</div>}
           <div style={{fontSize:11,opacity:.6,textAlign:'right',marginTop:3,display:'flex',justifyContent:'flex-end',gap:4}}>
             {m.edited_at && <span>изм.</span>}
@@ -3164,6 +3172,83 @@ const MessageRow = memo(function MessageRow({
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AudioPlayer — compact player for voice messages in bubbles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut }) {
+  const [playing, setPlaying] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [total,   setTotal]   = useState(initDur || 0);
+  const audioRef = useRef();
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onTime = () => setCurrent(a.currentTime);
+    const onEnd  = () => { setPlaying(false); setCurrent(0); a.currentTime = 0; };
+    const onMeta = () => { if (isFinite(a.duration)) setTotal(a.duration); };
+    a.addEventListener('timeupdate', onTime);
+    a.addEventListener('ended', onEnd);
+    a.addEventListener('loadedmetadata', onMeta);
+    return () => {
+      a.removeEventListener('timeupdate', onTime);
+      a.removeEventListener('ended', onEnd);
+      a.removeEventListener('loadedmetadata', onMeta);
+    };
+  }, [url]);
+
+  function toggle() {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) a.pause(); else a.play().catch(() => {});
+    setPlaying(p => !p);
+  }
+
+  function fmtSec(s) {
+    if (!s || !isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+    return `${m}:${ss.toString().padStart(2, '0')}`;
+  }
+
+  const progress = total > 0 ? Math.min(current / total, 1) : 0;
+  const barColor = isOut ? 'rgba(255,255,255,.9)' : 'rgba(100,70,160,.85)';
+  const trackColor = isOut ? 'rgba(255,255,255,.25)' : 'rgba(100,70,160,.2)';
+  const textColor  = isOut ? 'rgba(255,255,255,.75)' : 'rgba(60,40,100,.65)';
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:170, maxWidth:240 }}>
+      <audio ref={audioRef} src={url} preload="metadata" style={{ display:'none' }} />
+      <button onClick={toggle} style={{
+        width:36, height:36, borderRadius:'50%', flexShrink:0,
+        background: isOut ? 'rgba(255,255,255,.2)' : 'rgba(100,70,160,.15)',
+        border: isOut ? '1.5px solid rgba(255,255,255,.4)' : '1.5px solid rgba(100,70,160,.3)',
+        cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:14, color: isOut ? 'white' : '#4a2a90', transition:'background .15s',
+      }}>
+        {playing ? '⏸' : '▶'}
+      </button>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{
+          height:3, borderRadius:2, background:trackColor,
+          overflow:'hidden', marginBottom:4, cursor:'pointer',
+        }} onClick={e => {
+          const a = audioRef.current;
+          if (!a || !total) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          a.currentTime = ((e.clientX - rect.left) / rect.width) * total;
+        }}>
+          <div style={{ width:`${progress*100}%`, height:'100%', background:barColor, borderRadius:2, transition:'width .1s linear' }} />
+        </div>
+        <div style={{ fontSize:11, color:textColor }}>
+          {playing ? fmtSec(current) : fmtSec(total)}
+          {' '}🎙
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function ChatScreen() {
   const nav = useNavigate();
@@ -3193,6 +3278,17 @@ export function ChatScreen() {
   const [reactionPicker,setReactionPicker] = useState(null); // { msgId, x, y }
   const [customConfirm, confirmModal] = useConfirm();
   const [isContact,    setIsContact]    = useState(false); // is partner in my contacts?
+  // Voice recording
+  const [voiceState,   setVoiceState]   = useState(null); // null | 'recording' | 'preview'
+  const [voiceBlob,    setVoiceBlob]    = useState(null);
+  const [voiceObjUrl,  setVoiceObjUrl]  = useState(null); // object URL for preview player
+  const [voiceDuration,setVoiceDuration]= useState(0);     // seconds
+  const [recTime,      setRecTime]      = useState(0);     // seconds while recording
+  const [showVoiceLimit, setShowVoiceLimit] = useState(false);
+  const mediaRecorderRef  = useRef(null);
+  const audioChunksRef    = useRef([]);
+  const recTimerRef       = useRef(null);
+  const recStreamRef      = useRef(null);
   const [firstItemIndex, setFirstItemIndex] = useState(1_000_000); // Virtuoso prepend index
   const virtuosoRef        = useRef();
   const atBottomRef        = useRef(true);  // tracks whether list is scrolled to bottom
@@ -3375,6 +3471,108 @@ export function ChatScreen() {
     socket.startTyping(convId);
     clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => socket.stopTyping(convId), 1500);
+  }
+
+  // ── Voice recording ────────────────────────────────────────────────────────
+
+  const MAX_VOICE_SEC = user?.is_super ? 300 : 60; // 5 min Super, 1 min free
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recStreamRef.current = stream;
+      audioChunksRef.current = [];
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/mp4')  ? 'audio/mp4'
+        : '';
+      const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      mediaRecorderRef.current = mr;
+
+      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || 'audio/webm' });
+        const objUrl = URL.createObjectURL(blob);
+        setVoiceBlob(blob);
+        setVoiceObjUrl(objUrl);
+        setVoiceDuration(recTime);
+        setVoiceState('preview');
+        // Stop all tracks
+        recStreamRef.current?.getTracks().forEach(t => t.stop());
+        recStreamRef.current = null;
+      };
+      mr.start(200); // collect every 200ms
+      setVoiceState('recording');
+      setRecTime(0);
+
+      recTimerRef.current = setInterval(() => {
+        setRecTime(t => {
+          const next = t + 1;
+          if (next >= MAX_VOICE_SEC) {
+            stopRecording();
+            if (!user?.is_super) setShowVoiceLimit(true);
+          }
+          return next;
+        });
+      }, 1000);
+    } catch {
+      alert('Нет доступа к микрофону');
+    }
+  }
+
+  function stopRecording() {
+    clearInterval(recTimerRef.current);
+    if (mediaRecorderRef.current?.state !== 'inactive') {
+      mediaRecorderRef.current?.stop();
+    }
+  }
+
+  function cancelVoice() {
+    clearInterval(recTimerRef.current);
+    if (mediaRecorderRef.current?.state !== 'inactive') {
+      mediaRecorderRef.current?.stop();
+    }
+    recStreamRef.current?.getTracks().forEach(t => t.stop());
+    recStreamRef.current = null;
+    if (voiceObjUrl) URL.revokeObjectURL(voiceObjUrl);
+    setVoiceState(null);
+    setVoiceBlob(null);
+    setVoiceObjUrl(null);
+    setVoiceDuration(0);
+    setRecTime(0);
+  }
+
+  async function sendVoice() {
+    if (!voiceBlob) return;
+    const blob = voiceBlob;
+    const dur  = voiceDuration || recTime;
+    const objUrl = voiceObjUrl;
+    // Optimistic clear
+    cancelVoice();
+    let url;
+    try {
+      url = await uploadAudioBlob(blob, { getPresignUrl: api.getPresignUrl });
+    } catch(e) {
+      alert('Не удалось отправить голосовое: ' + e.message);
+      return;
+    }
+    const attachment = { type: 'audio', url, duration: Math.round(dur) };
+    const tempId = 'tmp-' + Date.now();
+    forceScrollBottom.current = true;
+    setMessages(prev => [...prev, {
+      id: tempId, text: null, attachment,
+      sender_id: user.id, sender_name: user.name,
+      status: 'sent', created_at: Math.floor(Date.now() / 1000),
+    }]);
+    socket.sendMessage(convId, '', tempId, attachment);
+    if (objUrl) URL.revokeObjectURL(objUrl);
+  }
+
+  function fmtRecTime(s) {
+    const m = Math.floor(s / 60), ss = s % 60;
+    return `${m}:${ss.toString().padStart(2, '0')}`;
   }
 
   async function handleFileSelect(e) {
@@ -3867,51 +4065,134 @@ export function ChatScreen() {
 
       {/* Input bar */}
       {!requestLock && !partner.isDeleted && <div style={{flexShrink:0}}>
-      <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
-        <div style={{
-          flex:1, borderRadius:26,
-          display:'flex', alignItems:'center', padding:'10px 14px', gap:8,
-          backgroundImage:'url(/input-bg.jpg)',
-          backgroundSize:'cover',
-          backgroundPosition:'center',
-          border:'1px solid rgba(255,255,255,0.5)',
-          boxShadow:'inset 0 1px 0 rgba(255,255,255,0.7), 0 4px 18px rgba(0,0,0,0.15)',
-        }}>
-          <textarea ref={textareaRef} value={text} onChange={handleInput} onKeyDown={handleKey}
-            placeholder="Написать сообщение..."
-            rows={1}
-            style={{flex:1,background:'none',border:'none',outline:'none',color:'white',
-              fontFamily:'inherit',fontSize:14,resize:'none',lineHeight:'1.4',
-              maxHeight:100,overflow:'auto'}}/>
-          <button onClick={() => setShowEmoji(s=>!s)} title="Смайлики"
-            style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
-              padding:0,opacity: showEmoji ? 1 : 0.75,transition:'opacity .15s'}}>
-            <img src="/emoji/smiling.svg" alt="emoji"
-              style={{width:22,height:22,display:'block',pointerEvents:'none'}}/>
-          </button>
-          <button onClick={() => fileInputRef.current?.click()} title="Прикрепить изображение"
-            style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
-              padding:0,opacity:.8,transition:'opacity .15s'}}
-            onMouseEnter={e=>e.currentTarget.style.opacity='1'}
-            onMouseLeave={e=>e.currentTarget.style.opacity='.8'}>
-            <img src="/emoji/paperclip.svg" alt="attach"
-              style={{width:22,height:22,display:'block',pointerEvents:'none',
-                filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
-          </button>
-          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
-            style={{display:'none'}} onChange={handleFileSelect}/>
+
+        {/* ── Voice: recording bar ── */}
+        {voiceState === 'recording' && (
+          <div style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px 10px',
+            maxWidth:680,margin:'0 auto',}}>
+            <button onClick={cancelVoice} title="Отменить"
+              style={{width:36,height:36,borderRadius:'50%',flexShrink:0,background:'rgba(255,80,80,.15)',
+                border:'1px solid rgba(255,120,120,.35)',color:'rgba(255,180,180,.9)',
+                fontSize:18,cursor:'pointer',lineHeight:1}}>✕</button>
+            <div style={{flex:1,display:'flex',alignItems:'center',gap:10,
+              background:'rgba(255,255,255,.07)',borderRadius:26,padding:'8px 16px',
+              border:'1px solid rgba(255,255,255,.12)'}}>
+              <span style={{width:10,height:10,borderRadius:'50%',background:'#e74c3c',flexShrink:0,
+                animation:'pulse 1s ease-in-out infinite',boxShadow:'0 0 6px #e74c3c'}}/>
+              <span style={{color:'rgba(255,255,255,.9)',fontSize:15,fontWeight:600,fontVariantNumeric:'tabular-nums'}}>
+                {fmtRecTime(recTime)}
+              </span>
+              <span style={{color:'rgba(255,255,255,.35)',fontSize:12,flex:1}}>
+                🎙 Говорите…
+              </span>
+              {!user?.is_super && (
+                <span style={{color:'rgba(255,200,100,.6)',fontSize:11}}>
+                  {MAX_VOICE_SEC - recTime}с
+                </span>
+              )}
+            </div>
+            <button onClick={stopRecording} title="Остановить"
+              style={{width:44,height:44,borderRadius:12,flexShrink:0,
+                background:'rgba(100,78,148,.85)',border:'none',
+                color:'white',fontSize:16,cursor:'pointer',
+                display:'flex',alignItems:'center',justifyContent:'center'}}>
+              ■
+            </button>
+          </div>
+        )}
+
+        {/* ── Voice: preview bar ── */}
+        {voiceState === 'preview' && (
+          <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',
+            maxWidth:680,margin:'0 auto'}}>
+            <button onClick={cancelVoice} title="Удалить"
+              style={{width:36,height:36,borderRadius:'50%',flexShrink:0,
+                background:'rgba(255,80,80,.15)',border:'1px solid rgba(255,120,120,.35)',
+                color:'rgba(255,180,180,.9)',fontSize:18,cursor:'pointer',lineHeight:1}}>🗑</button>
+            <div style={{flex:1,background:'rgba(255,255,255,.07)',borderRadius:26,
+              padding:'8px 14px',border:'1px solid rgba(255,255,255,.12)'}}>
+              <AudioPlayer url={voiceObjUrl} duration={voiceDuration} isOut={true}/>
+            </div>
+            <button onClick={sendVoice} title="Отправить"
+              style={{width:44,height:44,background:'rgba(100,78,148,.85)',border:'none',
+                borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',
+                justifyContent:'center',flexShrink:0,fontSize:20,color:'white'}}>
+              ➤
+            </button>
+          </div>
+        )}
+
+        {/* ── Normal text input bar (hidden while recording/preview) ── */}
+        {!voiceState && (
+        <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
+          <div style={{
+            flex:1, borderRadius:26,
+            display:'flex', alignItems:'center', padding:'10px 14px', gap:8,
+            backgroundImage:'url(/input-bg.jpg)',
+            backgroundSize:'cover',
+            backgroundPosition:'center',
+            border:'1px solid rgba(255,255,255,0.5)',
+            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.7), 0 4px 18px rgba(0,0,0,0.15)',
+          }}>
+            <textarea ref={textareaRef} value={text} onChange={handleInput} onKeyDown={handleKey}
+              placeholder="Написать сообщение..."
+              rows={1}
+              style={{flex:1,background:'none',border:'none',outline:'none',color:'white',
+                fontFamily:'inherit',fontSize:14,resize:'none',lineHeight:'1.4',
+                maxHeight:100,overflow:'auto'}}/>
+            <button onClick={() => setShowEmoji(s=>!s)} title="Смайлики"
+              style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
+                padding:0,opacity: showEmoji ? 1 : 0.75,transition:'opacity .15s'}}>
+              <img src="/emoji/smiling.svg" alt="emoji"
+                style={{width:22,height:22,display:'block',pointerEvents:'none'}}/>
+            </button>
+            <button onClick={() => fileInputRef.current?.click()} title="Прикрепить изображение"
+              style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
+                padding:0,opacity:.8,transition:'opacity .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+              onMouseLeave={e=>e.currentTarget.style.opacity='.8'}>
+              <img src="/emoji/paperclip.svg" alt="attach"
+                style={{width:22,height:22,display:'block',pointerEvents:'none',
+                  filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+              style={{display:'none'}} onChange={handleFileSelect}/>
+          </div>
+          {/* Mic button when empty, send when has text/image */}
+          {text.trim() || imgPreview ? (
+            <button onClick={send}
+              style={{width:44,height:44,background:'rgba(100,78,148,.75)',border:'none',
+                borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',
+                justifyContent:'center',flexShrink:0,fontSize:20,color:'white',
+                transition:'background .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.9)'}
+              onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.75)'}>
+              ➤
+            </button>
+          ) : (
+            <button onClick={startRecording} title="Голосовое сообщение"
+              style={{width:44,height:44,background:'rgba(100,78,148,.75)',border:'none',
+                borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',
+                justifyContent:'center',flexShrink:0,fontSize:20,color:'white',
+                transition:'background .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.9)'}
+              onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.75)'}>
+              🎙
+            </button>
+          )}
         </div>
-        <button onClick={send}
-          style={{width:44,height:44,background:'rgba(100,78,148,.75)',border:'none',
-            borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',
-            justifyContent:'center',flexShrink:0,fontSize:20,color:'white',
-            transition:'background .15s'}}
-          onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.9)'}
-          onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.75)'}>
-          ➤
-        </button>
-      </div>{/* end maxWidth input wrapper */}
+        )}
+
+        <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
       </div>}{/* end input bar outer (hidden when requestLock) */}
+
+      {/* SuperLimitPopup — free user hit 60s */}
+      {showVoiceLimit && (
+        <SuperLimitPopup
+          onClose={() => setShowVoiceLimit(false)}
+          onInvite={() => { setShowVoiceLimit(false); nav('/profile/me'); }}
+        />
+      )}
 
       {/* Reaction emoji picker */}
       {reactionPicker && (() => {

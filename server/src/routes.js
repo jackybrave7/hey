@@ -306,6 +306,7 @@ module.exports = function makeRouter(db, broadcast) {
     const { category, contentType } = req.body;
     const allowed = {
       'chat-image':    ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+      'chat-audio':    ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'],
       'moment-image':  ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
       'moment-video':  ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'],
       'moment-audio':  ['audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/webm'],
@@ -317,6 +318,7 @@ module.exports = function makeRouter(db, broadcast) {
     const ext   = contentType.split('/')[1].split(';')[0].replace('quicktime','mov').replace('x-matroska','mkv');
     const keyMap = {
       'chat-image':   `chat/${uuid()}.${ext}`,
+      'chat-audio':   `chat/audio/${uuid()}.${ext}`,
       'moment-image': `moments/${uuid()}/media.${ext}`,
       'moment-video': `moments/${uuid()}/video.${ext}`,
       'moment-audio': `moments/${uuid()}/audio.${ext}`,

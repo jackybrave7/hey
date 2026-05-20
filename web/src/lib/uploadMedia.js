@@ -96,6 +96,26 @@ export async function uploadMedia(file, category, apiFns) {
 }
 
 /**
+ * Upload a raw audio Blob (from MediaRecorder) to S3 via presign.
+ * Falls back to a data URL for local dev (no S3 configured).
+ *
+ * @param {Blob}   blob        - audio blob from MediaRecorder
+ * @param {{ getPresignUrl }} apiFns
+ * @returns {Promise<string>}  - public URL of uploaded audio
+ */
+export async function uploadAudioBlob(blob, apiFns) {
+  // Prefer webm; fall back to whatever the browser produced
+  const contentType = blob.type || 'audio/webm';
+  const presign = await apiFns.getPresignUrl('chat-audio', contentType);
+  if (presign.uploadUrl) {
+    await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});
+    return presign.publicUrl;
+  }
+  // Local fallback: base64 data URL stored as-is
+  return blobToDataUrl(blob);
+}
+
+/**
  * Create an object URL for local preview without reading the whole file.
  * Remember to call URL.revokeObjectURL(url) when the preview is no longer needed.
  */
