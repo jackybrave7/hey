@@ -2653,6 +2653,90 @@ export function ConversationsScreen() {
 
 const URL_RE = /https?:\/\/[^\s]+/g;
 
+// ── Chat video card helpers ───────────────────────────────────────────────────
+
+const CHAT_YT_RE    = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+const CHAT_VIMEO_RE = /vimeo\.com\/(?:video\/)?(\d+)/;
+
+function ChatVideoCard({ url }) {
+  const ytMatch    = url.match(CHAT_YT_RE);
+  const vimeoMatch = url.match(CHAT_VIMEO_RE);
+  const isYT       = !!ytMatch;
+
+  const thumbnail = isYT
+    ? `https://i.ytimg.com/vi/${ytMatch[1]}/hqdefault.jpg`
+    : null;
+
+  const label       = isYT ? '▶ YouTube' : '● Vimeo';
+  const labelColor  = isYT ? '#ff4444'   : '#1ab7ea';
+
+  function open(e) {
+    e.stopPropagation();
+    window.open(url, '_blank', 'noopener');
+  }
+
+  // Shorten URL for display
+  const displayUrl = url.length > 48 ? url.slice(0, 45) + '…' : url;
+
+  return (
+    <div
+      onClick={open}
+      title={url}
+      style={{
+        marginTop: 6,
+        borderRadius: 10,
+        overflow: 'hidden',
+        cursor: 'pointer',
+        background: 'rgba(10,5,30,.85)',
+        border: '1px solid rgba(255,255,255,.12)',
+        maxWidth: 300,
+        userSelect: 'none',
+      }}
+    >
+      {thumbnail && (
+        <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9' }}>
+          <img src={thumbnail} alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
+          <div style={{
+            position: 'absolute', inset: 0, background: 'rgba(0,0,0,.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'rgba(255,255,255,.2)', backdropFilter: 'blur(6px)',
+              border: '2px solid rgba(255,255,255,.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, color: 'white',
+            }}>▶</div>
+          </div>
+          <div style={{
+            position: 'absolute', bottom: 6, right: 6,
+            background: 'rgba(0,0,0,.7)', borderRadius: 20,
+            padding: '2px 7px', fontSize: 10, fontWeight: 700, color: labelColor,
+          }}>{label}</div>
+        </div>
+      )}
+      <div style={{
+        padding: thumbnail ? '7px 10px 8px' : '10px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        background: 'rgba(15,8,35,.9)',
+      }}>
+        {!thumbnail && (
+          <span style={{ fontSize: 16, flexShrink: 0, color: labelColor }}>
+            {isYT ? '▶' : '●'}
+          </span>
+        )}
+        <span style={{
+          color: 'rgba(255,255,255,.5)', fontSize: 11,
+          wordBreak: 'break-all', lineHeight: 1.4,
+        }}>{displayUrl}</span>
+      </div>
+    </div>
+  );
+}
+
 const HEY_EMOJI = [
   'smiling','happy','winking','sad','angry','surprised',
   'wow','dead','discouraged','dissatisfied','chilly','silent',
@@ -2673,12 +2757,18 @@ function renderText(text) {
   while ((m = TOKEN.exec(text)) !== null) {
     if (m.index > last) result.push(text.slice(last, m.index));
     if (m[1]) {
-      // URL
-      result.push(
-        <a key={i++} href={m[1]} target="_blank" rel="noopener noreferrer"
-          style={{color:'inherit',textDecoration:'underline',wordBreak:'break-all'}}
-          onClick={e => e.stopPropagation()}>{m[1]}</a>
-      );
+      const url = m[1];
+      if (CHAT_YT_RE.test(url) || CHAT_VIMEO_RE.test(url)) {
+        // Video URL — render as card
+        result.push(<ChatVideoCard key={i++} url={url}/>);
+      } else {
+        // Regular URL
+        result.push(
+          <a key={i++} href={url} target="_blank" rel="noopener noreferrer"
+            style={{color:'inherit',textDecoration:'underline',wordBreak:'break-all'}}
+            onClick={e => e.stopPropagation()}>{url}</a>
+        );
+      }
     } else if (m[2] && HEY_EMOJI_SET.has(m[2])) {
       // Custom emoji
       result.push(

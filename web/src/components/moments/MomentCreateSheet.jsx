@@ -3,6 +3,18 @@ import { useState, useRef, useEffect } from 'react';
 import { api } from '../../api';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 
+const YT_RE    = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+const VIMEO_RE = /vimeo\.com\/(?:video\/)?(\d+)/;
+
+function detectVideoUrl(text) {
+  const urls = text.match(/https?:\/\/[^\s]+/g);
+  if (!urls) return null;
+  for (const u of urls) {
+    if (YT_RE.test(u) || VIMEO_RE.test(u)) return u;
+  }
+  return null;
+}
+
 export default function MomentCreateSheet({ existing, onClose, onSaved, onConflict }) {
   const isEdit = !!existing;
   const [text,      setText]      = useState(existing?.text || '');
@@ -12,6 +24,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
   const [saving,    setSaving]    = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error,     setError]     = useState('');
+  const [detectedVideoUrl, setDetectedVideoUrl] = useState(null);
   const fileRef = useRef();
   const textRef = useRef();
   // Keep local object URL for preview; revoke on unmount / media removal
@@ -19,6 +32,11 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
 
   useEffect(() => { setTimeout(() => textRef.current?.focus(), 80); }, []);
   useEffect(() => () => { if (previewObjUrl.current) URL.revokeObjectURL(previewObjUrl.current); }, []);
+
+  // Detect YouTube/Vimeo URL in text for feedback
+  useEffect(() => {
+    setDetectedVideoUrl(detectVideoUrl(text));
+  }, [text]);
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
@@ -240,6 +258,32 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
             <span/>
             <span>{text.length}/2000</span>
           </div>
+
+          {/* Video URL detected feedback */}
+          {detectedVideoUrl && (
+            <div style={{
+              background:'rgba(20,10,50,.8)',
+              border:'1px solid rgba(120,80,200,.35)',
+              borderRadius:12,
+              padding:'10px 14px',
+              display:'flex',
+              alignItems:'flex-start',
+              gap:10,
+            }}>
+              <span style={{fontSize:18,flexShrink:0}}>🎬</span>
+              <div>
+                <div style={{color:'rgba(200,180,255,.9)',fontSize:13,fontWeight:600,marginBottom:3}}>
+                  Видео распознано
+                </div>
+                <div style={{color:'rgba(255,255,255,.4)',fontSize:11,wordBreak:'break-all'}}>
+                  {detectedVideoUrl}
+                </div>
+                <div style={{color:'rgba(255,255,255,.3)',fontSize:11,marginTop:3}}>
+                  После публикации появится превью
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Search toggle */}
           <div style={{

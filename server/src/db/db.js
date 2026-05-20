@@ -148,6 +148,7 @@ db.exec(`
 `);
 
 try { db.exec('ALTER TABLE moments ADD COLUMN moment_order INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE moments ADD COLUMN embedded_video TEXT'); } catch {}
 
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
@@ -740,7 +741,13 @@ function getReactionsForMessages(messageIds) {
 
 function _parseMoment(m) {
   if (!m) return null;
-  return { ...m, auto_tags: JSON.parse(m.auto_tags || '[]'), is_search: !!m.is_search, edited: !!m.edited };
+  return {
+    ...m,
+    auto_tags: JSON.parse(m.auto_tags || '[]'),
+    is_search: !!m.is_search,
+    edited: !!m.edited,
+    embedded_video: m.embedded_video ? JSON.parse(m.embedded_video) : null,
+  };
 }
 
 function getContactIds(userId) {
@@ -894,18 +901,19 @@ function reorderMoments(userId, orderedIds) {
   })();
 }
 
-function createMoment({ userId, text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch }) {
+function createMoment({ userId, text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch, embeddedVideo }) {
   const id = 'mom_' + uuid().replace(/-/g,'').slice(0,12);
   const t = now();
   db.prepare(
-    `INSERT INTO moments (id,user_id,text,media_type,media_url,media_duration,auto_tags,is_search,status,created_at,updated_at,edited,archived_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,0,NULL)`
+    `INSERT INTO moments (id,user_id,text,media_type,media_url,media_duration,auto_tags,is_search,status,created_at,updated_at,edited,archived_at,embedded_video)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,0,NULL,?)`
   ).run(id, userId, text, mediaType||null, mediaUrl||null, mediaDuration||null,
-        JSON.stringify(autoTags||[]), isSearch ? 1 : 0, 'active', t, t);
+        JSON.stringify(autoTags||[]), isSearch ? 1 : 0, 'active', t, t,
+        embeddedVideo ? JSON.stringify(embeddedVideo) : null);
   return getMomentById(id);
 }
 
-function updateMoment(id, { text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch }) {
+function updateMoment(id, { text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch, embeddedVideo }) {
   const t = now();
   const sets = ['updated_at=?', 'edited=1'];
   const vals = [t];
@@ -915,6 +923,7 @@ function updateMoment(id, { text, mediaType, mediaUrl, mediaDuration, autoTags, 
   if (mediaDuration !== undefined) { sets.push('media_duration=?'); vals.push(mediaDuration || null); }
   if (autoTags !== undefined)      { sets.push('auto_tags=?');      vals.push(JSON.stringify(autoTags)); }
   if (isSearch !== undefined)      { sets.push('is_search=?');      vals.push(isSearch ? 1 : 0); }
+  if (embeddedVideo !== undefined) { sets.push('embedded_video=?'); vals.push(embeddedVideo ? JSON.stringify(embeddedVideo) : null); }
   db.prepare(`UPDATE moments SET ${sets.join(',')} WHERE id=?`).run(...vals, id);
   return getMomentById(id);
 }

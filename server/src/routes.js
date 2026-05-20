@@ -8,6 +8,7 @@ const authModule = require('./auth');
 const { signToken, requireAuth, optionalAuth } = authModule;
 const db = require('./db/db');
 const { detectTags, detectMoodEmoji } = require('./auto-tags');
+const { parseEmbeddedVideo } = require('./video-embed');
 const storage = require('./storage');
 
 // ── requireAdmin middleware ────────────────────────────────────────────────────
@@ -629,55 +630,71 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   // Создать момент
-  r.post('/moments', requireAuth, (req, res) => {
-    const { text, mediaUrl, mediaType, mediaDuration, isSearch } = req.body;
-    if (!text?.trim()) return res.status(400).json({ error: 'text required' });
-    if (text.length > 2000) return res.status(400).json({ error: 'Текст слишком длинный (макс. 2000 символов)' });
+  r.post('/moments', requireAuth, async (req, res) => {
+    try {
+      const { text, mediaUrl, mediaType, mediaDuration, isSearch } = req.body;
+      if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+      if (text.length > 2000) return res.status(400).json({ error: 'Текст слишком длинный (макс. 2000 символов)' });
 
-    const MAX_ACTIVE = req.user.is_super ? 3 : 1;
-    const activeCount = db.getActiveMomentCount(req.user.id);
-    if (activeCount >= MAX_ACTIVE) {
-      const existing = db.getActiveMoment(req.user.id);
-      return res.status(409).json({ error: 'already_has_active', existing });
+      const MAX_ACTIVE = req.user.is_super ? 3 : 1;
+      const activeCount = db.getActiveMomentCount(req.user.id);
+      if (activeCount >= MAX_ACTIVE) {
+        const existing = db.getActiveMoment(req.user.id);
+        return res.status(409).json({ error: 'already_has_active', existing });
+      }
+
+      const embeddedVideo = await parseEmbeddedVideo(text);
+      const hasEmbeddedVideo = !!embeddedVideo;
+      const autoTags = detectTags(text, mediaType, hasEmbeddedVideo);
+      const moodEmoji = detectMoodEmoji(text, isSearch);
+      const moment = db.createMoment({
+        userId: req.user.id,
+        text: text.trim(),
+        mediaType: mediaType || null,
+        mediaUrl: mediaUrl || null,
+        mediaDuration: mediaDuration || null,
+        autoTags,
+        isSearch: !!isSearch,
+        embeddedVideo,
+      });
+      // WebSocket push to contacts
+      const contactOwners = db.getContactOwners(req.user.id);
+      broadcast(contactOwners, { type: 'moment:new', moment: { ...moment, mood_emoji: moodEmoji } });
+      res.json({ ...moment, mood_emoji: moodEmoji });
+    } catch (err) {
+      console.error('POST /moments error:', err);
+      res.status(500).json({ error: 'Internal server error' });
     }
-
-    const autoTags = detectTags(text, mediaType);
-    const moodEmoji = detectMoodEmoji(text, isSearch);
-    const moment = db.createMoment({
-      userId: req.user.id,
-      text: text.trim(),
-      mediaType: mediaType || null,
-      mediaUrl: mediaUrl || null,
-      mediaDuration: mediaDuration || null,
-      autoTags,
-      isSearch: !!isSearch,
-    });
-    // WebSocket push to contacts
-    const contactOwners = db.getContactOwners(req.user.id);
-    broadcast(contactOwners, { type: 'moment:new', moment: { ...moment, mood_emoji: moodEmoji } });
-    res.json({ ...moment, mood_emoji: moodEmoji });
   });
 
   // Редактировать момент
-  r.patch('/moments/:id', requireAuth, (req, res) => {
-    const m = db.getMomentById(req.params.id);
-    if (!m || m.status === 'deleted') return res.status(404).json({ error: 'Not found' });
-    if (m.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
-    const { text, isSearch } = req.body;
-    const newText = text?.trim() ?? m.text;
-    const autoTags = detectTags(newText, m.media_type);
-    const updated = db.updateMoment(req.params.id, {
-      text: newText,
-      mediaUrl: m.media_url,
-      mediaType: m.media_type,
-      mediaDuration: m.media_duration,
-      autoTags,
-      isSearch: isSearch !== undefined ? isSearch : m.is_search,
-    });
-    const moodEmoji = detectMoodEmoji(newText, updated.is_search);
-    const members = db.getContactOwners(req.user.id);
-    broadcast(members, { type: 'moment:updated', moment: { ...updated, mood_emoji: moodEmoji } });
-    res.json({ ...updated, mood_emoji: moodEmoji });
+  r.patch('/moments/:id', requireAuth, async (req, res) => {
+    try {
+      const m = db.getMomentById(req.params.id);
+      if (!m || m.status === 'deleted') return res.status(404).json({ error: 'Not found' });
+      if (m.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+      const { text, isSearch } = req.body;
+      const newText = text?.trim() ?? m.text;
+      const embeddedVideo = await parseEmbeddedVideo(newText);
+      const hasEmbeddedVideo = !!embeddedVideo;
+      const autoTags = detectTags(newText, m.media_type, hasEmbeddedVideo);
+      const updated = db.updateMoment(req.params.id, {
+        text: newText,
+        mediaUrl: m.media_url,
+        mediaType: m.media_type,
+        mediaDuration: m.media_duration,
+        autoTags,
+        isSearch: isSearch !== undefined ? isSearch : m.is_search,
+        embeddedVideo,
+      });
+      const moodEmoji = detectMoodEmoji(newText, updated.is_search);
+      const members = db.getContactOwners(req.user.id);
+      broadcast(members, { type: 'moment:updated', moment: { ...updated, mood_emoji: moodEmoji } });
+      res.json({ ...updated, mood_emoji: moodEmoji });
+    } catch (err) {
+      console.error('PATCH /moments/:id error:', err);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
   // Архивировать

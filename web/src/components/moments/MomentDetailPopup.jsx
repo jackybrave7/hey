@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import MoodEmoji from './MoodEmoji';
+import EmbeddedVideoPreview from './EmbeddedVideoPreview';
 import SuperInfoScreen from '../super/SuperInfoScreen';
 
 function fmtDate(ts) {
@@ -208,7 +209,8 @@ export default function MomentDetailPopup({
     if (dx < -50) goNext();
   }
 
-  const hasMedia = !!moment.media_url;
+  const hasMedia      = !!moment.media_url;
+  const hasEmbedVideo = !!moment.embedded_video;
 
   return (
     <>
@@ -306,15 +308,26 @@ export default function MomentDetailPopup({
         )}
 
         <div style={{flex:1,overflowY:'auto'}}>
-          {/* No-media mood */}
+          {/* No-media mood or embedded video */}
           {!hasMedia && (
-            <div style={{height:160,flexShrink:0,position:'relative'}}>
-              <MoodEmoji type={moment.mood_emoji||'calm'} size={80}/>
-              <button onClick={onClose} style={{position:'absolute',top:12,right:12,
-                background:'rgba(0,0,0,.35)',border:'none',borderRadius:'50%',
-                width:36,height:36,color:'white',fontSize:18,cursor:'pointer',
-                display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
-            </div>
+            hasEmbedVideo ? (
+              <div style={{flexShrink:0,position:'relative',background:'#0a0518'}}>
+                <EmbeddedVideoPreview data={moment.embedded_video} size="full"/>
+                <button onClick={onClose} style={{position:'absolute',top:12,right:12,
+                  background:'rgba(0,0,0,.5)',backdropFilter:'blur(8px)',
+                  border:'none',borderRadius:'50%',width:36,height:36,
+                  color:'white',fontSize:18,cursor:'pointer',display:'flex',
+                  alignItems:'center',justifyContent:'center',zIndex:10}}>✕</button>
+              </div>
+            ) : (
+              <div style={{height:160,flexShrink:0,position:'relative'}}>
+                <MoodEmoji type={moment.mood_emoji||'calm'} size={80}/>
+                <button onClick={onClose} style={{position:'absolute',top:12,right:12,
+                  background:'rgba(0,0,0,.35)',border:'none',borderRadius:'50%',
+                  width:36,height:36,color:'white',fontSize:18,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+              </div>
+            )
           )}
 
           <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -365,6 +378,11 @@ export default function MomentDetailPopup({
             <div style={{color:'rgba(255,255,255,.9)',fontSize:15,lineHeight:1.7,whiteSpace:'pre-wrap'}}>
               {moment.text}
             </div>
+
+            {/* Embedded video (shown below text when there's also a media_url) */}
+            {hasEmbedVideo && hasMedia && (
+              <EmbeddedVideoPreview data={moment.embedded_video} size="full"/>
+            )}
 
             {/* Search flag */}
             {moment.is_search && (

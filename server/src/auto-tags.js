@@ -1,7 +1,7 @@
 // server/src/auto-tags.js
 // Автоматическое определение тегов по тексту и типу медиа
 
-function detectTags(text, mediaType) {
+function detectTags(text, mediaType, hasEmbeddedVideo = false) {
   const tags = [];
   const t = (text || '').toLowerCase();
 
@@ -13,7 +13,7 @@ function detectTags(text, mediaType) {
     tags.push('✏️ Графика');
   if (/трек|альбом|музык|записал|записываю|студи|саундтрек|композици|ep |мелоди/.test(t) || mediaType === 'audio')
     tags.push('🎵 Музыка');
-  if (/съёмк|съемк|снимаю|снимаем|кино|фильм|короткий метр|видеоклип/.test(t) || mediaType === 'video')
+  if (/съёмк|съемк|снимаю|снимаем|кино|фильм|короткий метр|видеоклип/.test(t) || mediaType === 'video' || hasEmbeddedVideo)
     tags.push('🎬 Видео');
   if (/фотограф|фотосессия|снял|снимаю фото|кадр/.test(t))
     tags.push('📷 Фото');

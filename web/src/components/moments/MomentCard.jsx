@@ -1,5 +1,6 @@
 // MomentCard.jsx
 import MoodEmoji from './MoodEmoji';
+import EmbeddedVideoPreview from './EmbeddedVideoPreview';
 
 function fmtTime(ts) {
   if (!ts) return '';
@@ -33,8 +34,9 @@ function AudioBars() {
 }
 
 export default function MomentCard({ moment, isMine, onClick }) {
-  const hasMedia = !!moment.media_url;
-  const preview  = (moment.text || '').slice(0, 80);
+  const hasMedia       = !!moment.media_url;
+  const hasEmbedVideo  = !hasMedia && !!moment.embedded_video?.thumbnail_url;
+  const preview        = (moment.text || '').slice(0, 80);
 
   return (
     <div
@@ -87,6 +89,13 @@ export default function MomentCard({ moment, isMine, onClick }) {
             <AudioBars/>
           </div>
         )
+      ) : hasEmbedVideo ? (
+        /* Embedded video thumbnail as card background */
+        <>
+          <img src={moment.embedded_video.thumbnail_url} alt=""
+            style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+          <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.22)'}}/>
+        </>
       ) : (
         <MoodEmoji type={moment.mood_emoji || 'calm'} size={isMine ? 170 : 130}/>
       )}
@@ -109,6 +118,19 @@ export default function MomentCard({ moment, isMine, onClick }) {
           display:'flex',alignItems:'center',justifyContent:'center',
           fontSize:13,color:'white',
         }}>🎧</div>
+      )}
+      {/* Embedded video badge */}
+      {hasEmbedVideo && (
+        <div style={{
+          position:'absolute',top:10,right:10,zIndex:3,
+          background:'rgba(0,0,0,.65)',backdropFilter:'blur(8px)',
+          borderRadius:20,padding:'3px 8px',
+          fontSize:10,fontWeight:700,
+          color: moment.embedded_video?.provider === 'youtube' ? '#ff4444' : '#1ab7ea',
+          whiteSpace:'nowrap',
+        }}>
+          {moment.embedded_video?.provider === 'youtube' ? '▶ YT' : '● Vimeo'}
+        </div>
       )}
 
       {/* My moment badge (top-left) */}
