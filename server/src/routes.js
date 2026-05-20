@@ -120,12 +120,12 @@ module.exports = function makeRouter(db, broadcast) {
   r.get('/users/:id/profile', requireAuth, (req, res) => {
     const target = db.findUserById(req.params.id);
     if (!target || target.is_blocked) return res.status(404).json({ error: 'Not found' });
-    const activeMoment = db.getActiveMoment(target.id);
-    const presence     = db.getPresence(target.id);
-    const contacts     = db.getContacts(req.user.id);
-    const isContact    = contacts.some(c => c.id === target.id);
+    const activeMoments = db.getActiveMoments(target.id);
+    const presence      = db.getPresence(target.id);
+    const contacts      = db.getContacts(req.user.id);
+    const isContact     = contacts.some(c => c.id === target.id);
     const { password, phone, must_change_password, ...safe } = target;
-    res.json({ ...safe, active_moment: activeMoment || null, presence, is_contact: isContact });
+    res.json({ ...safe, active_moments: activeMoments, active_moment: activeMoments[0] || null, presence, is_contact: isContact });
   });
 
   r.get('/me', requireAuth, (req, res) => {
@@ -547,7 +547,18 @@ module.exports = function makeRouter(db, broadcast) {
   // Мои моменты
   r.get('/moments/my', requireAuth, (req, res) => {
     const status = ['active','archived','all'].includes(req.query.status) ? req.query.status : 'active';
+    if (status === 'active') return res.json(db.getActiveMoments(req.user.id));
     res.json(db.getMyMoments(req.user.id, status));
+  });
+
+  // Изменить порядок активных моментов (только Супер)
+  r.post('/moments/reorder', requireAuth, (req, res) => {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+      return res.status(400).json({ error: 'orderedIds required' });
+    }
+    db.reorderMoments(req.user.id, orderedIds);
+    res.json({ ok: true });
   });
 
   // Закладки (talk reaction)
@@ -579,8 +590,9 @@ module.exports = function makeRouter(db, broadcast) {
     if (!text?.trim()) return res.status(400).json({ error: 'text required' });
     if (text.length > 2000) return res.status(400).json({ error: 'Текст слишком длинный (макс. 2000 символов)' });
 
+    const creator = db.findUserById(req.user.id);
+    const MAX_ACTIVE = creator?.is_super ? 3 : 1;
     const activeCount = db.getActiveMomentCount(req.user.id);
-    const MAX_ACTIVE = 1; // premium = 3, пока у всех 1
     if (activeCount >= MAX_ACTIVE) {
       const existing = db.getActiveMoment(req.user.id);
       return res.status(409).json({ error: 'already_has_active', existing });
@@ -640,8 +652,10 @@ module.exports = function makeRouter(db, broadcast) {
     const m = db.getMomentById(req.params.id);
     if (!m) return res.status(404).json({ error: 'Not found' });
     if (m.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    const restorer = db.findUserById(req.user.id);
+    const restoreMax = restorer?.is_super ? 3 : 1;
     const activeCount = db.getActiveMomentCount(req.user.id);
-    if (activeCount >= 1) return res.status(409).json({ error: 'already_has_active' });
+    if (activeCount >= restoreMax) return res.status(409).json({ error: 'already_has_active' });
     db.restoreMoment(req.params.id);
     const restored = db.getMomentById(req.params.id);
     broadcast(db.getContactOwners(req.user.id), { type: 'moment:new', moment: restored });

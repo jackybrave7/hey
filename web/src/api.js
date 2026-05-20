@@ -106,6 +106,7 @@ export const api = {
   viewMoment:       (id)         => req('POST',   `/moments/${id}/view`),
   getDisciplines:   (userId)     => req('GET',    `/moments/disciplines/${userId}`),
   uploadMomentMedia: (data)      => req('POST',   '/moments/upload', { data }),
+  reorderMoments:    (orderedIds) => req('POST',  '/moments/reorder', { orderedIds }),
 
   // Admin
   adminGetStats:           ()              => req('GET',    '/admin/stats'),

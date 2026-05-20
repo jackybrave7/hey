@@ -147,6 +147,8 @@ db.exec(`
   );
 `);
 
+try { db.exec('ALTER TABLE moments ADD COLUMN moment_order INTEGER DEFAULT 0'); } catch {}
+
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0'); } catch {}
@@ -825,9 +827,28 @@ function getActiveMoment(userId) {
   const m = db.prepare(
     `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar, u.is_super AS author_is_super
      FROM moments m JOIN users u ON u.id=m.user_id
-     WHERE m.user_id=? AND m.status='active' LIMIT 1`
+     WHERE m.user_id=? AND m.status='active' ORDER BY m.moment_order DESC, m.created_at DESC LIMIT 1`
   ).get(userId);
   return _withStats(_parseMoment(m));
+}
+
+function getActiveMoments(userId) {
+  const rows = db.prepare(
+    `SELECT m.*, u.name AS author_name, u.avatar AS author_avatar, u.is_super AS author_is_super
+     FROM moments m JOIN users u ON u.id=m.user_id
+     WHERE m.user_id=? AND m.status='active'
+     ORDER BY m.moment_order DESC, m.created_at DESC`
+  ).all(userId);
+  return _withStatsBatch(rows.map(_parseMoment));
+}
+
+function reorderMoments(userId, orderedIds) {
+  const stmt = db.prepare('UPDATE moments SET moment_order=? WHERE id=? AND user_id=?');
+  db.transaction(() => {
+    orderedIds.forEach((id, idx) => {
+      stmt.run(orderedIds.length - idx, id, userId);
+    });
+  })();
 }
 
 function createMoment({ userId, text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch }) {
@@ -1075,8 +1096,8 @@ module.exports = {
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes,
   getReferralCount, findUserByInviteCode,
   // Moments
-  getMomentFeed, getMyMoments, getMomentById, getActiveMoment, getActiveMomentCount,
-  createMoment, updateMoment, archiveMoment, restoreMoment, deleteMomentForever,
+  getMomentFeed, getMyMoments, getMomentById, getActiveMoment, getActiveMoments, getActiveMomentCount,
+  createMoment, updateMoment, archiveMoment, restoreMoment, deleteMomentForever, reorderMoments,
   upsertMomentReaction, deleteMomentReaction, getMomentReactions, getUserMomentReaction,
   getSavedMoments, getMomentReactorsList,
   addMomentView, getDisciplinesCloud,
