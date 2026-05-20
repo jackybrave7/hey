@@ -17,8 +17,8 @@ export default function MomentsFeed({ currentUser }) {
   const [loadingMore, setLoadingMore] = useState(false);
 
   // UI state
-  const [selected, setSelected]     = useState(null);
-  const [showCreate, setShowCreate] = useState(false);
+  const [selected, setSelected]       = useState(null);  // { moments, index }
+  const [showCreate, setShowCreate]   = useState(false);
   const [pendingData, setPendingData]           = useState(null);
   const [conflictExisting, setConflictExisting] = useState(null);
   const [showDilemma, setShowDilemma]           = useState(false);
@@ -84,12 +84,12 @@ export default function MomentsFeed({ currentUser }) {
       socket.on('moment:archived', ({ momentId }) => {
         setFeed(prev => prev.filter(m => m.id !== momentId));
         setMyMoments(prev => prev.filter(m => m.id !== momentId));
-        if (selected?.id === momentId) setSelected(null);
+        if (selected?.moments.some(m => m.id === momentId)) setSelected(null);
       }),
       socket.on('moment:deleted', ({ momentId }) => {
         setFeed(prev => prev.filter(m => m.id !== momentId));
         setMyMoments(prev => prev.filter(m => m.id !== momentId));
-        if (selected?.id === momentId) setSelected(null);
+        if (selected?.moments.some(m => m.id === momentId)) setSelected(null);
       }),
     ];
     return () => unsubs.forEach(u => u());
@@ -97,12 +97,13 @@ export default function MomentsFeed({ currentUser }) {
 
   // ─── Actions ───────────────────────────────────────────────────────────────
 
-  async function handleArchive(momentId) {
+  async function handleArchive(moment) {
+    const momentId = moment?.id || moment;
     try {
       await api.archiveMoment(momentId);
       setFeed(prev => prev.filter(m => m.id !== momentId));
       setMyMoments(prev => prev.filter(m => m.id !== momentId));
-      if (selected?.id === momentId) setSelected(null);
+      if (selected?.moments.some(m => m.id === momentId)) setSelected(null);
       showToast('📦 Момент отправлен в архив');
     } catch(err) {
       showToast('Ошибка: ' + (err.message || 'не удалось'));
@@ -114,7 +115,7 @@ export default function MomentsFeed({ currentUser }) {
     await api.deleteMoment(deleteTarget.id);
     setFeed(prev => prev.filter(m => m.id !== deleteTarget.id));
     setMyMoments(prev => prev.filter(m => m.id !== deleteTarget.id));
-    if (selected?.id === deleteTarget.id) setSelected(null);
+    if (selected?.moments.some(m => m.id === deleteTarget.id)) setSelected(null);
     setDeleteTarget(null);
     showToast('🗑 Момент удалён навсегда');
   }
@@ -194,14 +195,14 @@ export default function MomentsFeed({ currentUser }) {
                 <SuperMomentGallery
                   moments={myMoments}
                   isMine={true}
-                  onSelect={setSelected}
+                  onSelect={m => setSelected({ moments: myMoments, index: myMoments.findIndex(x => x.id === m.id) })}
                   onMomentsChanged={setMyMoments}
                 />
               ) : (
                 <MomentCard
                   moment={myMoments[0]}
                   isMine={true}
-                  onClick={() => setSelected(myMoments[0])}
+                  onClick={() => setSelected({ moments: myMoments, index: 0 })}
                 />
               )}
             </div>
@@ -259,7 +260,7 @@ export default function MomentsFeed({ currentUser }) {
                     <SuperMomentGallery
                       moments={group.moments}
                       isMine={false}
-                      onSelect={setSelected}
+                      onSelect={m => setSelected({ moments: group.moments, index: group.moments.findIndex(x => x.id === m.id) })}
                     />
                   </div>
                 );
@@ -269,7 +270,7 @@ export default function MomentsFeed({ currentUser }) {
                   key={group.moments[0].id}
                   moment={group.moments[0]}
                   isMine={false}
-                  onClick={() => setSelected(group.moments[0])}
+                  onClick={() => setSelected({ moments: otherMoments, index: otherMoments.findIndex(x => x.id === group.moments[0].id) })}
                 />
               );
             })
@@ -299,13 +300,13 @@ export default function MomentsFeed({ currentUser }) {
 
       {selected && (
         <MomentDetailPopup
-          moment={selected}
-          isMine={selected.user_id === currentUser?.id}
+          moments={selected.moments}
+          initialIndex={selected.index ?? 0}
           currentUser={currentUser}
           onClose={() => setSelected(null)}
-          onEdit={() => { setEditTarget(selected); setSelected(null); }}
-          onArchive={() => handleArchive(selected.id)}
-          onDelete={() => { setDeleteTarget(selected); }}
+          onEdit={m => { setEditTarget(m); setSelected(null); }}
+          onArchive={m => { handleArchive(m); setSelected(null); }}
+          onDelete={m => { setDeleteTarget(m); setSelected(null); }}
         />
       )}
 
@@ -318,10 +319,9 @@ export default function MomentsFeed({ currentUser }) {
             setEditTarget(null);
             if (!result._conflict) {
               if (result.user_id === currentUser?.id) {
-                setMyMoments(prev => {
-                  const filtered = prev.filter(m => m.id !== result.id);
-                  return editTarget ? filtered.map(m => m.id === result.id ? result : m) : [result, ...filtered];
-                });
+                setMyMoments(prev => editTarget
+                  ? prev.map(m => m.id === result.id ? result : m)
+                  : [result, ...prev.filter(m => m.id !== result.id)]);
               }
               setFeed(prev => prev.map(m => m.id === result.id ? result : m));
               showToast(editTarget ? '✎ Момент обновлён' : '✦ Момент опубликован');
