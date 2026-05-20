@@ -2665,90 +2665,111 @@ function isChatVideoUrl(url) {
          CHAT_RUTUBE_RE.test(url) || CHAT_KINESCOPE_RE.test(url);
 }
 
-function ChatVideoCard({ url }) {
-  const ytMatch        = url.match(CHAT_YT_RE);
-  const kinescopeMatch = url.match(CHAT_KINESCOPE_RE);
-  const isYT           = !!ytMatch;
-  const isKinescope    = !!kinescopeMatch;
-  const isRutube       = CHAT_RUTUBE_RE.test(url);
+function getChatEmbed(url) {
+  const ytM = url.match(CHAT_YT_RE);        if (ytM) return { provider:'youtube',   videoId: ytM[1],        thumbnail: `https://i.ytimg.com/vi/${ytM[1]}/hqdefault.jpg`, label:'▶ YouTube',   color:'#ff4444' };
+  const vmM = url.match(CHAT_VIMEO_RE);     if (vmM) return { provider:'vimeo',     videoId: vmM[1],        thumbnail: null,                                             label:'● Vimeo',     color:'#1ab7ea' };
+  const rtM = url.match(CHAT_RUTUBE_RE);    if (rtM) return { provider:'rutube',    videoId: rtM[1],        thumbnail: null,                                             label:'▶ RuTube',   color:'#ff6600' };
+  const ksM = url.match(CHAT_KINESCOPE_RE); if (ksM) return { provider:'kinescope', videoId: ksM[1],        thumbnail: `https://kinescope.io/${ksM[1]}/thumbnail`,       label:'▶ Kinescope',color:'#9b6ecc' };
+  return null;
+}
 
-  const thumbnail = isYT
-    ? `https://i.ytimg.com/vi/${ytMatch[1]}/hqdefault.jpg`
-    : isKinescope
-    ? `https://kinescope.io/${kinescopeMatch[1]}/thumbnail`
-    : null;
-
-  const { label, labelColor } = isYT
-    ? { label: '▶ YouTube',   labelColor: '#ff4444' }
-    : isRutube
-    ? { label: '▶ RuTube',   labelColor: '#ff6600' }
-    : isKinescope
-    ? { label: '▶ Kinescope', labelColor: '#9b6ecc' }
-    : { label: '● Vimeo',    labelColor: '#1ab7ea' };
-
-  function open(e) {
-    e.stopPropagation();
-    window.open(url, '_blank', 'noopener');
+function getEmbedSrc(provider, videoId) {
+  switch (provider) {
+    case 'youtube':   return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+    case 'vimeo':     return `https://player.vimeo.com/video/${videoId}?autoplay=1`;
+    case 'rutube':    return `https://rutube.ru/play/embed/${videoId}?autoPlay=true`;
+    case 'kinescope': return `https://kinescope.io/embed/${videoId}`;
+    default:          return null;
   }
+}
 
-  // Shorten URL for display
-  const displayUrl = url.length > 48 ? url.slice(0, 45) + '…' : url;
+function ChatVideoCard({ url }) {
+  const [playing, setPlaying] = useState(false);
+  const info = getChatEmbed(url);
+  if (!info) return null;
+
+  const embedSrc = getEmbedSrc(info.provider, info.videoId);
+
+  function play(e) {
+    e.stopPropagation();
+    if (embedSrc) setPlaying(true);
+    else window.open(url, '_blank', 'noopener');
+  }
+  function stop(e) { e.stopPropagation(); setPlaying(false); }
+  function ext(e)  { e.stopPropagation(); window.open(url, '_blank', 'noopener'); }
 
   return (
-    <div
-      onClick={open}
-      title={url}
-      style={{
-        marginTop: 6,
-        borderRadius: 10,
-        overflow: 'hidden',
-        cursor: 'pointer',
-        background: 'rgba(10,5,30,.85)',
-        border: '1px solid rgba(255,255,255,.12)',
-        maxWidth: 300,
-        userSelect: 'none',
-      }}
-    >
-      {thumbnail && (
-        <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9' }}>
-          <img src={thumbnail} alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
-          <div style={{
-            position: 'absolute', inset: 0, background: 'rgba(0,0,0,.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%',
-              background: 'rgba(255,255,255,.2)', backdropFilter: 'blur(6px)',
-              border: '2px solid rgba(255,255,255,.5)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, color: 'white',
-            }}>▶</div>
+    <div style={{
+      marginTop: 6, borderRadius: 10, overflow: 'hidden',
+      background: 'rgba(10,5,30,.85)', border: '1px solid rgba(255,255,255,.12)',
+      maxWidth: 300, userSelect: 'none',
+    }}>
+      {playing ? (
+        <>
+          <div style={{ width: '100%', aspectRatio: '16/9' }}>
+            <iframe src={embedSrc} title={info.label}
+              allow="autoplay; fullscreen; picture-in-picture" allowFullScreen
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}/>
           </div>
           <div style={{
-            position: 'absolute', bottom: 6, right: 6,
-            background: 'rgba(0,0,0,.7)', borderRadius: 20,
-            padding: '2px 7px', fontSize: 10, fontWeight: 700, color: labelColor,
-          }}>{label}</div>
-        </div>
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '5px 10px', background: 'rgba(10,5,30,.95)',
+          }}>
+            <button onClick={stop} style={{
+              background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)',
+              borderRadius: 20, padding: '3px 10px', color: 'rgba(255,255,255,.6)',
+              fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+            }}>✕ Закрыть</button>
+            <button onClick={ext} style={{
+              background: 'none', border: 'none', color: `${info.color}bb`,
+              fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+            }}>Открыть ↗</button>
+          </div>
+        </>
+      ) : (
+        <>
+          {info.thumbnail ? (
+            <div onClick={play} style={{ position: 'relative', width: '100%', aspectRatio: '16/9', cursor: 'pointer' }}>
+              <img src={info.thumbnail} alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
+              <div style={{
+                position: 'absolute', inset: 0, background: 'rgba(0,0,0,.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'rgba(255,255,255,.2)', backdropFilter: 'blur(6px)',
+                  border: '2px solid rgba(255,255,255,.5)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, color: 'white',
+                }}>▶</div>
+              </div>
+              <div style={{
+                position: 'absolute', bottom: 6, right: 6,
+                background: 'rgba(0,0,0,.7)', borderRadius: 20,
+                padding: '2px 7px', fontSize: 10, fontWeight: 700, color: info.color,
+              }}>{info.label}</div>
+            </div>
+          ) : null}
+          <div onClick={info.thumbnail ? undefined : play} style={{
+            padding: info.thumbnail ? '6px 10px 7px' : '10px 12px',
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'rgba(15,8,35,.9)', cursor: info.thumbnail ? 'default' : 'pointer',
+          }}>
+            {!info.thumbnail && <span style={{ fontSize: 16, flexShrink: 0, color: info.color }}>▶</span>}
+            <span style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, flex: 1, wordBreak: 'break-all', lineHeight: 1.4 }}>
+              {url.length > 46 ? url.slice(0, 43) + '…' : url}
+            </span>
+            {info.thumbnail && (
+              <button onClick={play} style={{
+                background: info.color, border: 'none', borderRadius: 16,
+                padding: '3px 10px', color: 'white', fontSize: 11,
+                cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, flexShrink: 0,
+              }}>▶</button>
+            )}
+          </div>
+        </>
       )}
-      <div style={{
-        padding: thumbnail ? '7px 10px 8px' : '10px 12px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        background: 'rgba(15,8,35,.9)',
-      }}>
-        {!thumbnail && (
-          <span style={{ fontSize: 16, flexShrink: 0, color: labelColor }}>
-            {isYT ? '▶' : '●'}
-          </span>
-        )}
-        <span style={{
-          color: 'rgba(255,255,255,.5)', fontSize: 11,
-          wordBreak: 'break-all', lineHeight: 1.4,
-        }}>{displayUrl}</span>
-      </div>
     </div>
   );
 }
