@@ -2160,18 +2160,51 @@ export function ConversationsScreen() {
 
   const normalConvs  = convs.filter(c => !c.is_request);
   const requestConvs = convs.filter(c => c.is_request && c.request_from !== user?.id);
+  const pinnedConvs  = normalConvs.filter(c => c.is_pinned);
+  const regularConvs = normalConvs.filter(c => !c.is_pinned);
+  const [pinToast, setPinToast] = useState('');
+
+  async function togglePin(c) {
+    const wasPinned = c.is_pinned;
+    try {
+      if (wasPinned) {
+        await api.unpinConversation(c.id);
+        setConvs(prev => {
+          const updated = prev.map(x => x.id === c.id ? { ...x, is_pinned: false } : x);
+          return updated.sort((a, b) => {
+            if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+            return b.last_at - a.last_at;
+          });
+        });
+        setPinToast('Откреплено');
+      } else {
+        await api.pinConversation(c.id);
+        setConvs(prev => {
+          const updated = prev.map(x => x.id === c.id ? { ...x, is_pinned: true } : x);
+          return updated.sort((a, b) => {
+            if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+            return b.last_at - a.last_at;
+          });
+        });
+        setPinToast('📌 Закреплено');
+      }
+    } catch(err) {
+      setPinToast(err.message || 'Ошибка');
+    }
+    setTimeout(() => setPinToast(''), 2500);
+  }
 
   function ConvRow({ c, isRequest }) {
+    const [hovered, setHovered] = useState(false);
+
     async function handleRowClick() {
       if (isRequest) {
-        // Show profile card instead of navigating directly
         if (!c.partner_id) { nav(`/chat/${c.id}`); return; }
         setRequestCardLoading(true);
         try {
           const profile = await api.getUserProfile(c.partner_id);
           setRequestCard({ conv: c, profile });
         } catch {
-          // Fallback — just open chat
           nav(`/chat/${c.id}`);
         } finally {
           setRequestCardLoading(false);
@@ -2185,9 +2218,10 @@ export function ConversationsScreen() {
     return (
       <div onClick={handleRowClick}
         style={{display:'flex',alignItems:'center',gap:12,padding:'12px 20px',
-          cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s'}}
-        onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
-        onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+          cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s',
+          background: c.is_pinned ? 'rgba(120,90,200,.06)' : 'transparent'}}
+        onMouseEnter={e=>{ e.currentTarget.style.background = c.is_pinned ? 'rgba(120,90,200,.1)' : 'rgba(255,255,255,.04)'; setHovered(true); }}
+        onMouseLeave={e=>{ e.currentTarget.style.background = c.is_pinned ? 'rgba(120,90,200,.06)' : 'transparent'; setHovered(false); }}>
         {c.type === 'group' ? (
           <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
             background:'rgba(200,160,210,.35)',
@@ -2198,7 +2232,10 @@ export function ConversationsScreen() {
           <AvatarDisplay avatar={c.avatar} name={c.name} size={52}/>
         )}
         <div style={{flex:1,minWidth:0}}>
-          <div style={{color:'white',fontSize:15,fontWeight:600}}>{c.name||'Диалог'}</div>
+          <div style={{color:'white',fontSize:15,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+            {c.name||'Диалог'}
+            {c.is_pinned && <span style={{fontSize:11,opacity:.5}}>📌</span>}
+          </div>
           {isRequest ? (
             <div style={{color:'rgba(180,140,220,.8)',fontSize:13}}>хочет написать вам</div>
           ) : c.partner_is_deleted ? (
@@ -2220,9 +2257,22 @@ export function ConversationsScreen() {
             }}>Запрос</div>
           ) : (
             <>
-              {c.last_at && (
+              {/* Pin toggle — visible on hover */}
+              {hovered ? (
+                <button
+                  onClick={e => { e.stopPropagation(); togglePin(c); }}
+                  title={c.is_pinned ? 'Открепить' : 'Закрепить'}
+                  style={{
+                    background:'none',border:'none',cursor:'pointer',padding:'2px 4px',
+                    fontSize:14,opacity: c.is_pinned ? 0.9 : 0.45,
+                    transition:'opacity .15s',lineHeight:1,
+                  }}
+                  onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                  onMouseLeave={e=>e.currentTarget.style.opacity= c.is_pinned ? '0.9' : '0.45'}
+                >📌</button>
+              ) : c.last_at ? (
                 <div style={{color:'rgba(255,255,255,.35)',fontSize:11}}>{fmtTime(c.last_at)}</div>
-              )}
+              ) : null}
               {c.unread_count > 0 && (
                 <div style={{
                   minWidth:20,height:20,borderRadius:10,padding:'0 6px',
@@ -2268,13 +2318,36 @@ export function ConversationsScreen() {
 
       <div style={{maxWidth:680,margin:'0 auto',width:'100%'}}>
 
-        {/* Normal chats */}
         {normalConvs.length === 0 && requestConvs.length === 0 && (
           <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:60,fontSize:15,padding:'0 20px'}}>
             Нет активных диалогов.<br/>Перейди в Контакты, чтобы начать переписку.
           </div>
         )}
-        {normalConvs.map(c => <ConvRow key={c.id} c={c} isRequest={false}/>)}
+
+        {/* Pinned chats */}
+        {pinnedConvs.length > 0 && (
+          <div style={{
+            padding:'14px 20px 6px',
+            color:'rgba(255,255,255,.4)',fontSize:11,fontWeight:600,
+            textTransform:'uppercase',letterSpacing:'1px',
+            display:'flex',alignItems:'center',gap:6,
+          }}>
+            <span>📌</span> Закреплённые
+          </div>
+        )}
+        {pinnedConvs.map(c => <ConvRow key={c.id} c={c} isRequest={false}/>)}
+
+        {/* Divider when both sections have items */}
+        {pinnedConvs.length > 0 && regularConvs.length > 0 && (
+          <div style={{
+            padding:'14px 20px 6px',
+            color:'rgba(255,255,255,.4)',fontSize:11,fontWeight:600,
+            textTransform:'uppercase',letterSpacing:'1px',
+          }}>
+            Все чаты
+          </div>
+        )}
+        {regularConvs.map(c => <ConvRow key={c.id} c={c} isRequest={false}/>)}
 
         {/* Requests section */}
         {requestConvs.length > 0 && (
@@ -2296,6 +2369,22 @@ export function ConversationsScreen() {
         )}
 
       </div>
+
+      {/* Pin toast */}
+      {pinToast && (
+        <div style={{
+          position:'fixed',bottom:100,left:'50%',transform:'translateX(-50%)',
+          background:'rgba(30,20,60,.95)',backdropFilter:'blur(20px)',
+          border:'1px solid rgba(255,255,255,.15)',
+          borderRadius:50,padding:'9px 20px',
+          color:'white',fontSize:14,fontWeight:600,
+          zIndex:1000,whiteSpace:'nowrap',
+          boxShadow:'0 4px 20px rgba(0,0,0,.4)',
+          pointerEvents:'none',
+        }}>
+          {pinToast}
+        </div>
+      )}
 
       {/* Loading spinner while fetching profile */}
       {requestCardLoading && (

@@ -161,6 +161,12 @@ try { db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN bio TEXT'); } catch {}
 // ── Message requests ──────────────────────────────────────────────────────────
 try { db.exec('ALTER TABLE conversations ADD COLUMN request_from TEXT'); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS pinned_conversations (
+  user_id   TEXT NOT NULL,
+  conv_id   TEXT NOT NULL,
+  pinned_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, conv_id)
+)`); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (
   id               TEXT PRIMARY KEY,
   admin_id         TEXT NOT NULL,
@@ -480,6 +486,7 @@ function getConversationsForUser(userId) {
 
   // Collect blocked ids (both directions)
   const blockedIds = new Set(getBlockedByIds(userId));
+  const pinnedSet  = new Set(getPinnedConvIds(userId));
 
   return convIds.map(convId => {
     const conv = convsMap[convId];
@@ -512,9 +519,32 @@ function getConversationsForUser(userId) {
       unread_count: isRecipient ? 0 : (unreadMap[convId] || 0),
       is_request: isRequest,
       request_from: conv.request_from || null,
+      is_pinned: pinnedSet.has(convId),
     };
-  }).filter(Boolean).sort((a, b) => b.last_at - a.last_at);
+  }).filter(Boolean).sort((a, b) => {
+    if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+    return b.last_at - a.last_at;
+  });
 }
+
+function getPinnedConvIds(userId) {
+  return db.prepare('SELECT conv_id FROM pinned_conversations WHERE user_id=? ORDER BY pinned_at ASC')
+    .all(userId).map(r => r.conv_id);
+}
+
+function getPinnedCount(userId) {
+  return db.prepare('SELECT COUNT(*) as c FROM pinned_conversations WHERE user_id=?').get(userId)?.c ?? 0;
+}
+
+function pinConversation(userId, convId) {
+  db.prepare('INSERT OR IGNORE INTO pinned_conversations (user_id, conv_id, pinned_at) VALUES (?,?,?)')
+    .run(userId, convId, now());
+}
+
+function unpinConversation(userId, convId) {
+  db.prepare('DELETE FROM pinned_conversations WHERE user_id=? AND conv_id=?').run(userId, convId);
+}
+
 
 function getConversationById(convId) {
   return db.prepare('SELECT * FROM conversations WHERE id=?').get(convId) || null;
@@ -1087,6 +1117,7 @@ module.exports = {
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   getOrCreateDirectConversation, acceptRequest, declineRequest,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
+  getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
   clearConversationMessages, editMessage, deleteMessage,
   getMediaMessages, searchMessages,

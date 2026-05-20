@@ -243,6 +243,23 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ id: conv.id, is_request: !!conv.request_from });
   });
 
+  // Pin / unpin conversation
+  r.post('/conversations/:id/pin', requireAuth, (req, res) => {
+    if (!db.isMember(req.params.id, req.user.id))
+      return res.status(403).json({ error: 'Forbidden' });
+    const limit = req.user.is_super ? 10 : 5;
+    const count = db.getPinnedCount(req.user.id);
+    if (count >= limit)
+      return res.status(409).json({ error: `Можно закрепить не более ${limit} чатов` });
+    db.pinConversation(req.user.id, req.params.id);
+    res.json({ ok: true });
+  });
+
+  r.delete('/conversations/:id/pin', requireAuth, (req, res) => {
+    db.unpinConversation(req.user.id, req.params.id);
+    res.json({ ok: true });
+  });
+
   // Accept a message request
   r.post('/conversations/:id/accept', requireAuth, (req, res) => {
     if (!db.isMember(req.params.id, req.user.id))
