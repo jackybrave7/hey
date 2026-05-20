@@ -3907,37 +3907,42 @@ export function ChatScreen() {
 
       {/* Image preview bar */}
       {imgPreview && (
-        <div style={{display:'flex',alignItems:'center',gap:12,padding:'8px 16px',
-          background:'rgba(100,78,148,.45)',flexShrink:0}}>
-          <img src={imgPreview.dataUrl} alt=""
-            style={{height:56,width:56,objectFit:'cover',borderRadius:8,flexShrink:0}}/>
-          <span style={{flex:1,color:'rgba(255,255,255,.7)',fontSize:13}}>
-            {imgPreview.uploading ? 'Отправка…' : 'Добавьте подпись или нажмите ➤'}
-          </span>
-          <button onClick={() => { URL.revokeObjectURL(imgPreview.dataUrl); setImgPreview(null); }} disabled={imgPreview.uploading}
-            style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
-              fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+        <div style={{background:'rgba(100,78,148,.45)',flexShrink:0}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,padding:'8px 14px',
+            maxWidth:680,margin:'0 auto'}}>
+            <img src={imgPreview.dataUrl} alt=""
+              style={{height:56,width:56,objectFit:'cover',borderRadius:8,flexShrink:0}}/>
+            <span style={{flex:1,color:'rgba(255,255,255,.7)',fontSize:13}}>
+              {imgPreview.uploading ? 'Отправка…' : 'Добавьте подпись или нажмите ➤'}
+            </span>
+            <button onClick={() => { URL.revokeObjectURL(imgPreview.dataUrl); setImgPreview(null); }} disabled={imgPreview.uploading}
+              style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
+                fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+          </div>
         </div>
       )}
 
       {/* Edit banner */}
       {editingMsg && (
-        <div style={{display:'flex',alignItems:'center',gap:10,padding:'6px 16px',
-          background:'rgba(100,78,148,.5)',flexShrink:0}}>
-          <span style={{fontSize:16}}>✏️</span>
-          <span style={{flex:1,color:'rgba(255,255,255,.8)',fontSize:13,
-            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-            {editingMsg.text}
-          </span>
-          <button onClick={cancelEdit}
-            style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
-              fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+        <div style={{background:'rgba(100,78,148,.5)',flexShrink:0}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,padding:'6px 14px',
+            maxWidth:680,margin:'0 auto'}}>
+            <span style={{fontSize:16}}>✏️</span>
+            <span style={{flex:1,color:'rgba(255,255,255,.8)',fontSize:13,
+              overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+              {editingMsg.text}
+            </span>
+            <button onClick={cancelEdit}
+              style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
+                fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+          </div>
         </div>
       )}
 
       {/* Emoji keyboard */}
       {showEmoji && (
-        <div style={{background:'rgba(100,78,148,.78)',padding:'10px 12px',flexShrink:0}}>
+        <div style={{background:'rgba(100,78,148,.78)',flexShrink:0}}>
+          <div style={{maxWidth:680,margin:'0 auto',padding:'10px 12px'}}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:4}}>
             {HEY_EMOJI.map(name => (
               <button key={name} onClick={() => insertEmoji(name)} title={name}
@@ -3951,6 +3956,7 @@ export function ChatScreen() {
                     filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
               </button>
             ))}
+          </div>
           </div>
         </div>
       )}
@@ -4124,10 +4130,10 @@ export function ChatScreen() {
 
         {/* ── Normal text input bar (hidden while recording/preview) ── */}
         {!voiceState && (
-        <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
+        <div style={{padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
           <div style={{
-            flex:1, borderRadius:26,
-            display:'flex', alignItems:'center', padding:'10px 14px', gap:8,
+            borderRadius:26,
+            display:'flex', alignItems:'center', padding:'8px 8px 8px 14px', gap:6,
             backgroundImage:'url(/input-bg.jpg)',
             backgroundSize:'cover',
             backgroundPosition:'center',
@@ -4140,15 +4146,17 @@ export function ChatScreen() {
               style={{flex:1,background:'none',border:'none',outline:'none',color:'white',
                 fontFamily:'inherit',fontSize:14,resize:'none',lineHeight:'1.4',
                 maxHeight:100,overflow:'auto'}}/>
+            {/* Emoji */}
             <button onClick={() => setShowEmoji(s=>!s)} title="Смайлики"
               style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
-                padding:0,opacity: showEmoji ? 1 : 0.75,transition:'opacity .15s'}}>
+                padding:4,opacity: showEmoji ? 1 : 0.75,transition:'opacity .15s'}}>
               <img src="/emoji/smiling.svg" alt="emoji"
                 style={{width:22,height:22,display:'block',pointerEvents:'none'}}/>
             </button>
+            {/* Attach */}
             <button onClick={() => fileInputRef.current?.click()} title="Прикрепить изображение"
               style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
-                padding:0,opacity:.8,transition:'opacity .15s'}}
+                padding:4,opacity:.8,transition:'opacity .15s'}}
               onMouseEnter={e=>e.currentTarget.style.opacity='1'}
               onMouseLeave={e=>e.currentTarget.style.opacity='.8'}>
               <img src="/emoji/paperclip.svg" alt="attach"
@@ -4157,29 +4165,29 @@ export function ChatScreen() {
             </button>
             <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
               style={{display:'none'}} onChange={handleFileSelect}/>
+            {/* Mic / Send — inside the pill */}
+            {text.trim() || imgPreview ? (
+              <button onClick={send} title="Отправить"
+                style={{width:36,height:36,background:'rgba(100,78,148,.85)',border:'none',
+                  borderRadius:18,cursor:'pointer',display:'flex',alignItems:'center',
+                  justifyContent:'center',flexShrink:0,fontSize:17,color:'white',
+                  transition:'background .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.95)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.85)'}>
+                ➤
+              </button>
+            ) : (
+              <button onClick={startRecording} title="Голосовое сообщение"
+                style={{width:36,height:36,background:'rgba(100,78,148,.85)',border:'none',
+                  borderRadius:18,cursor:'pointer',display:'flex',alignItems:'center',
+                  justifyContent:'center',flexShrink:0,fontSize:17,color:'white',
+                  transition:'background .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.95)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.85)'}>
+                🎙
+              </button>
+            )}
           </div>
-          {/* Mic button when empty, send when has text/image */}
-          {text.trim() || imgPreview ? (
-            <button onClick={send}
-              style={{width:44,height:44,background:'rgba(100,78,148,.75)',border:'none',
-                borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',
-                justifyContent:'center',flexShrink:0,fontSize:20,color:'white',
-                transition:'background .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.9)'}
-              onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.75)'}>
-              ➤
-            </button>
-          ) : (
-            <button onClick={startRecording} title="Голосовое сообщение"
-              style={{width:44,height:44,background:'rgba(100,78,148,.75)',border:'none',
-                borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',
-                justifyContent:'center',flexShrink:0,fontSize:20,color:'white',
-                transition:'background .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.9)'}
-              onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.75)'}>
-              🎙
-            </button>
-          )}
         </div>
         )}
 
