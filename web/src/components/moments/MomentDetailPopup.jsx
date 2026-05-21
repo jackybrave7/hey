@@ -163,6 +163,35 @@ export default function MomentDetailPopup({
   const goPrev = useCallback(() => { if (canPrev) setIdx(i => i - 1); }, [canPrev]);
   const goNext = useCallback(() => { if (canNext) setIdx(i => i + 1); }, [canNext]);
 
+  // Стрелки навигации — вставляются абсолютно внутрь hero-контейнера,
+  // чтобы центрироваться вертикально по медиа, а не по всему попапу
+  const navArrows = (
+    <>
+      {canPrev && (
+        <button onClick={(e) => { e.stopPropagation(); goPrev(); }} style={{
+          position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
+          zIndex:10, width:36, height:36, borderRadius:'50%',
+          background:'rgba(20,12,40,.8)', backdropFilter:'blur(8px)',
+          border:'1px solid rgba(255,255,255,.12)', color:'white',
+          fontSize:20, cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          boxShadow:'0 2px 12px rgba(0,0,0,.5)',
+        }}>‹</button>
+      )}
+      {canNext && (
+        <button onClick={(e) => { e.stopPropagation(); goNext(); }} style={{
+          position:'absolute', right:10, top:'50%', transform:'translateY(-50%)',
+          zIndex:10, width:36, height:36, borderRadius:'50%',
+          background:'rgba(20,12,40,.8)', backdropFilter:'blur(8px)',
+          border:'1px solid rgba(255,255,255,.12)', color:'white',
+          fontSize:20, cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          boxShadow:'0 2px 12px rgba(0,0,0,.5)',
+        }}>›</button>
+      )}
+    </>
+  );
+
   // Keyboard navigation
   useEffect(() => {
     const handler = (e) => {
@@ -235,29 +264,7 @@ export default function MomentDetailPopup({
         position:'relative',
       }}>
 
-        {/* ← / → nav arrows */}
-        {canPrev && (
-          <button onClick={goPrev} style={{
-            position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
-            zIndex:10, width:36, height:36, borderRadius:'50%',
-            background:'rgba(20,12,40,.8)', backdropFilter:'blur(8px)',
-            border:'1px solid rgba(255,255,255,.12)', color:'white',
-            fontSize:20, cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            boxShadow:'0 2px 12px rgba(0,0,0,.5)',
-          }}>‹</button>
-        )}
-        {canNext && (
-          <button onClick={goNext} style={{
-            position:'absolute', right:10, top:'50%', transform:'translateY(-50%)',
-            zIndex:10, width:36, height:36, borderRadius:'50%',
-            background:'rgba(20,12,40,.8)', backdropFilter:'blur(8px)',
-            border:'1px solid rgba(255,255,255,.12)', color:'white',
-            fontSize:20, cursor:'pointer',
-            display:'flex', alignItems:'center', justifyContent:'center',
-            boxShadow:'0 2px 12px rgba(0,0,0,.5)',
-          }}>›</button>
-        )}
+        {/* ← / → nav arrows вставляются ниже — внутри hero-блока, чтобы центрироваться по медиа */}
 
         {/* Dot indicators */}
         {moments.length > 1 && (
@@ -304,6 +311,7 @@ export default function MomentDetailPopup({
               border:'none',borderRadius:'50%',width:36,height:36,
               color:'white',fontSize:18,cursor:'pointer',display:'flex',
               alignItems:'center',justifyContent:'center'}}>✕</button>
+            {navArrows}
           </div>
         )}
 
@@ -318,6 +326,7 @@ export default function MomentDetailPopup({
                   border:'none',borderRadius:'50%',width:36,height:36,
                   color:'white',fontSize:18,cursor:'pointer',display:'flex',
                   alignItems:'center',justifyContent:'center',zIndex:10}}>✕</button>
+                {navArrows}
               </div>
             ) : (
               <div style={{height:160,flexShrink:0,position:'relative'}}>
@@ -326,6 +335,7 @@ export default function MomentDetailPopup({
                   background:'rgba(0,0,0,.35)',border:'none',borderRadius:'50%',
                   width:36,height:36,color:'white',fontSize:18,cursor:'pointer',
                   display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                {navArrows}
               </div>
             )
           )}
@@ -468,13 +478,27 @@ export default function MomentDetailPopup({
 
         {/* Footer */}
         {onRestore ? (
-          <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
+          <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0,
+            display:'flex',gap:8}}>
             <button onClick={() => onRestore(moment)}
-              style={{width:'100%',padding:'13px',borderRadius:14,
+              style={{flex:1,padding:'13px',borderRadius:14,
                 background:'rgba(120,90,200,.75)',border:'none',
                 color:'white',fontSize:15,fontWeight:600,cursor:'pointer'}}>
-              ↩ Вернуть в активные
+              ↩ Восстановить
             </button>
+            {onDelete && (
+              <button onClick={() => onDelete(moment)}
+                style={{padding:'13px 18px',borderRadius:14,
+                  background:'rgba(255,80,80,.12)',border:'1px solid rgba(255,80,80,.3)',
+                  color:'rgba(255,140,140,.95)',fontSize:15,fontWeight:600,cursor:'pointer',
+                  flexShrink:0,
+                  transition:'background .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,80,80,.22)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(255,80,80,.12)'}
+                title="Удалить навсегда">
+                🗑
+              </button>
+            )}
           </div>
         ) : !isMine ? (
           <div style={{padding:'14px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>

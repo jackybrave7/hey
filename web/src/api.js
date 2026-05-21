@@ -70,7 +70,7 @@ export const api = {
   declineRequest:   (convId)              => req('DELETE', `/conversations/${convId}/request`),
   editMessage:      (convId, msgId, text) => req('PATCH',  `/conversations/${convId}/messages/${msgId}`, { text }),
   deleteMessage:    (convId, msgId)       => req('DELETE', `/conversations/${convId}/messages/${msgId}`),
-  getPresignUrl:    (category, contentType) => req('POST', '/upload/presign', { category, contentType }),
+  getPresignUrl:    (category, contentType, size) => req('POST', '/upload/presign', { category, contentType, size }),
   uploadImage:      (data)               => req('POST',   '/upload', { data }),
 
   // Groups

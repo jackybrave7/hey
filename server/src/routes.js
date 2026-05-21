@@ -310,7 +310,7 @@ module.exports = function makeRouter(db, broadcast) {
 
   // ── Presigned upload URL (client uploads directly to S3) ────────────────────
   r.post('/upload/presign', requireAuth, async (req, res) => {
-    const { category, contentType: rawContentType } = req.body;
+    const { category, contentType: rawContentType, size } = req.body;
     // Normalize: strip codec suffix ("audio/webm;codecs=opus" → "audio/webm")
     const contentType = (rawContentType || '').split(';')[0].trim();
     const allowed = {
@@ -324,6 +324,27 @@ module.exports = function makeRouter(db, broadcast) {
     if (!allowed[category]?.includes(contentType))
       return res.status(400).json({ error: 'Unsupported type' });
 
+    // ── Size limits per category (МБ). Super accounts get higher limits ─────
+    const MB = 1024 * 1024;
+    const isSuper = !!req.user.is_super;
+    const limits = {
+      'chat-image':    3 * MB,
+      'chat-audio':    10 * MB,                       // голосовухи — короткие
+      'moment-image':  isSuper ? 15 * MB : 5 * MB,
+      'moment-video':  isSuper ? 50 * MB : 20 * MB,
+      'moment-audio':  isSuper ? 30 * MB : 5 * MB,
+      'avatar':        2 * MB,
+    };
+    const maxBytes = limits[category];
+    if (typeof size === 'number' && size > maxBytes) {
+      const maxMb = Math.round(maxBytes / MB);
+      return res.status(413).json({
+        error: `Файл слишком большой. Максимум ${maxMb} МБ${!isSuper && (category==='moment-image'||category==='moment-audio'||category==='moment-video') ? ' (для Super — больше)' : ''}`,
+        maxBytes,
+        isSuper,
+      });
+    }
+
     const ext   = contentType.split('/')[1].split(';')[0].replace('quicktime','mov').replace('x-matroska','mkv');
     const keyMap = {
       'chat-image':   `chat/${uuid()}.${ext}`,
@@ -335,7 +356,7 @@ module.exports = function makeRouter(db, broadcast) {
     };
     try {
       const result = await storage.getPresignedUploadUrl(keyMap[category], contentType);
-      res.json(result);
+      res.json({ ...result, maxBytes });
     } catch (e) {
       console.error('[/upload/presign]', e);
       res.status(500).json({ error: 'Presign failed' });
@@ -542,14 +563,18 @@ module.exports = function makeRouter(db, broadcast) {
       const { data } = req.body;
       if (!data) return res.status(400).json({ error: 'No data' });
 
-      // image
+      // image — 5 МБ обычным, 15 МБ Super
       const imgMatch = data.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/s);
       if (imgMatch) {
         const [, mime, b64] = imgMatch;
         const ALLOWED = ['image/jpeg','image/png','image/webp','image/gif'];
         if (!ALLOWED.includes(mime)) return res.status(400).json({ error: 'Unsupported image type' });
         const buf = Buffer.from(b64, 'base64');
-        if (buf.length > 5 * 1024 * 1024) return res.status(400).json({ error: 'Image too large (max 5 MB)' });
+        const maxBytes = req.user.is_super ? 15 * 1024 * 1024 : 5 * 1024 * 1024;
+        if (buf.length > maxBytes) {
+          const maxMb = req.user.is_super ? 15 : 5;
+          return res.status(400).json({ error: `Image too large (max ${maxMb} MB)` });
+        }
         const baseKey = 'moments/' + uuid() + '/media';
         const { fullKey, fullUrl, thumbKey, thumbUrl } = await storage.uploadImage(buf, baseKey);
         return res.json({ url: fullUrl, key: fullKey, thumb_url: thumbUrl, thumb_key: thumbKey, mediaType: 'image' });
@@ -567,12 +592,16 @@ module.exports = function makeRouter(db, broadcast) {
         return res.json({ url, key, mediaType: 'video' });
       }
 
-      // audio
+      // audio — 5 МБ обычным, 30 МБ Super
       const audMatch = data.match(/^data:(audio\/[a-zA-Z0-9]+);base64,(.+)$/s);
       if (audMatch) {
         const [, mime, b64] = audMatch;
         const buf = Buffer.from(b64, 'base64');
-        if (buf.length > 10 * 1024 * 1024) return res.status(400).json({ error: 'Audio too large (max 10 MB)' });
+        const maxBytes = req.user.is_super ? 30 * 1024 * 1024 : 5 * 1024 * 1024;
+        if (buf.length > maxBytes) {
+          const maxMb = req.user.is_super ? 30 : 5;
+          return res.status(400).json({ error: `Audio too large (max ${maxMb} MB)` });
+        }
         const ext = mime.split('/')[1];
         const key = 'moments/' + uuid() + '/audio.' + ext;
         const { url } = await storage.uploadFile(key, buf, mime);
@@ -638,7 +667,7 @@ module.exports = function makeRouter(db, broadcast) {
   // Создать момент
   r.post('/moments', requireAuth, async (req, res) => {
     try {
-      const { text, mediaUrl, mediaType, mediaDuration, isSearch } = req.body;
+      const { text, mediaUrl, mediaType, mediaDuration, isSearch, moodEmoji: userMoodEmoji, mediaPosition } = req.body;
       if (!text?.trim()) return res.status(400).json({ error: 'text required' });
       if (text.length > 2000) return res.status(400).json({ error: 'Текст слишком длинный (макс. 2000 символов)' });
 
@@ -652,7 +681,8 @@ module.exports = function makeRouter(db, broadcast) {
       const embeddedVideo = await parseEmbeddedVideo(text);
       const hasEmbeddedVideo = !!embeddedVideo;
       const autoTags = detectTags(text, mediaType, hasEmbeddedVideo);
-      const moodEmoji = detectMoodEmoji(text, isSearch);
+      // Если юзер сам выбрал эмодзи — используем его, иначе авто-определяем
+      const moodEmoji = userMoodEmoji || detectMoodEmoji(text, isSearch);
       const moment = db.createMoment({
         userId: req.user.id,
         text: text.trim(),
@@ -662,6 +692,8 @@ module.exports = function makeRouter(db, broadcast) {
         autoTags,
         isSearch: !!isSearch,
         embeddedVideo,
+        moodEmoji,
+        mediaPosition: mediaPosition || null,
       });
       // WebSocket push to contacts
       const contactOwners = db.getContactOwners(req.user.id);
@@ -679,11 +711,15 @@ module.exports = function makeRouter(db, broadcast) {
       const m = db.getMomentById(req.params.id);
       if (!m || m.status === 'deleted') return res.status(404).json({ error: 'Not found' });
       if (m.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
-      const { text, isSearch } = req.body;
+      const { text, isSearch, moodEmoji: userMoodEmoji, mediaPosition } = req.body;
       const newText = text?.trim() ?? m.text;
       const embeddedVideo = await parseEmbeddedVideo(newText);
       const hasEmbeddedVideo = !!embeddedVideo;
       const autoTags = detectTags(newText, m.media_type, hasEmbeddedVideo);
+      // Если юзер прислал moodEmoji — обновляем, иначе сохраняем сохранённое (или авто-определяем если пусто)
+      const moodEmoji = userMoodEmoji !== undefined
+        ? (userMoodEmoji || null)
+        : (m.mood_emoji || detectMoodEmoji(newText, isSearch !== undefined ? isSearch : m.is_search));
       const updated = db.updateMoment(req.params.id, {
         text: newText,
         mediaUrl: m.media_url,
@@ -692,8 +728,9 @@ module.exports = function makeRouter(db, broadcast) {
         autoTags,
         isSearch: isSearch !== undefined ? isSearch : m.is_search,
         embeddedVideo,
+        moodEmoji,
+        mediaPosition: mediaPosition !== undefined ? (mediaPosition || null) : undefined,
       });
-      const moodEmoji = detectMoodEmoji(newText, updated.is_search);
       const members = db.getContactOwners(req.user.id);
       broadcast(members, { type: 'moment:updated', moment: { ...updated, mood_emoji: moodEmoji } });
       res.json({ ...updated, mood_emoji: moodEmoji });

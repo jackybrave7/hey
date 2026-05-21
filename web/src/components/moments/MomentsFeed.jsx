@@ -8,6 +8,7 @@ import MomentActionMenu from './MomentActionMenu';
 import MomentDelete from './MomentDelete';
 import MomentDilemma from './MomentDilemma';
 import SuperMomentGallery from './SuperMomentGallery';
+import SuperInfoScreen from '../super/SuperInfoScreen';
 
 export default function MomentsFeed({ currentUser }) {
   const [feed, setFeed]             = useState([]);
@@ -26,6 +27,7 @@ export default function MomentsFeed({ currentUser }) {
   const [menuTarget, setMenuTarget]  = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toast, setToast]           = useState('');
+  const [showSuperInfo, setShowSuperInfo] = useState(false);
 
   const isSuper = !!(currentUser?.is_super);
 
@@ -153,7 +155,6 @@ export default function MomentsFeed({ currentUser }) {
 
   const hasMyMoments  = myMoments.length > 0;
   const canAddMore    = isSuper ? myMoments.length < 3 : myMoments.length < 1;
-  const showMyGallery = isSuper && myMoments.length > 1;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--grad)', paddingBottom: 80 }}>
@@ -184,61 +185,115 @@ export default function MomentsFeed({ currentUser }) {
         </div>
       </div>
 
-      {/* Grid */}
-      <div style={{ padding: '14px 20px', maxWidth: 680, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-
-          {/* ── My moments ── */}
-          {hasMyMoments ? (
-            <div style={{ gridColumn: 'span 2' }}>
-              {showMyGallery ? (
-                <SuperMomentGallery
-                  moments={myMoments}
-                  isMine={true}
-                  onSelect={m => setSelected({ moments: myMoments, index: myMoments.findIndex(x => x.id === m.id) })}
-                  onMomentsChanged={setMyMoments}
-                />
-              ) : (
-                <MomentCard
-                  moment={myMoments[0]}
-                  isMine={true}
-                  onClick={() => setSelected({ moments: myMoments, index: 0 })}
-                />
+      {/* ─── My moments section ─────────────────────────────────────────── */}
+      <div style={{ padding: '14px 20px 0', maxWidth: 680, margin: '0 auto' }}>
+        {hasMyMoments ? (
+          <>
+            {/* Header: title + counter (only Super gets the "N из 3" counter) */}
+            <div style={{
+              display:'flex',alignItems:'center',gap:10,marginBottom:12,
+              color:'rgba(255,255,255,.55)',fontSize:13,fontWeight:600,
+              textTransform:'uppercase',letterSpacing:1.2,
+            }}>
+              <span>✦ Мои моменты</span>
+              {isSuper && (
+                <span style={{
+                  color:'rgba(200,170,255,.7)',fontSize:12,fontWeight:500,
+                  textTransform:'none',letterSpacing:0,
+                }}>
+                  {myMoments.length} из 3
+                </span>
               )}
             </div>
-          ) : (
-            <button onClick={() => setShowCreate(true)}
-              style={{
-                gridColumn: 'span 2',
-                padding: '28px 20px', borderRadius: 8, cursor: 'pointer',
-                border: '2px dashed rgba(180,140,220,.25)',
-                background: 'rgba(120,90,200,.06)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                transition: 'all .2s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(180,140,220,.45)'; e.currentTarget.style.background = 'rgba(120,90,200,.1)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(180,140,220,.25)'; e.currentTarget.style.background = 'rgba(120,90,200,.06)'; }}>
-              <div style={{ fontSize: 36 }}>✦</div>
-              <div style={{ color: 'white', fontSize: 16, fontWeight: 700 }}>Создай свой первый момент</div>
-              <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 13, textAlign: 'center', maxWidth: 260 }}>
+
+            {/* 3-column grid of slots */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
+              {myMoments.map((m, idx) => (
+                <MomentCard
+                  key={m.id}
+                  moment={m}
+                  isMine={true}
+                  onClick={() => setSelected({ moments: myMoments, index: idx })}
+                />
+              ))}
+
+              {/* Super: "+ Добавить" placeholders for remaining slots up to 3 */}
+              {isSuper && myMoments.length < 3 && (
+                <button onClick={() => setShowCreate(true)}
+                  style={{
+                    aspectRatio:'1 / 1', borderRadius:12, cursor:'pointer',
+                    border:'2px dashed rgba(180,140,220,.4)',
+                    background:'rgba(120,90,200,.06)',
+                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                    gap:6, color:'white', transition:'all .15s',
+                  }}
+                  onMouseEnter={e=>{ e.currentTarget.style.background='rgba(120,90,200,.14)'; e.currentTarget.style.borderColor='rgba(180,140,220,.6)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.background='rgba(120,90,200,.06)'; e.currentTarget.style.borderColor='rgba(180,140,220,.4)'; }}>
+                  <span style={{fontSize:28,lineHeight:1}}>+</span>
+                  <span style={{fontSize:13,fontWeight:600,color:'rgba(255,255,255,.85)'}}>Добавить</span>
+                </button>
+              )}
+
+              {/* Non-Super: "Ещё в СУПЕР" locked teaser (only when has 1 moment) */}
+              {!isSuper && myMoments.length === 1 && (
+                <button onClick={() => setShowSuperInfo(true)}
+                  style={{
+                    aspectRatio:'1 / 1', borderRadius:12, cursor:'pointer',
+                    border:'2px dashed rgba(180,140,220,.22)',
+                    background:'rgba(255,255,255,.04)',
+                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                    gap:6, transition:'all .15s',
+                  }}
+                  onMouseEnter={e=>{ e.currentTarget.style.background='rgba(180,140,220,.08)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,.04)'; }}>
+                  <span style={{fontSize:20,color:'rgba(180,140,220,.6)'}}>✦</span>
+                  <span style={{fontSize:12,fontWeight:500,color:'rgba(200,170,255,.55)'}}>Ещё в СУПЕР</span>
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          // Нет своих моментов — большой онбординг-CTA на всю ширину
+          <button onClick={() => setShowCreate(true)}
+            style={{
+              width:'100%',
+              padding: '28px 20px', borderRadius: 12, cursor: 'pointer',
+              border: '2px dashed rgba(180,140,220,.25)',
+              background: 'rgba(120,90,200,.06)',
+              display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 18,
+              transition: 'all .2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(180,140,220,.45)'; e.currentTarget.style.background = 'rgba(120,90,200,.1)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(180,140,220,.25)'; e.currentTarget.style.background = 'rgba(120,90,200,.06)'; }}>
+            <div style={{ fontSize: 36, flexShrink:0,
+              width:60,height:60,borderRadius:14,
+              background:'rgba(120,90,200,.35)',
+              display:'flex',alignItems:'center',justifyContent:'center'}}>✦</div>
+            <div style={{textAlign:'left',flex:1}}>
+              <div style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom:4 }}>Создай свой первый момент</div>
+              <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 13 }}>
                 Покажи над чем работаешь — друзья увидят
               </div>
-            </button>
-          )}
-
-          {/* Section divider */}
-          {!loading && feedGroups.length > 0 && (
-            <div style={{
-              gridColumn: 'span 2',
-              color: 'rgba(255,255,255,.5)', fontSize: 11, fontWeight: 600,
-              textTransform: 'uppercase', letterSpacing: '1px',
-              padding: '6px 4px 0',
-            }}>
-              Из твоих контактов
             </div>
-          )}
+          </button>
+        )}
+      </div>
 
-          {/* Feed */}
+      {/* ─── Contacts feed ──────────────────────────────────────────────── */}
+      <div style={{ padding: '20px 20px 14px', maxWidth: 680, margin: '0 auto' }}>
+        {!loading && feedGroups.length > 0 && (
+          <div style={{
+            color: 'rgba(255,255,255,.5)', fontSize: 11, fontWeight: 600,
+            textTransform: 'uppercase', letterSpacing: '1px',
+            padding: '0 4px 12px',
+            borderTop:'1px solid rgba(255,255,255,.06)',
+            paddingTop:14,marginTop:6,
+          }}>
+            Из твоих контактов
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {loading ? (
             <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,.35)', fontSize: 14 }}>
               Загрузка…
@@ -252,40 +307,20 @@ export default function MomentsFeed({ currentUser }) {
               </div>
             </div>
           ) : (
-            feedGroups.map(group => {
-              const showGallery = group.isSuper && group.moments.length > 1;
-              // Super users always full-width (span 2)
-              if (group.isSuper) {
-                return (
-                  <div key={group.userId} style={{ gridColumn: 'span 2' }}>
-                    {showGallery ? (
-                      <SuperMomentGallery
-                        moments={group.moments}
-                        isMine={false}
-                        onSelect={m => setSelected({ moments: group.moments, index: group.moments.findIndex(x => x.id === m.id) })}
-                      />
-                    ) : (
-                      <MomentCard
-                        moment={group.moments[0]}
-                        isMine={false}
-                        onClick={() => setSelected({ moments: otherMoments, index: otherMoments.findIndex(x => x.id === group.moments[0].id) })}
-                      />
-                    )}
-                  </div>
-                );
-              }
-              return (
+            // Все карточки одинакового размера 1:1. Super-пользователь
+            // показывает все свои моменты как отдельные квадратные карточки.
+            feedGroups.flatMap(group => (
+              group.moments.map(m => (
                 <MomentCard
-                  key={group.moments[0].id}
-                  moment={group.moments[0]}
+                  key={m.id}
+                  moment={m}
                   isMine={false}
-                  onClick={() => setSelected({ moments: otherMoments, index: otherMoments.findIndex(x => x.id === group.moments[0].id) })}
+                  onClick={() => setSelected({ moments: otherMoments, index: otherMoments.findIndex(x => x.id === m.id) })}
                 />
-              );
-            })
+              ))
+            ))
           )}
 
-          {/* Load more */}
           {hasMore && (
             <div style={{ gridColumn: 'span 2', textAlign: 'center', paddingTop: 8 }}>
               <button onClick={loadMore} disabled={loadingMore}
@@ -301,7 +336,6 @@ export default function MomentsFeed({ currentUser }) {
               </button>
             </div>
           )}
-
         </div>
       </div>
 
@@ -385,6 +419,13 @@ export default function MomentsFeed({ currentUser }) {
         }}>
           {toast}
         </div>
+      )}
+
+      {showSuperInfo && (
+        <SuperInfoScreen
+          onClose={() => setShowSuperInfo(false)}
+          onInvite={() => setShowSuperInfo(false)}
+        />
       )}
     </div>
   );

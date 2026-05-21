@@ -42,13 +42,16 @@ export default function MomentCard({ moment, isMine, onClick }) {
     <div
       onClick={onClick}
       style={{
-        aspectRatio: isMine ? '16/9' : '3/4',
-        borderRadius: 8,
+        aspectRatio: '1 / 1',
+        borderRadius: 12,
         overflow: 'hidden',
         position: 'relative',
         cursor: 'pointer',
         background: '#1a0a30',
         flexShrink: 0,
+        // Своя карточка выделяется ТОЛЬКО рамкой и значком, не размером
+        border: isMine ? '2px solid rgba(180,140,220,.7)' : '1px solid rgba(255,255,255,.06)',
+        boxShadow: isMine ? '0 0 0 1px rgba(120,90,200,.25), 0 4px 18px rgba(120,80,200,.3)' : 'none',
         transition: 'transform .2s',
       }}
       onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; }}
@@ -65,7 +68,8 @@ export default function MomentCard({ moment, isMine, onClick }) {
       {hasMedia ? (
         moment.media_type === 'image' ? (
           <img src={moment.media_url} alt=""
-            style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+            style={{width:'100%',height:'100%',objectFit:'cover',
+              objectPosition: moment.media_position || '50% 50%',display:'block'}}/>
         ) : moment.media_type === 'video' ? (
           <>
             <video src={moment.media_url} muted
@@ -97,7 +101,7 @@ export default function MomentCard({ moment, isMine, onClick }) {
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.22)'}}/>
         </>
       ) : (
-        <MoodEmoji type={moment.mood_emoji || 'calm'} size={isMine ? 170 : 130}/>
+        <MoodEmoji type={moment.mood_emoji || 'calm'} size={130}/>
       )}
 
       {/* Media type badge (top-right corner) */}
@@ -172,7 +176,7 @@ export default function MomentCard({ moment, isMine, onClick }) {
           </div>
         )}
         <div style={{
-          color:'white',fontSize: isMine ? 14 : 12,fontWeight:400,lineHeight:1.45,
+          color:'white',fontSize:12,fontWeight:400,lineHeight:1.45,
           overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,
           WebkitBoxOrient:'vertical',
         }}>

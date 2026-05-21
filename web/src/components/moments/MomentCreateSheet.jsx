@@ -1,7 +1,18 @@
 // MomentCreateSheet.jsx — шторка создания / редактирования Момента
 import { useState, useRef, useEffect } from 'react';
 import { api } from '../../api';
+import { useAuth } from '../../AuthContext';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
+import MoodEmoji from './MoodEmoji';
+
+// Набор настроений для ручного выбора (когда нет медиа)
+const MOOD_OPTIONS = [
+  { type: 'calm',       label: 'Спокойно' },
+  { type: 'excited',    label: 'Радость'  },
+  { type: 'dreamy',     label: 'Мечты'    },
+  { type: 'starstruck', label: 'Поиск'    },
+  { type: 'sleepy',     label: 'Усталость'},
+];
 
 const YT_RE        = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
 const VIMEO_RE     = /vimeo\.com\/(?:video\/)?(\d+)/;
@@ -27,10 +38,15 @@ function videoProviderName(url) {
 
 export default function MomentCreateSheet({ existing, onClose, onSaved, onConflict }) {
   const isEdit = !!existing;
+  const { user } = useAuth();
+  const isSuper  = !!user?.is_super;
   const [text,      setText]      = useState(existing?.text || '');
   const [isSearch,  setIsSearch]  = useState(existing?.is_search || false);
   const [mediaPreview, setMediaPreview] = useState(existing?.media_url || null);
   const [mediaType, setMediaType] = useState(existing?.media_type || null);
+  const [mediaPosition, setMediaPosition] = useState(existing?.media_position || '50% 50%'); // CSS object-position
+  const [moodEmoji, setMoodEmoji] = useState(existing?.mood_emoji || null); // null = авто
+  const [moodOpen,  setMoodOpen]  = useState(false); // свёрнуто по умолчанию
   const [saving,    setSaving]    = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error,     setError]     = useState('');
@@ -84,6 +100,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
     if (previewObjUrl.current) { URL.revokeObjectURL(previewObjUrl.current); previewObjUrl.current = null; }
     setMediaPreview(null);
     setMediaType(null);
+    setMediaPosition('50% 50%');
     setUploading(false);
     if (fileRef.current) fileRef.current.value = '';
   }
@@ -93,10 +110,13 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
     if (!text.trim()) { setError('Напишите что-нибудь'); return; }
     setSaving(true);
     setError('');
-    // When editing — only text and isSearch are sent; media stays unchanged
+    // When editing — текст/настрой/позиция меняются; медиа не трогаем
     const payload = isEdit
-      ? { text: text.trim(), isSearch }
-      : { text: text.trim(), mediaUrl: mediaPreview, mediaType, isSearch };
+      ? { text: text.trim(), isSearch, moodEmoji: moodEmoji || null,
+          mediaPosition: mediaPreview && mediaType==='image' ? mediaPosition : null }
+      : { text: text.trim(), mediaUrl: mediaPreview, mediaType, isSearch,
+          moodEmoji: (!mediaPreview && moodEmoji) ? moodEmoji : null,
+          mediaPosition: mediaPreview && mediaType==='image' ? mediaPosition : null };
     try {
       if (isEdit) {
         const result = await api.updateMoment(existing.id, payload);
@@ -135,6 +155,43 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
     setSaving(false);
   }
 
+  // ── Drag-to-reposition image inside frame ──────────────────────────────
+  // Хранит сырые проценты 0-100 для X/Y; конвертится в "X% Y%" CSS-строку
+  const dragStateRef = useRef(null); // { startX, startY, baseX, baseY, rect }
+
+  function onPosDragStart(e) {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const point = e.touches ? e.touches[0] : e;
+    const [bx, by] = (mediaPosition || '50% 50%').replace(/%/g,'').split(' ').map(Number);
+    dragStateRef.current = { startX: point.clientX, startY: point.clientY, baseX: bx, baseY: by, rect };
+    window.addEventListener('mousemove', onPosDragMove);
+    window.addEventListener('mouseup',   onPosDragEnd);
+    window.addEventListener('touchmove', onPosDragMove, { passive: false });
+    window.addEventListener('touchend',  onPosDragEnd);
+  }
+  function onPosDragMove(e) {
+    if (!dragStateRef.current) return;
+    e.preventDefault?.();
+    const point = e.touches ? e.touches[0] : e;
+    const { startX, startY, baseX, baseY, rect } = dragStateRef.current;
+    // Сколько % шага по контейнеру
+    const dx = ((point.clientX - startX) / rect.width)  * 100;
+    const dy = ((point.clientY - startY) / rect.height) * 100;
+    // Инверсия: тянем картинку вниз → object-position Y растёт меньше (видна верхняя часть)
+    // Но привычнее: тянем вниз — фокус смещается вниз → object-position Y растёт
+    const nx = Math.max(0, Math.min(100, baseX - dx));
+    const ny = Math.max(0, Math.min(100, baseY - dy));
+    setMediaPosition(`${nx.toFixed(0)}% ${ny.toFixed(0)}%`);
+  }
+  function onPosDragEnd() {
+    dragStateRef.current = null;
+    window.removeEventListener('mousemove', onPosDragMove);
+    window.removeEventListener('mouseup',   onPosDragEnd);
+    window.removeEventListener('touchmove', onPosDragMove);
+    window.removeEventListener('touchend',  onPosDragEnd);
+  }
+
   const overlay = {
     position:'fixed',inset:0,zIndex:600,
     background:'rgba(0,0,0,.6)',backdropFilter:'blur(10px)',
@@ -171,7 +228,24 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               mediaPreview ? (
                 <div style={{position:'relative',borderRadius:16,overflow:'hidden',
                   background:'#0a0518',maxHeight:200}}>
-                  {mediaType==='image' && <img src={mediaPreview} alt="" style={{width:'100%',maxHeight:200,objectFit:'cover'}}/>}
+                  {mediaType==='image' && (
+                    <div
+                      onMouseDown={onPosDragStart}
+                      onTouchStart={onPosDragStart}
+                      style={{position:'relative',width:'100%',height:200,
+                        cursor:'grab',userSelect:'none',touchAction:'none'}}>
+                      <img src={mediaPreview} alt="" draggable={false}
+                        style={{width:'100%',height:'100%',objectFit:'cover',
+                          objectPosition: mediaPosition,display:'block',pointerEvents:'none'}}/>
+                      <div style={{
+                        position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+                        background:'rgba(0,0,0,.55)',backdropFilter:'blur(6px)',
+                        borderRadius:20,padding:'4px 12px',
+                        color:'rgba(255,255,255,.7)',fontSize:11,whiteSpace:'nowrap',
+                        pointerEvents:'none',
+                      }}>↕ Перетащи чтобы выбрать кадр</div>
+                    </div>
+                  )}
                   {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
                   {mediaType==='audio' && (
                     <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:8,
@@ -180,12 +254,6 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                       <audio src={mediaPreview} controls style={{width:'100%'}}/>
                     </div>
                   )}
-                  <div style={{
-                    position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
-                    background:'rgba(0,0,0,.55)',backdropFilter:'blur(6px)',
-                    borderRadius:20,padding:'4px 12px',
-                    color:'rgba(255,255,255,.55)',fontSize:11,whiteSpace:'nowrap',
-                  }}>медиа нельзя изменить</div>
                 </div>
               ) : null
             ) : (
@@ -193,7 +261,32 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               mediaPreview ? (
                 <div style={{position:'relative',borderRadius:16,overflow:'hidden',
                   background:'#0a0518',maxHeight:200}}>
-                  {mediaType==='image' && <img src={mediaPreview} alt="" style={{width:'100%',maxHeight:200,objectFit:'cover'}}/>}
+                  {mediaType==='image' && (
+                    <div
+                      onMouseDown={!uploading ? onPosDragStart : undefined}
+                      onTouchStart={!uploading ? onPosDragStart : undefined}
+                      style={{
+                        position:'relative',width:'100%',height:200,
+                        cursor: uploading ? 'default' : 'grab',
+                        userSelect:'none', touchAction:'none',
+                      }}>
+                      <img src={mediaPreview} alt="" draggable={false}
+                        style={{
+                          width:'100%',height:'100%',objectFit:'cover',
+                          objectPosition: mediaPosition,
+                          display:'block',pointerEvents:'none',
+                        }}/>
+                      {!uploading && (
+                        <div style={{
+                          position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+                          background:'rgba(0,0,0,.55)',backdropFilter:'blur(6px)',
+                          borderRadius:20,padding:'4px 12px',
+                          color:'rgba(255,255,255,.7)',fontSize:11,whiteSpace:'nowrap',
+                          pointerEvents:'none',
+                        }}>↕ Перетащи чтобы выбрать кадр</div>
+                      )}
+                    </div>
+                  )}
                   {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
                   {mediaType==='audio' && (
                     <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:8,
@@ -233,17 +326,115 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                   onMouseEnter={e=>{ e.currentTarget.style.borderColor='rgba(180,140,220,.5)'; e.currentTarget.style.background='rgba(100,78,148,.08)'; }}
                   onMouseLeave={e=>{ e.currentTarget.style.borderColor='rgba(255,255,255,.18)'; e.currentTarget.style.background='rgba(255,255,255,.04)'; }}>
                   <span style={{fontSize:28}}>📎</span>
-                  <span>Добавить фото, видео или аудио</span>
-                  <span style={{fontSize:12,opacity:.6}}>JPG/PNG/WebP до 5 МБ · MP4 до 20 МБ · MP3 до 10 МБ</span>
+                  <span>Добавить фото или аудио</span>
+                  {isSuper ? (
+                    <>
+                      <span style={{fontSize:12,opacity:.6}}>
+                        JPG/PNG/WebP до 15 МБ · MP3 до 30 МБ
+                      </span>
+                      <span style={{fontSize:11,color:'rgba(200,170,255,.75)',
+                        background:'rgba(120,90,200,.18)',
+                        border:'1px solid rgba(180,140,220,.3)',
+                        borderRadius:10,padding:'3px 10px',marginTop:2}}>
+                        ✦ Расширенные лимиты Super
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{fontSize:12,opacity:.6}}>
+                      JPG/PNG/WebP до 5 МБ · MP3 до 5 МБ
+                    </span>
+                  )}
                 </button>
               )
             )}
             {!isEdit && (
               <input ref={fileRef} type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,audio/mpeg,audio/mp3,audio/ogg"
+                accept="image/jpeg,image/png,image/webp,image/gif,audio/mpeg,audio/mp3,audio/ogg"
                 onChange={handleFile} style={{display:'none'}}/>
             )}
           </div>
+
+          {/* Mood emoji picker — свёрнутая ссылка, раскрывается по клику */}
+          {!mediaPreview && (
+            <div>
+              {/* Свёрнутый триггер */}
+              <button onClick={() => setMoodOpen(o => !o)}
+                style={{
+                  width:'100%',background:'rgba(255,255,255,.04)',
+                  border:'1px solid rgba(255,255,255,.08)',borderRadius:12,
+                  padding:'10px 14px',cursor:'pointer',
+                  display:'flex',alignItems:'center',gap:10,
+                  color:'rgba(255,255,255,.6)',fontSize:13,fontFamily:'inherit',
+                  transition:'background .15s',
+                }}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.06)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}>
+                {/* Мини-превью текущего выбора, либо иконка-плейсхолдер */}
+                {moodEmoji ? (
+                  <div style={{width:28,height:28,borderRadius:8,overflow:'hidden',flexShrink:0}}>
+                    <MoodEmoji type={moodEmoji} size={20}/>
+                  </div>
+                ) : (
+                  <span style={{fontSize:18,flexShrink:0}}>🎨</span>
+                )}
+                <span style={{flex:1,textAlign:'left'}}>
+                  {moodEmoji
+                    ? `Настроение: ${MOOD_OPTIONS.find(o=>o.type===moodEmoji)?.label || moodEmoji}`
+                    : 'Настроение карточки — авто'}
+                </span>
+                <span style={{
+                  fontSize:11,color:'rgba(255,255,255,.4)',
+                  transform: moodOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition:'transform .15s',
+                }}>▾</span>
+              </button>
+
+              {/* Раскрытая панель */}
+              {moodOpen && (
+                <div style={{marginTop:10,paddingTop:4}}>
+                  {/* Большое превью выбранного */}
+                  {moodEmoji && (
+                    <div style={{
+                      height:120,borderRadius:14,overflow:'hidden',marginBottom:10,
+                      border:'1px solid rgba(255,255,255,.1)',
+                    }}>
+                      <MoodEmoji type={moodEmoji} size={70}/>
+                    </div>
+                  )}
+                  {/* Сетка вариантов */}
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
+                    {MOOD_OPTIONS.map(opt => (
+                      <button key={opt.type} onClick={()=>setMoodEmoji(opt.type)} title={opt.label}
+                        style={{
+                          aspectRatio:'1',borderRadius:12,cursor:'pointer',padding:0,
+                          border: moodEmoji===opt.type
+                            ? '2px solid rgba(180,140,220,.9)'
+                            : '2px solid transparent',
+                          background:'rgba(255,255,255,.05)',
+                          overflow:'hidden',position:'relative',
+                          transition:'border-color .15s, transform .12s',
+                        }}
+                        onMouseEnter={e=>{ e.currentTarget.style.transform='scale(1.04)'; }}
+                        onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1)'; }}>
+                        <MoodEmoji type={opt.type} size={40}/>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',
+                    marginTop:8,color:'rgba(255,255,255,.35)',fontSize:11}}>
+                    <span>{moodEmoji ? 'Сменить или сбросить →' : 'Или подберём автоматически по тексту'}</span>
+                    {moodEmoji && (
+                      <button onClick={()=>setMoodEmoji(null)}
+                        style={{background:'none',border:'none',color:'rgba(180,140,220,.8)',
+                          fontSize:11,cursor:'pointer',padding:0,fontFamily:'inherit'}}>
+                        Сбросить → авто
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Text */}
           <textarea

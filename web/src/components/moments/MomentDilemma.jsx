@@ -79,7 +79,9 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
             </div>
             {existing.media_url && existing.media_type === 'image' && (
               <img src={existing.media_url} alt=""
-                style={{width:'100%',height:100,objectFit:'cover',borderRadius:10,marginBottom:8,display:'block'}}/>
+                style={{width:'100%',height:100,objectFit:'cover',
+                  objectPosition: existing.media_position || '50% 50%',
+                  borderRadius:10,marginBottom:8,display:'block'}}/>
             )}
             <div style={{color:'rgba(255,255,255,.85)',fontSize:14,lineHeight:1.5,
               overflow:'hidden',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>

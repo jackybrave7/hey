@@ -11,6 +11,7 @@ import {
   InviteBadge, ForgotPasswordPopup
 } from './auth/AuthComponents';
 import MomentDetailPopup from './moments/MomentDetailPopup';
+import MoodEmoji from './moments/MoodEmoji';
 import SuperStatusCard from './super/SuperStatusCard';
 import AchievementBadges from './super/AchievementBadges';
 
@@ -824,6 +825,9 @@ export function MyProfileScreen() {
   // Invite link
   const [inviteCopied, setInviteCopied] = useState(false);
 
+  // Confirm dialog
+  const [customConfirm, confirmModal] = useConfirm();
+
   // Archive popup
   const [archiveSelected, setArchiveSelected] = useState(null);
   // Active moment popup
@@ -861,6 +865,32 @@ export function MyProfileScreen() {
     setProfileToast(msg);
     setTimeout(() => setProfileToast(''), 3000);
   };
+
+  // ── Archive actions ────────────────────────────────────────────────────────
+  async function restoreFromArchive(m) {
+    const maxActive = user?.is_super ? 3 : 1;
+    const curActive = myMoments.filter(x => x.status === 'active').length;
+    if (curActive >= maxActive) {
+      showProfileToast(maxActive === 1
+        ? 'Сначала отправь активный момент в архив'
+        : `Достигнут лимит (${maxActive} активных)`);
+      return;
+    }
+    try {
+      await api.restoreMoment(m.id);
+      setMyMoments(prev => prev.map(x => x.id === m.id ? { ...x, status: 'active' } : x));
+      showProfileToast('✦ Момент восстановлен');
+    } catch(e) { showProfileToast('Ошибка: ' + e.message); }
+  }
+
+  async function deleteForever(m) {
+    if (!await customConfirm('Удалить момент навсегда? Это действие нельзя отменить.', { danger: true })) return;
+    try {
+      await api.deleteMoment(m.id);
+      setMyMoments(prev => prev.filter(x => x.id !== m.id));
+      showProfileToast('Момент удалён');
+    } catch(e) { showProfileToast('Ошибка: ' + e.message); }
+  }
 
   // Init from user
   useEffect(() => {
@@ -1069,16 +1099,9 @@ export function MyProfileScreen() {
         </div>
       )}
 
-      {/* SUPER status card */}
+      {/* Achievement badges остаются вверху рядом с инфо */}
       {!editing && (
         <div style={{padding:'16px 26px 0'}}>
-          <SuperStatusCard user={user} onInvite={() => {
-            const link = `${location.origin}/register?invite=${user?.id}`;
-            navigator.clipboard?.writeText(link).then(() => {
-              setInviteCopied(true);
-              setTimeout(() => setInviteCopied(false), 2500);
-            });
-          }}/>
           <AchievementBadges achievements={user?.achievements} />
         </div>
       )}
@@ -1092,7 +1115,7 @@ export function MyProfileScreen() {
             borderRadius:14, padding:'14px 18px', display:'flex', alignItems:'center', gap:12,
           }}>
             <span style={{fontSize:22}}>🔗</span>
-            <div style={{flex:1}}>
+            <div style={{flex:1,minWidth:0}}>
               <div style={{color:'white',fontSize:14,fontWeight:600}}>Пригласить в HEY</div>
               <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginTop:2}}>
                 Друг зарегистрируется и увидит тебя в контактах
@@ -1146,7 +1169,8 @@ export function MyProfileScreen() {
                           background:'#1a0a30',aspectRatio:'3/4',position:'relative',
                         }}>
                         {m.media_url && m.media_type==='image'
-                          ? <img src={m.media_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                          ? <img src={m.media_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',
+                              objectPosition: m.media_position || '50% 50%'}}/>
                           : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',
                               justifyContent:'center',fontSize:28,
                               background:'linear-gradient(135deg,#1e0a40,#3a1060)'}}>✦</div>
@@ -1248,7 +1272,8 @@ export function MyProfileScreen() {
                       onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.06)'}>
                       {active.media_url && active.media_type === 'image' ? (
                         <img src={active.media_url} alt=""
-                          style={{width:'100%',height: activeMoments.length > 1 ? 100 : 140,objectFit:'cover',display:'block'}}/>
+                          style={{width:'100%',height: activeMoments.length > 1 ? 100 : 140,objectFit:'cover',
+                            objectPosition: active.media_position || '50% 50%',display:'block'}}/>
                       ) : (
                         <div style={{width:'100%',height: activeMoments.length > 1 ? 80 : 0,
                           background:'linear-gradient(135deg,rgba(80,40,140,.4),rgba(120,60,200,.3))',
@@ -1294,49 +1319,100 @@ export function MyProfileScreen() {
           )}</>) })()}
 
           {/* Archive tab */}
-          {momentsTab === 'archived' && (
-            <div style={{display:'flex',flexDirection:'column',gap:10}}>
-              {myMoments.filter(m => m.status === 'archived').length === 0 ? (
-                <div style={{color:'rgba(255,255,255,.35)',fontSize:13,textAlign:'center',
-                  padding:'20px 0'}}>
-                  Архив пуст
+          {momentsTab === 'archived' && (() => {
+            const archived = myMoments.filter(m => m.status === 'archived');
+            if (archived.length === 0) {
+              return (
+                <div style={{background:'rgba(255,255,255,.04)',borderRadius:16,
+                  padding:'24px',textAlign:'center',border:'2px dashed rgba(255,255,255,.1)'}}>
+                  <div style={{fontSize:28,marginBottom:10,opacity:.6}}>📦</div>
+                  <div style={{color:'rgba(255,255,255,.6)',fontSize:14,fontWeight:600}}>
+                    Архив пуст
+                  </div>
+                  <div style={{color:'rgba(255,255,255,.35)',fontSize:12,marginTop:6}}>
+                    Архивные моменты появятся здесь после того, как ты сам уберёшь их с публикации
+                  </div>
                 </div>
-              ) : (
-                myMoments.filter(m => m.status === 'archived').map(m => (
-                  <div key={m.id}
-                    onClick={() => setArchiveSelected(m)}
-                    style={{background:'rgba(255,255,255,.05)',borderRadius:14,
-                      padding:'12px 14px',border:'1px solid rgba(255,255,255,.08)',
-                      display:'flex',alignItems:'center',gap:12,
-                      cursor:'pointer',transition:'background .15s'}}
-                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.09)'}
-                    onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}>
-                    {m.media_url && m.media_type === 'image' ? (
-                      <img src={m.media_url} alt=""
-                        style={{width:52,height:52,borderRadius:10,objectFit:'cover',flexShrink:0}}/>
-                    ) : (
-                      <div style={{width:52,height:52,borderRadius:10,flexShrink:0,
-                        background:'linear-gradient(135deg,#1e0a40,#3a1060)',
-                        display:'flex',alignItems:'center',justifyContent:'center',
-                        fontSize:22,color:'rgba(255,255,255,.4)'}}>✦</div>
-                    )}
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{color:'rgba(255,255,255,.8)',fontSize:13,lineHeight:1.5,
-                        overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                        {m.text}
-                      </div>
-                      <div style={{color:'rgba(255,255,255,.3)',fontSize:11,marginTop:3}}>
-                        📦 {m.archived_at
-                          ? new Date(m.archived_at * 1000).toLocaleDateString('ru', {day:'numeric',month:'short'})
-                          : 'в архиве'}
+              );
+            }
+            return (
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                {archived.map(m => {
+                  const hasImg = m.media_url && m.media_type === 'image';
+                  const isAudio = m.media_url && m.media_type === 'audio';
+                  return (
+                    <div key={m.id} onClick={() => setArchiveSelected(m)}
+                      style={{background:'rgba(255,255,255,.06)',borderRadius:16,
+                        border:'1px solid rgba(255,255,255,.1)',overflow:'hidden',
+                        cursor:'pointer',transition:'background .15s',
+                        display:'flex',flexDirection:'column'}}
+                      onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.1)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.06)'}>
+                      {/* Hero: фото / mood / аудио-иконка */}
+                      {hasImg ? (
+                        <img src={m.media_url} alt=""
+                          style={{width:'100%',height:100,objectFit:'cover',
+                            objectPosition: m.media_position || '50% 50%',display:'block'}}/>
+                      ) : isAudio ? (
+                        <div style={{width:'100%',height:100,
+                          background:'linear-gradient(135deg,#1a0a38,#2a1858)',
+                          display:'flex',alignItems:'center',justifyContent:'center',
+                          fontSize:36,color:'rgba(255,255,255,.7)'}}>🎵</div>
+                      ) : (
+                        <div style={{width:'100%',height:100,overflow:'hidden'}}>
+                          <MoodEmoji type={m.mood_emoji || 'calm'} size={56}/>
+                        </div>
+                      )}
+                      <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:8}}>
+                        <div style={{color:'rgba(255,255,255,.85)',fontSize:12,lineHeight:1.45,
+                          overflow:'hidden',display:'-webkit-box',
+                          WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>
+                          {m.text}
+                        </div>
+                        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:'auto'}}>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>👁 {m.views || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>✨ {m.stats?.resonate || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>🤝 {m.stats?.talk || 0}</span>
+                        </div>
+                        <div style={{color:'rgba(255,255,255,.3)',fontSize:11,
+                          display:'flex',alignItems:'center',gap:4}}>
+                          📦 {m.archived_at
+                            ? new Date(m.archived_at * 1000).toLocaleDateString('ru', {day:'numeric',month:'short'})
+                            : 'в архиве'}
+                        </div>
+                        {/* Actions */}
+                        <div style={{display:'flex',gap:6,marginTop:4}}>
+                          <button onClick={(e) => { e.stopPropagation(); restoreFromArchive(m); }}
+                            style={{
+                              flex:1,padding:'7px 4px',borderRadius:10,
+                              background:'rgba(120,90,200,.5)',border:'1px solid rgba(180,140,220,.3)',
+                              color:'white',fontSize:11,fontWeight:600,cursor:'pointer',
+                              transition:'background .15s',whiteSpace:'nowrap',
+                            }}
+                            onMouseEnter={e=>e.currentTarget.style.background='rgba(120,90,200,.7)'}
+                            onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.5)'}>
+                            ↩ Восстановить
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); deleteForever(m); }}
+                            style={{
+                              padding:'7px 9px',borderRadius:10,
+                              background:'rgba(255,80,80,.12)',border:'1px solid rgba(255,80,80,.3)',
+                              color:'rgba(255,140,140,.95)',fontSize:13,cursor:'pointer',
+                              transition:'background .15s',flexShrink:0,
+                            }}
+                            onMouseEnter={e=>e.currentTarget.style.background='rgba(255,80,80,.22)'}
+                            onMouseLeave={e=>e.currentTarget.style.background='rgba(255,80,80,.12)'}
+                            title="Удалить навсегда">
+                            🗑
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <span style={{color:'rgba(255,255,255,.25)',fontSize:18,flexShrink:0}}>›</span>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Disciplines cloud */}
           {disciplines.length > 0 && (
@@ -1362,6 +1438,22 @@ export function MyProfileScreen() {
           )}
         </div>
       )}
+
+      {/* SUPER status card — в самом конце профиля */}
+      {!editing && (
+        <div style={{padding:'24px 26px 0'}}>
+          <SuperStatusCard user={user} onInvite={() => {
+            const link = `${location.origin}/register?invite=${user?.id}`;
+            navigator.clipboard?.writeText(link).then(() => {
+              setInviteCopied(true);
+              setTimeout(() => setInviteCopied(false), 2500);
+            });
+          }}/>
+        </div>
+      )}
+
+      {/* Confirm dialog */}
+      {confirmModal}
 
       {/* Toast */}
       {profileToast && (
@@ -3116,9 +3208,13 @@ export function GroupCreateScreen() {
   const { user } = useAuth();
   const [name,     setName]     = useState('');
   const [icon,     setIcon]     = useState('👥');
+  const [avatarUrl,setAvatarUrl]= useState(null);   // если загружена кастомная — приоритет над emoji
+  const [uploading,setUploading]= useState(false);
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState(new Set());
+  const [search,   setSearch]   = useState('');
   const [saving,   setSaving]   = useState(false);
+  const fileRef = useRef();
 
   useEffect(() => { api.getContacts().then(setContacts).catch(console.error); }, []);
 
@@ -3126,78 +3222,179 @@ export function GroupCreateScreen() {
     setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
+  async function handleAvatar(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadAvatar(file, { getPresignUrl: api.getPresignUrl });
+      setAvatarUrl(url);
+    } catch(err) {
+      alert(err.message || 'Не удалось загрузить аватар');
+    }
+    setUploading(false);
+  }
+
+  function removeAvatar() {
+    setAvatarUrl(null);
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
   async function create() {
     if (!name.trim()) { alert('Введите название группы'); return; }
     if (selected.size === 0) { alert('Добавьте хотя бы одного участника'); return; }
     setSaving(true);
     try {
-      const { id } = await api.createGroup({ name: name.trim(), icon, memberIds: [...selected] });
+      // приоритет: кастомный аватар → emoji
+      const groupIcon = avatarUrl || icon;
+      const { id } = await api.createGroup({ name: name.trim(), icon: groupIcon, memberIds: [...selected] });
       nav(`/chat/${id}`, { replace: true });
     } catch(e) { alert(e.message); setSaving(false); }
   }
 
+  // ── Фильтрация контактов по поиску ──────────────────────────────────────
+  const q = search.trim().toLowerCase();
+  const filteredContacts = q
+    ? contacts.filter(c =>
+        (c.nickname || c.name || '').toLowerCase().includes(q) ||
+        (c.phone || '').includes(q)
+      )
+    : contacts;
+
   return (
     <div className="screen">
       <TopBar title="Новая группа" onBack={() => nav(-1)}/>
-      <div style={{maxWidth:680,margin:'0 auto',width:'100%',padding:'20px 24px',display:'flex',flexDirection:'column',gap:20}}>
-        {/* Icon picker */}
-        <div>
-          <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:10}}>Иконка группы</div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-            {GROUP_ICONS.map(e => (
-              <button key={e} onClick={()=>setIcon(e)}
-                style={{width:44,height:44,fontSize:24,border:'none',cursor:'pointer',borderRadius:12,
-                  background: icon===e ? 'rgba(140,100,200,.7)' : 'rgba(255,255,255,.12)',
-                  transition:'background .15s'}}>
-                {e}
+      {/* Всё содержимое в едином 680 контейнере */}
+      <div style={{maxWidth:680,margin:'0 auto',width:'100%',display:'flex',flexDirection:'column',flex:1,minHeight:0}}>
+
+        {/* Шапка: аватарка + название */}
+        <div style={{padding:'20px 24px 16px',display:'flex',flexDirection:'column',gap:18,flexShrink:0}}>
+          {/* Большая круглая аватарка по центру */}
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
+            <div style={{position:'relative',width:88,height:88}}>
+              <div style={{
+                width:88,height:88,borderRadius:'50%',
+                background: avatarUrl ? '#0a0518' : 'rgba(140,100,200,.35)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                overflow:'hidden',fontSize:40,
+                border: '2px solid rgba(255,255,255,.12)',
+              }}>
+                {uploading
+                  ? <div style={{fontSize:24,animation:'spin 1s linear infinite'}}>⏳</div>
+                  : avatarUrl
+                    ? <img src={avatarUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                    : icon}
+              </div>
+              {/* Кнопка камеры */}
+              <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                style={{
+                  position:'absolute',bottom:0,right:0,width:30,height:30,borderRadius:'50%',
+                  background:'rgba(120,90,200,.95)',border:'2px solid var(--grad-bg-end,#1a0e36)',
+                  color:'white',fontSize:14,cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  boxShadow:'0 2px 8px rgba(0,0,0,.4)',
+                }}>
+                {avatarUrl ? '✎' : '📷'}
               </button>
-            ))}
-          </div>
-        </div>
-        {/* Name */}
-        <div>
-          <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:8}}>Название группы</div>
-          <input className="glass-input" value={name} onChange={e=>setName(e.target.value)}
-            placeholder="Например: Команда, Семья…" style={{width:'100%'}}/>
-        </div>
-      </div>
-      {/* Contacts list */}
-      <div style={{flex:1,overflowY:'auto'}}>
-        <div style={{padding:'0 24px 8px',color:'rgba(255,255,255,.5)',fontSize:13}}>
-          Участники ({selected.size} выбрано)
-        </div>
-        {contacts.map(c => (
-          <div key={c.id} onClick={()=>toggle(c.id)}
-            style={{display:'flex',alignItems:'center',gap:12,padding:'12px 24px',
-              cursor:'pointer',transition:'background .12s',
-              background: selected.has(c.id) ? 'rgba(140,100,200,.2)' : 'transparent'}}
-            onMouseEnter={e=>{ if(!selected.has(c.id)) e.currentTarget.style.background='rgba(255,255,255,.05)'; }}
-            onMouseLeave={e=>{ e.currentTarget.style.background = selected.has(c.id)?'rgba(140,100,200,.2)':'transparent'; }}>
-            <div style={{width:40,height:40,borderRadius:'50%',background:'rgba(200,160,210,.45)',
-              display:'flex',alignItems:'center',justifyContent:'center',
-              fontSize:18,color:'white',fontWeight:600,flexShrink:0}}>
-              {(c.nickname||c.name)[0].toUpperCase()}
+              {avatarUrl && !uploading && (
+                <button onClick={removeAvatar}
+                  style={{
+                    position:'absolute',top:-2,right:-2,width:24,height:24,borderRadius:'50%',
+                    background:'rgba(0,0,0,.7)',border:'none',color:'white',fontSize:12,cursor:'pointer',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                  }}>✕</button>
+              )}
             </div>
-            <div style={{flex:1}}>
-              <div style={{color:'white',fontSize:15}}>{c.nickname||c.name}</div>
-              <div style={{color:'rgba(255,255,255,.4)',fontSize:12}}>{c.phone}</div>
-            </div>
-            <div style={{width:24,height:24,borderRadius:'50%',border:'2px solid rgba(180,140,220,.6)',
-              background: selected.has(c.id) ? 'rgba(140,100,200,.8)' : 'transparent',
-              display:'flex',alignItems:'center',justifyContent:'center',
-              color:'white',fontSize:14,transition:'background .15s'}}>
-              {selected.has(c.id) && '✓'}
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp"
+              onChange={handleAvatar} style={{display:'none'}}/>
+            <div style={{color:'rgba(255,255,255,.4)',fontSize:11}}>
+              {avatarUrl ? 'Своя аватарка' : 'Выбери эмодзи ниже или загрузи фото'}
             </div>
           </div>
-        ))}
-      </div>
-      {selected.size > 0 && (
-        <div style={{padding:'12px 24px 24px'}}>
-          <button className="pill" onClick={create} disabled={saving} style={{width:'100%',opacity:saving?.7:1}}>
-            {saving ? 'Создание…' : `Создать группу (${selected.size + 1} участников)`}
-          </button>
+
+          {/* Emoji-иконки (когда нет своей аватарки) */}
+          {!avatarUrl && (
+            <div>
+              <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:8}}>Иконка группы</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'flex-start'}}>
+                {GROUP_ICONS.map(e => (
+                  <button key={e} onClick={()=>setIcon(e)}
+                    style={{width:44,height:44,fontSize:24,border:'none',cursor:'pointer',borderRadius:12,
+                      background: icon===e ? 'rgba(140,100,200,.7)' : 'rgba(255,255,255,.12)',
+                      transition:'background .15s'}}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Название */}
+          <div>
+            <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:8}}>Название группы</div>
+            <input className="glass-input" value={name} onChange={e=>setName(e.target.value)}
+              placeholder="Например: Команда, Семья…" style={{width:'100%',boxSizing:'border-box'}}/>
+          </div>
+
+          {/* Поиск по контактам */}
+          <div>
+            <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:8,
+              display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span>Участники ({selected.size} выбрано)</span>
+              {selected.size > 0 && (
+                <button onClick={() => setSelected(new Set())}
+                  style={{background:'none',border:'none',color:'rgba(180,140,220,.8)',
+                    fontSize:12,cursor:'pointer',padding:0}}>
+                  Сбросить
+                </button>
+              )}
+            </div>
+            <input className="glass-input" value={search} onChange={e=>setSearch(e.target.value)}
+              placeholder="🔍 Поиск по контактам" style={{width:'100%',boxSizing:'border-box'}}/>
+          </div>
         </div>
-      )}
+
+        {/* Список контактов */}
+        <div style={{flex:1,overflowY:'auto',minHeight:0}}>
+          {filteredContacts.length === 0 && (
+            <div style={{padding:'40px 24px',color:'rgba(255,255,255,.4)',
+              textAlign:'center',fontSize:14}}>
+              {q ? 'Никого не найдено' : 'У вас пока нет контактов'}
+            </div>
+          )}
+          {filteredContacts.map(c => (
+            <div key={c.id} onClick={()=>toggle(c.id)}
+              style={{display:'flex',alignItems:'center',gap:12,padding:'12px 24px',
+                cursor:'pointer',transition:'background .12s',
+                background: selected.has(c.id) ? 'rgba(140,100,200,.2)' : 'transparent'}}
+              onMouseEnter={e=>{ if(!selected.has(c.id)) e.currentTarget.style.background='rgba(255,255,255,.05)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background = selected.has(c.id)?'rgba(140,100,200,.2)':'transparent'; }}>
+              <AvatarDisplay avatar={c.avatar} name={c.nickname||c.name} size={40} fontSize={16}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:'white',fontSize:15,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.nickname||c.name}</div>
+                <div style={{color:'rgba(255,255,255,.4)',fontSize:12}}>{c.phone}</div>
+              </div>
+              <div style={{width:24,height:24,borderRadius:'50%',border:'2px solid rgba(180,140,220,.6)',
+                background: selected.has(c.id) ? 'rgba(140,100,200,.8)' : 'transparent',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                color:'white',fontSize:14,transition:'background .15s',flexShrink:0}}>
+                {selected.has(c.id) && '✓'}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Кнопка создания */}
+        {selected.size > 0 && (
+          <div style={{padding:'12px 24px 24px',flexShrink:0,
+            background:'linear-gradient(0deg,rgba(20,12,42,.95),rgba(20,12,42,0))'}}>
+            <button className="pill" onClick={create} disabled={saving}
+              style={{width:'100%',opacity:saving?.7:1}}>
+              {saving ? 'Создание…' : `Создать группу (${selected.size + 1} участников)`}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

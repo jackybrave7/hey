@@ -72,8 +72,8 @@ export async function uploadMedia(file, category, apiFns) {
     contentType = r.contentType;
   }
 
-  // 2. Get presigned URL (or null for local mode)
-  const presign = await apiFns.getPresignUrl(category, contentType);
+  // 2. Get presigned URL (or null for local mode) — pass size for server-side limit check
+  const presign = await apiFns.getPresignUrl(category, contentType, uploadBlob.size);
 
   // 3a. Direct S3 upload ✓
   if (presign.uploadUrl) {
@@ -106,7 +106,7 @@ export async function uploadMedia(file, category, apiFns) {
 export async function uploadAudioBlob(blob, apiFns) {
   // Normalize MIME type — strip codec suffix ("audio/webm;codecs=opus" → "audio/webm")
   const contentType = (blob.type || 'audio/webm').split(';')[0].trim();
-  const presign = await apiFns.getPresignUrl('chat-audio', contentType);
+  const presign = await apiFns.getPresignUrl('chat-audio', contentType, blob.size);
   if (presign.uploadUrl) {
     await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});
     return presign.publicUrl;
@@ -133,7 +133,7 @@ export function previewUrl(file) {
  */
 export async function uploadAvatar(file, apiFns) {
   const { blob, contentType } = await resizeToBlob(file, 512); // avatars don't need to be huge
-  const presign = await apiFns.getPresignUrl('avatar', contentType);
+  const presign = await apiFns.getPresignUrl('avatar', contentType, blob.size);
   if (presign.uploadUrl) {
     await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});
     return presign.publicUrl;

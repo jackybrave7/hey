@@ -149,6 +149,8 @@ db.exec(`
 
 try { db.exec('ALTER TABLE moments ADD COLUMN moment_order INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE moments ADD COLUMN embedded_video TEXT'); } catch {}
+try { db.exec('ALTER TABLE moments ADD COLUMN mood_emoji TEXT'); } catch {}
+try { db.exec('ALTER TABLE moments ADD COLUMN media_position TEXT'); } catch {}  // CSS object-position, например "50% 30%"
 
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
@@ -901,19 +903,21 @@ function reorderMoments(userId, orderedIds) {
   })();
 }
 
-function createMoment({ userId, text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch, embeddedVideo }) {
+function createMoment({ userId, text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch, embeddedVideo, moodEmoji, mediaPosition }) {
   const id = 'mom_' + uuid().replace(/-/g,'').slice(0,12);
   const t = now();
   db.prepare(
-    `INSERT INTO moments (id,user_id,text,media_type,media_url,media_duration,auto_tags,is_search,status,created_at,updated_at,edited,archived_at,embedded_video)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,0,NULL,?)`
+    `INSERT INTO moments (id,user_id,text,media_type,media_url,media_duration,auto_tags,is_search,status,created_at,updated_at,edited,archived_at,embedded_video,mood_emoji,media_position)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,0,NULL,?,?,?)`
   ).run(id, userId, text, mediaType||null, mediaUrl||null, mediaDuration||null,
         JSON.stringify(autoTags||[]), isSearch ? 1 : 0, 'active', t, t,
-        embeddedVideo ? JSON.stringify(embeddedVideo) : null);
+        embeddedVideo ? JSON.stringify(embeddedVideo) : null,
+        moodEmoji || null,
+        mediaPosition || null);
   return getMomentById(id);
 }
 
-function updateMoment(id, { text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch, embeddedVideo }) {
+function updateMoment(id, { text, mediaType, mediaUrl, mediaDuration, autoTags, isSearch, embeddedVideo, moodEmoji, mediaPosition }) {
   const t = now();
   const sets = ['updated_at=?', 'edited=1'];
   const vals = [t];
@@ -924,6 +928,8 @@ function updateMoment(id, { text, mediaType, mediaUrl, mediaDuration, autoTags, 
   if (autoTags !== undefined)      { sets.push('auto_tags=?');      vals.push(JSON.stringify(autoTags)); }
   if (isSearch !== undefined)      { sets.push('is_search=?');      vals.push(isSearch ? 1 : 0); }
   if (embeddedVideo !== undefined) { sets.push('embedded_video=?'); vals.push(embeddedVideo ? JSON.stringify(embeddedVideo) : null); }
+  if (moodEmoji !== undefined)     { sets.push('mood_emoji=?');     vals.push(moodEmoji || null); }
+  if (mediaPosition !== undefined) { sets.push('media_position=?'); vals.push(mediaPosition || null); }
   db.prepare(`UPDATE moments SET ${sets.join(',')} WHERE id=?`).run(...vals, id);
   return getMomentById(id);
 }
