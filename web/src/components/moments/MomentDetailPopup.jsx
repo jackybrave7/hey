@@ -453,24 +453,25 @@ export default function MomentDetailPopup({
                 )}
               </>
             ) : (
-              <div>
-                <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginBottom:10,
-                  textTransform:'uppercase',letterSpacing:.5}}>Отклик</div>
-                <div style={{display:'flex',gap:8}}>
-                  {REACTIONS.map(r => (
-                    <button key={r.id} onClick={() => handleReact(r.id)}
+              <div style={{display:'flex',gap:6}}>
+                {REACTIONS.map(r => {
+                  const active = myReaction===r.id;
+                  return (
+                    <button key={r.id} onClick={() => handleReact(r.id)} title={r.label}
                       style={{
-                        flex:1,padding:'11px 0',borderRadius:14,fontSize:13,fontWeight:600,
-                        cursor:'pointer',transition:'all .18s',
-                        background: myReaction===r.id ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
-                        border: myReaction===r.id ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.12)',
-                        color: myReaction===r.id ? 'white' : 'rgba(255,255,255,.7)',
+                        flex:1,padding:'8px 6px',borderRadius:12,
+                        cursor:'pointer',transition:'all .15s',
+                        display:'flex',alignItems:'center',justifyContent:'center',gap:6,
+                        background: active ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.06)',
+                        border: active ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.1)',
+                        color: active ? 'white' : 'rgba(255,255,255,.65)',
+                        fontFamily:'inherit',
                       }}>
-                      <div style={{fontSize:18}}>{r.icon}</div>
-                      <div style={{fontSize:11,marginTop:2}}>{r.label}</div>
+                      <span style={{fontSize:16,lineHeight:1}}>{r.icon}</span>
+                      <span style={{fontSize:12,fontWeight:500}}>{r.label}</span>
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             )}
           </div>

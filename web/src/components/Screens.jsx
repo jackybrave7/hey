@@ -37,10 +37,11 @@ function DotsMenu({ items }) {
       </div>
       {open && (
         <div style={{
-          position:'absolute', top:'calc(100% + 8px)', right:0, zIndex:100,
-          background:'rgba(60,50,90,0.97)', backdropFilter:'blur(16px)',
-          borderRadius:14, overflow:'hidden', minWidth:220,
-          boxShadow:'0 8px 32px rgba(0,0,0,.35)'
+          position:'absolute', top:'calc(100% + 8px)', right:0, zIndex:1500,
+          background:'rgba(28,18,58,0.98)', backdropFilter:'blur(20px)',
+          borderRadius:14, overflow:'hidden', minWidth:230,
+          boxShadow:'0 12px 40px rgba(0,0,0,.55)',
+          border:'1px solid rgba(255,255,255,.1)',
         }}>
           {items.map(({ label, icon, danger, onClick }) => (
             <div key={label} onClick={() => { setOpen(false); onClick(); }}

@@ -172,16 +172,18 @@ export default function MomentsFeed({ currentUser }) {
           <div style={{ color: 'white', fontSize: 20, fontWeight: 800, letterSpacing: -.3 }}>
             ✦ Моменты
           </div>
-          <button onClick={() => setShowCreate(true)}
-            style={{
-              padding: '8px 16px', borderRadius: 50, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              background: 'rgba(120,90,200,.85)', border: 'none', color: 'white',
-              boxShadow: '0 2px 12px rgba(120,80,200,.4)', transition: 'all .18s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,110,220,.9)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(120,90,200,.85)'}>
-            {canAddMore && hasMyMoments ? '+ Добавить' : '+ Мой момент'}
-          </button>
+          {canAddMore && (
+            <button onClick={() => setShowCreate(true)}
+              style={{
+                padding: '8px 16px', borderRadius: 50, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                background: 'rgba(120,90,200,.85)', border: 'none', color: 'white',
+                boxShadow: '0 2px 12px rgba(120,80,200,.4)', transition: 'all .18s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,110,220,.9)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(120,90,200,.85)'}>
+              {hasMyMoments ? '+ Добавить' : '+ Мой момент'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -201,7 +203,7 @@ export default function MomentsFeed({ currentUser }) {
                   color:'rgba(200,170,255,.7)',fontSize:12,fontWeight:500,
                   textTransform:'none',letterSpacing:0,
                 }}>
-                  {myMoments.length} из 3
+                  {Math.min(myMoments.length, 3)} из 3
                 </span>
               )}
             </div>

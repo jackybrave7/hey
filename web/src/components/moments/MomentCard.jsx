@@ -37,6 +37,19 @@ export default function MomentCard({ moment, isMine, onClick }) {
   const hasMedia       = !!moment.media_url;
   const hasEmbedVideo  = !hasMedia && !!moment.embedded_video?.thumbnail_url;
   const preview        = (moment.text || '').slice(0, 80);
+  const isAuthorSuper  = !!moment.author_is_super;
+
+  // Рамка: своя > Super автора > обычная
+  let border = '1px solid rgba(255,255,255,.06)';
+  let boxShadow = 'none';
+  if (isMine) {
+    border = '2px solid rgba(180,140,220,.7)';
+    boxShadow = '0 0 0 1px rgba(120,90,200,.25), 0 4px 18px rgba(120,80,200,.3)';
+  } else if (isAuthorSuper) {
+    // Лиловая обводка для Super-авторов из ленты — отличается от своей более холодным оттенком
+    border = '2px solid rgba(200,140,255,.55)';
+    boxShadow = '0 0 0 1px rgba(160,100,230,.18), 0 4px 14px rgba(160,100,230,.22)';
+  }
 
   return (
     <div
@@ -50,8 +63,8 @@ export default function MomentCard({ moment, isMine, onClick }) {
         background: '#1a0a30',
         flexShrink: 0,
         // Своя карточка выделяется ТОЛЬКО рамкой и значком, не размером
-        border: isMine ? '2px solid rgba(180,140,220,.7)' : '1px solid rgba(255,255,255,.06)',
-        boxShadow: isMine ? '0 0 0 1px rgba(120,90,200,.25), 0 4px 18px rgba(120,80,200,.3)' : 'none',
+        border,
+        boxShadow,
         transition: 'transform .2s',
       }}
       onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; }}
@@ -146,6 +159,19 @@ export default function MomentCard({ moment, isMine, onClick }) {
           fontSize:10,color:'white',fontWeight:700,
         }}>
           ✦ Мой момент
+        </div>
+      )}
+
+      {/* Super-author badge (top-left) — для Super-моментов в ленте */}
+      {!isMine && isAuthorSuper && (
+        <div style={{
+          position:'absolute',top:10,left:10,zIndex:3,
+          background:'rgba(160,100,220,.85)',backdropFilter:'blur(8px)',
+          borderRadius:9,padding:'3px 9px',
+          fontSize:10,color:'white',fontWeight:700,letterSpacing:.3,
+          boxShadow:'0 2px 8px rgba(0,0,0,.3)',
+        }}>
+          ✦ СУПЕР
         </div>
       )}
 
