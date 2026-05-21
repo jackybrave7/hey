@@ -46,9 +46,9 @@ export default function MomentCard({ moment, isMine, onClick }) {
     border = '2px solid rgba(180,140,220,.7)';
     boxShadow = '0 0 0 1px rgba(120,90,200,.25), 0 4px 18px rgba(120,80,200,.3)';
   } else if (isAuthorSuper) {
-    // Лиловая обводка для Super-авторов из ленты — отличается от своей более холодным оттенком
-    border = '2px solid rgba(200,140,255,.55)';
-    boxShadow = '0 0 0 1px rgba(160,100,230,.18), 0 4px 14px rgba(160,100,230,.22)';
+    // Лиловая обводка для Super-авторов из ленты
+    border = '2px solid rgba(200,140,255,.75)';
+    boxShadow = '0 0 0 1px rgba(160,100,230,.25), 0 4px 18px rgba(160,100,230,.3)';
   }
 
   return (
@@ -162,18 +162,6 @@ export default function MomentCard({ moment, isMine, onClick }) {
         </div>
       )}
 
-      {/* Super-author badge (top-left) — для Super-моментов в ленте */}
-      {!isMine && isAuthorSuper && (
-        <div style={{
-          position:'absolute',top:10,left:10,zIndex:3,
-          background:'rgba(160,100,220,.85)',backdropFilter:'blur(8px)',
-          borderRadius:9,padding:'3px 9px',
-          fontSize:10,color:'white',fontWeight:700,letterSpacing:.3,
-          boxShadow:'0 2px 8px rgba(0,0,0,.3)',
-        }}>
-          ✦ СУПЕР
-        </div>
-      )}
 
       {/* Search badge */}
       {moment.is_search && !isMine && (
