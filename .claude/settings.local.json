@@ -118,7 +118,15 @@
       "Bash(node -e \"const s = require\\('./src/storage'\\); console.log\\(typeof s.getPresignedUploadUrl\\); const r = require\\('./src/routes'\\); console.log\\('routes OK'\\)\")",
       "PowerShell($key = \"$env:USERPROFILE\\\\.ssh\\\\id_ed25519\"; ssh -i $key -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git pull && npm install --silent && npm run build 2>&1 | tail -5 && pm2 restart hey && sleep 1 && pm2 list | grep hey\")",
       "Bash(pm2 restart *)",
-      "Bash(node -e \"require\\('./server/src/db/db.js'\\); console.log\\('db OK'\\)\")"
+      "Bash(node -e \"require\\('./server/src/db/db.js'\\); console.log\\('db OK'\\)\")",
+      "Bash(node -e \"const db = require\\('./server/src/db/db.js'\\); console.log\\('searchUsers test:', db.searchUsers\\('тАми'\\).length\\)\")",
+      "Bash(node -e \"const db = require\\('./server/src/db/db.js'\\); console.log\\('OK system user id:', db.SYSTEM_USER_ID, '- exists:', !!db.findUserById\\(db.SYSTEM_USER_ID\\)\\)\")",
+      "Bash(node -e \"require\\('./server/src/db/db.js'\\); console.log\\('db ok'\\);\")",
+      "Bash(timeout 3 curl -sf -X POST http://localhost:3001/api/login -H \"Content-Type: application/json\" -d '{\"phone\":\"+79067549992\",\"password\":\"wrongpass\"}')",
+      "Bash(curl -s -w '\\\\nHTTP %{http_code}\\\\n' -X POST http://localhost:3001/api/login -H \"Content-Type: application/json\" -d '{\"phone\":\"+79999999999\",\"password\":\"wrong\"}')",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(curl -s http://localhost:5174/src/components/Screens.jsx)",
+      "Bash(kill %1)"
     ]
   }
 }

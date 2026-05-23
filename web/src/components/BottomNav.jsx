@@ -5,7 +5,7 @@ const ITEMS = [
   { label: 'Моменты', icon: '✦', paths: ['/main', '/moments'] },
   { label: 'Чаты',    icon: '💬', paths: ['/conversations'], badgeKey: 'unread' },
   { label: 'Контакты',icon: '👥', paths: ['/contacts'] },
-  { label: 'Я',       icon: null,  paths: ['/profile/me'] },
+  { label: 'Я',       icon: null,  paths: ['/me'] },
 ];
 
 export default function BottomNav({ user, unread = 0 }) {

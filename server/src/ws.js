@@ -71,6 +71,14 @@ module.exports = function setupWS(server) {
           if (conv?.type === 'direct') {
             const recipientId = members.find(id => id !== user.id);
             if (recipientId && (db.isBlocked(recipientId, user.id) || db.isBlocked(user.id, recipientId))) return;
+            // Запрет отправки сообщений системному пользователю
+            if (recipientId === db.SYSTEM_USER_ID && user.id !== db.SYSTEM_USER_ID) {
+              return ws.send(JSON.stringify({
+                type: 'error',
+                tempId,
+                error: 'HEY-заведующий не отвечает на сообщения',
+              }));
+            }
           }
 
           const saved = db.createMessage({

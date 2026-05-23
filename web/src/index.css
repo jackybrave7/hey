@@ -107,6 +107,25 @@ html, body, #root {
   border-radius: 50%; flex-shrink: 0;
 }
 
+/* Spin (used as inline animation references) */
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ── Reaction glow ────────────────────────────────────────────────────────
+   Используется на пузыре сообщения и кнопках реакций в момент-попапе. */
+@keyframes hey-reaction-glow {
+  0%   { box-shadow: 0 0 0  0    rgba(180,140,255, 0);   filter: brightness(1); }
+  35%  { box-shadow: 0 0 24px 6px rgba(180,140,255, .85); filter: brightness(1.25); }
+  100% { box-shadow: 0 0 0  0    rgba(180,140,255, 0);   filter: brightness(1); }
+}
+.hey-flash {
+  animation: hey-reaction-glow 1s ease-out;
+}
+
+/* Reduced motion — отключаем подсветку для тех у кого настроено */
+@media (prefers-reduced-motion: reduce) {
+  .hey-flash { animation: none; }
+}
+
 /* Birthday box */
 .bday-box {
   background: var(--accent2);

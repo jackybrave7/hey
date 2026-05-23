@@ -12,6 +12,286 @@ function fmtDate(ts) {
   return new Date(ts * 1000).toLocaleDateString('ru', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
 }
 
+// ── Меню для чужого момента (кнопка ⋮) ─────────────────────────────────
+function ForeignAuthorMenu({ open, onToggle, onReport }) {
+  const btnRef = useRef();
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+
+  useEffect(() => {
+    if (!open) return;
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) setPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    const handler = (e) => {
+      if (btnRef.current?.contains(e.target)) return;
+      onToggle();
+    };
+    document.addEventListener('mousedown', handler);
+    const onKey = (e) => { if (e.key === 'Escape') onToggle(); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]); // eslint-disable-line
+
+  return (
+    <>
+      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        title="Меню"
+        style={{
+          background: open ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.08)',
+          border: 'none', borderRadius: 10,
+          padding: '7px 10px', color: 'rgba(255,255,255,.7)',
+          fontSize: 18, cursor: 'pointer', transition: 'background .15s', lineHeight: 1,
+          flexShrink: 0,
+        }}>⋮</button>
+
+      {open && createPortal(
+        <div onMouseDown={e => e.stopPropagation()}
+          style={{
+            position:'fixed', top: pos.top, right: pos.right, zIndex: 9999,
+            background:'rgba(28,18,58,.98)', backdropFilter:'blur(20px)',
+            borderRadius: 14, overflow:'hidden', minWidth: 200,
+            boxShadow:'0 12px 40px rgba(0,0,0,.55)',
+            border:'1px solid rgba(255,255,255,.1)',
+          }}>
+          <div onClick={onReport}
+            style={{
+              display:'flex', alignItems:'center', gap:10,
+              padding:'12px 16px', cursor:'pointer',
+              color:'rgba(255,140,140,.95)', fontSize:14, fontWeight:500,
+              transition:'background .13s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,80,80,.1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <span style={{fontSize:17}}>🚩</span>
+            <span>Пожаловаться</span>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── Модалка «Пожаловаться» ─────────────────────────────────────────────
+// ── Reactors list modal — кто отреагировал (Super-функция) ──────────────
+const REACTION_META = {
+  see:      { icon: '👁', title: 'Просмотры'  },
+  resonate: { icon: '✨', title: 'Резонирует' },
+  talk:     { icon: '🤝', title: 'Поговорить' },
+};
+
+function ReactorsModal({ filter, reactors, loading, onClose, onOpenUser }) {
+  // filter = 'see' | 'resonate' | 'talk'
+  const list = !reactors ? [] : reactors.filter(r => r.reaction === filter);
+  const meta = REACTION_META[filter] || { icon: '✦', title: 'Отклик' };
+
+  function fmtTime(ts) {
+    if (!ts) return '';
+    const diff = (Date.now() - ts * 1000) / 1000;
+    if (diff < 60)    return 'только что';
+    if (diff < 3600)  return Math.floor(diff/60) + ' мин';
+    if (diff < 86400) return Math.floor(diff/3600) + ' ч';
+    return new Date(ts*1000).toLocaleDateString('ru', { day:'numeric', month:'short' });
+  }
+
+  return createPortal(
+    <div onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position:'fixed', inset:0, zIndex:10000,
+        background:'rgba(0,0,0,.6)', backdropFilter:'blur(10px)',
+        display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+      }}>
+      <div style={{
+        background:'rgba(22,15,50,.98)', borderRadius:18,
+        width:'min(94vw, 420px)', maxHeight:'80vh', display:'flex', flexDirection:'column',
+        border:'1px solid rgba(255,255,255,.1)',
+        boxShadow:'0 20px 60px rgba(0,0,0,.65)',
+      }}>
+        {/* Header */}
+        <div style={{padding:'16px 20px 14px',borderBottom:'1px solid rgba(255,255,255,.08)',
+          display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+          <span style={{fontSize:24}}>{meta.icon}</span>
+          <div style={{flex:1}}>
+            <div style={{color:'white',fontSize:16,fontWeight:700}}>{meta.title}</div>
+            <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginTop:2}}>
+              {loading ? 'Загрузка…' : `${list.length} ${list.length === 1 ? 'человек' : 'человек'}`}
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',color:'rgba(255,255,255,.4)',
+              fontSize:24,cursor:'pointer',lineHeight:1,padding:0}}>×</button>
+        </div>
+
+        {/* List */}
+        <div style={{flex:1,overflowY:'auto',padding:'8px 10px 14px'}}>
+          {loading && (
+            <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:'40px 20px',fontSize:14}}>
+              Загрузка…
+            </div>
+          )}
+          {!loading && list.length === 0 && (
+            <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:'40px 20px',fontSize:14}}>
+              Пока никого
+            </div>
+          )}
+          {!loading && list.map(r => (
+            <button key={r.id + r.reaction}
+              onClick={() => onOpenUser(r.id)}
+              style={{
+                width:'100%',display:'flex',alignItems:'center',gap:12,
+                padding:'10px 12px',borderRadius:12,marginBottom:4,
+                background:'transparent',border:'none',cursor:'pointer',
+                fontFamily:'inherit',textAlign:'left',
+                transition:'background .12s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.06)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div style={{width:38,height:38,borderRadius:'50%',flexShrink:0,
+                background:'rgba(180,140,220,.3)',overflow:'hidden',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:14,color:'white',fontWeight:700,
+                border:'1px solid rgba(255,255,255,.1)'}}>
+                {r.avatar
+                  ? <img src={r.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : (r.name||'?')[0].toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:'white',fontSize:14,fontWeight:600,
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {r.name || 'Без имени'}
+                </div>
+                <div style={{color:'rgba(255,255,255,.35)',fontSize:11}}>
+                  {fmtTime(r.created_at)}
+                </div>
+              </div>
+              <span style={{color:'rgba(255,255,255,.25)',fontSize:18,flexShrink:0}}>›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function ReportModal({ targetType, targetId, onClose, onSent }) {
+  const [text, setText]     = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError]   = useState('');
+
+  const MIN = 20;
+  const MAX = 1000;
+  const trimmed = text.trim();
+  const canSend = trimmed.length >= MIN && trimmed.length <= MAX;
+
+  async function submit() {
+    setError('');
+    if (!canSend) {
+      setError(trimmed.length < MIN
+        ? `Опишите подробнее (минимум ${MIN} символов, сейчас ${trimmed.length})`
+        : `Слишком длинно (максимум ${MAX})`);
+      return;
+    }
+    setSending(true);
+    try {
+      await api.createReport({ targetType, targetId, reason: trimmed });
+      onSent?.();
+    } catch (e) {
+      setError(e.message || 'Не удалось отправить жалобу');
+    }
+    setSending(false);
+  }
+
+  return createPortal(
+    <div onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position:'fixed', inset:0, zIndex:10000,
+        background:'rgba(0,0,0,.65)', backdropFilter:'blur(10px)',
+        display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+      }}>
+      <div style={{
+        background:'rgba(28,18,58,.99)', borderRadius:18,
+        width:'min(94vw, 460px)', overflow:'hidden',
+        border:'1px solid rgba(255,255,255,.1)',
+        boxShadow:'0 20px 60px rgba(0,0,0,.65)',
+      }}>
+        <div style={{padding:'18px 22px 14px',borderBottom:'1px solid rgba(255,255,255,.08)',
+          display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:22}}>🚩</span>
+          <div style={{flex:1}}>
+            <div style={{color:'white',fontSize:16,fontWeight:700}}>Пожаловаться</div>
+            <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginTop:2}}>
+              Опишите, что не так. Жалоба уйдёт администратору.
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',color:'rgba(255,255,255,.4)',
+              fontSize:24,cursor:'pointer',lineHeight:1,padding:0}}>×</button>
+        </div>
+
+        <div style={{padding:'18px 22px'}}>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value.slice(0, MAX))}
+            placeholder="Например: спам, оскорбления, неподходящий контент…"
+            rows={5}
+            autoFocus
+            style={{
+              width:'100%', boxSizing:'border-box',
+              background:'rgba(255,255,255,.07)',
+              border:`1px solid ${trimmed.length > 0 && !canSend ? 'rgba(255,140,140,.5)' : 'rgba(255,255,255,.14)'}`,
+              borderRadius:12, padding:'12px 14px', color:'white', fontSize:14,
+              fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.5,
+            }}
+          />
+          <div style={{display:'flex',justifyContent:'space-between',marginTop:6,
+            fontSize:11,color: trimmed.length < MIN ? 'rgba(255,180,100,.85)' : 'rgba(255,255,255,.35)'}}>
+            <span>
+              {trimmed.length < MIN
+                ? `Ещё ${MIN - trimmed.length} символ(ов)`
+                : '✓ Можно отправить'}
+            </span>
+            <span>{trimmed.length} / {MAX}</span>
+          </div>
+
+          {error && (
+            <div style={{
+              marginTop:12,padding:'10px 12px',borderRadius:10,
+              background:'rgba(255,80,80,.12)',
+              color:'rgba(255,160,160,.95)',fontSize:13,
+            }}>{error}</div>
+          )}
+        </div>
+
+        <div style={{padding:'14px 22px 20px',borderTop:'1px solid rgba(255,255,255,.06)',
+          display:'flex',gap:10}}>
+          <button onClick={onClose}
+            style={{
+              flex:1,padding:'12px',borderRadius:12,
+              background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)',
+              color:'rgba(255,255,255,.8)',fontSize:14,fontWeight:600,cursor:'pointer',
+            }}>
+            Отмена
+          </button>
+          <button onClick={submit} disabled={!canSend || sending}
+            style={{
+              flex:2,padding:'12px',borderRadius:12,
+              background: canSend && !sending ? 'rgba(200,80,80,.85)' : 'rgba(120,90,140,.4)',
+              border:'1px solid ' + (canSend ? 'rgba(255,120,120,.5)' : 'rgba(255,255,255,.1)'),
+              color:'white',fontSize:14,fontWeight:700,
+              cursor: canSend && !sending ? 'pointer' : 'not-allowed',
+            }}>
+            {sending ? 'Отправка…' : 'Отправить жалобу'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 const REACTIONS = [
   { id: 'see',       label: 'Вижу',       icon: '👁' },
   { id: 'resonate',  label: 'Резонирует', icon: '✨' },
@@ -130,6 +410,10 @@ export default function MomentDetailPopup({
   const [moment, setMoment]     = useState(moments[initialIndex ?? 0]);
   const [myReaction, setMyReaction] = useState(moment.myReaction || null);
   const [reacting, setReacting] = useState(false);
+  const [flashRxn, setFlashRxn] = useState(null); // id реакции которая на секунду подсвечивается
+  const [reportOpen, setReportOpen] = useState(false);
+  const [foreignMenuOpen, setForeignMenuOpen] = useState(false);
+  const [reactorsModal, setReactorsModal] = useState(null); // null | 'all' | 'see' | 'resonate' | 'talk'
   const [reactors, setReactors] = useState(null);
   const [showAnalyticsPromo, setShowAnalyticsPromo] = useState(false);
   const [showSuperInfo, setShowSuperInfo]             = useState(false);
@@ -206,6 +490,12 @@ export default function MomentDetailPopup({
   async function handleReact(reaction) {
     if (reacting) return;
     setReacting(true);
+    // Подсветка — только когда ставим реакцию (не при сбросе)
+    const isSettingNew = myReaction !== reaction;
+    if (isSettingNew) {
+      setFlashRxn(reaction);
+      setTimeout(() => setFlashRxn(curr => curr === reaction ? null : curr), 1000);
+    }
     try {
       if (myReaction === reaction) {
         await api.unreactMoment(moment.id);
@@ -341,13 +631,21 @@ export default function MomentDetailPopup({
           )}
 
           <div style={{padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
-            {/* Author + time */}
+            {/* Author + time — клик на аватар или имя открывает профиль автора */}
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:40,height:40,flexShrink:0,position:'relative'}}>
+              <div onClick={() => {
+                  if (!moment.user_id) return;
+                  if (moment.user_id === currentUser?.id) { onClose?.(); nav('/me'); }
+                  else { onClose?.(); nav(`/profile/${moment.user_id}`); }
+                }}
+                style={{width:40,height:40,flexShrink:0,position:'relative',cursor:'pointer'}}>
                 <div style={{width:40,height:40,borderRadius:'50%',
                   background:'rgba(180,140,220,.35)',overflow:'hidden',
                   display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:18,color:'white',fontWeight:600}}>
+                  fontSize:18,color:'white',fontWeight:600,
+                  transition:'transform .15s'}}
+                  onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'}
+                  onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
                   {moment.author_avatar
                     ? <img src={moment.author_avatar} alt={moment.author_name||''}
                         style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
@@ -362,18 +660,30 @@ export default function MomentDetailPopup({
                     border:'2px solid rgba(22,15,50,.98)',
                     display:'flex',alignItems:'center',justifyContent:'center',
                     fontSize:7,color:'white',fontWeight:700,
+                    pointerEvents:'none',
                   }}>✦</div>
                 )}
               </div>
-              <div style={{flex:1}}>
+              <div style={{flex:1,cursor:'pointer'}}
+                onClick={() => {
+                  if (!moment.user_id) return;
+                  if (moment.user_id === currentUser?.id) { onClose?.(); nav('/me'); }
+                  else { onClose?.(); nav(`/profile/${moment.user_id}`); }
+                }}>
                 <div style={{color:'white',fontSize:15,fontWeight:600}}>{moment.author_name}</div>
                 <div style={{color:'rgba(255,255,255,.4)',fontSize:12}}>
                   {fmtDate(moment.created_at)}
                   {moment.edited && <span style={{marginLeft:6,opacity:.6}}>· редактировалось</span>}
                 </div>
               </div>
-              {isMine && (
+              {isMine ? (
                 <InlineMenu moment={moment} onEdit={onEdit} onArchive={onArchive} onDelete={onDelete} onClose={onClose}/>
+              ) : (
+                <ForeignAuthorMenu
+                  open={foreignMenuOpen}
+                  onToggle={() => setForeignMenuOpen(v => !v)}
+                  onReport={() => { setForeignMenuOpen(false); setReportOpen(true); }}
+                />
               )}
             </div>
 
@@ -411,53 +721,61 @@ export default function MomentDetailPopup({
             {/* Analytics / Reactions */}
             {isMine ? (
               <>
-                <div
-                  onClick={() => { if (!moment.author_is_super) setShowAnalyticsPromo(true); }}
-                  style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
-                    display:'flex',gap:20,cursor: moment.author_is_super ? 'default' : 'pointer'}}>
-                  <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>👁 {moment.views || 0}</span>
-                  <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0}</span>
-                  <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>🤝 {moment.stats?.talk || 0}</span>
-                  {!moment.author_is_super && (
+                {moment.author_is_super ? (
+                  /* Super-автор — каждый счётчик кликабелен, открывает список реактивших */
+                  <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'8px',
+                    display:'flex',gap:4}}>
+                    {[
+                      { key: 'see',      icon: '👁', count: moment.stats?.see || 0,      label: 'просмотры'   },
+                      { key: 'resonate', icon: '✨', count: moment.stats?.resonate || 0, label: 'резонирует' },
+                      { key: 'talk',     icon: '🤝', count: moment.stats?.talk || 0,     label: 'поговорить' },
+                    ].map(stat => (
+                      <button key={stat.key}
+                        onClick={() => {
+                          if (stat.count === 0) return;
+                          setReactorsModal(stat.key);
+                          if (!reactors) api.getMomentReactors(moment.id).then(setReactors).catch(() => {});
+                        }}
+                        disabled={stat.count === 0}
+                        style={{
+                          flex:1,padding:'8px 6px',borderRadius:10,
+                          background: stat.count > 0 ? 'rgba(255,255,255,.04)' : 'transparent',
+                          border:'1px solid ' + (stat.count > 0 ? 'rgba(255,255,255,.08)' : 'transparent'),
+                          color: stat.count > 0 ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.3)',
+                          cursor: stat.count > 0 ? 'pointer' : 'default',
+                          fontFamily:'inherit',
+                          display:'flex',flexDirection:'column',alignItems:'center',gap:2,
+                          transition:'background .12s',
+                        }}
+                        onMouseEnter={e => { if (stat.count > 0) e.currentTarget.style.background='rgba(255,255,255,.09)'; }}
+                        onMouseLeave={e => { if (stat.count > 0) e.currentTarget.style.background='rgba(255,255,255,.04)'; }}>
+                        <span style={{fontSize:18,lineHeight:1}}>{stat.icon}</span>
+                        <span style={{fontSize:15,fontWeight:700,lineHeight:1}}>{stat.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  /* Обычный — клик по строке открывает Super-промо */
+                  <div
+                    onClick={() => setShowAnalyticsPromo(true)}
+                    style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
+                      display:'flex',gap:20,cursor:'pointer'}}>
+                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>👁 {moment.views || 0}</span>
+                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0}</span>
+                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>🤝 {moment.stats?.talk || 0}</span>
                     <span style={{marginLeft:'auto',color:'rgba(255,255,255,.25)',fontSize:12}}>кто? ›</span>
-                  )}
-                </div>
-                {moment.author_is_super && reactors && reactors.length > 0 && (
-                  <div>
-                    <div style={{color:'rgba(255,255,255,.35)',fontSize:11,fontWeight:600,
-                      textTransform:'uppercase',letterSpacing:.5,marginBottom:8}}>
-                      ⭐ Кто отреагировал
-                    </div>
-                    <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                      {reactors.map(r => (
-                        <div key={r.user_id + r.reaction} style={{
-                          display:'flex',alignItems:'center',gap:10,
-                          background:'rgba(255,255,255,.05)',borderRadius:10,padding:'8px 12px',
-                        }}>
-                          <div style={{width:30,height:30,borderRadius:'50%',flexShrink:0,
-                            background:'rgba(180,140,220,.3)',
-                            display:'flex',alignItems:'center',justifyContent:'center',
-                            fontSize:13,color:'white',fontWeight:600,overflow:'hidden'}}>
-                            {r.avatar
-                              ? <img src={r.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                              : (r.name||'?')[0].toUpperCase()}
-                          </div>
-                          <span style={{color:'rgba(255,255,255,.8)',fontSize:13,flex:1}}>{r.name}</span>
-                          <span style={{fontSize:16}}>
-                            {r.reaction === 'see' ? '👁' : r.reaction === 'resonate' ? '✨' : '🤝'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )}
               </>
             ) : (
               <div style={{display:'flex',gap:6}}>
                 {REACTIONS.map(r => {
-                  const active = myReaction===r.id;
+                  const active   = myReaction===r.id;
+                  const flashing = flashRxn===r.id;
                   return (
-                    <button key={r.id} onClick={() => handleReact(r.id)} title={r.label}
+                    <button key={r.id + (flashing ? '-flash' : '')}
+                      onClick={() => handleReact(r.id)} title={r.label}
+                      className={flashing ? 'hey-flash' : ''}
                       style={{
                         flex:1,padding:'8px 6px',borderRadius:12,
                         cursor:'pointer',transition:'all .15s',
@@ -540,6 +858,28 @@ export default function MomentDetailPopup({
     )}
 
     {showSuperInfo && <SuperInfoScreen onClose={() => setShowSuperInfo(false)} onInvite={() => setShowSuperInfo(false)}/>}
+
+    {reportOpen && (
+      <ReportModal
+        targetType="moment"
+        targetId={moment.id}
+        onClose={() => setReportOpen(false)}
+        onSent={() => {
+          setReportOpen(false);
+          alert('✓ Жалоба отправлена. Спасибо, мы рассмотрим её.');
+        }}
+      />
+    )}
+
+    {reactorsModal && (
+      <ReactorsModal
+        filter={reactorsModal}
+        reactors={reactors}
+        loading={!reactors}
+        onClose={() => setReactorsModal(null)}
+        onOpenUser={(uid) => { setReactorsModal(null); onClose?.(); nav(`/profile/${uid}`); }}
+      />
+    )}
 
     {/* Image lightbox */}
     {imgLightbox && (

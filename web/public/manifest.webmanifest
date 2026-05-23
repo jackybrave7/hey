@@ -1,0 +1,27 @@
+{
+  "name": "HEY Messenger",
+  "short_name": "HEY",
+  "description": "Мессенджер для близкого круга. Чаты, моменты, голосовые.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a0a30",
+  "theme_color": "#5a2d96",
+  "lang": "ru",
+  "categories": ["social", "communication"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "180x180",
+      "purpose": "any maskable"
+    }
+  ]
+}

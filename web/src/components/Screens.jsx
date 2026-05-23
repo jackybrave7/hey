@@ -667,9 +667,16 @@ export function RegisterScreen() {
           color: 'white', marginBottom: 22,
           animation: 'authFadeUp .6s ease-out .15s both'
         }}>
-          Создать аккаунт
+          {inviteCode ? 'Создать аккаунт' : 'Только по приглашению'}
         </div>
 
+        {/* Без инвайта — показываем приглашение в waitlist */}
+        {!inviteCode && (
+          <InviteOnlyBlock onSwitchToLogin={() => nav('/login')}/>
+        )}
+
+        {/* С инвайтом — обычная форма регистрации */}
+        {inviteCode && (
         <div style={{ animation: 'authFadeUp .6s ease-out .25s both' }}>
           <FloatingInput id="reg-name" label="Имя" value={name}
             onChange={e => setName(e.target.value)} autoComplete="name" />
@@ -706,6 +713,106 @@ export function RegisterScreen() {
             </span>
           </div>
         </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// InviteOnlyBlock — экран без инвайта: объяснение + waitlist
+// ─────────────────────────────────────────────────────────────────────────────
+
+function InviteOnlyBlock({ onSwitchToLogin }) {
+  const [email, setEmail]   = useState('');
+  const [sending, setSending] = useState(false);
+  const [done, setDone]     = useState(false);
+  const [err, setErr]       = useState('');
+
+  async function submit() {
+    setErr('');
+    if (!email.trim()) { setErr('Введите email'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) {
+      setErr('Похоже, email с опечаткой');
+      return;
+    }
+    setSending(true);
+    try {
+      await api.joinWaitlist(email.trim());
+      setDone(true);
+    } catch (e) { setErr(e.message || 'Не удалось сохранить'); }
+    setSending(false);
+  }
+
+  return (
+    <div style={{ animation: 'authFadeUp .6s ease-out .25s both' }}>
+      {/* Объяснение */}
+      <div style={{
+        background:'rgba(120,90,200,.15)',
+        border:'1px solid rgba(180,140,220,.3)',
+        borderRadius:16,padding:'16px 18px',marginBottom:20,
+        color:'rgba(235,225,255,.92)',fontSize:14,lineHeight:1.55,
+      }}>
+        <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
+          <span style={{fontSize:22,flexShrink:0}}>🎟</span>
+          <div>
+            <div style={{fontWeight:700,color:'white',marginBottom:6}}>
+              Сейчас вход только по приглашению
+            </div>
+            <div style={{color:'rgba(255,255,255,.7)',fontSize:13}}>
+              Попроси у знакомого, который уже в HEY, ссылку-приглашение —
+              откроется страница регистрации с его именем.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Waitlist */}
+      {!done ? (
+        <>
+          <div style={{
+            color:'rgba(255,255,255,.65)',fontSize:13,marginBottom:10,lineHeight:1.5,
+          }}>
+            Хочешь узнать когда регистрация откроется без приглашения? Оставь email — напишем.
+          </div>
+          <FloatingInput id="wl-email" label="Твой email" type="email"
+            value={email} onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submit()} autoComplete="email" />
+
+          {err && (
+            <div style={{
+              background:'rgba(220,60,60,.18)',border:'1px solid rgba(255,120,120,.35)',
+              borderRadius:12,padding:'10px 16px',marginBottom:12,
+              color:'white',fontSize:13,textAlign:'center',lineHeight:1.4,
+            }}>{err}</div>
+          )}
+
+          <button className="auth-btn-primary" onClick={submit} disabled={sending}>
+            {sending ? 'Отправка…' : 'Хочу получить уведомление'}
+          </button>
+        </>
+      ) : (
+        <div style={{
+          background:'rgba(46,204,113,.15)',
+          border:'1px solid rgba(46,204,113,.35)',
+          borderRadius:16,padding:'18px 20px',
+          color:'rgba(180,255,200,.95)',fontSize:14,textAlign:'center',lineHeight:1.55,
+        }}>
+          <div style={{fontSize:28,marginBottom:8}}>✓</div>
+          <div style={{fontWeight:700,marginBottom:4,color:'white'}}>Email добавлен</div>
+          <div style={{color:'rgba(255,255,255,.7)',fontSize:13}}>
+            Напишем когда регистрация откроется.
+          </div>
+        </div>
+      )}
+
+      <div style={{ textAlign:'center', marginTop:22, color:'rgba(255,255,255,.68)', fontSize:14 }}>
+        Уже есть аккаунт?{' '}
+        <span onClick={onSwitchToLogin}
+          style={{ color:'white', fontWeight:700, cursor:'pointer',
+            borderBottom:'1px solid rgba(255,255,255,.5)', paddingBottom:1 }}>
+          Войти
+        </span>
       </div>
     </div>
   );
@@ -746,7 +853,7 @@ export function WelcomeScreen() {
   const steps = [
     { icon: '✦', title: 'Создать свой первый момент', sub: 'Покажи над чем работаешь', action: () => nav('/main') },
     { icon: '👥', title: 'Добавить контакты',          sub: 'По номеру или импорт из телефона', action: () => nav('/contacts') },
-    { icon: '🎨', title: 'Заполнить профиль',          sub: 'Аватар, имя, день рождения', action: () => nav('/profile/me') },
+    { icon: '🎨', title: 'Заполнить профиль',          sub: 'Аватар, имя, день рождения', action: () => nav('/me') },
   ];
 
   return (
@@ -979,6 +1086,15 @@ export function MyProfileScreen() {
     const pv = validatePhone(phone);
     if (!pv.ok) { setPhoneErr(pv.msg); return; }
     if (!name.trim()) return;
+    // Проверяем лимит ссылок ДО запроса (повторно проверится на сервере)
+    const urls = (bio || '').match(/https?:\/\/\S+/gi) || [];
+    const maxLinks = user?.is_super ? 5 : 1;
+    if (urls.length > maxLinks) {
+      alert(user?.is_super
+        ? `В описании можно до ${maxLinks} ссылок (у тебя ${urls.length}). Лишние нужно убрать.`
+        : `В описании можно только 1 ссылку (у тебя ${urls.length}). В ✦ Super — до 5. Лишние нужно убрать.`);
+      return;
+    }
     setSaving(true);
     try {
       // Upload avatar to S3 if a new file was selected
@@ -1097,35 +1213,60 @@ export function MyProfileScreen() {
 
       {/* Bio — full-width row below avatar block */}
       <div style={{padding:'16px 26px 0'}}>
-        {editing ? (
-          <div>
-            <div style={{color:'rgba(255,255,255,.6)',fontSize:12,marginBottom:6,display:'flex',justifyContent:'space-between'}}>
-              <span>О себе</span>
-              <span style={{color: bio.length > 180 ? 'rgba(255,180,100,.8)' : 'rgba(255,255,255,.25)'}}>{bio.length}/200</span>
+        {editing ? (() => {
+          const urls = (bio || '').match(/https?:\/\/\S+/gi) || [];
+          const maxLinks = user?.is_super ? 5 : 1;
+          const overLimit = urls.length > maxLinks;
+          return (
+            <div>
+              <div style={{color:'rgba(255,255,255,.6)',fontSize:12,marginBottom:6,display:'flex',justifyContent:'space-between'}}>
+                <span>О себе</span>
+                <span style={{color: bio.length > 180 ? 'rgba(255,180,100,.8)' : 'rgba(255,255,255,.25)'}}>{bio.length}/200</span>
+              </div>
+              <textarea
+                value={bio}
+                onChange={e => setBio(e.target.value.slice(0, 200))}
+                placeholder="Расскажи о себе — пару строк о том, чем занимаешься…"
+                rows={3}
+                style={{
+                  width:'100%', boxSizing:'border-box',
+                  background:'rgba(255,255,255,.08)',
+                  border: overLimit ? '1px solid rgba(255,120,120,.6)' : '1px solid rgba(255,255,255,.15)',
+                  borderRadius:12, padding:'10px 13px', color:'white', fontSize:14,
+                  fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.6,
+                  transition:'border-color .15s',
+                }}
+                onFocus={e=>{ if(!overLimit) e.target.style.borderColor='rgba(180,140,220,.6)'; }}
+                onBlur={e=>{ if(!overLimit) e.target.style.borderColor='rgba(255,255,255,.15)'; }}
+              />
+              <div style={{
+                marginTop:6,fontSize:11,
+                color: overLimit ? 'rgba(255,140,140,.95)' : 'rgba(255,255,255,.4)',
+                display:'flex',alignItems:'center',gap:6,
+              }}>
+                <span>🔗</span>
+                {overLimit ? (
+                  <span>
+                    <strong>Слишком много ссылок: {urls.length} из {maxLinks}.</strong>
+                    {' '}Лишние нужно убрать.
+                  </span>
+                ) : (
+                  <span>
+                    Ссылок: <strong style={{color:'rgba(200,170,255,.85)'}}>{urls.length} из {maxLinks}</strong>
+                    {!user?.is_super && <> · в ✦ Super — до 5</>}
+                  </span>
+                )}
+              </div>
             </div>
-            <textarea
-              value={bio}
-              onChange={e => setBio(e.target.value.slice(0, 200))}
-              placeholder="Расскажи о себе — пару строк о том, чем занимаешься…"
-              rows={3}
-              style={{
-                width:'100%', boxSizing:'border-box',
-                background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.15)',
-                borderRadius:12, padding:'10px 13px', color:'white', fontSize:14,
-                fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.6,
-                transition:'border-color .15s',
-              }}
-              onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.6)'}
-              onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.15)'}
-            />
-          </div>
-        ) : user?.bio ? (
+          );
+        })() : user?.bio ? (
           <div style={{
             background:'rgba(255,255,255,.05)', borderRadius:14,
             border:'1px solid rgba(255,255,255,.08)', padding:'12px 16px',
             color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.6,
+            wordBreak:'break-word',
           }}>
-            {user.bio}
+            <BioWithLinks text={user.bio}/>
           </div>
         ) : null}
       </div>
@@ -1608,7 +1749,7 @@ export function MainScreen() {
     <div className="screen">
       <div className="topbar">
         <span className="topbar-title">Главная</span>
-        <div onClick={() => nav('/profile/me')} style={{width:32,height:32,borderRadius:'50%',background:'white',
+        <div onClick={() => nav('/me')} style={{width:32,height:32,borderRadius:'50%',background:'white',
           display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,
           color:'#7A6AAA',cursor:'pointer',marginRight:8}}>Я</div>
         <div className="topbar-dots">{[0,1,2].map(i=><div key={i} className="topbar-dot"/>)}</div>
@@ -1635,6 +1776,35 @@ export function MainScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Show emoji avatar or first letter; never render long strings / URLs as text
+// Рендер «О себе» с автоопределением ссылок и превращением их в <a>
+function BioWithLinks({ text }) {
+  if (!text) return null;
+  const urlRe = /https?:\/\/[^\s<>"']+/gi;
+  const parts = [];
+  let lastIdx = 0;
+  let m;
+  while ((m = urlRe.exec(text)) !== null) {
+    if (m.index > lastIdx) parts.push({ t: text.slice(lastIdx, m.index), link: false });
+    parts.push({ t: m[0], link: true });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) parts.push({ t: text.slice(lastIdx), link: false });
+  return (
+    <>
+      {parts.map((p, i) => p.link ? (
+        <a key={i} href={p.t} target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{
+            color:'rgba(180,140,255,.95)', textDecoration:'underline',
+            textUnderlineOffset:2, wordBreak:'break-all',
+          }}>
+          {p.t.replace(/^https?:\/\//,'')}
+        </a>
+      ) : <span key={i}>{p.t}</span>)}
+    </>
+  );
+}
+
 function AvatarDisplay({ avatar, name, size = 52, fontSize = 20, radius = '50%', style = {} }) {
   const letter = (name || '?')[0].toUpperCase();
   const isImg  = avatar && (avatar.startsWith('/') || avatar.startsWith('http') || avatar.startsWith('data:'));
@@ -2286,8 +2456,6 @@ export function ContactsScreen() {
   const [contacts,      setContacts]      = useState([]);
   const [blocked,       setBlocked]       = useState([]);
   const [query,         setQuery]         = useState('');
-  const [searchResults, setSearchResults] = useState(null); // null = not searching
-  const [searchLoading, setSearchLoading] = useState(false);
   const [inviteTarget,  setInviteTarget]  = useState(null); // phone not found — show invite popup
   const [card,          setCard]          = useState(null);
   const [showImport,    setShowImport]    = useState(false);
@@ -2299,20 +2467,9 @@ export function ContactsScreen() {
     api.getBlocked().then(setBlocked).catch(console.error);
   }, []);
 
-  // ── Live search ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const q = query.trim();
-    if (q.length < 3) { setSearchResults(null); return; }
-    setSearchLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        const res = await api.searchUsers(q);
-        setSearchResults(res);
-      } catch { setSearchResults([]); }
-      setSearchLoading(false);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [query]);
+  // ── Global поиск отключён — приватность.
+  // Найти пользователя можно только если он уже в контактах,
+  // или ввести номер телефона и нажать «+».
 
   // ── Add contact by phone (+ button) ─────────────────────────────────────
   async function addContact() {
@@ -2336,19 +2493,9 @@ export function ContactsScreen() {
           alert(e.message);
         }
       }
-    } else if (searchResults?.length === 1) {
-      // Single search result — add it directly
-      await addFromSearch(searchResults[0]);
     }
-  }
-
-  async function addFromSearch(user) {
-    try {
-      const c = await api.addContact({ userId: user.id });
-      setContacts(prev => prev.find(x => x.id === c.id) ? prev : [...prev, c]);
-      setQuery('');
-      setSearchResults(null);
-    } catch(e) { alert(e.message || 'Не удалось добавить'); }
+    // Не телефон и не нашли локально → ничего не делаем,
+    // дальше нужно либо точнее ввести имя, либо ввести номер.
   }
 
   async function openChat(contactId) {
@@ -2416,106 +2563,129 @@ export function ContactsScreen() {
         <button className="pill" onClick={addContact} style={{padding:'13px 20px',fontSize:20}}>+</button>
       </div>
 
-      {/* Search results */}
-      {searchResults !== null && (
-        <div style={{flexShrink:0,paddingBottom:8}}>
-          {searchLoading && (
-            <div style={{color:'rgba(255,255,255,.35)',fontSize:13,textAlign:'center',padding:'12px 20px'}}>
-              Поиск…
-            </div>
-          )}
-          {!searchLoading && searchResults.length === 0 && (
-            <div style={{color:'rgba(255,255,255,.35)',fontSize:13,textAlign:'center',padding:'12px 20px'}}>
-              Не найдено. Попробуй номер телефона.
-            </div>
-          )}
-          {!searchLoading && searchResults.map(u => {
-            const alreadyAdded = contacts.some(c => c.id === u.id);
-            return (
-              <div key={u.id} style={{
-                display:'flex',alignItems:'center',gap:12,padding:'10px 20px',
-                borderBottom:'1px solid rgba(255,255,255,.06)',
-                background:'rgba(255,255,255,.025)',
-              }}>
-                <AvatarDisplay avatar={u.avatar} name={u.name} size={42} fontSize={16}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{color:'white',fontSize:15,fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
-                    {u.name}
-                    {u.online && <div className="online-dot"/>}
-                  </div>
-                  <div style={{color:'rgba(255,255,255,.4)',fontSize:12}}>{u.phone}</div>
-                </div>
-                {alreadyAdded ? (
-                  <span style={{color:'rgba(255,255,255,.3)',fontSize:12}}>уже добавлен</span>
-                ) : (
-                  <button onClick={() => addFromSearch(u)}
-                    style={{
-                      background:'rgba(100,78,148,.7)',border:'none',borderRadius:20,
-                      color:'white',fontSize:13,fontWeight:600,padding:'7px 16px',
-                      cursor:'pointer',flexShrink:0,
-                    }}>
-                    + Добавить
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* Invite popup when phone not found */}
       {inviteTarget && (
         <InviteByPhoneModal phone={inviteTarget} onClose={() => setInviteTarget(null)} />
       )}
 
-      {/* List */}
-      <div style={{flex:1}}>
-        {visibleContacts.length === 0 && !searchResults && (
-          <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:60,fontSize:15}}>
-            Контакты не найдены.<br/>Добавьте первый по номеру телефона.
-          </div>
-        )}
-        {visibleContacts.map(c => (
-          <div key={c.id}
-            style={{display:'flex',alignItems:'center',gap:12,padding:'14px 20px',
-              cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s'}}
-            onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
-            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-            {/* Avatar */}
-            <div onClick={() => setCard(c)}
-              style={{cursor:'pointer',transition:'transform .15s',flexShrink:0}}
-              onMouseEnter={e=>e.currentTarget.style.transform='scale(1.06)'}
-              onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-              <AvatarDisplay avatar={c.avatar} name={c.nickname||c.name}/>
-            </div>
-            {/* Name → opens chat */}
-            <div style={{flex:1,minWidth:0}} onClick={() => openChat(c.id)}>
-              <div style={{color:'white',fontSize:15,fontWeight:600,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                {c.nickname || c.name}
-                {c.online && !c.is_deleted ? <div className="online-dot"/> : null}
-                {c.is_deleted && (
-                  <span style={{fontSize:11,color:'rgba(255,255,255,.35)',fontWeight:400,
-                    background:'rgba(255,255,255,.08)',borderRadius:6,padding:'2px 8px',fontStyle:'italic'}}>
-                    удалил аккаунт
-                  </span>
+      {/* List — фильтруется по query */}
+      {(() => {
+        const q = query.trim().toLowerCase();
+        const isSearching = q.length >= 3;
+
+        // Локальные совпадения по контактам
+        const localMatches = q
+          ? visibleContacts.filter(c =>
+              (c.nickname || '').toLowerCase().includes(q) ||
+              (c.name     || '').toLowerCase().includes(q) ||
+              (c.phone    || '').includes(query.trim())
+            )
+          : visibleContacts;
+
+        const hasAny = localMatches.length > 0;
+        const looksLikePhone = /^[\d\s\-+()]{7,}$/.test(query.trim());
+
+        return (
+          <div style={{flex:1}}>
+            {/* Поиск активен — показываем только локальные совпадения */}
+            {isSearching ? (
+              <>
+                {/* Локальные совпадения (свои контакты) */}
+                {localMatches.map(c => (
+                  <div key={'local-'+c.id}
+                    style={{display:'flex',alignItems:'center',gap:12,padding:'14px 20px',
+                      cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    <div onClick={() => setCard(c)} style={{cursor:'pointer',flexShrink:0}}>
+                      <AvatarDisplay avatar={c.avatar} name={c.nickname||c.name}/>
+                    </div>
+                    <div style={{flex:1,minWidth:0}} onClick={() => openChat(c.id)}>
+                      <div style={{color:'white',fontSize:15,fontWeight:600}}>{c.nickname||c.name}</div>
+                      <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>
+                    </div>
+                    <span style={{color:'rgba(255,255,255,.25)',fontSize:18,flexShrink:0}}>›</span>
+                  </div>
+                ))}
+
+                {/* Ничего не нашлось */}
+                {!hasAny && (
+                  <div style={{
+                    padding:'24px 20px',textAlign:'center',
+                    display:'flex',flexDirection:'column',alignItems:'center',gap:10,
+                  }}>
+                    <div style={{fontSize:32,opacity:.5}}>🤷</div>
+                    <div style={{color:'rgba(255,255,255,.45)',fontSize:14}}>
+                      Никого не нашли по «{query.trim()}»
+                    </div>
+                    {looksLikePhone ? (
+                      <button onClick={addContact}
+                        style={{
+                          marginTop:6,padding:'10px 18px',borderRadius:50,
+                          background:'rgba(120,90,200,.75)',border:'none',color:'white',
+                          fontSize:13,fontWeight:600,cursor:'pointer',
+                          display:'flex',alignItems:'center',gap:8,
+                        }}>
+                        <span style={{fontSize:18}}>+</span> Добавить как контакт
+                      </button>
+                    ) : (
+                      <div style={{color:'rgba(255,255,255,.3)',fontSize:12}}>
+                        Введи имя ещё точнее или номер телефона
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
-              {!c.is_deleted && <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>}
-              {c.notes && !c.is_deleted && <div style={{color:'rgba(255,255,255,.3)',fontSize:12,marginTop:2,
-                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
-            </div>
-            {/* Open card */}
-            <button onClick={() => setCard(c)}
-              style={{background:'none',border:'none',color:'rgba(255,255,255,.3)',
-                fontSize:20,cursor:'pointer',padding:'4px 8px',lineHeight:1,
-                transition:'color .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.color='rgba(255,255,255,.7)'}
-              onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,.3)'}>
-              ›
-            </button>
+              </>
+            ) : (
+              <>
+                {/* Обычный режим — все контакты */}
+                {visibleContacts.length === 0 && (
+                  <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:60,fontSize:15}}>
+                    Контакты не найдены.<br/>Добавьте первый по номеру телефона.
+                  </div>
+                )}
+                {visibleContacts.map(c => (
+                  <div key={c.id}
+                    style={{display:'flex',alignItems:'center',gap:12,padding:'14px 20px',
+                      cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'background .12s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    <div onClick={() => setCard(c)}
+                      style={{cursor:'pointer',transition:'transform .15s',flexShrink:0}}
+                      onMouseEnter={e=>e.currentTarget.style.transform='scale(1.06)'}
+                      onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                      <AvatarDisplay avatar={c.avatar} name={c.nickname||c.name}/>
+                    </div>
+                    <div style={{flex:1,minWidth:0}} onClick={() => openChat(c.id)}>
+                      <div style={{color:'white',fontSize:15,fontWeight:600,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                        {c.nickname || c.name}
+                        {c.online && !c.is_deleted ? <div className="online-dot"/> : null}
+                        {c.is_deleted && (
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.35)',fontWeight:400,
+                            background:'rgba(255,255,255,.08)',borderRadius:6,padding:'2px 8px',fontStyle:'italic'}}>
+                            удалил аккаунт
+                          </span>
+                        )}
+                      </div>
+                      {!c.is_deleted && <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>}
+                      {c.notes && !c.is_deleted && <div style={{color:'rgba(255,255,255,.3)',fontSize:12,marginTop:2,
+                        overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
+                    </div>
+                    <button onClick={() => setCard(c)}
+                      style={{background:'none',border:'none',color:'rgba(255,255,255,.3)',
+                        fontSize:20,cursor:'pointer',padding:'4px 8px',lineHeight:1,
+                        transition:'color .15s'}}
+                      onMouseEnter={e=>e.currentTarget.style.color='rgba(255,255,255,.7)'}
+                      onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,.3)'}>
+                      ›
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
-        ))}
-      </div>
+        );
+      })()}
 
       {/* Contact card modal */}
       {card && (
@@ -3589,7 +3759,7 @@ export function GroupSettingsScreen() {
 
 const MessageRow = memo(function MessageRow({
   m, isOut, isGroup, editingMsgId, reactionPickerMsgId,
-  partnerName, currentUserId,
+  partnerName, currentUserId, isFlashing,
   onOpenMenu, onLightbox, onToggleReaction, onSetReactionPicker,
   statusIcon, renderText,
 }) {
@@ -3624,16 +3794,19 @@ const MessageRow = memo(function MessageRow({
 
       <div style={{display:'flex', flexDirection:'column',
         alignItems: isOut ? 'flex-end' : 'flex-start', maxWidth:'80%'}}>
-        <div style={{
-          background: editingMsgId === m.id
-            ? 'rgba(160,120,210,.85)'
-            : isOut ? 'rgba(110,80,155,.70)' : 'rgba(255,255,255,.90)',
-          borderRadius: isOut ? '20px 20px 5px 20px' : '20px 20px 20px 5px',
-          padding:'10px 13px 6px',
-          color: isOut ? 'white' : '#2a2040',
-          fontSize:14, lineHeight:'1.5',
-          transition:'background .2s'
-        }}>
+        <div
+          key={isFlashing ? 'flash-' + m.id : m.id}
+          className={isFlashing ? 'hey-flash' : ''}
+          style={{
+            background: editingMsgId === m.id
+              ? 'rgba(160,120,210,.85)'
+              : isOut ? 'rgba(110,80,155,.70)' : 'rgba(255,255,255,.90)',
+            borderRadius: isOut ? '20px 20px 5px 20px' : '20px 20px 20px 5px',
+            padding:'10px 13px 6px',
+            color: isOut ? 'white' : '#2a2040',
+            fontSize:14, lineHeight:'1.5',
+            transition:'background .2s'
+          }}>
           {isGroup && !isOut && (
             <div style={{fontSize:11,fontWeight:700,color:'rgba(200,160,240,.8)',marginBottom:4}}>
               {m.sender_name}
@@ -3727,29 +3900,50 @@ const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut })
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [total,   setTotal]   = useState(initDur || 0);
+  const [error,   setError]   = useState(null);
   const audioRef = useRef();
 
   useEffect(() => {
     const a = audioRef.current;
     if (!a) return;
-    const onTime = () => setCurrent(a.currentTime);
-    const onEnd  = () => { setPlaying(false); setCurrent(0); a.currentTime = 0; };
-    const onMeta = () => { if (isFinite(a.duration)) setTotal(a.duration); };
+    const onTime  = () => setCurrent(a.currentTime);
+    const onEnd   = () => { setPlaying(false); setCurrent(0); a.currentTime = 0; };
+    const onMeta  = () => { if (isFinite(a.duration)) setTotal(a.duration); };
+    const onError = () => {
+      const code = a.error?.code;
+      const map = { 1:'прервано', 2:'сеть', 3:'формат', 4:'недоступен' };
+      setError(map[code] || 'ошибка');
+      setPlaying(false);
+    };
     a.addEventListener('timeupdate', onTime);
     a.addEventListener('ended', onEnd);
     a.addEventListener('loadedmetadata', onMeta);
+    a.addEventListener('error', onError);
     return () => {
       a.removeEventListener('timeupdate', onTime);
       a.removeEventListener('ended', onEnd);
       a.removeEventListener('loadedmetadata', onMeta);
+      a.removeEventListener('error', onError);
     };
   }, [url]);
 
-  function toggle() {
+  async function toggle() {
     const a = audioRef.current;
     if (!a) return;
-    if (playing) a.pause(); else a.play().catch(() => {});
-    setPlaying(p => !p);
+    setError(null);
+    if (playing) { a.pause(); setPlaying(false); return; }
+    try {
+      // Принудительно перезагружаем источник если ещё не пробовали — иногда
+      // <audio> с preload="metadata" не дотягивает аудио и play() падает с
+      // NotSupportedError. Это особенно стабильно для голосовых от других
+      // (свой play()-вызов мог отработать раньше).
+      if (a.readyState < 2) { a.load(); }
+      await a.play();
+      setPlaying(true);
+    } catch(err) {
+      setError(err?.name === 'NotAllowedError' ? 'разрешение' : 'не воспроизводится');
+      setPlaying(false);
+    }
   }
 
   function fmtSec(s) {
@@ -3765,7 +3959,7 @@ const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut })
 
   return (
     <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:170, maxWidth:240 }}>
-      <audio ref={audioRef} src={url} preload="metadata" style={{ display:'none' }} />
+      <audio ref={audioRef} src={url} preload="auto" playsInline style={{ display:'none' }} />
       <button onClick={toggle} style={{
         width:36, height:36, borderRadius:'50%', flexShrink:0,
         background: isOut ? 'rgba(255,255,255,.2)' : 'rgba(100,70,160,.15)',
@@ -3787,9 +3981,8 @@ const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut })
         }}>
           <div style={{ width:`${progress*100}%`, height:'100%', background:barColor, borderRadius:2, transition:'width .1s linear' }} />
         </div>
-        <div style={{ fontSize:11, color:textColor }}>
-          {playing ? fmtSec(current) : fmtSec(total)}
-          {' '}🎙
+        <div style={{ fontSize:11, color: error ? '#ff8080' : textColor }}>
+          {error ? `⚠ ${error}` : <>{playing ? fmtSec(current) : fmtSec(total)} 🎙</>}
         </div>
       </div>
     </div>
@@ -3824,6 +4017,7 @@ export function ChatScreen() {
   const [accepting,    setAccepting]    = useState(false);
   const [declining,    setDeclining]    = useState(false);
   const [reactionPicker,setReactionPicker] = useState(null); // { msgId, x, y }
+  const [flashMsgId,    setFlashMsgId]    = useState(null);  // id сообщения, которое подсвечивается
   const [customConfirm, confirmModal] = useConfirm();
   const [isContact,    setIsContact]    = useState(false); // is partner in my contacts?
   // Voice recording
@@ -3926,7 +4120,10 @@ export function ChatScreen() {
           isGroup:true, icon:c.icon||'👥', admin_id:c.admin_id, isDeleted:false });
       } else {
         setPartner(p => ({ ...p, name: c.name||'Диалог', id: c.partner_id||null,
-          isGroup:false, avatar: c.avatar||null, isDeleted:!!c.partner_is_deleted }));
+          isGroup:false, avatar: c.avatar||null,
+          isDeleted: !!c.partner_is_deleted,
+          isSuper:   !!c.partner_is_super,
+          isSystem:  !!c.partner_is_system }));
         if (c.partner_id) {
           setIsContact(contacts.some(ct => ct.id === c.partner_id));
         }
@@ -4013,6 +4210,9 @@ export function ChatScreen() {
     });
     const u9 = socket.on('reaction:update', ({ messageId, reactions }) => {
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
+      // Подсветка сообщения на секунду
+      setFlashMsgId(messageId);
+      setTimeout(() => setFlashMsgId(curr => curr === messageId ? null : curr), 1000);
     });
     return () => { u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u7(); u8(); u9(); };
   }, [convId, user?.id]);
@@ -4386,20 +4586,45 @@ export function ChatScreen() {
       display:'flex', flexDirection:'column', overflow:'hidden',
       background:'var(--grad)',
     }}>
-      {/* TopBar */}
+      {/* TopBar — клик на аватар/имя собеседника открывает его профиль */}
       <div className="topbar">
         <div className="topbar-inner">
           <button className="back-btn" onClick={() => nav(-1)}>‹</button>
           {partner.isGroup ? (
-            <div style={{width:36,height:36,borderRadius:'12px',flexShrink:0,
-              background:'rgba(140,100,200,.5)',display:'flex',alignItems:'center',
-              justifyContent:'center',fontSize:20}}>
+            <div onClick={() => nav(`/groups/${convId}/settings`)}
+              style={{width:36,height:36,borderRadius:'12px',flexShrink:0,cursor:'pointer',
+                background:'rgba(140,100,200,.5)',display:'flex',alignItems:'center',
+                justifyContent:'center',fontSize:20,transition:'transform .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'}
+              onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
               {partner.icon||'👥'}
             </div>
           ) : (
-            <AvatarDisplay avatar={partner.avatar} name={partner.name} size={36}/>
+            <div onClick={() => partner.id && nav(`/profile/${partner.id}`)}
+              style={{cursor: partner.id ? 'pointer' : 'default',transition:'transform .15s',
+                position:'relative',width:36,height:36,flexShrink:0}}
+              onMouseEnter={e=>{ if(partner.id) e.currentTarget.style.transform='scale(1.05)'; }}
+              onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+              <AvatarDisplay avatar={partner.avatar} name={partner.name} size={36}/>
+              {partner.isSuper && (
+                <div style={{
+                  position:'absolute',bottom:-1,right:-1,
+                  width:14,height:14,borderRadius:'50%',
+                  background:'linear-gradient(135deg,#c8a8ff,#7858b0)',
+                  border:'2px solid var(--topbar-bg,#1a0e36)',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:7,color:'white',fontWeight:700,
+                  pointerEvents:'none',
+                }}>✦</div>
+              )}
+            </div>
           )}
-          <div style={{flex:1,marginLeft:8,minWidth:0}}>
+          <div onClick={() => {
+              if (partner.isGroup) nav(`/groups/${convId}/settings`);
+              else if (partner.id) nav(`/profile/${partner.id}`);
+            }}
+            style={{flex:1,marginLeft:8,minWidth:0,
+              cursor: (partner.isGroup || partner.id) ? 'pointer' : 'default'}}>
             <div className="topbar-title" style={{flex:'unset'}}>{partner.name}</div>
             {partner.isGroup && <div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>группа</div>}
           </div>
@@ -4495,6 +4720,7 @@ export function ChatScreen() {
                   editingMsgId={editingMsg?.id}
                   reactionPickerMsgId={reactionPicker?.msgId}
                   currentUserId={user?.id}
+                  isFlashing={flashMsgId === item.id}
                   onOpenMenu={handleOpenMenu}
                   onLightbox={handleLightbox}
                   onToggleReaction={handleToggleRxn}
@@ -4739,8 +4965,24 @@ export function ChatScreen() {
           </div>
         )}
 
-        {/* ── Normal text input bar (hidden while recording/preview) ── */}
-        {!voiceState && (
+        {/* ── Системный пользователь: показываем плашку вместо инпута ── */}
+        {partner.isSystem && (
+          <div style={{padding:'14px 20px 20px',maxWidth:680,margin:'0 auto'}}>
+            <div style={{
+              background:'rgba(120,90,200,.1)',
+              border:'1px solid rgba(180,140,220,.2)',
+              borderRadius:14, padding:'12px 16px',
+              display:'flex', alignItems:'center', gap:10,
+              color:'rgba(255,255,255,.5)', fontSize:13,
+            }}>
+              <span style={{fontSize:18}}>💬</span>
+              <span>Это сервисный аккаунт. Ответить здесь нельзя.</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Normal text input bar (hidden while recording/preview/system) ── */}
+        {!voiceState && !partner.isSystem && (
         <div style={{padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
           <div style={{
             borderRadius:26,
@@ -4809,7 +5051,7 @@ export function ChatScreen() {
       {showVoiceLimit && (
         <SuperLimitPopup
           onClose={() => setShowVoiceLimit(false)}
-          onInvite={() => { setShowVoiceLimit(false); nav('/profile/me'); }}
+          onInvite={() => { setShowVoiceLimit(false); nav('/me'); }}
         />
       )}
 
@@ -5693,7 +5935,8 @@ export function MomentPage() {
   }, [id]);
 
   useEffect(() => {
-    if (moment && moment.user_id !== user?.id) {
+    // Считаем просмотр только когда юзер залогинен и это не его момент
+    if (moment && user && moment.user_id !== user.id) {
       api.viewMoment(moment.id).catch(() => {});
     }
   }, [moment?.id, user?.id]);
@@ -5773,10 +6016,12 @@ export function MomentPage() {
       }}>
         <div style={{ maxWidth:680, margin:'0 auto', padding:'14px 20px',
           display:'flex', alignItems:'center', gap:12 }}>
-          <button onClick={() => nav(-1)} style={{
+          <button onClick={() => user ? nav(-1) : nav('/')} style={{
             background:'none', border:'none', color:'white', fontSize:24,
             cursor:'pointer', lineHeight:1, padding:'0 6px', opacity:.7 }}>‹</button>
-          <div style={{ color:'white', fontSize:18, fontWeight:700, flex:1 }}>Момент</div>
+          <div style={{ color:'white', fontSize:18, fontWeight:700, flex:1 }}>
+            {user ? 'Момент' : '✦ HEY · Момент'}
+          </div>
         </div>
       </div>
 
@@ -5867,36 +6112,72 @@ export function MomentPage() {
                 <span style={{ color:'rgba(255,255,255,.6)', fontSize:14 }}>✨ {moment.stats?.resonate || 0} резонирует</span>
                 <span style={{ color:'rgba(255,255,255,.6)', fontSize:14 }}>🤝 {moment.stats?.talk || 0}</span>
               </div>
+            ) : user ? (
+              <>
+                <div>
+                  <div style={{ color:'rgba(255,255,255,.45)', fontSize:12, marginBottom:10,
+                    textTransform:'uppercase', letterSpacing:.5 }}>Отклик</div>
+                  <div style={{ display:'flex', gap:8 }}>
+                    {REACTIONS.map(r => (
+                      <button key={r.id} onClick={() => handleReact(r.id)}
+                        style={{
+                          flex:1, padding:'11px 0', borderRadius:14, fontSize:13, fontWeight:600,
+                          cursor:'pointer', transition:'all .18s',
+                          background: myReaction===r.id ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
+                          border: myReaction===r.id ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.12)',
+                          color: myReaction===r.id ? 'white' : 'rgba(255,255,255,.7)',
+                        }}>
+                        <div style={{ fontSize:18 }}>{r.icon}</div>
+                        <div style={{ fontSize:11, marginTop:2 }}>{r.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={handleChat}
+                  style={{ width:'100%', padding:'13px', borderRadius:14,
+                    background:'rgba(100,78,148,.75)', border:'none',
+                    color:'white', fontSize:15, fontWeight:600, cursor:'pointer', marginTop:4 }}>
+                  ✉ Написать {moment.author_name?.split(' ')[0]}
+                </button>
+              </>
             ) : (
-              <div>
-                <div style={{ color:'rgba(255,255,255,.45)', fontSize:12, marginBottom:10,
-                  textTransform:'uppercase', letterSpacing:.5 }}>Отклик</div>
-                <div style={{ display:'flex', gap:8 }}>
-                  {REACTIONS.map(r => (
-                    <button key={r.id} onClick={() => handleReact(r.id)}
-                      style={{
-                        flex:1, padding:'11px 0', borderRadius:14, fontSize:13, fontWeight:600,
-                        cursor:'pointer', transition:'all .18s',
-                        background: myReaction===r.id ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
-                        border: myReaction===r.id ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.12)',
-                        color: myReaction===r.id ? 'white' : 'rgba(255,255,255,.7)',
-                      }}>
-                      <div style={{ fontSize:18 }}>{r.icon}</div>
-                      <div style={{ fontSize:11, marginTop:2 }}>{r.label}</div>
-                    </button>
-                  ))}
+              /* Аноним — приглашение залогиниться/зарегистрироваться */
+              <div style={{
+                background:'linear-gradient(135deg, rgba(120,90,200,.18), rgba(180,140,220,.08))',
+                border:'1px solid rgba(180,140,220,.3)',
+                borderRadius:16, padding:'18px 18px',
+                display:'flex', flexDirection:'column', gap:12,
+              }}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontSize:24}}>✦</span>
+                  <div>
+                    <div style={{color:'white',fontSize:15,fontWeight:700,marginBottom:2}}>
+                      Это HEY — приватный мессенджер
+                    </div>
+                    <div style={{color:'rgba(255,255,255,.6)',fontSize:13,lineHeight:1.45}}>
+                      Войди, чтобы поддержать момент и написать автору
+                    </div>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:8,marginTop:4}}>
+                  <button onClick={() => nav('/login')}
+                    style={{
+                      flex:1,padding:'12px',borderRadius:12,
+                      background:'rgba(120,90,200,.85)',border:'none',color:'white',
+                      fontSize:14,fontWeight:700,cursor:'pointer',
+                    }}>
+                    Войти
+                  </button>
+                  <button onClick={() => nav('/register')}
+                    style={{
+                      flex:1,padding:'12px',borderRadius:12,
+                      background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.15)',
+                      color:'white',fontSize:14,fontWeight:600,cursor:'pointer',
+                    }}>
+                    Регистрация
+                  </button>
                 </div>
               </div>
-            )}
-
-            {/* Chat button for other's moments */}
-            {!isMine && (
-              <button onClick={handleChat}
-                style={{ width:'100%', padding:'13px', borderRadius:14,
-                  background:'rgba(100,78,148,.75)', border:'none',
-                  color:'white', fontSize:15, fontWeight:600, cursor:'pointer', marginTop:4 }}>
-                ✉ Написать {moment.author_name?.split(' ')[0]}
-              </button>
             )}
           </div>
         </div>
@@ -5996,8 +6277,25 @@ export function PublicProfileScreen() {
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             <div style={{width:8,height:8,borderRadius:'50%',
               background: isOnline ? '#4ade80' : 'rgba(255,255,255,.25)'}}/>
-            <div style={{color:'rgba(255,255,255,.45)',fontSize:12}}>
-              {isOnline ? 'онлайн' : lastSeen ? fmtLastSeen(lastSeen) : 'не в сети'}
+            <div style={{color:'rgba(255,255,255,.45)',fontSize:12,
+              display:'flex',alignItems:'center',gap:4}}
+              title={!me?.is_super && !isOnline ? 'Точное время визита видно в ✦ Super' : ''}>
+              <span>
+                {isOnline
+                  ? 'онлайн'
+                  : me?.is_super
+                    ? (lastSeen ? fmtLastSeen(lastSeen) : 'не в сети')
+                    : 'не в сети'}
+              </span>
+              {!isOnline && me?.is_super && lastSeen && (
+                <span style={{
+                  background:'rgba(180,140,255,.18)',
+                  border:'1px solid rgba(180,140,255,.35)',
+                  borderRadius:8,padding:'1px 5px',
+                  fontSize:9,color:'rgba(220,200,255,.85)',
+                  fontWeight:700,letterSpacing:.3,
+                }}>✦</span>
+              )}
             </div>
           </div>
         </div>
@@ -6028,6 +6326,18 @@ export function PublicProfileScreen() {
             <AchievementBadges achievements={profile?.achievements} />
           </div>
         </div>
+
+        {/* Bio — описание */}
+        {profile?.bio && (
+          <div style={{
+            background:'rgba(255,255,255,.05)', borderRadius:14,
+            border:'1px solid rgba(255,255,255,.08)', padding:'12px 16px',
+            color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.6,
+            marginBottom:20,wordBreak:'break-word',
+          }}>
+            <BioWithLinks text={profile.bio}/>
+          </div>
+        )}
 
         {/* Actions */}
         {!isMe && (

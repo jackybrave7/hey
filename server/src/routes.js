@@ -80,9 +80,20 @@ module.exports = function makeRouter(db, broadcast) {
       return res.status(400).json({ error: 'phone, name, password required' });
     if (password.length < 8)
       return res.status(400).json({ error: 'Пароль минимум 8 символов' });
+    // Пока открыта регистрация только по инвайту
+    const openSignup = process.env.OPEN_SIGNUP === '1';
+    if (!openSignup && !inviteUserId) {
+      return res.status(403).json({
+        error: 'Регистрация пока только по приглашению. Попроси ссылку у знакомых.',
+        code: 'INVITE_REQUIRED',
+      });
+    }
     if (db.findUserByPhone(phone))
       return res.status(409).json({ error: 'Телефон уже зарегистрирован' });
     const user = db.createUser({ phone, name, password, birthday, avatar });
+
+    // Системный пользователь автоматически в контактах у нового юзера
+    db.addSystemContactFor(user.id);
 
     // Auto-add mutual contacts if registered via invite link
     if (inviteUserId) {
@@ -116,6 +127,28 @@ module.exports = function makeRouter(db, broadcast) {
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
     const { password: _, ...safe } = user;
     res.json({ token, user: safe });
+  });
+
+  // ── Waitlist (email уведомления когда регистрация откроется) ──────────
+  r.post('/waitlist', rateLimit(5, 60 * 60 * 1000), (req, res) => {
+    const raw = (req.body?.email || '').trim().toLowerCase();
+    if (!raw) return res.status(400).json({ error: 'Введите email' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(raw)) {
+      return res.status(400).json({ error: 'Неверный формат email' });
+    }
+    if (raw.length > 200) return res.status(400).json({ error: 'Слишком длинный email' });
+    try {
+      const result = db.addToWaitlist(raw, req.body?.source || 'register-page');
+      res.json({ ok: true, isNew: result.isNew });
+    } catch (e) {
+      console.error('[waitlist]', e);
+      res.status(500).json({ error: 'Не удалось сохранить' });
+    }
+  });
+
+  // Админ: список ожидания
+  r.get('/admin/waitlist', requireAdmin, (req, res) => {
+    res.json(db.getWaitlist());
   });
 
   r.post('/login', rateLimit(10, 15 * 60 * 1000), (req, res) => {
@@ -197,13 +230,33 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   r.patch('/me', requireAuth, (req, res) => {
-    const { name, phone, birthday, avatar, bio } = req.body;
+    const { name, phone, birthday, avatar, bio, headline } = req.body;
     const updates = {};
     if (name) updates.name = name;
     if (phone) updates.phone = phone;
     if (birthday !== undefined) updates.birthday = birthday;
     if (avatar  !== undefined) updates.avatar = avatar;
-    if (bio     !== undefined) updates.bio = bio.slice(0, 200); // hard cap 200 chars
+    if (bio !== undefined) {
+      const cleanedBio = bio ? bio.slice(0, 200) : null;
+      // Проверка лимита ссылок: обычный — 1, Super — до 5
+      if (cleanedBio) {
+        const urls = cleanedBio.match(/https?:\/\/\S+/gi) || [];
+        const me = db.findUserById(req.user.id);
+        const maxLinks = me?.is_super ? 5 : 1;
+        if (urls.length > maxLinks) {
+          return res.status(400).json({
+            error: me?.is_super
+              ? `В описании можно до ${maxLinks} ссылок (у вас ${urls.length}).`
+              : `В описании можно только 1 ссылку (у вас ${urls.length}). В ✦ Super — до 5.`,
+            code: 'TOO_MANY_LINKS',
+            maxLinks,
+            current: urls.length,
+          });
+        }
+      }
+      updates.bio = cleanedBio;
+    }
+    if (headline  !== undefined) updates.headline = headline ? headline.slice(0, 100) : null;
     const user = db.updateUser(req.user.id, updates);
     const { password, ...safe } = user;
     res.json(safe);
@@ -694,10 +747,19 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   // Один момент
-  r.get('/moments/:id', requireAuth, (req, res) => {
+  // Публичный — момент по share-ссылке открывается без логина.
+  // Если юзер залогинен, дополнительно возвращаем myReaction.
+  r.get('/moments/:id', optionalAuth, (req, res) => {
     const m = db.getMomentById(req.params.id);
     if (!m || m.status === 'deleted') return res.status(404).json({ error: 'Not found' });
-    const myReaction = db.getUserMomentReaction(req.params.id, req.user.id);
+    // Если автор заблокирован — момент тоже не показываем
+    const author = db.findUserById(m.user_id);
+    if (author?.is_blocked || author?.is_deleted) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const myReaction = req.user
+      ? db.getUserMomentReaction(req.params.id, req.user.id)
+      : null;
     res.json({ ...m, myReaction: myReaction?.reaction || null });
   });
 
@@ -842,6 +904,55 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getMomentReactions(req.params.id));
   });
 
+  // ── Reports / Жалобы ───────────────────────────────────────────────────
+  // Юзер жалуется на момент или другого юзера. Минимум 20 символов в описании.
+  r.post('/reports', requireAuth, (req, res) => {
+    const { targetType, targetId, reason } = req.body;
+    if (!['moment','user','message'].includes(targetType)) {
+      return res.status(400).json({ error: 'Неверный тип объекта' });
+    }
+    if (!targetId) return res.status(400).json({ error: 'Не указан объект' });
+    const trimmed = (reason || '').trim();
+    if (trimmed.length < 20) {
+      return res.status(400).json({ error: 'Опишите ситуацию подробнее (минимум 20 символов)' });
+    }
+    if (trimmed.length > 1000) {
+      return res.status(400).json({ error: 'Слишком длинное описание (максимум 1000 символов)' });
+    }
+    // Определяем target_user_id для удобства админки
+    let targetUserId = null;
+    if (targetType === 'moment') {
+      const m = db.getMomentById(targetId);
+      if (!m) return res.status(404).json({ error: 'Момент не найден' });
+      targetUserId = m.user_id;
+    } else if (targetType === 'user') {
+      const u = db.findUserById(targetId);
+      if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
+      targetUserId = u.id;
+    }
+    const report = db.createReport({
+      reporterId: req.user.id,
+      targetType, targetId, targetUserId, reason: trimmed,
+    });
+    res.json({ ok: true, id: report.id });
+  });
+
+  // Админ: список жалоб
+  r.get('/admin/reports', requireAdmin, (req, res) => {
+    const status = req.query.status || 'open';
+    res.json(db.getReports({ status }));
+  });
+
+  // Админ: закрыть жалобу
+  r.patch('/admin/reports/:id', requireAdmin, (req, res) => {
+    const { action } = req.body; // 'resolved' | 'dismissed'
+    if (!['resolved','dismissed'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action' });
+    }
+    db.resolveReport(req.params.id, req.user.id, action);
+    res.json({ ok: true });
+  });
+
   // ── Moment Views ──────────────────────────────────────────────────────────
 
   r.post('/moments/:id/view', requireAuth, (req, res) => {
@@ -898,6 +1009,17 @@ module.exports = function makeRouter(db, broadcast) {
     const user = db.findUserById(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
     db.adminUnblockUser(req.params.id, req.user.id);
+    res.json({ ok: true });
+  });
+
+  // Полное удаление аккаунта (анонимизация). Только для админов.
+  r.delete('/admin/users/:id', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    if (user.id === req.user.id) return res.status(400).json({ error: 'Нельзя удалить свой аккаунт через админку' });
+    if (user.is_admin)             return res.status(400).json({ error: 'Сначала снимите права администратора' });
+    db.deleteUserAccount(req.params.id);
+    if (db.logAdminAction) db.logAdminAction(req.user.id, 'delete_user', req.params.id, `phone=${user.phone}`);
     res.json({ ok: true });
   });
 

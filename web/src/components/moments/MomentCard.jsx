@@ -33,11 +33,34 @@ function AudioBars() {
   );
 }
 
+// Перебиваем провайдер по фактическому URL — старые записи могли быть сохранены
+// с неверным провайдером (до того как добавили RuTube/Kinescope).
+function detectProvider(url, fallback) {
+  if (!url) return fallback;
+  if (/kinescope\.io/i.test(url))  return 'kinescope';
+  if (/rutube\.ru/i.test(url))     return 'rutube';
+  if (/(youtube\.com|youtu\.be)/i.test(url)) return 'youtube';
+  if (/vimeo\.com/i.test(url))     return 'vimeo';
+  return fallback;
+}
+const PROVIDER_BADGE = {
+  youtube:   { label: '▶ YT',        color: '#ff4444' },
+  vimeo:     { label: '● Vimeo',     color: '#1ab7ea' },
+  rutube:    { label: '▶ RuTube',    color: '#ff8a3c' },
+  kinescope: { label: '▶ Kinescope', color: '#b89aff' },
+};
+
 export default function MomentCard({ moment, isMine, onClick }) {
   const hasMedia       = !!moment.media_url;
-  const hasEmbedVideo  = !hasMedia && !!moment.embedded_video?.thumbnail_url;
+  // Считаем что embedded видео есть, если есть объект (даже без thumbnail — покажем плейсхолдер)
+  const hasEmbedVideo  = !hasMedia && !!moment.embedded_video;
   const preview        = (moment.text || '').slice(0, 80);
   const isAuthorSuper  = !!moment.author_is_super;
+  // Истинный провайдер с фолбэком на сохранённый
+  const embedProvider = hasEmbedVideo
+    ? detectProvider(moment.embedded_video.url, moment.embedded_video.provider)
+    : null;
+  const providerBadge = embedProvider ? PROVIDER_BADGE[embedProvider] : null;
 
   // Рамка: своя > Super автора > обычная
   let border = '1px solid rgba(255,255,255,.06)';
@@ -109,9 +132,23 @@ export default function MomentCard({ moment, isMine, onClick }) {
       ) : hasEmbedVideo ? (
         /* Embedded video thumbnail as card background */
         <>
-          <img src={moment.embedded_video.thumbnail_url} alt=""
-            style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+          {moment.embedded_video.thumbnail_url && (
+            <img src={moment.embedded_video.thumbnail_url} alt=""
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              style={{width:'100%',height:'100%',objectFit:'cover',display:'block',
+                background:'linear-gradient(135deg,#1e0a40,#4a1a80,#7030b0)'}}/>
+          )}
+          {!moment.embedded_video.thumbnail_url && (
+            <div style={{width:'100%',height:'100%',
+              background:'linear-gradient(135deg,#1e0a40,#4a1a80,#7030b0)'}}/>
+          )}
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.22)'}}/>
+          {/* Центральная иконка плёнки для случая когда обложка не загрузилась */}
+          <div style={{
+            position:'absolute',top:'50%',left:'50%',
+            transform:'translate(-50%,-50%)',fontSize:42,
+            opacity:.35,color:'white',pointerEvents:'none',
+          }}>🎬</div>
         </>
       ) : (
         <MoodEmoji type={moment.mood_emoji || 'calm'} size={130}/>
@@ -137,16 +174,16 @@ export default function MomentCard({ moment, isMine, onClick }) {
         }}>🎧</div>
       )}
       {/* Embedded video badge */}
-      {hasEmbedVideo && (
+      {hasEmbedVideo && providerBadge && (
         <div style={{
           position:'absolute',top:10,right:10,zIndex:3,
           background:'rgba(0,0,0,.65)',backdropFilter:'blur(8px)',
           borderRadius:20,padding:'3px 8px',
           fontSize:10,fontWeight:700,
-          color: moment.embedded_video?.provider === 'youtube' ? '#ff4444' : '#1ab7ea',
+          color: providerBadge.color,
           whiteSpace:'nowrap',
         }}>
-          {moment.embedded_video?.provider === 'youtube' ? '▶ YT' : '● Vimeo'}
+          {providerBadge.label}
         </div>
       )}
 
@@ -163,40 +200,72 @@ export default function MomentCard({ moment, isMine, onClick }) {
         </div>
       )}
 
-      {/* Glass caption */}
-      <div style={{
-        position:'absolute',bottom:8,left:8,right:8,zIndex:2,
-        background:'rgba(20,12,40,.65)',backdropFilter:'blur(14px)',
-        borderRadius:6,padding:'9px 12px',
-      }}>
-        {!isMine && (
-          <div style={{
-            color:'rgba(255,255,255,.55)',fontSize:11,fontWeight:400,
-            marginBottom:3,
-            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
-          }}>
-            {moment.author_name}
-          </div>
-        )}
+      {/* Glass caption — только для чужих моментов; на своих ничего не перекрывает превью */}
+      {!isMine && (
         <div style={{
-          color:'white',fontSize:12,fontWeight:400,lineHeight:1.45,
-          overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,
-          WebkitBoxOrient:'vertical',
+          position:'absolute',bottom:8,left:8,right:8,zIndex:2,
+          background:'rgba(20,12,40,.65)',backdropFilter:'blur(14px)',
+          borderRadius:6,padding:'9px 12px',
         }}>
-          {preview}{moment.text?.length > 80 ? '…' : ''}
-        </div>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
-          <span style={{color:'rgba(255,255,255,.35)',fontSize:10}}>{fmtTime(moment.created_at)}</span>
-          <div style={{display:'flex',alignItems:'center',gap:4}}>
-            {isMine && (
-              <span style={{color:'rgba(255,255,255,.35)',fontSize:10}}>👁 {moment.views || 0}</span>
-            )}
-            {moment.stats?.see      > 0 && <span style={{fontSize:12,lineHeight:1}}>👁</span>}
-            {moment.stats?.resonate > 0 && <span style={{fontSize:12,lineHeight:1}}>✨</span>}
-            {moment.stats?.talk     > 0 && <span style={{fontSize:12,lineHeight:1}}>🤝</span>}
+          <div style={{
+            display:'flex',alignItems:'center',gap:6,marginBottom:4,
+            overflow:'hidden',
+          }}>
+            {/* Аватар автора — фото или буква */}
+            <div style={{
+              width:18,height:18,borderRadius:'50%',flexShrink:0,
+              background:'rgba(200,160,210,.45)',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:10,color:'white',fontWeight:700,
+              overflow:'hidden',
+              border:'1px solid rgba(255,255,255,.2)',
+            }}>
+              {moment.author_avatar && (moment.author_avatar.startsWith('/') ||
+                                        moment.author_avatar.startsWith('http') ||
+                                        moment.author_avatar.startsWith('data:'))
+                ? <img src={moment.author_avatar} alt=""
+                    style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                : (moment.author_name || '?')[0].toUpperCase()}
+            </div>
+            <span style={{
+              color:'rgba(255,255,255,.75)',fontSize:11,fontWeight:500,
+              overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
+            }}>
+              {moment.author_name}
+            </span>
+          </div>
+          <div style={{
+            color:'white',fontSize:12,fontWeight:400,lineHeight:1.45,
+            overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,
+            WebkitBoxOrient:'vertical',
+          }}>
+            {preview}{moment.text?.length > 80 ? '…' : ''}
+          </div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
+            <span style={{color:'rgba(255,255,255,.35)',fontSize:10}}>{fmtTime(moment.created_at)}</span>
+            <div style={{display:'flex',alignItems:'center',gap:4}}>
+              {moment.stats?.see      > 0 && <span style={{fontSize:12,lineHeight:1}}>👁</span>}
+              {moment.stats?.resonate > 0 && <span style={{fontSize:12,lineHeight:1}}>✨</span>}
+              {moment.stats?.talk     > 0 && <span style={{fontSize:12,lineHeight:1}}>🤝</span>}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* На своих моментах — компактный счётчик просмотров в углу */}
+      {isMine && (moment.views > 0 || moment.stats?.resonate > 0 || moment.stats?.talk > 0) && (
+        <div style={{
+          position:'absolute',bottom:8,left:8,zIndex:2,
+          background:'rgba(20,12,40,.6)',backdropFilter:'blur(10px)',
+          borderRadius:50,padding:'4px 10px',
+          display:'flex',alignItems:'center',gap:8,
+          fontSize:11,color:'rgba(255,255,255,.85)',
+        }}>
+          {moment.views > 0          && <span>👁 {moment.views}</span>}
+          {moment.stats?.resonate > 0 && <span>✨ {moment.stats.resonate}</span>}
+          {moment.stats?.talk > 0     && <span>🤝 {moment.stats.talk}</span>}
+        </div>
+      )}
     </div>
   );
 }

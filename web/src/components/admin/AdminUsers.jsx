@@ -111,17 +111,25 @@ export default function AdminUsers() {
                   <td style={cell}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{
-                        width: 32, height: 32, borderRadius: '50%',
+                        width: 36, height: 36, borderRadius: '50%',
                         background: 'rgba(120,90,200,.4)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 14, color: 'white', fontWeight: 700, flexShrink: 0,
+                        overflow: 'hidden',
+                        border: '1px solid rgba(255,255,255,.1)',
                       }}>
-                        {u.name?.[0]?.toUpperCase() || '?'}
+                        {u.avatar && (u.avatar.startsWith('/') || u.avatar.startsWith('http') || u.avatar.startsWith('data:'))
+                          ? <img src={u.avatar} alt=""
+                              onError={e => { e.currentTarget.style.display = 'none'; }}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+                          : (u.name?.[0]?.toUpperCase() || '?')}
                       </div>
-                      <div>
-                        <div style={{ color: 'white', fontWeight: 600 }}>{u.name}</div>
-                        {u.is_admin && <div style={{ color: 'rgba(180,140,255,.8)', fontSize: 11 }}>admin</div>}
-                        {u.is_super && <div style={{ color: 'rgba(255,200,80,.9)', fontSize: 11 }}>⭐ super</div>}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: 'white', fontWeight: 600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.name}</div>
+                        <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                          {u.is_admin && <span style={{ color: 'rgba(180,140,255,.8)', fontSize: 11 }}>admin</span>}
+                          {u.is_super && <span style={{ color: 'rgba(255,200,80,.9)', fontSize: 11 }}>⭐ super</span>}
+                        </div>
                       </div>
                     </div>
                   </td>

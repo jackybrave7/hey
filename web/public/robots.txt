@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /$
+Allow: /register
+Allow: /login
+Disallow: /chat/
+Disallow: /groups/
+Disallow: /contacts
+Disallow: /settings
+Disallow: /admin
+Disallow: /api/
+Disallow: /me
+Disallow: /main
+
+Sitemap: https://hey-messenger.ru/sitemap.xml

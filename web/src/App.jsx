@@ -225,16 +225,19 @@ export default function App() {
             </Protected>
           }/>
 
-          <Route path="/profile/me" element={
+          <Route path="/me" element={
             <Protected>
               <WithBottomNav>
                 <MyProfileScreen/>
               </WithBottomNav>
             </Protected>
           }/>
+          {/* Старый URL — редирект для обратной совместимости */}
+          <Route path="/profile/me" element={<Navigate to="/me" replace/>}/>
 
           {/* Protected — without bottom nav */}
-          <Route path="/moments/:id"             element={<Protected><MomentPage/></Protected>}/>
+          {/* Публичный шар-линк момента — доступен без логина */}
+          <Route path="/moments/:id"             element={<MomentPage/>}/>
           <Route path="/profile/:id"             element={<Protected><PublicProfileScreen/></Protected>}/>
           <Route path="/chat/:convId"            element={<Protected><ChatScreen/></Protected>}/>
           <Route path="/groups/new"              element={<Protected><GroupCreateScreen/></Protected>}/>

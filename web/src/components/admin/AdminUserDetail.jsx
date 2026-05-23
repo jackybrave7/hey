@@ -109,6 +109,24 @@ export default function AdminUserDetail() {
     } catch (e) { showMsg('Ошибка: ' + e.message); }
   }
 
+  async function handleDeleteUser() {
+    const phrase = 'УДАЛИТЬ';
+    const answer = prompt(
+      `Полностью удалить пользователя "${user.name}" (${user.phone})?\n\n` +
+      `Это действие необратимо. Данные будут анонимизированы:\n` +
+      `— имя заменится на «Удалённый пользователь»\n` +
+      `— телефон, email, аватар, био — очистятся\n` +
+      `— моменты и сообщения останутся, но без авторства\n\n` +
+      `Для подтверждения введи: ${phrase}`
+    );
+    if (answer !== phrase) return;
+    try {
+      await api.adminDeleteUser(id);
+      showMsg('Пользователь удалён');
+      setTimeout(() => nav('/admin/users'), 800);
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+
   if (loading) return <div style={{ padding: 32, color: 'rgba(255,255,255,.4)' }}>Загрузка…</div>;
   if (error)   return <div style={{ padding: 32, color: 'rgba(255,140,140,.9)' }}>Ошибка: {error}</div>;
   if (!user)   return <div style={{ padding: 32, color: 'rgba(255,255,255,.4)' }}>Не найдено</div>;
@@ -125,12 +143,19 @@ export default function AdminUserDetail() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
         <div style={{
-          width: 64, height: 64, borderRadius: '50%',
+          width: 72, height: 72, borderRadius: '50%',
           background: 'rgba(120,90,200,.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 28, color: 'white', fontWeight: 700,
+          fontSize: 30, color: 'white', fontWeight: 700,
+          overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,.12)',
+          flexShrink: 0,
         }}>
-          {user.name?.[0]?.toUpperCase()}
+          {user.avatar && (user.avatar.startsWith('/') || user.avatar.startsWith('http') || user.avatar.startsWith('data:'))
+            ? <img src={user.avatar} alt=""
+                onError={e => { e.currentTarget.style.display = 'none'; }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+            : user.name?.[0]?.toUpperCase()}
         </div>
         <div>
           <h1 style={{ color: 'white', fontSize: 22, fontWeight: 800, margin: 0 }}>
@@ -220,6 +245,39 @@ export default function AdminUserDetail() {
               Заблокировать
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Danger zone */}
+      {!isSelf && !user.is_admin && (
+        <div style={{
+          marginTop: 32, padding: 16,
+          background: 'rgba(200,50,50,.08)',
+          border: '1px solid rgba(255,80,80,.25)',
+          borderRadius: 14,
+        }}>
+          <div style={{ color: 'rgba(255,140,140,.95)', fontSize: 13, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: .8, marginBottom: 8 }}>
+            ⚠ Опасная зона
+          </div>
+          <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12, marginBottom: 12 }}>
+            Полное удаление аккаунта. Данные пользователя будут анонимизированы и не восстанавливаются.
+          </div>
+          <button onClick={handleDeleteUser}
+            style={{
+              padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', border: '1px solid rgba(255,80,80,.4)',
+              background: 'rgba(200,50,50,.18)', color: 'rgba(255,140,140,.95)',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(200,50,50,.32)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(200,50,50,.18)'}>
+            🗑 Удалить пользователя
+          </button>
+          {user.is_admin && (
+            <div style={{ color: 'rgba(255,180,80,.85)', fontSize: 12, marginTop: 8 }}>
+              ⚠ Сначала снимите права администратора.
+            </div>
+          )}
         </div>
       )}
 

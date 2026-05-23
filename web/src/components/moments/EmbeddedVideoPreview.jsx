@@ -28,10 +28,11 @@ function getEmbedUrl(provider, videoId) {
 
 export default function EmbeddedVideoPreview({ data, size = 'full' }) {
   const [playing, setPlaying] = useState(false);
+  const [thumbBroken, setThumbBroken] = useState(false);
   if (!data) return null;
 
   const p            = PROVIDERS[data.provider] || { label: '▶ Видео', color: '#aaa' };
-  const hasThumbnail = !!data.thumbnail_url;
+  const hasThumbnail = !!data.thumbnail_url && !thumbBroken;
   const embedUrl     = getEmbedUrl(data.provider, data.video_id);
   const isCard       = size === 'card';
 
@@ -113,7 +114,17 @@ export default function EmbeddedVideoPreview({ data, size = 'full' }) {
           >
             {hasThumbnail && (
               <img src={data.thumbnail_url} alt={data.title || ''}
+                onError={() => setThumbBroken(true)}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
+            )}
+            {/* Если обложки нет — показываем мягкий иконку в центре фоном */}
+            {!hasThumbnail && (
+              <div style={{
+                position:'absolute', top:'50%', left:'50%',
+                transform:'translate(-50%,-50%) translateY(-30px)',
+                fontSize: isCard ? 32 : 56, opacity:.25, color:'white',
+                pointerEvents:'none',
+              }}>🎬</div>
             )}
             {/* Overlay */}
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.28)' }}/>

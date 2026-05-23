@@ -80,20 +80,35 @@ async function fetchEmbedData(url) {
     // ── Kinescope ────────────────────────────────────────────────────────────
     if (kinescopeMatch) {
       const videoId = kinescopeMatch[1];
-      // Kinescope doesn't have a public oEmbed — construct thumbnail URL from known pattern
-      const thumbnail_url = `https://kinescope.io/${videoId}/thumbnail`;
-      let title = null, author = null, duration_seconds = null;
+      let thumbnail_url = null, title = null, author = null, duration_seconds = null;
+      // 1. Пробуем oEmbed (если включён у воркспейса) — берём thumbnail_url из ответа
       try {
-        // Kinescope oEmbed endpoint (undocumented but functional)
         const oembedUrl = `https://kinescope.io/oembed?url=${encodeURIComponent(`https://kinescope.io/${videoId}`)}`;
         const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(5000) });
         if (res.ok) {
           const d = await res.json();
-          title           = d.title       || null;
-          author          = d.author_name || null;
-          duration_seconds = d.duration   || null;
+          title           = d.title         || null;
+          author          = d.author_name   || null;
+          duration_seconds = d.duration     || null;
+          thumbnail_url   = d.thumbnail_url || null;
         }
       } catch {}
+      // 2. Если oEmbed не дал обложку — пробуем парсить og:image со страницы видео
+      if (!thumbnail_url) {
+        try {
+          const pageRes = await fetch(`https://kinescope.io/${videoId}`, {
+            signal: AbortSignal.timeout(5000),
+            headers: { 'User-Agent': 'Mozilla/5.0 (HEY Messenger bot)' },
+          });
+          if (pageRes.ok) {
+            const html = await pageRes.text();
+            const m = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                   || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+            if (m && m[1]) thumbnail_url = m[1];
+          }
+        } catch {}
+      }
+      // 3. Не нашли — оставляем null. UI красиво покажет градиент-плейсхолдер.
       return { provider: 'kinescope', video_id: videoId, url, thumbnail_url, title, author, duration_seconds };
     }
 

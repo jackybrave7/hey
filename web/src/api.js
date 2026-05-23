@@ -108,6 +108,14 @@ export const api = {
   deleteMoment:     (id)         => req('DELETE', `/moments/${id}`, { confirm: 'удалить' }),
   reactMoment:      (id, reaction) => req('POST', `/moments/${id}/react`, { reaction }),
   unreactMoment:    (id)         => req('DELETE', `/moments/${id}/react`),
+
+  // Waitlist
+  joinWaitlist:     (email)     => req('POST', '/waitlist', { email, source: 'register-page' }),
+
+  // Reports
+  createReport:     (data)      => req('POST', '/reports', data),
+  adminGetReports:  (status='open') => req('GET', `/admin/reports?status=${status}`),
+  adminResolveReport: (id, action) => req('PATCH', `/admin/reports/${id}`, { action }),
   viewMoment:       (id)         => req('POST',   `/moments/${id}/view`),
   getDisciplines:   (userId)     => req('GET',    `/moments/disciplines/${userId}`),
   uploadMomentMedia: (data)      => req('POST',   '/moments/upload', { data }),
@@ -123,6 +131,7 @@ export const api = {
   adminResetPassword:      (id)            => req('POST',   `/admin/users/${id}/reset-password`),
   adminBlockUser:          (id, reason)    => req('POST',   `/admin/users/${id}/block`, { reason }),
   adminUnblockUser:        (id)            => req('POST',   `/admin/users/${id}/unblock`),
+  adminDeleteUser:         (id)            => req('DELETE', `/admin/users/${id}`),
   adminMakeAdmin:          (id)            => req('POST',   `/admin/users/${id}/make-admin`),
   adminRevokeAdmin:        (id)            => req('POST',   `/admin/users/${id}/revoke-admin`),
   adminMakeSuper:          (id)            => req('POST',   `/admin/users/${id}/make-super`),

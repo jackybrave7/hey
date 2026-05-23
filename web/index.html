@@ -2,14 +2,116 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>HEY Messenger</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"/>
+
+  <!-- ── Primary meta ─────────────────────────────────────────────────── -->
+  <title>HEY Messenger — мессенджер для близкого круга</title>
+  <meta name="description" content="HEY — приватный мессенджер для близкого круга. Чаты с друзьями, моменты дня, голосовые сообщения. Без рекламы и алгоритмов."/>
+  <meta name="keywords" content="HEY, messenger, мессенджер, чат, моменты, общение, голосовые сообщения, приватный мессенджер"/>
+  <meta name="author" content="HEY Messenger"/>
+  <meta name="application-name" content="HEY"/>
+  <meta name="generator" content="Vite + React"/>
+
+  <!-- ── Theme & UI ───────────────────────────────────────────────────── -->
+  <meta name="theme-color" content="#5a2d96"/>
+  <meta name="color-scheme" content="dark"/>
+  <meta name="format-detection" content="telephone=no"/>
+
+  <!-- ── PWA / iOS ─────────────────────────────────────────────────────── -->
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="HEY"/>
+
+  <!-- ── Favicons ─────────────────────────────────────────────────────── -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+  <link rel="alternate icon" href="/favicon.svg"/>
+  <link rel="mask-icon" href="/favicon.svg" color="#7c45c7"/>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.svg"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.svg"/>
+
+  <!-- ── Canonical & language ──────────────────────────────────────────── -->
+  <link rel="canonical" href="https://hey-messenger.ru/"/>
+  <meta http-equiv="content-language" content="ru"/>
+
+  <!-- ── Open Graph (Facebook, VK, Telegram preview) ───────────────────── -->
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="HEY Messenger"/>
+  <meta property="og:title" content="HEY Messenger — мессенджер для близкого круга"/>
+  <meta property="og:description" content="Приватный мессенджер. Чаты, моменты дня, голосовые сообщения. Без рекламы и алгоритмов."/>
+  <meta property="og:url" content="https://hey-messenger.ru/"/>
+  <meta property="og:image" content="https://hey-messenger.ru/og-image.svg"/>
+  <meta property="og:image:width" content="1200"/>
+  <meta property="og:image:height" content="630"/>
+  <meta property="og:image:alt" content="HEY Messenger"/>
+  <meta property="og:locale" content="ru_RU"/>
+
+  <!-- ── Twitter Card ─────────────────────────────────────────────────── -->
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="HEY Messenger — мессенджер для близкого круга"/>
+  <meta name="twitter:description" content="Приватный мессенджер. Чаты, моменты, голосовые. Без рекламы."/>
+  <meta name="twitter:image" content="https://hey-messenger.ru/og-image.svg"/>
+  <meta name="twitter:image:alt" content="HEY Messenger"/>
+
+  <!-- ── Robots ────────────────────────────────────────────────────────── -->
+  <meta name="robots" content="index, follow, max-image-preview:large"/>
+  <meta name="googlebot" content="index, follow"/>
+  <meta name="yandex" content="index, follow"/>
+
+  <!-- ── Performance hints ─────────────────────────────────────────────── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet"/>
+
+  <!-- ── Structured data (JSON-LD) ─────────────────────────────────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "HEY Messenger",
+    "alternateName": "HEY",
+    "url": "https://hey-messenger.ru/",
+    "description": "Приватный мессенджер для близкого круга. Чаты, моменты, голосовые сообщения.",
+    "applicationCategory": "CommunicationApplication",
+    "operatingSystem": "Web, iOS, Android",
+    "browserRequirements": "Requires JavaScript. Modern browser.",
+    "inLanguage": "ru",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "RUB"
+    }
+  }
+  </script>
+
+  <!-- ── Initial loading paint (избегаем белого экрана) ────────────────── -->
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #1a0a30; color: #fff; }
+    body { font-family: 'Comfortaa', system-ui, -apple-system, sans-serif; }
+    #root { min-height: 100vh; }
+    .boot-splash {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg,#2a1058,#5a2d96,#7c45c7);
+      font-size: 38px; color: white;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div class="boot-splash">✦</div>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
+
+  <!-- noscript fallback -->
+  <noscript>
+    <div style="padding:40px;max-width:480px;margin:0 auto;text-align:center;">
+      <h1 style="color:#fff;">HEY Messenger</h1>
+      <p style="color:#d8c5f5;">Для работы приложения нужен JavaScript. Включи его в настройках браузера.</p>
+    </div>
+  </noscript>
 </body>
 </html>

@@ -15,6 +15,12 @@ db.pragma('foreign_keys = ON');
 db.pragma('synchronous = NORMAL');   // safe with WAL, much faster than FULL
 db.pragma('cache_size = -32000');    // 32 MB page cache
 db.pragma('temp_store = MEMORY');    // temp tables in RAM
+
+// Кастомная LOWER, корректно работающая с кириллицей (и любым unicode).
+// Перекрывает встроенную LOWER, которая в SQLite поддерживает только ASCII.
+db.function('LOWER', { deterministic: true }, (s) =>
+  s == null ? null : String(s).toLocaleLowerCase('ru-RU')
+);
 db.pragma('mmap_size = 268435456'); // 256 MB memory-mapped I/O
 
 // Safe migrations for existing DBs
@@ -162,6 +168,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN is_super INTEGER DEFAULT 0'); } catc
 try { db.exec('ALTER TABLE users ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN deleted_at INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN bio TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN headline TEXT'); } catch {}  // Главное обо мне (короткая фраза)
 // ── Message requests ──────────────────────────────────────────────────────────
 try { db.exec('ALTER TABLE conversations ADD COLUMN request_from TEXT'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS pinned_conversations (
@@ -180,11 +187,36 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (
   created_at       INTEGER NOT NULL
 )`); } catch {}
 
+// Жалобы от юзеров на моменты / других юзеров
+try { db.exec(`CREATE TABLE IF NOT EXISTS reports (
+  id               TEXT PRIMARY KEY,
+  reporter_id      TEXT NOT NULL,
+  target_type      TEXT NOT NULL,    -- 'moment' | 'user' | 'message'
+  target_id        TEXT NOT NULL,
+  target_user_id   TEXT,
+  reason           TEXT NOT NULL,
+  status           TEXT DEFAULT 'open',  -- 'open' | 'resolved' | 'dismissed'
+  created_at       INTEGER NOT NULL,
+  resolved_at      INTEGER,
+  resolved_by      TEXT
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC)'); } catch {}
+
+// Лист ожидания на открытую регистрацию (без инвайта)
+try { db.exec(`CREATE TABLE IF NOT EXISTS waitlist (
+  id           TEXT PRIMARY KEY,
+  email        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  source       TEXT,
+  created_at   INTEGER NOT NULL,
+  notified_at  INTEGER
+)`); } catch {}
+
 // ── Referral / Super bonus migrations ─────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN invited_count INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN super_bonus_claimed INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN super_expires_at INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN achievements TEXT DEFAULT \'[]\''); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN is_system INTEGER DEFAULT 0'); } catch {} // системные аккаунты (нельзя писать им)
 
 // Back-fill invite codes for existing users without one (safe — users table now exists)
 db.prepare("SELECT id FROM users WHERE invite_code IS NULL").all().forEach(u => {
@@ -198,6 +230,34 @@ db.prepare(`
     SELECT COUNT(*) FROM referrals WHERE inviter_id = users.id
   ) WHERE invited_count = 0
 `).run();
+
+// ── System user: «HEY-заведующий» ──────────────────────────────────────────
+// Создаётся один раз, если ещё нет в БД. Используется для сервисных уведомлений.
+// Юзеры не могут отправлять ему сообщения, но могут получать.
+const SYSTEM_USER_ID = 'system_hey_official';
+(function ensureSystemUser() {
+  const existing = db.prepare('SELECT id FROM users WHERE id=?').get(SYSTEM_USER_ID);
+  if (existing) return;
+  try {
+    db.prepare(`
+      INSERT INTO users (id, name, phone, password, avatar, created_at,
+                         is_admin, is_super, is_blocked, is_system, bio,
+                         invite_code, must_change_password)
+      VALUES (?, ?, ?, ?, ?, ?, 0, 1, 0, 1, ?, ?, 0)
+    `).run(
+      SYSTEM_USER_ID,
+      'HEY-заведующий',
+      '+0',
+      '$disabled$', // невозможно войти под этим аккаунтом
+      null,
+      Math.floor(Date.now() / 1000),
+      'Сервисный аккаунт HEY. Сюда приходят системные уведомления и анонсы.',
+      'HEYSYSTEM1',
+    );
+  } catch (e) {
+    console.warn('[system-user] не удалось создать:', e.message);
+  }
+})();
 
 function now() { return Math.floor(Date.now() / 1000); }
 
@@ -285,7 +345,7 @@ function normalizeAvatars(rows) {
 }
 
 function updateUser(id, fields) {
-  const allowed = ['name','phone','birthday','avatar'];
+  const allowed = ['name','phone','birthday','avatar','bio','headline'];
   const sets = Object.keys(fields).filter(k => allowed.includes(k));
   if (!sets.length) return findUserById(id);
   const sql = `UPDATE users SET ${sets.map(k=>`${k}=@${k}`).join(',')} WHERE id=@id`;
@@ -340,8 +400,29 @@ function addContact(ownerId, contactId, nickname) {
 }
 
 function removeContact(ownerId, contactId) {
+  // Защита: системный пользователь не должен удаляться из контактов
+  if (contactId === SYSTEM_USER_ID) return;
   db.prepare('DELETE FROM contacts WHERE owner_id=? AND contact_id=?').run(ownerId, contactId);
 }
+
+// Добавляет системный аккаунт в контакты юзера (если ещё не там)
+function addSystemContactFor(userId) {
+  if (!userId || userId === SYSTEM_USER_ID) return;
+  try {
+    db.prepare(
+      `INSERT OR IGNORE INTO contacts (id,owner_id,contact_id,nickname) VALUES (?,?,?,?)`
+    ).run(uuid(), userId, SYSTEM_USER_ID, null);
+  } catch {}
+}
+
+// Бэкфилл: добавляем системного юзера в контакты всем существующим
+(function backfillSystemContact() {
+  try {
+    const users = db.prepare("SELECT id FROM users WHERE id != ? AND is_deleted = 0").all(SYSTEM_USER_ID);
+    const ins = db.prepare(`INSERT OR IGNORE INTO contacts (id,owner_id,contact_id,nickname) VALUES (?,?,?,?)`);
+    users.forEach(u => { try { ins.run(uuid(), u.id, SYSTEM_USER_ID, null); } catch {} });
+  } catch {}
+})();
 
 function getContactOwners(userId) {
   return db.prepare('SELECT owner_id FROM contacts WHERE contact_id=?')
@@ -567,6 +648,8 @@ function getConversationsForUser(userId) {
       admin_id: conv.admin_id || null, partner_id: partnerId,
       avatar: partnerAvatar,
       partner_is_deleted: !!(partnerUser?.is_deleted),
+      partner_is_super:   !!(partnerUser?.is_super),
+      partner_is_system:  !!(partnerUser?.is_system),
       last_text: isRecipient ? null : (last?.text || null),
       last_at:   last?.created_at || conv.created_at,
       last_sender_id: isRecipient ? null : (last?.sender_id || null),
@@ -903,12 +986,21 @@ function getSavedMoments(userId) {
 }
 
 function getMomentReactorsList(momentId) {
-  const rows = db.prepare(
+  // Реакции (resonate, talk)
+  const reactions = db.prepare(
     `SELECT mr.user_id AS id, mr.reaction, mr.created_at, u.name, u.avatar
      FROM moment_reactions mr JOIN users u ON u.id=mr.user_id
-     WHERE mr.moment_id=? ORDER BY mr.created_at DESC`
+     WHERE mr.moment_id=? AND u.is_blocked=0 AND u.is_deleted=0
+     ORDER BY mr.created_at DESC`
   ).all(momentId);
-  return normalizeAvatars(rows);
+  // Просмотры — выдаём как псевдо-реакцию 'see'
+  const views = db.prepare(
+    `SELECT mv.user_id AS id, 'see' AS reaction, mv.viewed_at AS created_at, u.name, u.avatar
+     FROM moment_views mv JOIN users u ON u.id=mv.user_id
+     WHERE mv.moment_id=? AND u.is_blocked=0 AND u.is_deleted=0
+     ORDER BY mv.viewed_at DESC`
+  ).all(momentId);
+  return normalizeAvatars([...reactions, ...views]);
 }
 
 function makeUserSuper(userId) { db.prepare('UPDATE users SET is_super=1 WHERE id=?').run(userId); }
@@ -1071,21 +1163,71 @@ function getAdminStats() {
   return { users, blocked, admins, moments, activeMoments, reactions };
 }
 
-// Search users by name or phone (for contacts search, returns safe public fields only)
+// Search users by name or phone (для контактов; case-insensitive в том числе и для кириллицы)
 function searchUsers(query, excludeUserId) {
-  const q = `%${query}%`;
+  const q = `%${(query || '').toLowerCase()}%`;
   const rows = db.prepare(
     `SELECT u.id, u.name, u.avatar, u.phone,
             p.online
      FROM users u
      LEFT JOIN presence p ON p.user_id = u.id
-     WHERE (u.name LIKE ? OR u.phone LIKE ?)
+     WHERE (LOWER(u.name) LIKE ? OR LOWER(u.phone) LIKE ?)
        AND u.is_blocked = 0
        AND u.id != ?
      ORDER BY u.name ASC
      LIMIT 20`
   ).all(q, q, excludeUserId || 0);
   return normalizeAvatars(rows.map(r => ({ ...r, online: !!r.online })));
+}
+
+// ── Reports ──────────────────────────────────────────────────────────────
+function createReport({ reporterId, targetType, targetId, targetUserId, reason }) {
+  const id = 'rep_' + uuid().replace(/-/g,'').slice(0,12);
+  db.prepare(
+    `INSERT INTO reports (id, reporter_id, target_type, target_id, target_user_id, reason, status, created_at)
+     VALUES (?,?,?,?,?,?,?,?)`
+  ).run(id, reporterId, targetType, targetId, targetUserId || null, reason, 'open', now());
+  return { id };
+}
+
+function getReports({ status = 'open', limit = 100 } = {}) {
+  const rows = db.prepare(
+    `SELECT r.*,
+            u1.name AS reporter_name, u1.avatar AS reporter_avatar,
+            u2.name AS target_user_name, u2.avatar AS target_user_avatar
+     FROM reports r
+     LEFT JOIN users u1 ON u1.id = r.reporter_id
+     LEFT JOIN users u2 ON u2.id = r.target_user_id
+     ${status === 'all' ? '' : 'WHERE r.status = ?'}
+     ORDER BY r.created_at DESC LIMIT ?`
+  ).all(...(status === 'all' ? [limit] : [status, limit]));
+  return normalizeAvatars(rows);
+}
+
+function resolveReport(id, adminId, action /* 'resolved' | 'dismissed' */) {
+  db.prepare('UPDATE reports SET status=?, resolved_at=?, resolved_by=? WHERE id=?')
+    .run(action, now(), adminId, id);
+}
+
+// ── Waitlist ─────────────────────────────────────────────────────────────
+function addToWaitlist(email, source) {
+  const id = 'wl_' + uuid().replace(/-/g,'').slice(0,12);
+  try {
+    db.prepare('INSERT INTO waitlist (id, email, source, created_at) VALUES (?,?,?,?)')
+      .run(id, email, source || null, now());
+    return { id, isNew: true };
+  } catch (e) {
+    if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      return { isNew: false };
+    }
+    throw e;
+  }
+}
+
+function getWaitlist({ limit = 500 } = {}) {
+  return db.prepare(
+    'SELECT id, email, source, created_at, notified_at FROM waitlist ORDER BY created_at DESC LIMIT ?'
+  ).all(limit);
 }
 
 function getAdminUsers({ search, filter } = {}) {
@@ -1259,8 +1401,9 @@ function checkAndExpireSuper(userId) {
 
 module.exports = {
   now,
+  SYSTEM_USER_ID,
   createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount,
-  getContacts, addContact, removeContact, getContactOwners, getContactIds,
+  getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   getOrCreateDirectConversation, acceptRequest, declineRequest,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
@@ -1282,6 +1425,10 @@ module.exports = {
   addMomentView, getDisciplinesCloud,
   // Admin
   searchUsers,
+  // Reports
+  createReport, getReports, resolveReport,
+  // Waitlist
+  addToWaitlist, getWaitlist,
   // Admin
   getAdminStats, getAdminUsers, getAdminUserById,
   adminResetPassword, adminBlockUser, adminUnblockUser,
