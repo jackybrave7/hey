@@ -137,6 +137,43 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ id: user.id, name: user.name, avatar_url: user.avatar || null });
   });
 
+  // ── Avatar endpoint — отдельный endpoint, кешируется браузером на 30 дней ───
+  // /api/avatars/:userId  → возвращает бинарь аватара с сильным Cache-Control,
+  // позволяя клиентским запросам conversation/messages не таскать base64 инлайн.
+  // Без auth (аватары и так публичны через профили), чтобы можно было кешировать на CDN.
+  r.get('/avatars/:userId', (req, res) => {
+    const user = db.findUserById(req.params.userId);
+    const av = user?.avatar;
+    if (!av) {
+      // 1x1 прозрачный пиксель — не падаем, чтобы не сбивать <img>
+      const px = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');
+      res.set('Content-Type', 'image/gif');
+      res.set('Cache-Control', 'public, max-age=60'); // короткий кеш — может появиться позже
+      return res.send(px);
+    }
+    // Если это уже внешний URL (S3 / http) — редирект, браузер сам закеширует с того ресурса
+    if (/^https?:\/\//i.test(av)) {
+      res.set('Cache-Control', 'public, max-age=86400');
+      return res.redirect(302, av);
+    }
+    // Если это data URL — декодируем и отдаём бинарём
+    const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/s.exec(av);
+    if (m) {
+      const [, mime, b64] = m;
+      const buf = Buffer.from(b64, 'base64');
+      res.set('Content-Type', mime);
+      res.set('Cache-Control', 'public, max-age=2592000, immutable'); // 30 дней
+      res.set('ETag', `"${user.id}-${buf.length}"`);
+      return res.send(buf);
+    }
+    // Иначе (эмодзи / буква) — отдаём прозрачный пиксель, чтобы <img> не сломался;
+    // UI должен сам отрендерить букву через AvatarDisplay
+    const px = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');
+    res.set('Content-Type', 'image/gif');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send(px);
+  });
+
   // Public profile endpoint (auth required)
   r.get('/users/:id/profile', requireAuth, (req, res) => {
     const target = db.findUserById(req.params.id);

@@ -248,6 +248,42 @@ const stmtFindById    = db.prepare('SELECT * FROM users WHERE id=?');
 function findUserByPhone(phone) { return stmtFindByPhone.get(phone) || null; }
 function findUserById(id)       { return stmtFindById.get(id) || null; }
 
+// Avatar payload helper.
+// Если аватар — base64 (data:image/...), возвращает ссылку на /api/avatars/:userId
+// (кешируется на 30 дней, не таскается инлайн в каждом сообщении/чате).
+// Если аватар — URL (S3/http) или emoji/буква — возвращает как есть.
+function avatarPayload(userId, rawAvatar) {
+  if (!rawAvatar) return null;
+  if (rawAvatar.startsWith('data:image/')) return `/api/avatars/${userId}`;
+  return rawAvatar; // URL / emoji / one-char letter — пропускаем как есть
+}
+
+// Универсальный post-process: проходит по строке/массиву строк и заменяет тяжёлые
+// base64 аватары на ссылку /api/avatars/:userId. Применяется к любым полям имени
+// avatar / author_avatar / sender_avatar / partner_avatar и т.п.
+// Берёт ID юзера из соседних полей: id / user_id / author_id / sender_id / partner_id.
+const _AVATAR_FIELDS = [
+  ['avatar',         'id'],
+  ['author_avatar',  'user_id'],     // moments
+  ['sender_avatar',  'sender_id'],   // messages
+  ['partner_avatar', 'partner_id'],  // direct convs
+];
+function normalizeAvatars(rows) {
+  if (!rows) return rows;
+  const list = Array.isArray(rows) ? rows : [rows];
+  for (const r of list) {
+    if (!r) continue;
+    for (const [avField, idField] of _AVATAR_FIELDS) {
+      const v = r[avField];
+      if (typeof v === 'string' && v.startsWith('data:image/')) {
+        const uid = r[idField] ?? r.user_id ?? r.id;
+        if (uid) r[avField] = `/api/avatars/${uid}`;
+      }
+    }
+  }
+  return rows;
+}
+
 function updateUser(id, fields) {
   const allowed = ['name','phone','birthday','avatar'];
   const sets = Object.keys(fields).filter(k => allowed.includes(k));
@@ -267,7 +303,9 @@ function getContacts(ownerId) {
      LEFT JOIN presence p ON p.user_id = c.contact_id
      WHERE c.owner_id = ?`
   ).all(ownerId);
-  return rows.map(({ password, ...r }) => ({ ...r, online: !!r.online, is_deleted: !!r.is_deleted }));
+  return normalizeAvatars(
+    rows.map(({ password, ...r }) => ({ ...r, online: !!r.online, is_deleted: !!r.is_deleted }))
+  );
 }
 
 function deleteUserAccount(userId) {
@@ -515,7 +553,7 @@ function getConversationsForUser(userId) {
       if (partnerId && blockedIds.has(partnerId)) return null;
       const partner = partnerId ? usersMap[partnerId] : null;
       name = (partnerId && nickMap[partnerId]) || partner?.name || 'Диалог';
-      partnerAvatar = partner?.avatar || null;
+      partnerAvatar = partner ? avatarPayload(partner.id, partner.avatar) : null;
     }
 
     const isRequest = !!conv.request_from;
@@ -583,14 +621,21 @@ function _parseMsg(m) {
 }
 
 function getMessages(convId, before, limit = 50) {
+  // Не таскаем avatar инлайн — он берётся через /api/avatars/:userId с долгим кешем.
+  // Возвращаем только sender_avatar как ссылку, чтобы UI мог рендерить <img src>.
   const rows = db.prepare(
-    `SELECT m.*, u.name AS sender_name, u.avatar AS sender_avatar
+    `SELECT m.*, u.name AS sender_name, u.id AS _sender_id_for_avatar,
+            CASE
+              WHEN u.avatar IS NULL OR u.avatar = '' THEN NULL
+              WHEN u.avatar LIKE 'data:image/%' THEN '/api/avatars/' || u.id
+              ELSE u.avatar
+            END AS sender_avatar
      FROM messages m JOIN users u ON u.id=m.sender_id
      WHERE m.conversation_id=? AND m.created_at<?
      ORDER BY m.created_at ASC
      LIMIT ?`
   ).all(convId, before, limit);
-  return rows.map(_parseMsg);
+  return rows.map(r => { delete r._sender_id_for_avatar; return _parseMsg(r); });
 }
 
 function createMessage({ conversationId, senderId, text, attachment }) {
@@ -679,11 +724,11 @@ function unblockUser(userId, blockedId) {
 }
 
 function getBlockedUsers(userId) {
-  return db.prepare(
+  return normalizeAvatars(db.prepare(
     `SELECT u.id, u.name, u.phone, u.avatar, b.created_at
      FROM blocks b JOIN users u ON u.id = b.blocked_id
      WHERE b.user_id = ? ORDER BY b.created_at DESC`
-  ).all(userId);
+  ).all(userId));
 }
 
 function isBlocked(userId, blockedId) {
@@ -743,13 +788,18 @@ function getReactionsForMessages(messageIds) {
 
 function _parseMoment(m) {
   if (!m) return null;
-  return {
+  const parsed = {
     ...m,
     auto_tags: JSON.parse(m.auto_tags || '[]'),
     is_search: !!m.is_search,
     edited: !!m.edited,
     embedded_video: m.embedded_video ? JSON.parse(m.embedded_video) : null,
   };
+  // Заменяем тяжёлый base64 author_avatar на ссылку /api/avatars/:userId
+  if (typeof parsed.author_avatar === 'string' && parsed.author_avatar.startsWith('data:image/')) {
+    parsed.author_avatar = `/api/avatars/${parsed.user_id}`;
+  }
+  return parsed;
 }
 
 function getContactIds(userId) {
@@ -853,11 +903,12 @@ function getSavedMoments(userId) {
 }
 
 function getMomentReactorsList(momentId) {
-  return db.prepare(
-    `SELECT mr.user_id, mr.reaction, mr.created_at, u.name, u.avatar
+  const rows = db.prepare(
+    `SELECT mr.user_id AS id, mr.reaction, mr.created_at, u.name, u.avatar
      FROM moment_reactions mr JOIN users u ON u.id=mr.user_id
      WHERE mr.moment_id=? ORDER BY mr.created_at DESC`
   ).all(momentId);
+  return normalizeAvatars(rows);
 }
 
 function makeUserSuper(userId) { db.prepare('UPDATE users SET is_super=1 WHERE id=?').run(userId); }
@@ -1034,7 +1085,7 @@ function searchUsers(query, excludeUserId) {
      ORDER BY u.name ASC
      LIMIT 20`
   ).all(q, q, excludeUserId || 0);
-  return rows.map(r => ({ ...r, online: !!r.online }));
+  return normalizeAvatars(rows.map(r => ({ ...r, online: !!r.online })));
 }
 
 function getAdminUsers({ search, filter } = {}) {
