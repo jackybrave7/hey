@@ -1,5 +1,6 @@
 // web/src/components/Screens.jsx
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
@@ -21,28 +22,63 @@ import AchievementBadges from './super/AchievementBadges';
 
 function DotsMenu({ items }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef();
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef();
+  const menuRef = useRef();
 
+  // Закрытие по клику вне (и кнопки, и портального меню)
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (btnRef.current?.contains(e.target)) return;
+      if (menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  // Закрытие на ESC / при скролле страницы
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    const onScroll = () => setOpen(false);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [open]);
+
+  function toggle(e) {
+    e.stopPropagation();
+    if (open) { setOpen(false); return; }
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPos({
+        top:   rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen(true);
+  }
+
   return (
-    <div ref={ref} style={{position:'relative'}}>
-      <div className="topbar-dots" style={{cursor:'pointer'}} onClick={() => setOpen(o => !o)}>
+    <>
+      <div ref={btnRef} className="topbar-dots" style={{cursor:'pointer'}} onClick={toggle}>
         {[0,1,2].map(i => <div key={i} className="topbar-dot"/>)}
       </div>
-      {open && (
-        <div style={{
-          position:'absolute', top:'calc(100% + 8px)', right:0, zIndex:1500,
-          background:'rgba(28,18,58,0.98)', backdropFilter:'blur(20px)',
-          borderRadius:14, overflow:'hidden', minWidth:230,
-          boxShadow:'0 12px 40px rgba(0,0,0,.55)',
-          border:'1px solid rgba(255,255,255,.1)',
-        }}>
+      {open && createPortal(
+        <div ref={menuRef}
+          onMouseDown={e => e.stopPropagation()}
+          style={{
+            position:'fixed', top: pos.top, right: pos.right, zIndex: 9999,
+            background:'rgba(28,18,58,0.98)', backdropFilter:'blur(20px)',
+            borderRadius:14, overflow:'hidden', minWidth:230,
+            boxShadow:'0 12px 40px rgba(0,0,0,.55)',
+            border:'1px solid rgba(255,255,255,.1)',
+          }}>
           {items.map(({ label, icon, danger, onClick }) => (
             <div key={label} onClick={() => { setOpen(false); onClick(); }}
               style={{
@@ -55,9 +91,10 @@ function DotsMenu({ items }) {
               <span style={{fontSize:18}}>{icon}</span>{label}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 

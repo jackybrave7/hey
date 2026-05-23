@@ -150,17 +150,6 @@ export default function MomentCard({ moment, isMine, onClick }) {
         </div>
       )}
 
-      {/* My moment badge (top-left) */}
-      {isMine && (
-        <div style={{
-          position:'absolute',top:10,left:10,zIndex:3,
-          background:'rgba(120,88,176,.85)',backdropFilter:'blur(8px)',
-          borderRadius:9,padding:'3px 9px',
-          fontSize:10,color:'white',fontWeight:700,
-        }}>
-          ✦ Мой момент
-        </div>
-      )}
 
 
       {/* Search badge */}

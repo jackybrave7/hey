@@ -29,6 +29,45 @@ export default function MomentsFeed({ currentUser }) {
   const [toast, setToast]           = useState('');
   const [showSuperInfo, setShowSuperInfo] = useState(false);
 
+  // Drag-to-reorder для своих моментов
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+
+  function onDragStart(e, idx) {
+    setDragIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', String(idx)); } catch {}
+  }
+  function onDragOver(e, idx) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (idx !== overIdx) setOverIdx(idx);
+  }
+  function onDragEnd() {
+    setDragIdx(null);
+    setOverIdx(null);
+  }
+  async function onDrop(e, toIdx) {
+    e.preventDefault();
+    const fromIdx = dragIdx;
+    setDragIdx(null);
+    setOverIdx(null);
+    if (fromIdx == null || fromIdx === toIdx) return;
+    // Локально перестраиваем сразу — оптимистичное обновление
+    const next = [...myMoments];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setMyMoments(next);
+    // Серверу шлём новый порядок ID
+    try {
+      await api.reorderMoments(next.map(m => m.id));
+    } catch(err) {
+      // Откат при ошибке
+      setMyMoments(myMoments);
+      showToast('Не удалось сохранить порядок');
+    }
+  }
+
   const isSuper = !!(currentUser?.is_super);
 
   const showToast = (msg) => {
@@ -191,32 +230,28 @@ export default function MomentsFeed({ currentUser }) {
       <div style={{ padding: '14px 20px 0', maxWidth: 680, margin: '0 auto' }}>
         {hasMyMoments ? (
           <>
-            {/* Header: title + counter (only Super gets the "N из 3" counter) */}
-            <div style={{
-              display:'flex',alignItems:'center',gap:10,marginBottom:12,
-              color:'rgba(255,255,255,.55)',fontSize:13,fontWeight:600,
-              textTransform:'uppercase',letterSpacing:1.2,
-            }}>
-              <span>✦ Мои моменты</span>
-              {isSuper && (
-                <span style={{
-                  color:'rgba(200,170,255,.7)',fontSize:12,fontWeight:500,
-                  textTransform:'none',letterSpacing:0,
-                }}>
-                  {Math.min(myMoments.length, 3)} из 3
-                </span>
-              )}
-            </div>
-
-            {/* 3-column grid of slots */}
+            {/* 3-column grid of slots — свои моменты можно перетаскивать */}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
               {myMoments.map((m, idx) => (
-                <MomentCard
-                  key={m.id}
-                  moment={m}
-                  isMine={true}
-                  onClick={() => setSelected({ moments: myMoments, index: idx })}
-                />
+                <div key={m.id}
+                  draggable
+                  onDragStart={e => onDragStart(e, idx)}
+                  onDragOver={e => onDragOver(e, idx)}
+                  onDrop={e => onDrop(e, idx)}
+                  onDragEnd={onDragEnd}
+                  style={{
+                    cursor: dragIdx !== null ? 'grabbing' : 'grab',
+                    opacity: dragIdx === idx ? 0.4 : 1,
+                    transform: overIdx === idx && dragIdx !== null && dragIdx !== idx
+                      ? 'scale(1.05)' : 'scale(1)',
+                    transition: 'transform .15s, opacity .15s',
+                  }}>
+                  <MomentCard
+                    moment={m}
+                    isMine={true}
+                    onClick={() => setSelected({ moments: myMoments, index: idx })}
+                  />
+                </div>
               ))}
 
               {/* Super: "+ Добавить" placeholders for remaining slots up to 3 */}
@@ -309,18 +344,22 @@ export default function MomentsFeed({ currentUser }) {
               </div>
             </div>
           ) : (
-            // Все карточки одинакового размера 1:1. Super-пользователь
-            // показывает все свои моменты как отдельные квадратные карточки.
-            feedGroups.flatMap(group => (
-              group.moments.map(m => (
+            // Каждый автор — одна квадратная карточка. По клику открывается
+            // попап со всеми его моментами (можно листать).
+            feedGroups.map(group => {
+              const first = group.moments[0];
+              return (
                 <MomentCard
-                  key={m.id}
-                  moment={m}
+                  key={first.id}
+                  moment={first}
                   isMine={false}
-                  onClick={() => setSelected({ moments: otherMoments, index: otherMoments.findIndex(x => x.id === m.id) })}
+                  onClick={() => setSelected({
+                    moments: group.moments,
+                    index: 0,
+                  })}
                 />
-              ))
-            ))
+              );
+            })
           )}
 
           {hasMore && (
