@@ -12,6 +12,7 @@ import {
   InviteBadge, ForgotPasswordPopup
 } from './auth/AuthComponents';
 import MomentDetailPopup from './moments/MomentDetailPopup';
+import MomentCard from './moments/MomentCard';
 import MoodEmoji from './moments/MoodEmoji';
 import SuperStatusCard from './super/SuperStatusCard';
 import AchievementBadges from './super/AchievementBadges';
@@ -6199,6 +6200,7 @@ export function PublicProfileScreen() {
   const [notFound, setNotFound] = useState(false);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  const [momentPopupIdx, setMomentPopupIdx] = useState(null);
 
   useEffect(() => {
     api.getUserProfile(id)
@@ -6371,51 +6373,83 @@ export function PublicProfileScreen() {
           </div>
         )}
 
-        {/* Active moment */}
-        {moment ? (
-          <div style={{marginBottom:24}}>
-            <div style={{color:'rgba(255,255,255,.4)',fontSize:11,textTransform:'uppercase',
-              letterSpacing:.8,marginBottom:12}}>Активный момент</div>
-            <div style={{
-              background:'rgba(255,255,255,.06)',borderRadius:16,
-              border:'1px solid rgba(255,255,255,.1)',overflow:'hidden',
-            }}>
-              {moment.media_url && moment.media_type === 'image' && (
-                <img src={moment.media_url} alt=""
-                  style={{width:'100%',maxHeight:200,objectFit:'cover',display:'block'}}/>
-              )}
-              <div style={{padding:'14px 16px'}}>
-                {moment.mood_emoji && (
-                  <span style={{fontSize:20,marginRight:8}}>{moment.mood_emoji}</span>
-                )}
-                <span style={{color:'rgba(255,255,255,.85)',fontSize:14,lineHeight:1.6}}>
-                  {moment.text}
-                </span>
-                {moment.auto_tags?.length > 0 && (
-                  <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:10}}>
-                    {moment.auto_tags.map(tag => (
-                      <span key={tag} style={{
-                        border:'1px dashed rgba(255,255,255,.2)',borderRadius:20,
-                        padding:'2px 10px',fontSize:11,color:'rgba(255,255,255,.45)'}}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
+        {/* Active moments — карточки квадратные как в ленте */}
+        {(() => {
+          const activeMoments = profile?.active_moments || (moment ? [moment] : []);
+          if (activeMoments.length === 0) {
+            return (
+              <div style={{
+                background:'rgba(255,255,255,.04)',borderRadius:16,
+                padding:'24px',textAlign:'center',
+                border:'2px dashed rgba(255,255,255,.1)',
+                color:'rgba(255,255,255,.3)',fontSize:13,marginBottom:24,
+              }}>
+                Нет активного момента
+              </div>
+            );
+          }
+          return (
+            <div style={{marginBottom:24}}>
+              <div style={{color:'rgba(255,255,255,.4)',fontSize:11,textTransform:'uppercase',
+                letterSpacing:.8,marginBottom:12}}>
+                {activeMoments.length === 1 ? 'Активный момент' : `Активные моменты · ${activeMoments.length}`}
+              </div>
+              {/* Grid: 1 — на всю ширину; 2-3 — по две в ряд (для Super) */}
+              <div style={{
+                display:'grid',
+                gridTemplateColumns: activeMoments.length === 1
+                  ? 'minmax(0, 240px)'
+                  : 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap:12,
+              }}>
+                {activeMoments.map((m, idx) => {
+                  // Готовим объект для MomentCard — добавляем author_* поля из профиля
+                  const enriched = {
+                    ...m,
+                    author_name:   profile.name,
+                    author_avatar: profile.avatar,
+                    author_is_super: profile.is_super,
+                    user_id: profile.id,
+                  };
+                  return (
+                    <div key={m.id} onClick={() => setMomentPopupIdx(idx)}>
+                      <MomentCard
+                        moment={enriched}
+                        isMine={false}
+                        onClick={() => setMomentPopupIdx(idx)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
-        ) : (
-          <div style={{
-            background:'rgba(255,255,255,.04)',borderRadius:16,
-            padding:'24px',textAlign:'center',
-            border:'2px dashed rgba(255,255,255,.1)',
-            color:'rgba(255,255,255,.3)',fontSize:13,
-          }}>
-            Нет активного момента
-          </div>
-        )}
+          );
+        })()}
       </div>
+
+      {/* Moment detail popup */}
+      {momentPopupIdx !== null && (() => {
+        const list = (profile?.active_moments || (moment ? [moment] : []))
+          .map(m => ({
+            ...m,
+            author_name: profile?.name,
+            author_avatar: profile?.avatar,
+            author_is_super: profile?.is_super,
+            user_id: profile?.id,
+          }));
+        if (!list.length) return null;
+        return (
+          <MomentDetailPopup
+            moments={list}
+            initialIndex={momentPopupIdx}
+            currentUser={me}
+            onClose={() => setMomentPopupIdx(null)}
+            onEdit={() => {}}
+            onArchive={() => {}}
+            onDelete={() => {}}
+          />
+        );
+      })()}
     </div>
   );
 }
