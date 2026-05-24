@@ -11,7 +11,7 @@ import {
   AuthBrand, FloatingInput, PasswordInput,
   InviteBadge, ForgotPasswordPopup
 } from './auth/AuthComponents';
-import MomentDetailPopup from './moments/MomentDetailPopup';
+import MomentDetailPopup, { TextWithLinks } from './moments/MomentDetailPopup';
 import MomentCard from './moments/MomentCard';
 import OnboardingTour from './OnboardingTour';
 import MoodEmoji from './moments/MoodEmoji';
@@ -2832,7 +2832,13 @@ export function ConversationsScreen() {
           background: c.is_pinned ? 'rgba(120,90,200,.06)' : 'transparent'}}
         onMouseEnter={e=>{ e.currentTarget.style.background = c.is_pinned ? 'rgba(120,90,200,.1)' : 'rgba(255,255,255,.04)'; setHovered(true); }}
         onMouseLeave={e=>{ e.currentTarget.style.background = c.is_pinned ? 'rgba(120,90,200,.06)' : 'transparent'; setHovered(false); }}>
-        {c.type === 'group' ? (
+        {c.type === 'monolog' ? (
+          <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
+            background:'linear-gradient(135deg,#5a4090,#8060c0)',
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>
+            📝
+          </div>
+        ) : c.type === 'group' ? (
           <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
             background:'rgba(200,160,210,.35)',
             display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>
@@ -4131,6 +4137,10 @@ export function ChatScreen() {
       if (c.type === 'group') {
         setPartner({ name: c.name||'Группа', online:false, id:null,
           isGroup:true, icon:c.icon||'👥', admin_id:c.admin_id, isDeleted:false });
+      } else if (c.type === 'monolog') {
+        setPartner({ name:'Монолог', online:false, id:null,
+          isGroup:false, isMonolog:true, icon:'📝', avatar:null,
+          isDeleted:false, isSuper:false, isSystem:false });
       } else {
         setPartner(p => ({ ...p, name: c.name||'Диалог', id: c.partner_id||null,
           isGroup:false, avatar: c.avatar||null,
@@ -4603,7 +4613,13 @@ export function ChatScreen() {
       <div className="topbar">
         <div className="topbar-inner">
           <button className="back-btn" onClick={() => nav(-1)}>‹</button>
-          {partner.isGroup ? (
+          {partner.isMonolog ? (
+            <div style={{width:36,height:36,borderRadius:'12px',flexShrink:0,
+              background:'linear-gradient(135deg,#5a4090,#8060c0)',
+              display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>
+              📝
+            </div>
+          ) : partner.isGroup ? (
             <div onClick={() => nav(`/groups/${convId}/settings`)}
               style={{width:36,height:36,borderRadius:'12px',flexShrink:0,cursor:'pointer',
                 background:'rgba(140,100,200,.5)',display:'flex',alignItems:'center',
@@ -5620,8 +5636,9 @@ export function SettingsScreen() {
       <button onClick={onClick} style={{
         width:'100%', display:'flex', alignItems:'center', gap:14,
         padding:'13px 18px', background:'none', border:'none',
-        color: danger ? 'rgba(255,160,160,.9)' : 'white',
-        fontSize:14, fontWeight:500, cursor:'pointer', textAlign:'left', fontFamily:'inherit',
+        color: danger ? 'rgba(255,170,170,1)' : 'white',
+        fontSize:14, fontWeight: danger ? 600 : 500,
+        cursor:'pointer', textAlign:'left', fontFamily:'inherit',
         transition:'background .12s',
       }}
         onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
@@ -5629,9 +5646,9 @@ export function SettingsScreen() {
         <span style={{fontSize:20,flexShrink:0,lineHeight:1}}>{icon}</span>
         <div style={{flex:1}}>
           <div>{label}</div>
-          {sub && <div style={{fontSize:12,color:'rgba(255,255,255,.4)',marginTop:1}}>{sub}</div>}
+          {sub && <div style={{fontSize:12,color:'rgba(255,255,255,.65)',marginTop:1}}>{sub}</div>}
         </div>
-        {chevron && <span style={{color:'rgba(255,255,255,.3)',fontSize:18}}>›</span>}
+        {chevron && <span style={{color:'rgba(255,255,255,.5)',fontSize:18}}>›</span>}
       </button>
     );
   }
@@ -5642,7 +5659,7 @@ export function SettingsScreen() {
   };
   const dividerStyle = { borderBottom:'1px solid rgba(255,255,255,.05)' };
   const sectionLabelStyle = {
-    color:'rgba(255,255,255,.35)', fontSize:11, fontWeight:700,
+    color:'rgba(255,255,255,.7)', fontSize:11, fontWeight:700,
     textTransform:'uppercase', letterSpacing:.8, marginBottom:8, paddingLeft:4,
   };
 
@@ -5699,9 +5716,9 @@ export function SettingsScreen() {
                 <span style={{fontSize:20,lineHeight:1}}>🔔</span>
                 <div style={{flex:1}}>
                   <div>Оповещения</div>
-                  <div style={{fontSize:12, marginTop:1,
-                    color: notifPerm==='granted' ? 'rgba(80,220,130,.85)' :
-                           notifPerm==='denied'  ? 'rgba(255,140,140,.75)' : 'rgba(255,255,255,.4)'}}>
+                  <div style={{fontSize:12, marginTop:1, fontWeight:500,
+                    color: notifPerm==='granted' ? 'rgba(110,235,150,.95)' :
+                           notifPerm==='denied'  ? 'rgba(255,160,160,.95)' : 'rgba(255,255,255,.6)'}}>
                     {notifPerm==='granted' ? 'Включены' :
                      notifPerm==='denied'  ? 'Заблокированы в браузере' : 'Не настроены'}
                   </div>
@@ -5712,14 +5729,14 @@ export function SettingsScreen() {
               </button>
               {showNotif && (
                 <div style={{padding:'4px 18px 14px', display:'flex', flexDirection:'column', gap:10}}>
-                  <div style={{color:'rgba(255,255,255,.45)', fontSize:13, lineHeight:1.6}}>
+                  <div style={{color:'rgba(255,255,255,.78)', fontSize:13, lineHeight:1.6}}>
                     Получайте уведомления о новых сообщениях, когда приложение свёрнуто.
                   </div>
                   {notifPerm === 'unsupported' && (
-                    <div style={{color:'rgba(255,200,100,.7)', fontSize:13}}>Браузер не поддерживает уведомления</div>
+                    <div style={{color:'rgba(255,210,120,.95)', fontSize:13}}>Браузер не поддерживает уведомления</div>
                   )}
                   {notifPerm === 'denied' && (
-                    <div style={{color:'rgba(255,140,140,.8)', fontSize:13}}>
+                    <div style={{color:'rgba(255,160,160,.95)', fontSize:13, fontWeight:500}}>
                       Разрешите уведомления в настройках браузера и перезагрузите страницу.
                     </div>
                   )}
@@ -5780,12 +5797,12 @@ export function SettingsScreen() {
         <button onClick={() => { setShowDeleteAccount(true); setDeletePassword(''); setDeleteErr(''); }}
           style={{
             padding:'14px', borderRadius:14, cursor:'pointer',
-            background:'transparent', border:'1px solid rgba(255,80,80,.2)',
-            color:'rgba(255,120,120,.5)', fontSize:13, fontWeight:500,
+            background:'rgba(255,50,50,.08)', border:'1px solid rgba(255,80,80,.4)',
+            color:'rgba(255,160,160,.95)', fontSize:13, fontWeight:600,
             transition:'all .15s', fontFamily:'inherit',
           }}
-          onMouseEnter={e=>{ e.currentTarget.style.background='rgba(255,50,50,.08)'; e.currentTarget.style.color='rgba(255,120,120,.75)'; }}
-          onMouseLeave={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='rgba(255,120,120,.5)'; }}>
+          onMouseEnter={e=>{ e.currentTarget.style.background='rgba(255,50,50,.18)'; e.currentTarget.style.color='rgba(255,180,180,1)'; }}
+          onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,50,50,.08)'; e.currentTarget.style.color='rgba(255,160,160,.95)'; }}>
           Удалить аккаунт и все данные
         </button>
 
@@ -6105,8 +6122,9 @@ export function MomentPage() {
             )}
 
             {/* Text */}
-            <div style={{ color:'rgba(255,255,255,.9)', fontSize:15, lineHeight:1.7, whiteSpace:'pre-wrap' }}>
-              {moment.text}
+            <div style={{ color:'rgba(255,255,255,.9)', fontSize:15, lineHeight:1.7,
+              whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
+              <TextWithLinks text={moment.text}/>
             </div>
 
             {/* Search flag */}

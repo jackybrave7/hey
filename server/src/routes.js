@@ -95,6 +95,9 @@ module.exports = function makeRouter(db, broadcast) {
     // Системный пользователь автоматически в контактах у нового юзера
     db.addSystemContactFor(user.id);
 
+    // Создаём self-chat «Монолог»
+    try { db.getOrCreateSelfChat(user.id); } catch {}
+
     // Auto-add mutual contacts if registered via invite link
     if (inviteUserId) {
       const inviter = db.findUserById(inviteUserId);

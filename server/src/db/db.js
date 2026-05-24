@@ -424,6 +424,28 @@ function addSystemContactFor(userId) {
   } catch {}
 })();
 
+// Бэкфилл: у каждого юзера должен быть «Монолог» (self-chat)
+(function backfillSelfChat() {
+  try {
+    const users = db.prepare("SELECT id FROM users WHERE id != ? AND is_deleted = 0").all(SYSTEM_USER_ID);
+    users.forEach(u => {
+      const has = db.prepare(
+        `SELECT 1 FROM conversations c
+         JOIN members m ON m.conversation_id=c.id AND m.user_id=?
+         WHERE c.type='monolog' LIMIT 1`
+      ).get(u.id);
+      if (has) return;
+      const id = uuid();
+      db.transaction(() => {
+        db.prepare(`INSERT INTO conversations (id,type,name,created_at) VALUES (?,?,?,?)`)
+          .run(id, 'monolog', 'Монолог', now());
+        db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at) VALUES (?,?,?)`)
+          .run(id, u.id, now());
+      })();
+    });
+  } catch (e) { console.warn('[self-chat backfill]', e.message); }
+})();
+
 function getContactOwners(userId) {
   return db.prepare('SELECT owner_id FROM contacts WHERE contact_id=?')
     .all(userId).map(r => r.owner_id);
@@ -495,6 +517,9 @@ function searchMessages(convId, query) {
 }
 
 function getOrCreateDirectConversation(userId1, userId2) {
+  // Self-chat — «Монолог»: пользователь пишет сам себе
+  if (userId1 === userId2) return getOrCreateSelfChat(userId1);
+
   const existing = db.prepare(
     `SELECT c.id, c.request_from FROM conversations c
      JOIN members m1 ON m1.conversation_id=c.id AND m1.user_id=?
@@ -518,6 +543,27 @@ function getOrCreateDirectConversation(userId1, userId2) {
     db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at) VALUES (?,?,?)`).run(id,userId2,now());
   })();
   return { id, request_from: requestFrom };
+}
+
+// Self-chat «Монолог» — диалог пользователя с самим собой.
+// Хранится как conversation type='monolog' с одним участником.
+function getOrCreateSelfChat(userId) {
+  const existing = db.prepare(
+    `SELECT c.id FROM conversations c
+     JOIN members m ON m.conversation_id=c.id AND m.user_id=?
+     WHERE c.type='monolog'
+     AND (SELECT COUNT(*) FROM members WHERE conversation_id=c.id)=1
+     LIMIT 1`
+  ).get(userId);
+  if (existing) return { id: existing.id, request_from: null };
+  const id = uuid();
+  db.transaction(() => {
+    db.prepare(`INSERT INTO conversations (id,type,name,created_at) VALUES (?,?,?,?)`)
+      .run(id, 'monolog', 'Монолог', now());
+    db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at) VALUES (?,?,?)`)
+      .run(id, userId, now());
+  })();
+  return { id, request_from: null };
 }
 
 // Accept a message request: add requester as contact, unlock conversation
@@ -635,6 +681,8 @@ function getConversationsForUser(userId) {
       const partner = partnerId ? usersMap[partnerId] : null;
       name = (partnerId && nickMap[partnerId]) || partner?.name || 'Диалог';
       partnerAvatar = partner ? avatarPayload(partner.id, partner.avatar) : null;
+    } else if (conv.type === 'monolog') {
+      name = 'Монолог';
     }
 
     const isRequest = !!conv.request_from;
@@ -1405,7 +1453,7 @@ module.exports = {
   createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount,
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
-  getOrCreateDirectConversation, acceptRequest, declineRequest,
+  getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,

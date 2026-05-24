@@ -12,6 +12,40 @@ function fmtDate(ts) {
   return new Date(ts * 1000).toLocaleDateString('ru', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
 }
 
+// Рендерит текст с кликабельными ссылками. Длинные ссылки сокращаются для отображения.
+export function TextWithLinks({ text, linkColor = 'rgba(180,140,255,.95)' }) {
+  if (!text) return null;
+  const re = /https?:\/\/[^\s<>"']+/gi;
+  const parts = [];
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ t: text.slice(last, m.index), link: false });
+    parts.push({ t: m[0], link: true });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ t: text.slice(last), link: false });
+
+  // Сокращает URL для отображения: domain + /первые-несколько-симв… без https://
+  function shortenUrl(url) {
+    const stripped = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (stripped.length <= 38) return stripped;
+    return stripped.slice(0, 35) + '…';
+  }
+
+  return (
+    <>
+      {parts.map((p, i) => p.link ? (
+        <a key={i} href={p.t} target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          title={p.t}
+          style={{ color: linkColor, textDecoration:'underline', textUnderlineOffset:2, wordBreak:'break-all' }}>
+          {shortenUrl(p.t)}
+        </a>
+      ) : <span key={i}>{p.t}</span>)}
+    </>
+  );
+}
+
 // ── Меню для чужого момента (кнопка ⋮) ─────────────────────────────────
 function ForeignAuthorMenu({ open, onToggle, onReport }) {
   const btnRef = useRef();
@@ -701,8 +735,9 @@ export default function MomentDetailPopup({
             )}
 
             {/* Text */}
-            <div style={{color:'rgba(255,255,255,.9)',fontSize:15,lineHeight:1.7,whiteSpace:'pre-wrap'}}>
-              {moment.text}
+            <div style={{color:'rgba(255,255,255,.9)',fontSize:15,lineHeight:1.7,
+              whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+              <TextWithLinks text={moment.text}/>
             </div>
 
             {/* Embedded video (shown below text when there's also a media_url) */}
