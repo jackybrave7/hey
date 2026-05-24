@@ -13,8 +13,16 @@ export default function AdminUsers() {
   const [users, setUsers]     = useState([]);
   const [search, setSearch]   = useState('');
   const [filter, setFilter]   = useState('');
+  const [sortBy, setSortBy]   = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+
+  function toggleSort(col) {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('desc'); }
+  }
+  const sortIcon = (col) => sortBy === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,10 +97,10 @@ export default function AdminUsers() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={hcell}>Имя</th>
-                <th style={hcell}>Телефон</th>
-                <th style={hcell}>Моменты</th>
-                <th style={hcell}>Зарегистрирован</th>
+                <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('name')}>Имя{sortIcon('name')}</th>
+                <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('phone')}>Телефон{sortIcon('phone')}</th>
+                <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('total_moments')}>Моменты{sortIcon('total_moments')}</th>
+                <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('created_at')}>Зарегистрирован{sortIcon('created_at')}</th>
                 <th style={hcell}>Статус</th>
               </tr>
             </thead>
@@ -102,7 +110,12 @@ export default function AdminUsers() {
                   Пусто
                 </td></tr>
               )}
-              {users.map(u => (
+              {[...users].sort((a, b) => {
+                const va = a[sortBy] ?? '';
+                const vb = b[sortBy] ?? '';
+                if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                return sortDir === 'asc' ? va - vb : vb - va;
+              }).map(u => (
                 <tr key={u.id}
                   onClick={() => nav(`/admin/users/${u.id}`)}
                   style={{ cursor: 'pointer' }}

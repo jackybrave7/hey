@@ -10,10 +10,19 @@ function fmtDate(ts) {
 export default function AdminMoments() {
   const [moments, setMoments]   = useState([]);
   const [status, setStatus]     = useState('active');
+  const [search, setSearch]     = useState('');
+  const [sortBy, setSortBy]     = useState('created_at');
+  const [sortDir, setSortDir]   = useState('desc');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
   const [toast, setToast]       = useState('');
   const [deleting, setDeleting] = useState(null);
+
+  function toggleSort(col) {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('desc'); }
+  }
+  const sortIcon = (col) => sortBy === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   function showMsg(msg) {
     setToast(msg);
@@ -62,18 +71,28 @@ export default function AdminMoments() {
         ✦ Моменты
       </h1>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {STATUSES.map(s => (
-          <button key={s.value} onClick={() => setStatus(s.value)}
-            style={{
-              padding: '9px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', border: 'none',
-              background: status === s.value ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
-              color: status === s.value ? 'white' : 'rgba(255,255,255,.6)',
-            }}>
-            {s.label}
-          </button>
-        ))}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Поиск по тексту, автору или телефону…"
+          style={{
+            flex: 1, minWidth: 220,
+            background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)',
+            borderRadius: 10, padding: '9px 14px', color: 'white', fontSize: 14,
+            fontFamily: 'inherit', outline: 'none',
+          }}/>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {STATUSES.map(s => (
+            <button key={s.value} onClick={() => setStatus(s.value)}
+              style={{
+                padding: '9px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', border: 'none',
+                background: status === s.value ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
+                color: status === s.value ? 'white' : 'rgba(255,255,255,.6)',
+              }}>
+              {s.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -85,29 +104,51 @@ export default function AdminMoments() {
 
       {loading ? (
         <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 14 }}>Загрузка…</div>
-      ) : (
+      ) : (() => {
+        const q = search.trim().toLowerCase();
+        const filtered = q
+          ? moments.filter(m =>
+              (m.text || '').toLowerCase().includes(q) ||
+              (m.author_name || '').toLowerCase().includes(q) ||
+              (m.author_phone || '').includes(search.trim())
+            )
+          : moments;
+        const sorted = [...filtered].sort((a, b) => {
+          const va = sortBy === 'reactions'
+            ? (a.stats?.see || 0) + (a.stats?.resonate || 0) + (a.stats?.talk || 0)
+            : (a[sortBy] ?? 0);
+          const vb = sortBy === 'reactions'
+            ? (b.stats?.see || 0) + (b.stats?.resonate || 0) + (b.stats?.talk || 0)
+            : (b[sortBy] ?? 0);
+          if (typeof va === 'string') {
+            return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+          }
+          return sortDir === 'asc' ? va - vb : vb - va;
+        });
+        const sortHCell = (col) => ({...hcell, cursor:'pointer', userSelect:'none'});
+        return (
         <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 14, overflow: 'hidden',
           border: '1px solid rgba(255,255,255,.08)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={hcell}>Автор</th>
+                <th style={sortHCell('author_name')} onClick={() => toggleSort('author_name')}>Автор{sortIcon('author_name')}</th>
                 <th style={hcell}>Текст</th>
                 <th style={hcell}>Медиа</th>
-                <th style={{ ...hcell, textAlign: 'center' }}>👁</th>
-                <th style={{ ...hcell, textAlign: 'center' }}>Реакции</th>
-                <th style={hcell}>Создан</th>
+                <th style={{ ...sortHCell('views'), textAlign: 'center' }} onClick={() => toggleSort('views')}>👁{sortIcon('views')}</th>
+                <th style={{ ...sortHCell('reactions'), textAlign: 'center' }} onClick={() => toggleSort('reactions')}>Реакции{sortIcon('reactions')}</th>
+                <th style={sortHCell('created_at')} onClick={() => toggleSort('created_at')}>Создан{sortIcon('created_at')}</th>
                 <th style={hcell}>Статус</th>
                 <th style={hcell}></th>
               </tr>
             </thead>
             <tbody>
-              {moments.length === 0 && (
+              {sorted.length === 0 && (
                 <tr><td colSpan={8} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
-                  Пусто
+                  {q ? 'Ничего не найдено' : 'Пусто'}
                 </td></tr>
               )}
-              {moments.map(m => (
+              {sorted.map(m => (
                 <tr key={m.id}>
                   <td style={cell}>
                     <div style={{ color: 'white', fontWeight: 600 }}>{m.author_name}</div>
@@ -165,10 +206,11 @@ export default function AdminMoments() {
             </tbody>
           </table>
         </div>
-      )}
+        );
+      })()}
 
       <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 12, marginTop: 12 }}>
-        {moments.length} моментов
+        {moments.length} моментов{search.trim() && ` · показано совпадений`}
       </div>
 
       {toast && (

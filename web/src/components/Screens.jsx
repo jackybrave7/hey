@@ -13,6 +13,7 @@ import {
 } from './auth/AuthComponents';
 import MomentDetailPopup from './moments/MomentDetailPopup';
 import MomentCard from './moments/MomentCard';
+import OnboardingTour from './OnboardingTour';
 import MoodEmoji from './moments/MoodEmoji';
 import SuperStatusCard from './super/SuperStatusCard';
 import AchievementBadges from './super/AchievementBadges';
@@ -842,11 +843,22 @@ export function WelcomeScreen() {
   const nav = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const [tourDone, setTourDone] = useState(() => localStorage.getItem('hey_tour_seen') === '1');
 
   // Guard: if arrived without isNewUser flag, redirect to main
   useEffect(() => {
     if (!location.state?.isNewUser) nav('/main', { replace: true });
   }, []);
+
+  function finishTour() {
+    localStorage.setItem('hey_tour_seen', '1');
+    setTourDone(true);
+  }
+
+  // Сначала — гид по ключевым концепциям
+  if (!tourDone) {
+    return <OnboardingTour onDone={finishTour}/>;
+  }
 
   const name = location.state?.userName || user?.name || '';
   const initial = name ? name[0].toUpperCase() : '?';

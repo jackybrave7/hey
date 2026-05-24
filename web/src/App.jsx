@@ -19,6 +19,7 @@ import AdminUsers from './components/admin/AdminUsers';
 import AdminUserDetail from './components/admin/AdminUserDetail';
 import AdminMoments from './components/admin/AdminMoments';
 import AdminLogs from './components/admin/AdminLogs';
+import AdminSystem from './components/admin/AdminSystem';
 
 function useNotifications() {
   useEffect(() => {
@@ -270,6 +271,11 @@ export default function App() {
           <Route path="/admin/logs" element={
             <RequireAdmin>
               <AdminLayout><AdminLogs/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/system" element={
+            <RequireAdmin>
+              <AdminLayout><AdminSystem/></AdminLayout>
             </RequireAdmin>
           }/>
 

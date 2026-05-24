@@ -3,9 +3,10 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 
 const NAV = [
-  { to: '/admin',         label: '📊 Дашборд',  exact: true },
+  { to: '/admin',         label: '📊 Дашборд',          exact: true },
   { to: '/admin/users',   label: '👥 Пользователи' },
   { to: '/admin/moments', label: '✦ Моменты' },
+  { to: '/admin/system',  label: '📢 HEY-заведующий' },
   { to: '/admin/logs',    label: '📋 Логи' },
 ];
 

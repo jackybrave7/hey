@@ -9,16 +9,21 @@ function fmtDate(ts) {
 }
 
 const ACTION_LABELS = {
-  block_user:       { label: '🚫 Блокировка',       color: 'rgba(255,100,80,.8)' },
-  unblock_user:     { label: '✓ Разблокировка',      color: 'rgba(100,220,140,.8)' },
-  make_admin:       { label: '👑 Назначен admin',    color: 'rgba(200,160,80,.8)' },
-  revoke_admin:     { label: '👑 Снят admin',        color: 'rgba(200,160,80,.6)' },
-  reset_password:   { label: '🔑 Сброс пароля',     color: 'rgba(180,140,255,.8)' },
-  delete_moment:    { label: '🗑 Удалён момент',    color: 'rgba(255,140,100,.8)' },
+  block_user:           { label: '🚫 Блокировка',          color: 'rgba(255,100,80,.8)' },
+  unblock_user:         { label: '✓ Разблокировка',        color: 'rgba(100,220,140,.8)' },
+  make_admin:           { label: '👑 Назначен admin',      color: 'rgba(200,160,80,.8)' },
+  revoke_admin:         { label: '👑 Снят admin',          color: 'rgba(200,160,80,.6)' },
+  reset_password:       { label: '🔑 Сброс пароля',        color: 'rgba(180,140,255,.8)' },
+  delete_moment:        { label: '🗑 Удалён момент',       color: 'rgba(255,140,100,.8)' },
+  delete_user:          { label: '🗑 Удалён пользователь', color: 'rgba(255,80,80,.95)' },
+  system_moment_create: { label: '📢 Момент HEY-зав.',     color: 'rgba(120,200,255,.9)' },
+  system_broadcast:     { label: '📢 Рассылка HEY-зав.',   color: 'rgba(120,200,255,.9)' },
 };
 
 export default function AdminLogs() {
   const [logs, setLogs]       = useState([]);
+  const [search, setSearch]   = useState('');
+  const [actionFilter, setActionFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
@@ -39,9 +44,31 @@ export default function AdminLogs() {
       <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         📋 Логи администратора
       </h1>
-      <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14, marginBottom: 24 }}>
+      <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14, marginBottom: 16 }}>
         Последние 200 действий
       </p>
+
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Поиск по администратору, цели, причине…"
+          style={{
+            flex: 1, minWidth: 220,
+            background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)',
+            borderRadius: 10, padding: '9px 14px', color: 'white', fontSize: 14,
+            fontFamily: 'inherit', outline: 'none',
+          }}/>
+        <select value={actionFilter} onChange={e => setActionFilter(e.target.value)}
+          style={{
+            background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)',
+            borderRadius: 10, padding: '9px 14px', color: 'white', fontSize: 13,
+            fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
+          }}>
+          <option value="" style={{background:'#1a0e36'}}>Все действия</option>
+          {Object.entries(ACTION_LABELS).map(([k, v]) => (
+            <option key={k} value={k} style={{background:'#1a0e36'}}>{v.label}</option>
+          ))}
+        </select>
+      </div>
 
       {error && (
         <div style={{ color: 'rgba(255,140,140,.9)', background: 'rgba(200,50,50,.12)',
@@ -66,12 +93,36 @@ export default function AdminLogs() {
               </tr>
             </thead>
             <tbody>
-              {logs.length === 0 && (
-                <tr><td colSpan={5} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
-                  Логов нет
-                </td></tr>
-              )}
-              {logs.map(log => {
+              {(() => {
+                const q = search.trim().toLowerCase();
+                const filtered = logs.filter(l => {
+                  if (actionFilter && l.action !== actionFilter) return false;
+                  if (!q) return true;
+                  return (
+                    (l.admin_name || '').toLowerCase().includes(q) ||
+                    (l.target_user_name || '').toLowerCase().includes(q) ||
+                    (l.target_moment_text || '').toLowerCase().includes(q) ||
+                    (l.reason || '').toLowerCase().includes(q)
+                  );
+                });
+                if (filtered.length === 0) return (
+                  <tr><td colSpan={5} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                    {q || actionFilter ? 'Ничего не найдено' : 'Логов нет'}
+                  </td></tr>
+                );
+                return null;
+              })()}
+              {logs.filter(l => {
+                const q = search.trim().toLowerCase();
+                if (actionFilter && l.action !== actionFilter) return false;
+                if (!q) return true;
+                return (
+                  (l.admin_name || '').toLowerCase().includes(q) ||
+                  (l.target_user_name || '').toLowerCase().includes(q) ||
+                  (l.target_moment_text || '').toLowerCase().includes(q) ||
+                  (l.reason || '').toLowerCase().includes(q)
+                );
+              }).map(log => {
                 const info = ACTION_LABELS[log.action] || { label: log.action, color: 'rgba(255,255,255,.5)' };
                 return (
                   <tr key={log.id}>

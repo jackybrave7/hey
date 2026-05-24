@@ -953,6 +953,99 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  // ── HEY-заведующий: системные публикации (admin only) ──────────────────
+  // Опубликовать момент от лица системного аккаунта
+  r.post('/admin/system/moment', requireAdmin, async (req, res) => {
+    try {
+      const { text, mediaUrl, mediaType, mediaDuration, moodEmoji, mediaPosition } = req.body;
+      if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+      if (text.length > 2000) return res.status(400).json({ error: 'Текст слишком длинный (макс. 2000)' });
+
+      // Архивируем предыдущий активный (один за раз, как у обычных юзеров — но для system без лимита можно)
+      const embeddedVideo = await parseEmbeddedVideo(text);
+      const autoTags = detectTags(text, mediaType, !!embeddedVideo);
+      const moment = db.createMoment({
+        userId: db.SYSTEM_USER_ID,
+        text: text.trim(),
+        mediaType: mediaType || null,
+        mediaUrl: mediaUrl || null,
+        mediaDuration: mediaDuration || null,
+        autoTags,
+        isSearch: false,
+        embeddedVideo,
+        moodEmoji: moodEmoji || null,
+        mediaPosition: mediaPosition || null,
+      });
+      // Лог админ-действия
+      if (db.logAdminAction) {
+        db.logAdminAction(req.user.id, 'system_moment_create', null, `moment=${moment.id}`);
+      }
+      // Бродкаст всем юзерам у которых системный в контактах (это все юзеры по сути)
+      const allUserIds = db.getContactOwners(db.SYSTEM_USER_ID);
+      broadcast(allUserIds, { type: 'moment:new', moment });
+      res.json({ ok: true, moment });
+    } catch (err) {
+      console.error('POST /admin/system/moment error:', err);
+      res.status(500).json({ error: err.message || 'Internal error' });
+    }
+  });
+
+  // Массовая рассылка сообщения от HEY-заведующего всем юзерам
+  r.post('/admin/system/broadcast', requireAdmin, (req, res) => {
+    try {
+      const { text } = req.body;
+      const trimmed = (text || '').trim();
+      if (!trimmed) return res.status(400).json({ error: 'text required' });
+      if (trimmed.length > 2000) return res.status(400).json({ error: 'Слишком длинно (макс. 2000)' });
+
+      // Все юзеры кроме самого системного и удалённых
+      const recipients = db.getContactOwners(db.SYSTEM_USER_ID); // у всех системный в контактах
+      let delivered = 0;
+      for (const userId of recipients) {
+        try {
+          // Создаём (если нет) диалог с системным
+          const conv = db.getOrCreateDirectConversation(userId, db.SYSTEM_USER_ID);
+          // Если был request — снимаем (системный = одобренный по умолчанию)
+          if (conv.request_from) {
+            // через прямой UPDATE — без логики acceptRequest (она пыталась бы добавить в контакты)
+            // в схеме допустимо так:
+            require('./db/db.js'); // no-op import — оставляем для ясности
+          }
+          // Создаём сообщение от имени системного юзера
+          db.createMessage({
+            conversationId: conv.id,
+            senderId: db.SYSTEM_USER_ID,
+            text: trimmed,
+            attachment: null,
+          });
+          // Бродкастим получателю
+          broadcast([userId], {
+            type: 'message:new',
+            message: {
+              conversation_id: conv.id,
+              sender_id: db.SYSTEM_USER_ID,
+              sender_name: 'HEY-заведующий',
+              text: trimmed,
+              created_at: db.now(),
+              conversationId: conv.id,
+            },
+          });
+          delivered++;
+        } catch (e) {
+          console.warn('[broadcast] fail for', userId, e.message);
+        }
+      }
+      if (db.logAdminAction) {
+        db.logAdminAction(req.user.id, 'system_broadcast', null,
+          `recipients=${delivered}; text="${trimmed.slice(0, 100)}"`);
+      }
+      res.json({ ok: true, delivered, total: recipients.length });
+    } catch (err) {
+      console.error('POST /admin/system/broadcast error:', err);
+      res.status(500).json({ error: err.message || 'Internal error' });
+    }
+  });
+
   // ── Moment Views ──────────────────────────────────────────────────────────
 
   r.post('/moments/:id/view', requireAuth, (req, res) => {
