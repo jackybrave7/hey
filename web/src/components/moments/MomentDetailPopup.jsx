@@ -734,10 +734,14 @@ export default function MomentDetailPopup({
               </div>
             )}
 
-            {/* Text */}
+            {/* Text — если есть превью видео, скрываем сам URL из подписи
+                (он избыточен; автор увидит в режиме редактирования) */}
             <div style={{color:'rgba(255,255,255,.9)',fontSize:15,lineHeight:1.7,
               whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
-              <TextWithLinks text={moment.text}/>
+              <TextWithLinks
+                text={hasEmbedVideo && moment.embedded_video?.url
+                  ? moment.text.replace(moment.embedded_video.url, '').replace(/\s{2,}/g, ' ').trim()
+                  : moment.text}/>
             </div>
 
             {/* Embedded video (shown below text when there's also a media_url) */}

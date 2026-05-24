@@ -261,7 +261,8 @@ module.exports = function makeRouter(db, broadcast) {
     }
     if (headline  !== undefined) updates.headline = headline ? headline.slice(0, 100) : null;
     const user = db.updateUser(req.user.id, updates);
-    const { password, ...safe } = user;
+    const { password, achievements: achRaw, ...safe } = user;
+    safe.achievements = (() => { try { return JSON.parse(achRaw || '[]'); } catch { return []; } })();
     res.json(safe);
   });
 

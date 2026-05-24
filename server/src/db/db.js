@@ -638,6 +638,15 @@ function getConversationsForUser(userId) {
       .forEach(u => { usersMap[u.id] = u; });
   }
 
+  // 1 query: partner presence (online / last_seen)
+  const presenceMap = {}; // userId -> { online, last_seen }
+  if (partnerIds.length) {
+    const pph = partnerIds.map(() => '?').join(',');
+    db.prepare(`SELECT user_id, online, last_seen FROM presence WHERE user_id IN (${pph})`)
+      .all(...partnerIds)
+      .forEach(p => { presenceMap[p.user_id] = { online: !!p.online, last_seen: p.last_seen }; });
+  }
+
   // 1 query: contact nicknames
   const nickMap = {}; // partnerId -> nickname
   if (partnerIds.length) {
@@ -698,6 +707,8 @@ function getConversationsForUser(userId) {
       partner_is_deleted: !!(partnerUser?.is_deleted),
       partner_is_super:   !!(partnerUser?.is_super),
       partner_is_system:  !!(partnerUser?.is_system),
+      partner_online:     !!(partnerId && presenceMap[partnerId]?.online),
+      partner_last_seen:  partnerId ? (presenceMap[partnerId]?.last_seen || null) : null,
       last_text: isRecipient ? null : (last?.text || null),
       last_at:   last?.created_at || conv.created_at,
       last_sender_id: isRecipient ? null : (last?.sender_id || null),

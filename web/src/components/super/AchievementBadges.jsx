@@ -6,9 +6,15 @@ const BADGES = {
 };
 
 export default function AchievementBadges({ achievements }) {
-  if (!achievements || achievements.length === 0) return null;
+  if (!achievements) return null;
+  // Защита: иногда сервер может вернуть JSON-строкой (legacy), нормализуем
+  let list = achievements;
+  if (typeof list === 'string') {
+    try { list = JSON.parse(list); } catch { list = []; }
+  }
+  if (!Array.isArray(list) || list.length === 0) return null;
 
-  const earned = achievements.filter(key => BADGES[key]);
+  const earned = list.filter(key => BADGES[key]);
   if (!earned.length) return null;
 
   return (

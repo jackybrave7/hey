@@ -240,6 +240,19 @@ function fmtDate(ts) {
   return d.toLocaleDateString('ru', { day:'numeric', month:'long', year:'numeric' });
 }
 
+// Короткая форма «был X назад» для шапки чата
+function fmtLastSeenShort(ts) {
+  if (!ts) return '';
+  const diff = Math.floor((Date.now() - ts * 1000) / 60000);
+  if (diff < 1)   return 'только что';
+  if (diff < 60)  return `${diff} мин. назад`;
+  const h = Math.floor(diff / 60);
+  if (h < 24)     return `${h} ч. назад`;
+  const days = Math.floor(h / 24);
+  if (days < 7)   return `${days} дн. назад`;
+  return new Date(ts * 1000).toLocaleDateString('ru', { day:'numeric', month:'short' });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SplashScreen
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3336,7 +3349,16 @@ function MediaViewerModal({ convId, onClose }) {
 
   useEffect(() => {
     api.getMedia(convId).then(msgs => {
-      setMedia(msgs.filter(m => m.attachment?.type === 'image'));
+      // Берём как одиночные, так и галереи; разворачиваем галереи в отдельные элементы
+      const flat = [];
+      for (const m of msgs) {
+        const a = m.attachment;
+        if (a?.type === 'image' && a.url) flat.push({ ...m, attachment: a });
+        else if (a?.type === 'images' && Array.isArray(a.urls)) {
+          a.urls.forEach((u, i) => flat.push({ ...m, id: m.id + '_' + i, attachment: { type:'image', url:u } }));
+        }
+      }
+      setMedia(flat);
       setLoading(false);
     }).catch(console.error);
     api.searchMessages(convId, 'http').then(msgs => {
@@ -3846,6 +3868,33 @@ const MessageRow = memo(function MessageRow({
                   cursor:'zoom-in'}}/>
             );
           })()}
+          {m.attachment?.type === 'images' && Array.isArray(m.attachment.urls) && (() => {
+            const urls = m.attachment.urls.filter(Boolean);
+            if (!urls.length) return null;
+            // Сетка: 1 → одна большая; 2 → две в ряд; 3-4 → 2x2; 5+ → 3 колонки
+            const cols = urls.length === 1 ? 1
+                       : urls.length === 2 ? 2
+                       : urls.length <= 4 ? 2 : 3;
+            return (
+              <div style={{
+                display:'grid',
+                gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                gap: 4,
+                marginBottom: m.text ? 6 : 2,
+                maxWidth: 360,
+              }}>
+                {urls.map((u, i) => (
+                  <img key={i} src={u} alt=""
+                    onClick={() => onLightbox(u)}
+                    style={{
+                      width:'100%', aspectRatio:'1 / 1',
+                      objectFit:'cover', borderRadius:8,
+                      display:'block', cursor:'zoom-in',
+                    }}/>
+                ))}
+              </div>
+            );
+          })()}
           {m.attachment?.type === 'audio' && (
             <AudioPlayer
               url={m.attachment.url}
@@ -4022,7 +4071,7 @@ export function ChatScreen() {
   const [partner,     setPartner]     = useState({ name:'Диалог', online:false, id:null, isGroup:false, icon:null, admin_id:null, avatar:null, isDeleted:false });
   const [editingMsg,  setEditingMsg]  = useState(null);
   const [msgMenu,     setMsgMenu]     = useState(null);
-  const [imgPreview,  setImgPreview]  = useState(null);
+  const [imgPreviews, setImgPreviews] = useState([]); // [{dataUrl, file, uploading?}]
   const [lightbox,    setLightbox]    = useState(null);
   const [showMedia,   setShowMedia]   = useState(false);
   const [searchMode,  setSearchMode]  = useState(false);
@@ -4146,7 +4195,9 @@ export function ChatScreen() {
           isGroup:false, avatar: c.avatar||null,
           isDeleted: !!c.partner_is_deleted,
           isSuper:   !!c.partner_is_super,
-          isSystem:  !!c.partner_is_system }));
+          isSystem:  !!c.partner_is_system,
+          online:    !!c.partner_online,
+          lastSeen:  c.partner_last_seen || null }));
         if (c.partner_id) {
           setIsContact(contacts.some(ct => ct.id === c.partner_id));
         }
@@ -4168,20 +4219,51 @@ export function ChatScreen() {
     finally { setLoadingMore(false); }
   }
 
+  // ── Esc — закрыть самый верхний попап чата ────────────────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      // Приоритет от самого «верхнего» к нижнему
+      if (lightbox)              { setLightbox(null);            return; }
+      if (showMedia)             { setShowMedia(false);          return; }
+      if (msgMenu)               { setMsgMenu(null);             return; }
+      if (reactionPicker)        { setReactionPicker(null);      return; }
+      if (showEmoji)             { setShowEmoji(false);          return; }
+      if (editingMsg)            { cancelEdit();                 return; }
+      if (imgPreviews.length)    {
+        imgPreviews.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
+        setImgPreviews([]);
+        return;
+      }
+      if (searchMode)            { setSearchMode(false); setSearchQuery(''); setSearchResults(null); return; }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox, showMedia, msgMenu, reactionPicker, showEmoji, editingMsg, imgPreviews, searchMode]);
+
   // Scroll to bottom on initial load or after send — Virtuoso's followOutput handles the rest
   useEffect(() => {
     if (messages.length === 0) return;
     if (isInitialLoad.current) {
       isInitialLoad.current = false;
-      // Jump to last item instantly after first render
-      requestAnimationFrame(() => {
-        virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'instant' });
-      });
+      // Несколько попыток: первая сразу, остальные после возможной загрузки картинок
+      const scroll = () => virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'instant' });
+      requestAnimationFrame(scroll);
+      setTimeout(scroll, 150);
+      setTimeout(scroll, 500);
+      setTimeout(scroll, 1200);
       return;
     }
     if (forceScrollBottom.current) {
       forceScrollBottom.current = false;
-      virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'smooth' });
+      const scroll = (smooth) => virtuosoRef.current?.scrollToIndex({
+        index: 'LAST', behavior: smooth ? 'smooth' : 'auto'
+      });
+      scroll(true);
+      // Повторные попытки — изображения и кастомные превью могут изменить высоту
+      setTimeout(() => scroll(false), 150);
+      setTimeout(() => scroll(false), 500);
+      setTimeout(() => scroll(false), 1200);
     }
   }, [messages, typing]);
 
@@ -4218,8 +4300,10 @@ export function ChatScreen() {
       const idSet = new Set(ids);
       setMessages(prev => prev.map(m => idSet.has(m.id) ? { ...m, status } : m));
     });
-    const u5 = socket.on('presence:change', ({ userId, online }) => {
-      setPartner(p => p.id === userId ? { ...p, online } : p);
+    const u5 = socket.on('presence:change', ({ userId, online, lastSeen }) => {
+      setPartner(p => p.id === userId
+        ? { ...p, online, lastSeen: lastSeen ?? p.lastSeen ?? Math.floor(Date.now()/1000) }
+        : p);
     });
     const u6 = socket.on('chat:cleared', ({ conversationId }) => {
       if (conversationId === convId) setMessages([]);
@@ -4402,48 +4486,72 @@ export function ChatScreen() {
   }
 
   async function handleFileSelect(e) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { alert('Только изображения'); return; }
-    if (file.size > 10 * 1024 * 1024) { alert('Файл слишком большой (макс. 10 МБ)'); return; }
+    if (!files.length) return;
 
-    // Instant local preview — no FileReader needed
-    const localUrl = previewUrl(file);
-    setImgPreview({ dataUrl: localUrl, file, uploading: false });
+    const MAX_TOTAL = 10;
+    const remaining = MAX_TOTAL - imgPreviews.length;
+    if (remaining <= 0) { alert(`Можно прикрепить максимум ${MAX_TOTAL} изображений`); return; }
+
+    const added = [];
+    for (const file of files.slice(0, remaining)) {
+      if (!file.type.startsWith('image/')) {
+        alert(`«${file.name}» — не изображение, пропущено`);
+        continue;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`«${file.name}» слишком большой (макс. 10 МБ)`);
+        continue;
+      }
+      added.push({ dataUrl: previewUrl(file), file, uploading: false });
+    }
+    if (added.length) setImgPreviews(prev => [...prev, ...added]);
+    if (files.length > remaining) {
+      alert(`Лимит ${MAX_TOTAL} картинок — лишние не добавлены`);
+    }
   }
 
   async function send() {
     const t = text.trim();
 
-    if (imgPreview) {
-      if (imgPreview.uploading) return;
-      const capturedFile    = imgPreview.file;
-      const capturedObjUrl  = imgPreview.dataUrl; // object URL to revoke after send
-      const capturedText    = t;
-      setImgPreview(p => ({ ...p, uploading: true }));
-      let attachment;
+    if (imgPreviews.length > 0) {
+      if (imgPreviews.some(p => p.uploading)) return;
+      const captured = imgPreviews;
+      const capturedText = t;
+      setImgPreviews(prev => prev.map(p => ({ ...p, uploading: true })));
+
+      let urls = [];
       try {
-        const { url } = await uploadMedia(capturedFile, 'chat-image', {
-          getPresignUrl: api.getPresignUrl,
-          uploadImage:   api.uploadImage,
-        });
-        attachment = { type: 'image', url };
+        const results = await Promise.all(captured.map(p =>
+          uploadMedia(p.file, 'chat-image', {
+            getPresignUrl: api.getPresignUrl,
+            uploadImage:   api.uploadImage,
+          })
+        ));
+        urls = results.map(r => r.url);
       } catch (err) {
-        alert(err.message);
-        setImgPreview(p => ({ ...p, uploading: false }));
+        alert(err.message || 'Не удалось загрузить изображения');
+        setImgPreviews(prev => prev.map(p => ({ ...p, uploading: false })));
         return;
       }
+
+      // Если только одна — оставляем старый формат для обратной совместимости
+      const attachment = urls.length === 1
+        ? { type: 'image',  url:  urls[0] }
+        : { type: 'images', urls };
+
       const tempId = 'tmp-' + Date.now();
       forceScrollBottom.current = true;
       setMessages(prev => [...prev, {
         id: tempId, text: capturedText || null, attachment, sender_id: user.id,
         sender_name: user.name, status: 'sent',
-        created_at: Math.floor(Date.now() / 1000)
+        created_at: Math.floor(Date.now() / 1000),
       }]);
       socket.sendMessage(convId, capturedText || '', tempId, attachment);
-      URL.revokeObjectURL(capturedObjUrl);
-      setImgPreview(null);
+      // Освобождаем object URLs
+      captured.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
+      setImgPreviews([]);
       setText('');
       return;
     }
@@ -4656,8 +4764,20 @@ export function ChatScreen() {
               cursor: (partner.isGroup || partner.id) ? 'pointer' : 'default'}}>
             <div className="topbar-title" style={{flex:'unset'}}>{partner.name}</div>
             {partner.isGroup && <div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>группа</div>}
+            {/* Super видит когда собеседник был онлайн в чате */}
+            {!partner.isGroup && !partner.isMonolog && partner.id && user?.is_super && (
+              partner.online ? (
+                <div style={{fontSize:11,color:'rgba(110,235,150,.95)',fontWeight:500}}>
+                  онлайн
+                </div>
+              ) : partner.lastSeen ? (
+                <div style={{fontSize:11,color:'rgba(255,255,255,.55)'}}>
+                  был {fmtLastSeenShort(partner.lastSeen)}
+                </div>
+              ) : null
+            )}
           </div>
-          {partner.online && <div className="online-dot"/>}
+          {partner.online && !partner.isGroup && !partner.isMonolog && <div className="online-dot"/>}
           <DotsMenu items={chatMenuItems}/>
         </div>
       </div>
@@ -4705,6 +4825,7 @@ export function ChatScreen() {
           style={{ flex: 1, overscrollBehavior: 'contain' }}
           firstItemIndex={firstItemIndex}
           data={flatItems}
+          initialTopMostItemIndex={Math.max(0, flatItems.length - 1)}
           startReached={loadOlder}
           atBottomStateChange={bottom => { atBottomRef.current = bottom; }}
           followOutput={(atBottom) => {
@@ -4763,19 +4884,49 @@ export function ChatScreen() {
         />
       )}
 
-      {/* Image preview bar */}
-      {imgPreview && (
+      {/* Image previews bar — до 10 миниатюр в ряд */}
+      {imgPreviews.length > 0 && (
         <div style={{background:'rgba(100,78,148,.45)',flexShrink:0}}>
-          <div style={{display:'flex',alignItems:'center',gap:12,padding:'8px 14px',
-            maxWidth:680,margin:'0 auto'}}>
-            <img src={imgPreview.dataUrl} alt=""
-              style={{height:56,width:56,objectFit:'cover',borderRadius:8,flexShrink:0}}/>
-            <span style={{flex:1,color:'rgba(255,255,255,.7)',fontSize:13}}>
-              {imgPreview.uploading ? 'Отправка…' : 'Добавьте подпись или нажмите ➤'}
-            </span>
-            <button onClick={() => { URL.revokeObjectURL(imgPreview.dataUrl); setImgPreview(null); }} disabled={imgPreview.uploading}
-              style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
-                fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+          <div style={{padding:'10px 14px',maxWidth:680,margin:'0 auto'}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+              <span style={{color:'rgba(255,255,255,.85)',fontSize:13,fontWeight:600,flex:1}}>
+                {imgPreviews.some(p => p.uploading)
+                  ? 'Отправка…'
+                  : `${imgPreviews.length} ${imgPreviews.length === 1 ? 'картинка' : 'картинки'} · добавь подпись или нажми ➤`}
+              </span>
+              <button onClick={() => {
+                  imgPreviews.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
+                  setImgPreviews([]);
+                }}
+                disabled={imgPreviews.some(p => p.uploading)}
+                style={{background:'none',border:'none',color:'rgba(255,255,255,.7)',
+                  fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+                Сбросить
+              </button>
+            </div>
+            <div style={{display:'flex',gap:6,overflowX:'auto',padding:'2px 0'}}>
+              {imgPreviews.map((p, idx) => (
+                <div key={idx} style={{position:'relative',flexShrink:0}}>
+                  <img src={p.dataUrl} alt=""
+                    style={{height:56,width:56,objectFit:'cover',borderRadius:8,
+                      opacity: p.uploading ? .5 : 1, transition:'opacity .2s',
+                      border:'1px solid rgba(255,255,255,.15)'}}/>
+                  {!p.uploading && (
+                    <button onClick={() => {
+                        try { URL.revokeObjectURL(p.dataUrl); } catch {}
+                        setImgPreviews(prev => prev.filter((_, i) => i !== idx));
+                      }}
+                      style={{
+                        position:'absolute',top:-4,right:-4,width:18,height:18,
+                        borderRadius:'50%',background:'rgba(0,0,0,.85)',
+                        border:'none',color:'white',fontSize:12,cursor:'pointer',
+                        display:'flex',alignItems:'center',justifyContent:'center',
+                        padding:0,lineHeight:1,
+                      }}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -5045,10 +5196,11 @@ export function ChatScreen() {
                 style={{width:22,height:22,display:'block',pointerEvents:'none',
                   filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
             </button>
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+            <input ref={fileInputRef} type="file" multiple
+              accept="image/jpeg,image/png,image/webp,image/gif"
               style={{display:'none'}} onChange={handleFileSelect}/>
             {/* Mic / Send — inside the pill */}
-            {text.trim() || imgPreview ? (
+            {text.trim() || imgPreviews.length > 0 ? (
               <button onClick={send} title="Отправить"
                 style={{width:36,height:36,background:'rgba(100,78,148,.85)',border:'none',
                   borderRadius:18,cursor:'pointer',display:'flex',alignItems:'center',
@@ -5593,6 +5745,19 @@ export function SettingsScreen() {
   const [deletePassword,    setDeletePassword]    = useState('');
   const [deleteErr,         setDeleteErr]         = useState('');
   const [deleting,          setDeleting]          = useState(false);
+
+  // Esc — закрыть верхнюю модалку
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      if (showDeleteAccount) { setShowDeleteAccount(false); return; }
+      if (showPwdModal)      { setShowPwdModal(false);      return; }
+      if (showBlacklist)     { setShowBlacklist(false);     return; }
+      if (showFeedback)      { setShowFeedback(false);      return; }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showDeleteAccount, showPwdModal, showBlacklist, showFeedback]);
 
   async function submitDeleteAccount() {
     setDeleteErr('');
