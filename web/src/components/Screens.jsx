@@ -3068,10 +3068,13 @@ export function ConversationsScreen() {
             📝
           </div>
         ) : c.type === 'group' ? (
-          <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
-            background:'rgba(200,160,210,.35)',
+          <div style={{width:52,height:52,borderRadius:14,flexShrink:0,overflow:'hidden',
+            background: (c.icon && (c.icon.startsWith('http') || c.icon.startsWith('/') || c.icon.startsWith('data:')))
+              ? '#0a0518' : 'rgba(200,160,210,.35)',
             display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>
-            {c.icon || '👥'}
+            {(c.icon && (c.icon.startsWith('http') || c.icon.startsWith('/') || c.icon.startsWith('data:')))
+              ? <img src={c.icon} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              : (c.icon || '👥')}
           </div>
         ) : (
           <AvatarDisplay avatar={c.avatar} name={c.name} size={52}/>
@@ -3977,9 +3980,13 @@ export function GroupSettingsScreen() {
   const [contacts,setContacts]= useState([]);
   const [editing, setEditing] = useState(false);
   const [name,    setName]    = useState('');
-  const [icon,    setIcon]    = useState('👥');
+  const [icon,    setIcon]    = useState('👥');           // emoji или URL
+  const [uploading, setUploading] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');    // поиск по контактам для добавления
+  const avatarInputRef = useRef();
 
   const isAdmin = info.admin_id === user?.id;
+  const isUrl = (s) => typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:') || s.startsWith('/'));
 
   useEffect(() => {
     api.getConversations().then(convs => {
@@ -3989,6 +3996,28 @@ export function GroupSettingsScreen() {
     api.getGroupMembers(convId).then(setMembers);
     api.getContacts().then(setContacts);
   }, [convId]);
+
+  async function handleAvatarSelect(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      heyToast('Только изображение', 'warning');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      heyToast('Картинка больше 5 МБ', 'warning');
+      return;
+    }
+    setUploading(true);
+    try {
+      const url = await uploadAvatar(file, { getPresignUrl: api.getPresignUrl });
+      setIcon(url);
+    } catch (err) {
+      heyToast('Не удалось загрузить: ' + (err.message || 'ошибка'), 'error');
+    }
+    setUploading(false);
+  }
 
   async function saveInfo() {
     await api.updateGroup(convId, { name, icon });
@@ -4014,6 +4043,14 @@ export function GroupSettingsScreen() {
   }
 
   const nonMembers = contacts.filter(c => !members.find(m => m.id === c.id));
+  const memberSearchQ = memberSearch.trim().toLowerCase();
+  const filteredNonMembers = memberSearchQ
+    ? nonMembers.filter(c =>
+        (c.name     || '').toLowerCase().includes(memberSearchQ) ||
+        (c.nickname || '').toLowerCase().includes(memberSearchQ) ||
+        (c.phone    || '').includes(memberSearch.trim())
+      )
+    : nonMembers;
 
   return (
     <div className="screen">
@@ -4021,9 +4058,12 @@ export function GroupSettingsScreen() {
       <div style={{flex:1,overflowY:'auto',maxWidth:680,margin:'0 auto',width:'100%',padding:'20px 24px'}}>
         {/* Group header */}
         <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:24}}>
-          <div style={{width:64,height:64,borderRadius:20,background:'rgba(140,100,200,.5)',
-            display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>
-            {info.icon || '👥'}
+          <div style={{width:64,height:64,borderRadius:20,overflow:'hidden',
+            background: isUrl(info.icon) ? '#0a0518' : 'rgba(140,100,200,.5)',
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,flexShrink:0}}>
+            {isUrl(info.icon)
+              ? <img src={info.icon} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              : (info.icon || '👥')}
           </div>
           <div>
             <div style={{color:'white',fontSize:19,fontWeight:600}}>{info.name}</div>
@@ -4036,6 +4076,44 @@ export function GroupSettingsScreen() {
         {/* Edit form */}
         {editing && isAdmin && (
           <div style={{background:'rgba(255,255,255,.08)',borderRadius:16,padding:16,marginBottom:20,display:'flex',flexDirection:'column',gap:12}}>
+            {/* Превью текущего аватара + загрузка */}
+            <div style={{display:'flex',alignItems:'center',gap:14}}>
+              <div style={{width:64,height:64,borderRadius:20,overflow:'hidden',position:'relative',
+                background: isUrl(icon) ? '#0a0518' : 'rgba(140,100,200,.5)',
+                display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,
+                cursor: uploading ? 'wait' : 'pointer',flexShrink:0}}
+                onClick={() => !uploading && avatarInputRef.current?.click()}>
+                {isUrl(icon)
+                  ? <img src={icon} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : icon}
+                {uploading && (
+                  <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.5)',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    color:'white',fontSize:11}}>…</div>
+                )}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <button onClick={() => avatarInputRef.current?.click()} disabled={uploading}
+                  style={{background:'rgba(140,100,200,.5)',border:'none',borderRadius:10,
+                    padding:'8px 14px',color:'white',fontSize:13,cursor: uploading ? 'wait' : 'pointer'}}>
+                  {uploading ? 'Загрузка…' : (isUrl(icon) ? '✎ Сменить фото' : '📷 Загрузить фото')}
+                </button>
+                {isUrl(icon) && !uploading && (
+                  <button onClick={() => setIcon('👥')}
+                    style={{marginLeft:8,background:'none',border:'1px solid rgba(255,255,255,.15)',
+                      borderRadius:10,padding:'7px 12px',color:'rgba(255,255,255,.7)',
+                      fontSize:13,cursor:'pointer'}}>
+                    ✕ Убрать
+                  </button>
+                )}
+                <div style={{color:'rgba(255,255,255,.4)',fontSize:11,marginTop:6}}>
+                  Или выбери эмодзи ниже
+                </div>
+              </div>
+              <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+                style={{display:'none'}} onChange={handleAvatarSelect}/>
+            </div>
+
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
               {GROUP_ICONS.map(e => (
                 <button key={e} onClick={()=>setIcon(e)}
@@ -4047,8 +4125,8 @@ export function GroupSettingsScreen() {
             </div>
             <input className="glass-input" value={name} onChange={e=>setName(e.target.value)} placeholder="Название"/>
             <div style={{display:'flex',gap:8}}>
-              <button className="pill" onClick={saveInfo} style={{flex:1,padding:'10px 0'}}>Сохранить</button>
-              <button onClick={()=>setEditing(false)}
+              <button className="pill" onClick={saveInfo} disabled={uploading} style={{flex:1,padding:'10px 0'}}>Сохранить</button>
+              <button onClick={()=>{ setEditing(false); setIcon(info.icon || '👥'); }}
                 style={{flex:1,padding:'10px 0',background:'rgba(255,255,255,.1)',border:'none',
                   borderRadius:24,color:'white',cursor:'pointer'}}>Отмена</button>
             </div>
@@ -4079,20 +4157,54 @@ export function GroupSettingsScreen() {
         {/* Add members (admin only) */}
         {isAdmin && nonMembers.length > 0 && (
           <>
-            <div style={{color:'rgba(255,255,255,.5)',fontSize:13,margin:'16px 0 10px'}}>Добавить участников</div>
-            {nonMembers.map(c => (
-              <div key={c.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',
-                borderBottom:'1px solid rgba(255,255,255,.07)'}}>
-                <div style={{width:40,height:40,borderRadius:'50%',background:'rgba(200,160,210,.3)',
-                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,color:'white'}}>
-                  {(c.nickname||c.name)[0].toUpperCase()}
-                </div>
-                <div style={{flex:1,color:'rgba(255,255,255,.7)',fontSize:14}}>{c.nickname||c.name}</div>
-                <button onClick={()=>addMember(c.id)}
-                  style={{background:'rgba(140,100,200,.5)',border:'none',borderRadius:10,
-                    padding:'6px 14px',color:'white',fontSize:13,cursor:'pointer'}}>+</button>
+            <div style={{color:'rgba(255,255,255,.5)',fontSize:13,margin:'16px 0 10px'}}>
+              Добавить участников ({nonMembers.length})
+            </div>
+            {/* Поиск по контактам */}
+            {nonMembers.length > 5 && (
+              <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
+                placeholder="🔍 Поиск по имени или телефону…"
+                style={{
+                  width:'100%',boxSizing:'border-box',marginBottom:10,
+                  background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.14)',
+                  borderRadius:10,padding:'9px 14px',color:'white',fontSize:14,
+                  fontFamily:'inherit',outline:'none',
+                }}
+                onFocus={e => e.target.style.borderColor='rgba(180,140,220,.6)'}
+                onBlur={e => e.target.style.borderColor='rgba(255,255,255,.14)'}/>
+            )}
+            {filteredNonMembers.length === 0 && memberSearchQ && (
+              <div style={{color:'rgba(255,255,255,.35)',fontSize:13,padding:'12px 0'}}>
+                Никого не найдено по «{memberSearch}»
               </div>
-            ))}
+            )}
+            {filteredNonMembers.map(c => {
+              const avatarIsImg = c.avatar && (c.avatar.startsWith('http') || c.avatar.startsWith('/') || c.avatar.startsWith('data:'));
+              return (
+                <div key={c.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',
+                  borderBottom:'1px solid rgba(255,255,255,.07)'}}>
+                  <div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',
+                    background:'rgba(200,160,210,.3)',
+                    display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,color:'white',flexShrink:0}}>
+                    {avatarIsImg
+                      ? <img src={c.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                      : (c.nickname||c.name)[0].toUpperCase()}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{color:'rgba(255,255,255,.85)',fontSize:14,
+                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {c.nickname||c.name}
+                    </div>
+                    {c.phone && (
+                      <div style={{color:'rgba(255,255,255,.4)',fontSize:11}}>{c.phone}</div>
+                    )}
+                  </div>
+                  <button onClick={()=>addMember(c.id)}
+                    style={{background:'rgba(140,100,200,.5)',border:'none',borderRadius:10,
+                      padding:'6px 14px',color:'white',fontSize:13,cursor:'pointer'}}>+</button>
+                </div>
+              );
+            })}
           </>
         )}
 
@@ -5380,16 +5492,22 @@ export function ChatScreen() {
               display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>
               📝
             </div>
-          ) : partner.isGroup ? (
-            <div onClick={() => nav(`/groups/${convId}/settings`)}
-              style={{width:36,height:36,borderRadius:'12px',flexShrink:0,cursor:'pointer',
-                background:'rgba(140,100,200,.5)',display:'flex',alignItems:'center',
-                justifyContent:'center',fontSize:20,transition:'transform .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'}
-              onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-              {partner.icon||'👥'}
-            </div>
-          ) : (
+          ) : partner.isGroup ? (() => {
+            const ic = partner.icon || '';
+            const isImg = ic.startsWith('http') || ic.startsWith('/') || ic.startsWith('data:');
+            return (
+              <div onClick={() => nav(`/groups/${convId}/settings`)}
+                style={{width:36,height:36,borderRadius:'12px',flexShrink:0,cursor:'pointer',overflow:'hidden',
+                  background: isImg ? '#0a0518' : 'rgba(140,100,200,.5)',
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,transition:'transform .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'}
+                onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                {isImg
+                  ? <img src={ic} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : (ic || '👥')}
+              </div>
+            );
+          })() : (
             <div onClick={() => partner.id && nav(`/profile/${partner.id}`)}
               style={{cursor: partner.id ? 'pointer' : 'default',transition:'transform .15s',
                 position:'relative',width:36,height:36,flexShrink:0}}
