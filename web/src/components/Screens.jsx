@@ -3211,7 +3211,7 @@ export function ConversationsScreen() {
           {isRequest ? (
             <div style={{color:'rgba(180,140,220,.8)',fontSize:13}}>хочет написать вам</div>
           ) : c.is_group_invite ? (
-            <div style={{color:'rgba(180,140,220,.85)',fontSize:13,whiteSpace:'nowrap',
+            <div style={{color:'rgba(220,190,255,1)',fontSize:13,fontWeight:500,whiteSpace:'nowrap',
               overflow:'hidden',textOverflow:'ellipsis'}}>
               {c.group_invited_by_name
                 ? `${c.group_invited_by_name} приглашает в группу`
@@ -3236,8 +3236,9 @@ export function ConversationsScreen() {
             }}>Запрос</div>
           ) : c.is_group_invite ? (
             <div style={{
-              background:'rgba(140,100,210,.55)',border:'1px solid rgba(180,140,220,.45)',
-              borderRadius:20,padding:'3px 10px',fontSize:11,color:'rgba(230,210,255,.95)',fontWeight:700,
+              background:'rgba(110,70,200,.85)',border:'1px solid rgba(200,160,240,.6)',
+              borderRadius:20,padding:'3px 10px',fontSize:11,color:'white',fontWeight:700,
+              boxShadow:'0 2px 8px rgba(80,40,180,.3)',
             }}>📩 Приглашение</div>
           ) : (
             <>
@@ -3576,8 +3577,8 @@ export function ConversationsScreen() {
                   }}
                   style={{
                     flex:1,padding:'13px',borderRadius:14,fontSize:14,fontWeight:600,
-                    background:'rgba(255,80,80,.15)',border:'1px solid rgba(255,120,120,.3)',
-                    color:'rgba(255,180,180,.9)',cursor:'pointer',
+                    background:'rgba(200,60,60,.45)',border:'1px solid rgba(255,140,140,.55)',
+                    color:'rgba(255,225,225,1)',cursor:'pointer',
                     opacity: requestCardAction === 'decline' ? .6 : 1,
                     fontFamily:'inherit',
                   }}>
@@ -6108,8 +6109,9 @@ export function ChatScreen() {
                   window.dispatchEvent(new CustomEvent('hey:scroll-to-msg', { detail: pinnedMessage.id }));
                 }}
                 style={{flex:1,minWidth:0,cursor:'pointer'}}>
-                <div style={{color:'rgba(200,170,240,.95)',fontSize:11,fontWeight:700,letterSpacing:.3}}>
-                  Закреплено
+                <div style={{color:'rgba(230,200,255,1)',fontSize:11,fontWeight:700,letterSpacing:.5,
+                  textTransform:'uppercase'}}>
+                  📌 Закреплено
                 </div>
                 <div style={{color:'rgba(255,255,255,.85)',fontSize:13,
                   overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:1}}>
@@ -6469,15 +6471,23 @@ export function ChatScreen() {
             );
           })()}
           <div style={{textAlign:'center'}}>
-            <div style={{color:'rgba(200,170,250,.95)',fontSize:12,fontWeight:700,
-              letterSpacing:.8,textTransform:'uppercase',marginBottom:8}}>
+            <div style={{
+              display:'inline-block',
+              background:'rgba(80,50,140,.55)',
+              border:'1px solid rgba(180,140,220,.5)',
+              color:'white', fontSize:11, fontWeight:700,
+              letterSpacing:.9, textTransform:'uppercase',
+              padding:'4px 12px', borderRadius:50, marginBottom:10,
+            }}>
               📩 Приглашение в группу
             </div>
-            <div style={{color:'white', fontSize:22, fontWeight:800, marginBottom:8}}>
+            <div style={{color:'white', fontSize:22, fontWeight:800, marginBottom:8,
+              textShadow:'0 2px 8px rgba(0,0,0,.25)'}}>
               {groupInvite.conversation?.name || 'Группа'}
             </div>
             {groupInvite.invitedBy?.name && (
-              <div style={{color:'rgba(255,255,255,.6)', fontSize:14, lineHeight:1.5}}>
+              <div style={{color:'rgba(255,255,255,.85)', fontSize:14, lineHeight:1.5,
+                textShadow:'0 1px 4px rgba(0,0,0,.2)'}}>
                 {groupInvite.invitedBy.name} приглашает тебя в группу
               </div>
             )}
@@ -6494,8 +6504,8 @@ export function ChatScreen() {
               }}
               style={{
                 flex:1, padding:'13px', borderRadius:14, fontSize:14, fontWeight:600,
-                background:'rgba(255,80,80,.15)', border:'1px solid rgba(255,120,120,.35)',
-                color:'rgba(255,180,180,.95)', cursor:'pointer', opacity: declining ? .6 : 1,
+                background:'rgba(200,60,60,.45)', border:'1px solid rgba(255,140,140,.6)',
+                color:'rgba(255,225,225,1)', cursor:'pointer', opacity: declining ? .6 : 1,
                 fontFamily:'inherit',
               }}>
               {declining ? '…' : 'Отклонить'}
@@ -6594,8 +6604,8 @@ export function ChatScreen() {
               }}
               style={{
                 flex:1, padding:'13px', borderRadius:14, fontSize:14, fontWeight:600,
-                background:'rgba(255,80,80,.15)', border:'1px solid rgba(255,120,120,.35)',
-                color:'rgba(255,180,180,.9)', cursor:'pointer', opacity: declining ? .6 : 1,
+                background:'rgba(200,60,60,.45)', border:'1px solid rgba(255,140,140,.6)',
+                color:'rgba(255,225,225,1)', cursor:'pointer', opacity: declining ? .6 : 1,
               }}>
               {declining ? '…' : 'Удалить'}
             </button>
@@ -6685,7 +6695,7 @@ export function ChatScreen() {
               {/* Cancel */}
               <button onClick={cancelVoice} title="Отменить"
                 style={{width:28,height:28,borderRadius:'50%',flexShrink:0,
-                  background:'rgba(255,80,80,.18)',border:'1px solid rgba(255,120,120,.3)',
+                  background:'rgba(200,60,60,.45)',border:'1px solid rgba(255,140,140,.55)',
                   color:'rgba(255,180,180,.85)',fontSize:14,cursor:'pointer',lineHeight:1,
                   display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
               {/* Stop → preview */}
@@ -7622,7 +7632,7 @@ export function SettingsScreen() {
                             ✉ Тест
                           </button>
                           <button onClick={disablePush} disabled={pushBusy} style={{
-                            background:'rgba(255,80,80,.18)', border:'1px solid rgba(255,120,120,.3)',
+                            background:'rgba(200,60,60,.45)', border:'1px solid rgba(255,140,140,.55)',
                             borderRadius:50, padding:'9px 16px', color:'rgba(255,180,180,.95)',
                             fontSize:13, cursor: pushBusy ? 'wait' : 'pointer',
                             fontFamily:'inherit', opacity: pushBusy ? .6 : 1,
@@ -7662,12 +7672,12 @@ export function SettingsScreen() {
           if (await customConfirm('Выйти из аккаунта?')) { logout(); nav('/login'); }
         }} style={{
           padding:'14px', borderRadius:14, cursor:'pointer',
-          background:'rgba(255,60,60,.15)', border:'1px solid rgba(255,100,100,.3)',
-          color:'rgba(255,180,180,.9)', fontSize:15, fontWeight:600,
+          background:'rgba(200,60,60,.42)', border:'1px solid rgba(255,140,140,.55)',
+          color:'rgba(255,225,225,1)', fontSize:15, fontWeight:600,
           transition:'background .15s', fontFamily:'inherit',
         }}
-          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,60,60,.27)'}
-          onMouseLeave={e=>e.currentTarget.style.background='rgba(255,60,60,.15)'}>
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(200,60,60,.62)'}
+          onMouseLeave={e=>e.currentTarget.style.background='rgba(200,60,60,.42)'}>
           Выйти из аккаунта
         </button>
 
