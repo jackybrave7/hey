@@ -1778,11 +1778,46 @@ function deleteAwoCourseChat(course) {
   db.prepare('DELETE FROM awo_course_chats WHERE course=? COLLATE NOCASE').run(course);
 }
 
-function getChatForCourse(course) {
-  if (!course) return null;
-  const row = db.prepare('SELECT chat_id FROM awo_course_chats WHERE course=? COLLATE NOCASE')
-    .get(String(course).trim());
-  return row ? row.chat_id : null;
+// Подбор чата под название курса из АВО.
+// Логика:
+//   1. Берём название `goods` от АВО (например "BL School — Zoom Участник, поток 5")
+//   2. Проверяем глобальные исключающие слова из настроек (например "слушатель, запись")
+//      — если совпало хоть одно → доступ к чату НЕ даём (вернём null)
+//   3. Ищем маппинг где сохранённый `course` входит подстрокой в `goods`
+//      (case-insensitive). Например маппинг "Zoom Участник" сматчит
+//      "BL School — Zoom Участник, поток 5"
+function getChatForCourse(goods) {
+  if (!goods) return null;
+  const goodsLower = String(goods).trim().toLowerCase();
+  if (!goodsLower) return null;
+
+  // Глобальные стоп-слова
+  const excludeRaw = getSetting('awo_chat_excludes', 'слушатель,запись') || '';
+  const excludes = String(excludeRaw).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  for (const ex of excludes) {
+    if (goodsLower.includes(ex)) {
+      console.log(`[AWO] курс "${goods}" содержит стоп-слово "${ex}" — чат не назначаем`);
+      return null;
+    }
+  }
+
+  // Сначала пробуем точный матч (быстрый путь, обратная совместимость)
+  const exact = db.prepare('SELECT chat_id FROM awo_course_chats WHERE course=? COLLATE NOCASE')
+    .get(String(goods).trim());
+  if (exact) return exact.chat_id;
+
+  // Затем — подстрочный матч: маппинг с самым длинным совпавшим паттерном выигрывает
+  const all = db.prepare('SELECT course, chat_id FROM awo_course_chats').all();
+  let best = null;
+  for (const row of all) {
+    const pattern = String(row.course || '').trim().toLowerCase();
+    if (pattern && goodsLower.includes(pattern)) {
+      if (!best || pattern.length > best.patternLen) {
+        best = { chat_id: row.chat_id, patternLen: pattern.length };
+      }
+    }
+  }
+  return best ? best.chat_id : null;
 }
 
 function listAllGroupChats() {
@@ -1820,14 +1855,16 @@ function setSetting(key, value) {
 
 function getAwoSettings() {
   return {
-    test_mode:   !!getSetting('awo_test_mode', false),
-    test_course: getSetting('awo_test_course', ''),
+    test_mode:    !!getSetting('awo_test_mode', false),
+    test_course:  getSetting('awo_test_course', ''),
+    chat_excludes: getSetting('awo_chat_excludes', 'слушатель,запись'),
   };
 }
 
-function setAwoSettings({ test_mode, test_course }) {
-  if (test_mode != null)   setSetting('awo_test_mode', !!test_mode);
-  if (test_course != null) setSetting('awo_test_course', String(test_course || ''));
+function setAwoSettings({ test_mode, test_course, chat_excludes }) {
+  if (test_mode != null)     setSetting('awo_test_mode', !!test_mode);
+  if (test_course != null)   setSetting('awo_test_course', String(test_course || ''));
+  if (chat_excludes != null) setSetting('awo_chat_excludes', String(chat_excludes || ''));
   return getAwoSettings();
 }
 

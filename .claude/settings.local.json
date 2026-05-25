@@ -150,7 +150,21 @@
       "Bash(curl -sS \"https://hey-messenger.ru/api/join/validate?email=attacker@example.com&course=Test%20Course\")",
       "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app && git pull origin main 2>&1 | tail -2 && pm2 restart hey --update-env\")",
       "Bash(curl -sS -X POST \"https://hey-messenger.ru/api/integrations/awo/webhook?token=4f5ca463019b98e25be47cc5f274eecf29461b0eb20d379d\" -H \"Content-Type: application/x-www-form-urlencoded\" -d \"id_account=form_test&id_account_status=5&email=form@example.com&goods=FormTest\")",
-      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app/server && sqlite3 data/hey.db \\\\\"DELETE FROM school_invites WHERE bound_email LIKE '%@example.com'; DELETE FROM awo_processed WHERE id_account='form_test';\\\\\" && echo cleaned\")"
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app/server && sqlite3 data/hey.db \\\\\"DELETE FROM school_invites WHERE bound_email LIKE '%@example.com'; DELETE FROM awo_processed WHERE id_account='form_test';\\\\\" && echo cleaned\")",
+      "Bash(scp -o BatchMode=yes C:/projects/hey/server/src/routes.js root@72.56.16.44:/app/server/src/routes.js)",
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app/server && sqlite3 data/hey.db \\\\\"DELETE FROM awo_processed WHERE id_account='10060';\\\\\" && pm2 restart hey --update-env 2>&1 | tail -1\")",
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"pm2 list | grep hey\")",
+      "Bash(curl -sS -X POST \"https://hey-messenger.ru/api/integrations/awo/webhook?token=4f5ca463019b98e25be47cc5f274eecf29461b0eb20d379d\" -H \"Content-Type: application/json\" -d '{\"id_account\":\"99999\",\"id_account_status\":\"1\",\"email\":\"flowtest@example.com\",\"goods\":\"FlowTest\",\"phone_number\":\"79001234567\"}')",
+      "Bash(curl -sS -X POST \"https://hey-messenger.ru/api/integrations/awo/webhook?token=4f5ca463019b98e25be47cc5f274eecf29461b0eb20d379d\" -H \"Content-Type: application/json\" -d '{\"id_account\":\"99999\",\"id_account_status\":\"5\",\"email\":\"flowtest@example.com\",\"goods\":\"FlowTest\",\"phone_number\":\"79001234567\",\"name\":\"Тест\"}')",
+      "Bash(curl -sS -X POST \"https://hey-messenger.ru/api/integrations/awo/webhook?token=4f5ca463019b98e25be47cc5f274eecf29461b0eb20d379d\" -H \"Content-Type: application/json\" -d '{\"id_account\":\"99999\",\"id_account_status\":\"5\",\"email\":\"flowtest@example.com\",\"goods\":\"FlowTest\"}')",
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app/server && sqlite3 data/hey.db \\\\\"SELECT id_account, email, phone, course, result FROM awo_processed WHERE id_account='99999';\\\\\"\")",
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app/server && sqlite3 data/hey.db \\\\\"SELECT code, bound_email, bound_phone, course FROM school_invites WHERE bound_email='flowtest@example.com';\\\\\"\")",
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app/server && sqlite3 data/hey.db \\\\\"DELETE FROM school_invites WHERE bound_email='flowtest@example.com'; DELETE FROM awo_processed WHERE id_account='99999';\\\\\" && echo cleaned\")",
+      "Bash(curl -sS -o /dev/null -w \"GitHub status: %{http_code}\\\\n\" https://www.githubstatus.com/api/v2/status.json)",
+      "Bash(curl -sS https://www.githubstatus.com/api/v2/status.json)",
+      "Bash(scp -o BatchMode=yes C:/projects/hey/server/src/db/db.js root@72.56.16.44:/app/server/src/db/db.js)",
+      "Bash(scp -r -o BatchMode=yes C:/projects/hey/web/dist/* root@72.56.16.44:/app/web/dist/)",
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"pm2 restart hey --update-env\")"
     ]
   }
 }

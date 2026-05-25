@@ -39,6 +39,7 @@ export default function AdminAwo() {
   const [settings, setSettings] = useState(null);
   const [testCourse, setTestCourse] = useState('');
   const [testMode, setTestMode] = useState(false);
+  const [chatExcludes, setChatExcludes] = useState('слушатель,запись');
   const [savingSettings, setSavingSettings] = useState(false);
 
   const [mappings, setMappings] = useState([]);
@@ -70,6 +71,7 @@ export default function AdminAwo() {
       setSettings(s);
       setTestMode(!!s.test_mode);
       setTestCourse(s.test_course || '');
+      setChatExcludes(s.chat_excludes ?? 'слушатель,запись');
       setMappings(m);
       setGroupChats(g);
       setLog(l);
@@ -79,7 +81,11 @@ export default function AdminAwo() {
   async function saveSettings() {
     setSavingSettings(true);
     try {
-      const s = await api.adminSetAwoSettings({ test_mode: testMode, test_course: testCourse });
+      const s = await api.adminSetAwoSettings({
+        test_mode: testMode,
+        test_course: testCourse,
+        chat_excludes: chatExcludes,
+      });
       setSettings(s);
       notify('Сохранено');
     } catch (e) { setError(e.message); }
@@ -171,6 +177,17 @@ export default function AdminAwo() {
           </div>
         )}
 
+        <div style={{ marginBottom: 14 }}>
+          <div style={labelStyle}>🚫 Стоп-слова для доступа к чату (через запятую)</div>
+          <input style={inputStyle} value={chatExcludes} onChange={e => setChatExcludes(e.target.value)}
+            placeholder="слушатель, запись"/>
+          <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+            Если в названии курса (<code>goods</code>) есть хоть одно из этих слов —
+            ученика <strong>не добавим</strong> в чат курса (инвайт всё равно создастся).
+            Регистр не важен.
+          </div>
+        </div>
+
         <button style={btnStyle} disabled={savingSettings} onClick={saveSettings}>
           {savingSettings ? 'Сохраняю…' : 'Сохранить настройки'}
         </button>
@@ -186,8 +203,10 @@ export default function AdminAwo() {
         <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
           🔗 Курс → групповой чат
         </h3>
-        <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, marginBottom: 14 }}>
-          После регистрации ученик автоматически добавится в указанный чат
+        <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
+          После регистрации ученик автоматически добавится в указанный чат.<br/>
+          Название курса можно указывать как <strong>точное</strong>, так и <strong>часть</strong> названия —
+          например маппинг «Zoom Участник» подойдёт под курс «BL School — Zoom Участник, поток 5».
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr auto', gap: 10, marginBottom: 16 }}>
