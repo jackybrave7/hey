@@ -10,6 +10,7 @@ const db = require('./db/db');
 const { detectTags, detectMoodEmoji } = require('./auto-tags');
 const { parseEmbeddedVideo } = require('./video-embed');
 const storage = require('./storage');
+const awo = require('./awo');
 
 // ── requireAdmin middleware ────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
@@ -75,22 +76,41 @@ module.exports = function makeRouter(db, broadcast) {
   authModule.init(db); // inject DB into auth for block checks
 
   r.post('/register', rateLimit(5, 15 * 60 * 1000), (req, res) => {
-    const { phone, name, password, birthday, avatar, inviteUserId } = req.body;
+    const { phone, name, password, birthday, avatar, inviteUserId, email, schoolInviteCode } = req.body;
     if (!phone || !name || !password)
       return res.status(400).json({ error: 'phone, name, password required' });
     if (password.length < 8)
       return res.status(400).json({ error: 'Пароль минимум 8 символов' });
-    // Пока открыта регистрация только по инвайту
+
+    // Школьный инвайт (от АВО) — отдельный канал регистрации, не требует inviteUserId
+    let schoolInvite = null;
+    if (schoolInviteCode) {
+      schoolInvite = db.findSchoolInviteByCode(schoolInviteCode);
+      if (!schoolInvite) return res.status(400).json({ error: 'Школьный инвайт недействителен' });
+      if (schoolInvite.used_at) return res.status(400).json({ error: 'Школьный инвайт уже использован' });
+    }
+
+    // Пока открыта регистрация только по инвайту (личному или школьному)
     const openSignup = process.env.OPEN_SIGNUP === '1';
-    if (!openSignup && !inviteUserId) {
+    if (!openSignup && !inviteUserId && !schoolInvite) {
       return res.status(403).json({
         error: 'Регистрация пока только по приглашению. Попроси ссылку у знакомых.',
         code: 'INVITE_REQUIRED',
       });
     }
+
+    // Email из школьного инвайта имеет приоритет (зашит в /join-ссылку)
+    const finalEmail = schoolInvite?.bound_email || (email ? String(email).trim().toLowerCase() : null);
+    if (finalEmail && !awo.isValidEmail(finalEmail)) {
+      return res.status(400).json({ error: 'Неверный формат email' });
+    }
+
     if (db.findUserByPhone(phone))
       return res.status(409).json({ error: 'Телефон уже зарегистрирован' });
-    const user = db.createUser({ phone, name, password, birthday, avatar });
+    if (finalEmail && db.findUserByEmail(finalEmail))
+      return res.status(409).json({ error: 'Email уже зарегистрирован' });
+
+    const user = db.createUser({ phone, name, password, birthday, avatar, email: finalEmail });
 
     // Системный пользователь автоматически в контактах у нового юзера
     db.addSystemContactFor(user.id);
@@ -124,6 +144,39 @@ module.exports = function makeRouter(db, broadcast) {
             });
           }
         } catch(e) { console.error('[REFERRAL]', e.message); }
+      }
+    }
+
+    // Активация школьного инвайта (от АВО): отметить как использованный + добавить
+    // школьный аккаунт в контакты + автодобавление в групповой чат курса
+    if (schoolInvite) {
+      try { db.markSchoolInviteUsed(schoolInvite.code, user.id); } catch (e) { console.error('[school-invite]', e.message); }
+      try {
+        const school = db.getSchoolAccount();
+        if (school) {
+          try { db.addContact(user.id, school.id, null); } catch {}
+        }
+      } catch {}
+      // Автодобавление в групповой чат курса
+      if (schoolInvite.course) {
+        const chatId = db.getChatForCourse(schoolInvite.course);
+        if (chatId) {
+          try {
+            const result = db.addUserToChat(chatId, user.id);
+            if (result.added) {
+              try {
+                db.createMessage({
+                  conversationId: chatId,
+                  senderId: db.SCHOOL_USER_ID,
+                  text: `🎓 ${user.name} присоединился к курсу «${schoolInvite.course}»`,
+                });
+              } catch {}
+              try { broadcast([user.id], { type: 'conversation:added', chat_id: chatId }); } catch {}
+            }
+          } catch (e) { console.error('[awo-course-chat]', e.message); }
+        } else {
+          console.warn(`[awo] нет маппинга курса "${schoolInvite.course}" → чат`);
+        }
       }
     }
 
@@ -233,12 +286,25 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   r.patch('/me', requireAuth, (req, res) => {
-    const { name, phone, birthday, avatar, bio, headline } = req.body;
+    const { name, phone, birthday, avatar, bio, headline, email } = req.body;
     const updates = {};
     if (name) updates.name = name;
     if (phone) updates.phone = phone;
     if (birthday !== undefined) updates.birthday = birthday;
     if (avatar  !== undefined) updates.avatar = avatar;
+    if (email !== undefined) {
+      const cleanedEmail = email ? String(email).trim().toLowerCase() : null;
+      if (cleanedEmail) {
+        if (!awo.isValidEmail(cleanedEmail)) {
+          return res.status(400).json({ error: 'Неверный формат email' });
+        }
+        const existing = db.findUserByEmail(cleanedEmail);
+        if (existing && existing.id !== req.user.id) {
+          return res.status(409).json({ error: 'Email уже используется' });
+        }
+      }
+      updates.email = cleanedEmail;
+    }
     if (bio !== undefined) {
       const cleanedBio = bio ? bio.slice(0, 200) : null;
       // Проверка лимита ссылок: обычный — 1, Super — до 5
@@ -1278,6 +1344,188 @@ module.exports = function makeRouter(db, broadcast) {
   r.get('/admin/logs', requireAdmin, (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 500);
     res.json(db.getAdminLogs(limit));
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // AWO (АвтоВебОфис) integration
+  // ═════════════════════════════════════════════════════════════════════════
+
+  // Публичная валидация /join-ссылки (без auth). Возвращает ok=true и подготовленный
+  // школьный инвайт-код, который фронт прокинет в /register.
+  r.get('/join/validate', rateLimit(30, 60 * 1000), (req, res) => {
+    const email  = (req.query.email  || '').trim().toLowerCase();
+    const course = (req.query.course || '').trim();
+    const sig    = (req.query.sig    || '').trim();
+
+    if (!email || !sig) return res.status(400).json({ ok: false, error: 'email и sig обязательны' });
+    if (!awo.isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Неверный формат email' });
+    if (!awo.verifyJoin(email, course, sig)) {
+      return res.status(403).json({ ok: false, error: 'Подпись недействительна' });
+    }
+
+    // Уже есть аккаунт с таким email — фронт покажет «войди»
+    const existing = db.findUserByEmail(email);
+    if (existing) {
+      return res.json({ ok: true, alreadyRegistered: true, email, course });
+    }
+
+    // Ищем подготовленный webhook'ом инвайт. Если webhook ещё не пришёл —
+    // создаём инвайт на лету (но только при валидной подписи).
+    let invite = db.findActiveSchoolInviteByEmail(email);
+    if (!invite) {
+      invite = db.createSchoolInvite({ bound_email: email, course });
+    }
+
+    res.json({
+      ok: true,
+      alreadyRegistered: false,
+      email,
+      course,
+      schoolInviteCode: invite.code,
+      schoolName: db.getSchoolAccount()?.name || 'Школа',
+    });
+  });
+
+  // Webhook от АВО — публичный endpoint, защищён токеном из .env (AWO_WEBHOOK_TOKEN)
+  r.post('/integrations/awo/webhook', rateLimit(120, 60 * 1000), (req, res) => {
+    // Логируем raw payload до любых проверок (для отладки)
+    const payload = req.body || {};
+    console.log('[AWO webhook]', JSON.stringify(payload).slice(0, 500));
+
+    if (!awo.checkWebhookToken(req)) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const id_account        = payload.id_account || payload.invoice_id || payload.id;
+    const id_account_status = Number(payload.id_account_status ?? payload.status ?? 0);
+    const goods             = (payload.goods || payload.product || payload.course || '').toString().trim();
+    const rawEmail          = (payload.email || '').toString().trim().toLowerCase();
+    const rawPhone          = payload.phone_number || payload.phone || null;
+
+    if (!id_account) {
+      return res.status(400).json({ error: 'id_account required' });
+    }
+
+    // Только статус «оплачен»
+    if (id_account_status !== awo.AWO_STATUS_PAID) {
+      db.awoMarkProcessed({ id_account, email: rawEmail, phone: rawPhone, course: goods,
+        result: 'ignored_status_' + id_account_status, raw_payload: payload });
+      return res.json({ ok: true, ignored: 'status' });
+    }
+
+    // Идемпотентность
+    if (db.awoIsProcessed(id_account)) {
+      return res.json({ ok: true, ignored: 'already_processed' });
+    }
+
+    // Тестовый режим: фильтруем по курсу
+    const settings = db.getAwoSettings();
+    if (settings.test_mode) {
+      const testCourse = (settings.test_course || '').trim().toLowerCase();
+      if (testCourse && goods.toLowerCase() !== testCourse) {
+        db.awoMarkProcessed({ id_account, email: rawEmail, phone: rawPhone, course: goods,
+          result: 'ignored_test_mode', raw_payload: payload });
+        console.log(`[AWO] тестовый режим: курс "${goods}" не совпадает с "${testCourse}" — игнор`);
+        return res.json({ ok: true, ignored: 'test_mode' });
+      }
+    }
+
+    // Валидация — email обязателен (основной ключ)
+    if (!awo.isValidEmail(rawEmail)) {
+      db.awoMarkProcessed({ id_account, email: rawEmail, phone: rawPhone, course: goods,
+        result: 'invalid_email', raw_payload: payload });
+      return res.status(400).json({ error: 'Invalid email' });
+    }
+
+    const phone = awo.normalizePhone(rawPhone);
+
+    // Уже в HEY?
+    const existing = db.findUserByEmailOrPhone(rawEmail, phone);
+    if (existing) {
+      let extraResult = 'user_exists';
+      // Если есть маппинг курса → добавить в чат курса
+      if (goods) {
+        const chatId = db.getChatForCourse(goods);
+        if (chatId) {
+          try {
+            const r = db.addUserToChat(chatId, existing.id);
+            if (r.added) {
+              try {
+                db.createMessage({
+                  conversationId: chatId,
+                  senderId: db.SCHOOL_USER_ID,
+                  text: `🎓 ${existing.name} присоединился к курсу «${goods}»`,
+                });
+              } catch {}
+              try { broadcast([existing.id], { type: 'conversation:added', chat_id: chatId }); } catch {}
+              extraResult = 'user_exists_added_to_chat';
+            } else {
+              extraResult = 'user_exists_already_in_chat';
+            }
+          } catch (e) { console.error('[awo-existing-add]', e.message); extraResult = 'user_exists_chat_error'; }
+        } else {
+          extraResult = 'user_exists_no_chat_mapping';
+        }
+      }
+      db.awoMarkProcessed({ id_account, email: rawEmail, phone, course: goods,
+        result: extraResult, raw_payload: payload });
+      return res.json({ ok: true, result: extraResult });
+    }
+
+    // Новый пользователь — создаём школьный инвайт
+    const invite = db.createSchoolInvite({ bound_email: rawEmail, bound_phone: phone, course: goods });
+    db.awoMarkProcessed({ id_account, email: rawEmail, phone, course: goods,
+      invite_code: invite.code, result: 'invite_created', raw_payload: payload });
+
+    res.json({ ok: true, result: 'invite_created', invite_code: invite.code });
+  });
+
+  // Админка: настройки AWO
+  r.get('/admin/awo/settings', requireAdmin, (req, res) => {
+    res.json(db.getAwoSettings());
+  });
+  r.put('/admin/awo/settings', requireAdmin, (req, res) => {
+    const { test_mode, test_course } = req.body || {};
+    res.json(db.setAwoSettings({ test_mode, test_course }));
+  });
+
+  // Админка: маппинг курс ↔ групповой чат
+  r.get('/admin/awo/course-chats', requireAdmin, (req, res) => {
+    res.json(db.listAwoCourseChats());
+  });
+  r.post('/admin/awo/course-chats', requireAdmin, (req, res) => {
+    const { course, chat_id } = req.body || {};
+    if (!course || !chat_id) return res.status(400).json({ error: 'course и chat_id обязательны' });
+    try {
+      db.setAwoCourseChat(course, chat_id);
+      res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+  r.delete('/admin/awo/course-chats/:course', requireAdmin, (req, res) => {
+    db.deleteAwoCourseChat(req.params.course);
+    res.json({ ok: true });
+  });
+
+  // Админка: список всех групповых чатов (для выбора при маппинге)
+  r.get('/admin/group-chats', requireAdmin, (req, res) => {
+    res.json(db.listAllGroupChats());
+  });
+
+  // Админка: лог webhook'ов AWO
+  r.get('/admin/awo/log', requireAdmin, (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    res.json(db.awoListProcessed(limit));
+  });
+
+  // Админка: сгенерировать /join-ссылку (для ручной отправки/тестирования)
+  r.post('/admin/awo/join-link', requireAdmin, (req, res) => {
+    const email  = (req.body?.email  || '').trim().toLowerCase();
+    const course = (req.body?.course || '').trim();
+    if (!awo.isValidEmail(email)) return res.status(400).json({ error: 'Неверный email' });
+    const sig = awo.signJoin(email, course);
+    const base = process.env.PUBLIC_URL || (req.protocol + '://' + req.get('host'));
+    const url = `${base}/join?email=${encodeURIComponent(email)}&course=${encodeURIComponent(course)}&sig=${sig}`;
+    res.json({ url, sig });
   });
 
   r.get('/health', (_, res) => res.json({ ok: true }));

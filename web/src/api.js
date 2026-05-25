@@ -151,6 +151,18 @@ export const api = {
   },
   adminDeleteMoment:       (id, reason)    => req('DELETE', `/admin/moments/${id}`, { reason }),
   adminGetLogs:            (limit)         => req('GET',    `/admin/logs${limit ? '?limit=' + limit : ''}`),
+
+  // AWO / Школьная интеграция
+  joinValidate:            (email, course, sig) =>
+    req('GET', `/join/validate?email=${encodeURIComponent(email)}&course=${encodeURIComponent(course||'')}&sig=${encodeURIComponent(sig)}`),
+  adminGetAwoSettings:     ()              => req('GET',    '/admin/awo/settings'),
+  adminSetAwoSettings:     (data)          => req('PUT',    '/admin/awo/settings', data),
+  adminGetAwoCourseChats:  ()              => req('GET',    '/admin/awo/course-chats'),
+  adminSetAwoCourseChat:   (course, chatId) => req('POST',  '/admin/awo/course-chats', { course, chat_id: chatId }),
+  adminDeleteAwoCourseChat:(course)        => req('DELETE', `/admin/awo/course-chats/${encodeURIComponent(course)}`),
+  adminGetGroupChats:      ()              => req('GET',    '/admin/group-chats'),
+  adminGetAwoLog:          (limit)         => req('GET',    `/admin/awo/log${limit ? '?limit=' + limit : ''}`),
+  adminAwoMakeJoinLink:    (email, course) => req('POST',   '/admin/awo/join-link', { email, course }),
 };
 
 // ── WebSocket ────────────────────────────────────────────────────────────────

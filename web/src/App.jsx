@@ -22,6 +22,8 @@ import AdminMoments from './components/admin/AdminMoments';
 import AdminLogs from './components/admin/AdminLogs';
 import AdminSystem from './components/admin/AdminSystem';
 import AdminReports from './components/admin/AdminReports';
+import AdminAwo from './components/admin/AdminAwo';
+import JoinScreen from './components/JoinScreen';
 
 function useNotifications() {
   useEffect(() => {
@@ -200,6 +202,7 @@ export default function App() {
           <Route path="/hey"      element={<HeyScreen/>}/>
           <Route path="/login"    element={<GuestOnly><LoginScreen/></GuestOnly>}/>
           <Route path="/register" element={<GuestOnly><RegisterScreen/></GuestOnly>}/>
+          <Route path="/join"     element={<GuestOnly><JoinScreen/></GuestOnly>}/>
           <Route path="/success"  element={<SuccessScreen/>}/>
           <Route path="/welcome"  element={<WelcomeScreen/>}/>
 
@@ -286,6 +289,11 @@ export default function App() {
           <Route path="/admin/reports" element={
             <RequireAdmin>
               <AdminLayout><AdminReports/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/awo" element={
+            <RequireAdmin>
+              <AdminLayout><AdminAwo/></AdminLayout>
             </RequireAdmin>
           }/>
 

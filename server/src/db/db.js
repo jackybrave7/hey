@@ -221,6 +221,51 @@ try { db.exec('ALTER TABLE users ADD COLUMN super_expires_at INTEGER'); } catch 
 try { db.exec('ALTER TABLE users ADD COLUMN achievements TEXT DEFAULT \'[]\''); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_system INTEGER DEFAULT 0'); } catch {} // системные аккаунты (нельзя писать им)
 
+// ── AWO integration migrations ────────────────────────────────────────────────
+try { db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN is_school_account INTEGER DEFAULT 0'); } catch {}
+try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL"); } catch {}
+
+// Школьные инвайты (для интеграции с АВО)
+try { db.exec(`CREATE TABLE IF NOT EXISTS school_invites (
+  code            TEXT PRIMARY KEY,
+  issued_by       TEXT NOT NULL,
+  bound_email     TEXT,
+  bound_phone     TEXT,
+  course          TEXT,
+  created_at      INTEGER NOT NULL,
+  used_at         INTEGER,
+  used_by_user_id TEXT
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_school_invites_email ON school_invites(bound_email COLLATE NOCASE)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_school_invites_phone ON school_invites(bound_phone)'); } catch {}
+
+// Обработанные счета АВО (идемпотентность)
+try { db.exec(`CREATE TABLE IF NOT EXISTS awo_processed (
+  id_account    TEXT PRIMARY KEY,
+  processed_at  INTEGER NOT NULL,
+  email         TEXT,
+  phone         TEXT,
+  course        TEXT,
+  invite_code   TEXT,
+  result        TEXT,
+  raw_payload   TEXT
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_awo_processed_email ON awo_processed(email COLLATE NOCASE)'); } catch {}
+
+// Соответствия курс АВО ↔ групповой чат HEY
+try { db.exec(`CREATE TABLE IF NOT EXISTS awo_course_chats (
+  course      TEXT PRIMARY KEY COLLATE NOCASE,
+  chat_id     TEXT NOT NULL,
+  created_at  INTEGER NOT NULL
+)`); } catch {}
+
+// Системные настройки key-value (тестовый режим AWO, тестовый курс и т.п.)
+try { db.exec(`CREATE TABLE IF NOT EXISTS system_settings (
+  key    TEXT PRIMARY KEY,
+  value  TEXT
+)`); } catch {}
+
 // Back-fill invite codes for existing users without one (safe — users table now exists)
 db.prepare("SELECT id FROM users WHERE invite_code IS NULL").all().forEach(u => {
   const code = u.id.replace(/-/g,'').slice(0,10).toUpperCase();
@@ -272,11 +317,40 @@ const SYSTEM_AVATAR  = '/favicon.svg'; // лого HEY как аватар се�
 
 function now() { return Math.floor(Date.now() / 1000); }
 
+// ── School (BL School) inviter account ──────────────────────────────────────
+// Системный аккаунт от имени которого выпускаются школьные инвайты через АВО.
+const SCHOOL_USER_ID = 'system_school_bl';
+const SCHOOL_NAME    = process.env.AWO_SCHOOL_NAME || 'BL School';
+
+(function ensureSchoolAccount() {
+  const existing = db.prepare('SELECT id FROM users WHERE id=?').get(SCHOOL_USER_ID);
+  if (existing) return;
+  try {
+    db.prepare(`
+      INSERT INTO users (id, name, phone, password, avatar, created_at,
+                         is_admin, is_super, is_blocked, is_system, is_school_account,
+                         bio, invite_code, must_change_password)
+      VALUES (?, ?, ?, ?, ?, ?, 0, 1, 0, 1, 1, ?, ?, 0)
+    `).run(
+      SCHOOL_USER_ID,
+      SCHOOL_NAME,
+      '+00000000001',  // плейсхолдер, логин невозможен
+      '$disabled$',
+      '/favicon.svg',
+      Math.floor(Date.now() / 1000),
+      'Системный аккаунт школы BL School. Через него приходят приглашения ученикам.',
+      'BLSCHOOL01',
+    );
+  } catch (e) {
+    console.warn('[school-account] не удалось создать:', e.message);
+  }
+})();
+
 // ── Users ──────────────────────────────────────────────────────────────────
 
 const stmtInsertUser = db.prepare(
-  `INSERT INTO users (id,phone,name,password,avatar,birthday,created_at,invite_code,referral_by)
-   VALUES (@id,@phone,@name,@password,@avatar,@birthday,@created_at,@invite_code,@referral_by)`
+  `INSERT INTO users (id,phone,name,password,avatar,birthday,created_at,invite_code,referral_by,email)
+   VALUES (@id,@phone,@name,@password,@avatar,@birthday,@created_at,@invite_code,@referral_by,@email)`
 );
 const stmtInsertPresence = db.prepare(
   `INSERT INTO presence (user_id,online,last_seen) VALUES (@user_id,0,@last_seen)`
@@ -286,14 +360,15 @@ function makeInviteCode(id) {
   return id.replace(/-/g,'').slice(0,10).toUpperCase();
 }
 
-function createUser({ phone, name, password, birthday, avatar, inviteCode }) {
+function createUser({ phone, name, password, birthday, avatar, inviteCode, email }) {
   const id = uuid();
   const referredBy = inviteCode
     ? (db.prepare('SELECT id FROM users WHERE invite_code=?').get(inviteCode)?.id || null)
     : null;
   const user = { id, phone, name, password: bcrypt.hashSync(password, 10),
     avatar: avatar || null, birthday: birthday || null, created_at: now(),
-    invite_code: makeInviteCode(id), referral_by: referredBy };
+    invite_code: makeInviteCode(id), referral_by: referredBy,
+    email: email ? String(email).trim().toLowerCase() : null };
   db.transaction(() => {
     stmtInsertUser.run(user);
     stmtInsertPresence.run({ user_id: id, last_seen: now() });
@@ -356,12 +431,37 @@ function normalizeAvatars(rows) {
 }
 
 function updateUser(id, fields) {
-  const allowed = ['name','phone','birthday','avatar','bio','headline'];
+  const allowed = ['name','phone','birthday','avatar','bio','headline','email'];
   const sets = Object.keys(fields).filter(k => allowed.includes(k));
   if (!sets.length) return findUserById(id);
+  const normalized = { ...fields };
+  if (normalized.email != null) {
+    normalized.email = String(normalized.email).trim().toLowerCase() || null;
+  }
   const sql = `UPDATE users SET ${sets.map(k=>`${k}=@${k}`).join(',')} WHERE id=@id`;
-  db.prepare(sql).run({ ...fields, id });
+  db.prepare(sql).run({ ...normalized, id });
   return findUserById(id);
+}
+
+function findUserByEmail(email) {
+  if (!email) return null;
+  return db.prepare('SELECT * FROM users WHERE email=? COLLATE NOCASE').get(String(email).trim().toLowerCase()) || null;
+}
+
+function findUserByEmailOrPhone(email, phone) {
+  if (email) {
+    const u = findUserByEmail(email);
+    if (u) return u;
+  }
+  if (phone) {
+    const u = findUserByPhone(phone);
+    if (u) return u;
+  }
+  return null;
+}
+
+function getSchoolAccount() {
+  return findUserById(SCHOOL_USER_ID);
 }
 
 // ── Contacts ───────────────────────────────────────────────────────────────
@@ -1574,9 +1674,156 @@ function checkAndExpireSuper(userId) {
   }
 }
 
+// ── AWO Integration helpers ────────────────────────────────────────────────────
+
+// Добавляет пользователя в групповой чат без проверки прав (для системных потоков:
+// AWO-интеграция, авто-добавление в курс). Идемпотентно.
+function addUserToChat(convId, userId) {
+  const conv = db.prepare('SELECT id, type FROM conversations WHERE id=?').get(convId);
+  if (!conv) throw new Error('Чат не найден');
+  if (conv.type !== 'group') throw new Error('Это не групповой чат');
+  const before = db.prepare('SELECT 1 FROM members WHERE conversation_id=? AND user_id=?').get(convId, userId);
+  if (before) return { added: false, alreadyMember: true };
+  db.prepare(`INSERT OR IGNORE INTO members (conversation_id,user_id,joined_at) VALUES (?,?,?)`)
+    .run(convId, userId, now());
+  return { added: true, alreadyMember: false };
+}
+
+function _makeShortCode(len = 16) {
+  const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = ''; for (let i = 0; i < len; i++) s += a[Math.floor(Math.random() * a.length)];
+  return s;
+}
+
+function createSchoolInvite({ bound_email, bound_phone, course }) {
+  const code = _makeShortCode(16);
+  const email = bound_email ? String(bound_email).trim().toLowerCase() : null;
+  db.prepare(`INSERT INTO school_invites
+    (code, issued_by, bound_email, bound_phone, course, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(code, SCHOOL_USER_ID, email, bound_phone || null, course || null, now());
+  return { code, issued_by: SCHOOL_USER_ID, bound_email: email, bound_phone, course };
+}
+
+function findSchoolInviteByCode(code) {
+  if (!code) return null;
+  return db.prepare('SELECT * FROM school_invites WHERE code=?').get(code) || null;
+}
+
+function findActiveSchoolInviteByEmail(email) {
+  if (!email) return null;
+  return db.prepare(
+    `SELECT * FROM school_invites
+     WHERE bound_email = ? COLLATE NOCASE AND used_at IS NULL
+     ORDER BY created_at DESC LIMIT 1`
+  ).get(String(email).trim().toLowerCase()) || null;
+}
+
+function markSchoolInviteUsed(code, userId) {
+  db.prepare('UPDATE school_invites SET used_at=?, used_by_user_id=? WHERE code=?')
+    .run(now(), userId, code);
+}
+
+// ── AWO processed (idempotency) ─────────────────────────────────────────────────
+
+function awoIsProcessed(id_account) {
+  if (!id_account) return false;
+  return !!db.prepare('SELECT 1 FROM awo_processed WHERE id_account=?').get(String(id_account));
+}
+
+function awoMarkProcessed({ id_account, email, phone, course, invite_code, result, raw_payload }) {
+  try {
+    db.prepare(`INSERT INTO awo_processed
+      (id_account, processed_at, email, phone, course, invite_code, result, raw_payload)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(String(id_account), now(),
+           email ? String(email).toLowerCase() : null,
+           phone || null, course || null, invite_code || null,
+           result || null, raw_payload ? JSON.stringify(raw_payload).slice(0, 8000) : null);
+  } catch (e) {
+    // Уже есть — игнорируем (race condition)
+    if (e.code !== 'SQLITE_CONSTRAINT_PRIMARYKEY') throw e;
+  }
+}
+
+function awoListProcessed(limit = 100) {
+  return db.prepare(
+    `SELECT id_account, processed_at, email, phone, course, invite_code, result
+     FROM awo_processed ORDER BY processed_at DESC LIMIT ?`
+  ).all(limit);
+}
+
+// ── AWO course ↔ group chat mapping ─────────────────────────────────────────────
+
+function setAwoCourseChat(course, chatId) {
+  if (!course || !chatId) throw new Error('course and chatId required');
+  db.prepare(`INSERT INTO awo_course_chats (course, chat_id, created_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(course) DO UPDATE SET chat_id=excluded.chat_id`)
+    .run(String(course).trim(), chatId, now());
+}
+
+function deleteAwoCourseChat(course) {
+  db.prepare('DELETE FROM awo_course_chats WHERE course=? COLLATE NOCASE').run(course);
+}
+
+function getChatForCourse(course) {
+  if (!course) return null;
+  const row = db.prepare('SELECT chat_id FROM awo_course_chats WHERE course=? COLLATE NOCASE')
+    .get(String(course).trim());
+  return row ? row.chat_id : null;
+}
+
+function listAllGroupChats() {
+  return db.prepare(
+    `SELECT c.id, c.name, c.icon, c.created_at,
+            (SELECT COUNT(*) FROM members WHERE conversation_id=c.id) AS member_count
+     FROM conversations c WHERE c.type='group'
+     ORDER BY c.created_at DESC`
+  ).all();
+}
+
+function listAwoCourseChats() {
+  return db.prepare(
+    `SELECT ac.course, ac.chat_id, ac.created_at,
+            c.name AS chat_name, c.type AS chat_type
+     FROM awo_course_chats ac
+     LEFT JOIN conversations c ON c.id = ac.chat_id
+     ORDER BY ac.created_at DESC`
+  ).all();
+}
+
+// ── System settings (key-value) ─────────────────────────────────────────────────
+
+function getSetting(key, defaultValue = null) {
+  const row = db.prepare('SELECT value FROM system_settings WHERE key=?').get(key);
+  if (!row) return defaultValue;
+  try { return JSON.parse(row.value); } catch { return row.value; }
+}
+
+function setSetting(key, value) {
+  const v = typeof value === 'string' ? value : JSON.stringify(value);
+  db.prepare(`INSERT INTO system_settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(key, v);
+}
+
+function getAwoSettings() {
+  return {
+    test_mode:   !!getSetting('awo_test_mode', false),
+    test_course: getSetting('awo_test_course', ''),
+  };
+}
+
+function setAwoSettings({ test_mode, test_course }) {
+  if (test_mode != null)   setSetting('awo_test_mode', !!test_mode);
+  if (test_course != null) setSetting('awo_test_course', String(test_course || ''));
+  return getAwoSettings();
+}
+
 module.exports = {
   now,
   SYSTEM_USER_ID,
+  SCHOOL_USER_ID,
   createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount,
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
@@ -1591,6 +1838,13 @@ module.exports = {
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes,
   getReferralCount, findUserByInviteCode,
+  findUserByEmail, findUserByEmailOrPhone, getSchoolAccount,
+  // AWO integration
+  createSchoolInvite, findSchoolInviteByCode, findActiveSchoolInviteByEmail, markSchoolInviteUsed,
+  addUserToChat,
+  awoIsProcessed, awoMarkProcessed, awoListProcessed,
+  setAwoCourseChat, deleteAwoCourseChat, getChatForCourse, listAwoCourseChats, listAllGroupChats,
+  getSetting, setSetting, getAwoSettings, setAwoSettings,
   extendSuper, processReferral, checkAndExpireSuper,
   // Moments
   getMomentFeed, getMyMoments, getMomentById, getActiveMoment, getActiveMoments, getActiveMomentCount,

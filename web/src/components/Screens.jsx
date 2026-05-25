@@ -696,12 +696,22 @@ export function RegisterScreen() {
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get('invite');
 
+  // Школьный инвайт (от АВО) — кладётся в sessionStorage страницей /join
+  const [schoolInvite, setSchoolInvite] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('hey_school_invite');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+
   const [name, setName]         = useState('');
   const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr]           = useState('');
   const [loading, setLoading]   = useState(false);
   const [inviter, setInviter]   = useState(null);
+
+  const hasInvite = !!inviteCode || !!schoolInvite;
 
   // Load inviter info if invite code present
   useEffect(() => {
@@ -721,8 +731,11 @@ export function RegisterScreen() {
     try {
       const res = await api.register({
         name: name.trim(), phone: pv.normalized, password,
-        ...(inviteCode ? { inviteUserId: inviteCode } : {})
+        ...(inviteCode    ? { inviteUserId: inviteCode } : {}),
+        ...(schoolInvite  ? { schoolInviteCode: schoolInvite.code, email: schoolInvite.email } : {}),
       });
+      // Чистим sessionStorage после успеха
+      if (schoolInvite) sessionStorage.removeItem('hey_school_invite');
       login(res.token, res.user);
       nav('/welcome', { state: { isNewUser: true, userName: name.trim() } });
     } catch(e) { setErr(e.message); }
@@ -739,21 +752,37 @@ export function RegisterScreen() {
 
         {inviter && <InviteBadge name={inviter.name} avatar={inviter.avatar_url} />}
 
+        {schoolInvite && (
+          <div style={{
+            background:'rgba(120,90,200,.2)', border:'1px solid rgba(180,140,220,.4)',
+            borderRadius:14, padding:'12px 16px', marginBottom:18,
+            display:'flex', alignItems:'center', gap:10,
+            animation: 'authFadeUp .6s ease-out .1s both',
+          }}>
+            <span style={{fontSize:22}}>🎓</span>
+            <div style={{fontSize:13, color:'rgba(235,225,255,.95)'}}>
+              <div style={{fontWeight:700, color:'white'}}>{schoolInvite.schoolName} приглашает</div>
+              {schoolInvite.course && <div style={{opacity:.75, marginTop:2}}>Курс «{schoolInvite.course}»</div>}
+              <div style={{opacity:.65, marginTop:2, fontSize:12}}>{schoolInvite.email}</div>
+            </div>
+          </div>
+        )}
+
         <div style={{
           fontSize: 22, fontWeight: 700, textAlign: 'center',
           color: 'white', marginBottom: 22,
           animation: 'authFadeUp .6s ease-out .15s both'
         }}>
-          {inviteCode ? 'Создать аккаунт' : 'Только по приглашению'}
+          {hasInvite ? 'Создать аккаунт' : 'Только по приглашению'}
         </div>
 
         {/* Без инвайта — показываем приглашение в waitlist */}
-        {!inviteCode && (
+        {!hasInvite && (
           <InviteOnlyBlock onSwitchToLogin={() => nav('/login')}/>
         )}
 
         {/* С инвайтом — обычная форма регистрации */}
-        {inviteCode && (
+        {hasInvite && (
         <div style={{ animation: 'authFadeUp .6s ease-out .25s both' }}>
           <FloatingInput id="reg-name" label="Имя" value={name}
             onChange={e => setName(e.target.value)} autoComplete="name" />
@@ -776,7 +805,7 @@ export function RegisterScreen() {
           )}
 
           <button className="auth-btn-primary" onClick={handleRegister} disabled={loading}>
-            {loading ? 'Создаём…' : inviteCode ? 'Принять приглашение' : 'Создать аккаунт'}
+            {loading ? 'Создаём…' : (inviteCode || schoolInvite) ? 'Принять приглашение' : 'Создать аккаунт'}
           </button>
 
           <div style={{ textAlign: 'center', marginTop: 22, color: 'rgba(255,255,255,.68)', fontSize: 14 }}>
@@ -1936,10 +1965,28 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
   const [notes, setNotes]         = useState(contact.notes || '');
   const [notesSaved, setNotesSaved] = useState(false);
   const [avatarFull, setAvatarFull] = useState(false);
+  // Свежие данные профиля (аватар / bio / headline) — подтягиваем при открытии,
+  // чтобы карточка не показывала устаревшие данные из contacts-кеша.
+  const [fresh, setFresh] = useState(null);
   const saveTimer = useRef();
 
+  useEffect(() => {
+    let alive = true;
+    if (!contact?.id) return;
+    api.getUserProfile(contact.id)
+      .then(p => { if (alive) setFresh(p); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [contact?.id]);
+
+  // Объединяем: свежие данные имеют приоритет над contacts-кешем
+  const merged = { ...contact, ...(fresh || {}) };
+  // nickname (личное прозвище) хранится только локально — сохраняем из contact
+  merged.nickname = contact.nickname;
+  merged.notes    = contact.notes;
+
   // Determine if avatar is a real image (not emoji/letter)
-  const av = contact.avatar;
+  const av = merged.avatar;
   const avatarIsImg = av && (av.startsWith('/') || av.startsWith('http') || av.startsWith('data:'));
 
   function handleNotesChange(val) {
@@ -1975,7 +2022,7 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
             style={{cursor: avatarIsImg ? 'zoom-in' : 'default', position:'relative'}}
             onMouseEnter={e => { if (avatarIsImg) e.currentTarget.querySelector('.av-zoom').style.opacity='1'; }}
             onMouseLeave={e => { if (avatarIsImg) e.currentTarget.querySelector('.av-zoom').style.opacity='0'; }}>
-            <AvatarDisplay avatar={contact.avatar} name={contact.nickname||contact.name}
+            <AvatarDisplay avatar={merged.avatar} name={merged.nickname||merged.name}
               size={96} fontSize={42}
               style={{boxShadow:'0 8px 24px rgba(0,0,0,.3)',border:'3px solid rgba(255,255,255,.25)'}}/>
             <div className="av-zoom" style={{
@@ -1984,14 +2031,31 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
               pointerEvents:'none',fontSize:22
             }}>🔍</div>
           </div>
-          <div style={{textAlign:'center'}}>
+          <div style={{textAlign:'center', width:'100%'}}>
             <div style={{color:'white',fontSize:20,fontWeight:700}}>
-              {contact.nickname || contact.name}
+              {merged.nickname || merged.name}
             </div>
-            {contact.nickname && (
-              <div style={{color:'rgba(255,255,255,.55)',fontSize:14,marginTop:2}}>{contact.name}</div>
+            {merged.nickname && (
+              <div style={{color:'rgba(255,255,255,.55)',fontSize:14,marginTop:2}}>{merged.name}</div>
             )}
-            <div style={{color:'rgba(255,255,255,.45)',fontSize:13,marginTop:4}}>{contact.phone}</div>
+            {merged.headline && (
+              <div style={{color:'rgba(255,255,255,.75)',fontSize:13,marginTop:6,
+                fontStyle:'italic',lineHeight:1.4}}>
+                {merged.headline}
+              </div>
+            )}
+            <div style={{color:'rgba(255,255,255,.45)',fontSize:13,marginTop:4}}>{merged.phone}</div>
+            {merged.bio && (
+              <div style={{
+                marginTop:12, padding:'10px 14px',
+                background:'rgba(255,255,255,.1)', borderRadius:12,
+                border:'1px solid rgba(255,255,255,.12)',
+                color:'rgba(255,255,255,.88)', fontSize:13, lineHeight:1.5,
+                textAlign:'left', whiteSpace:'pre-wrap', wordBreak:'break-word',
+              }}>
+                {merged.bio}
+              </div>
+            )}
           </div>
           <button onClick={onClose}
             style={{position:'absolute',top:16,right:16,background:'none',border:'none',
@@ -2000,16 +2064,6 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
 
         {/* Body */}
         <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:16}}>
-          {/* Bio */}
-          {contact.bio && (
-            <div style={{
-              background:'rgba(255,255,255,.06)', borderRadius:12,
-              border:'1px solid rgba(255,255,255,.1)', padding:'11px 14px',
-              color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.6,
-            }}>
-              {contact.bio}
-            </div>
-          )}
           {/* Notes */}
           <div>
             <div style={{color:'rgba(255,255,255,.5)',fontSize:12,marginBottom:6,
@@ -2074,8 +2128,8 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
             display:'flex',alignItems:'center',justifyContent:'center',cursor:'zoom-out'
           }}>
           <img
-            src={contact.avatar}
-            alt={contact.name}
+            src={merged.avatar}
+            alt={merged.name}
             onClick={e => e.stopPropagation()}
             style={{
               maxWidth:'min(92vw,900px)',maxHeight:'88vh',
@@ -4369,6 +4423,7 @@ export function ChatScreen() {
   const [firstItemIndex, setFirstItemIndex] = useState(1_000_000); // Virtuoso prepend index
   const virtuosoRef        = useRef();
   const atBottomRef        = useRef(true);  // tracks whether list is scrolled to bottom
+  const [showScrollDown, setShowScrollDown] = useState(false);
   const typingTimer        = useRef();
   const textareaRef        = useRef();
   const fileInputRef       = useRef();
@@ -5152,7 +5207,7 @@ export function ChatScreen() {
           data={flatItems}
           initialTopMostItemIndex={Math.max(0, flatItems.length - 1)}
           startReached={loadOlder}
-          atBottomStateChange={bottom => { atBottomRef.current = bottom; }}
+          atBottomStateChange={bottom => { atBottomRef.current = bottom; setShowScrollDown(!bottom); }}
           followOutput={(atBottom) => {
             if (forceScrollBottom.current) return 'smooth';
             return atBottom ? 'smooth' : false;
@@ -5163,6 +5218,9 @@ export function ChatScreen() {
                 Загрузка…
               </div>
             ) : null,
+            // Хвостовой отступ — чтобы последнее сообщение / индикатор «печатает»
+            // не подъезжали под инпут-бар
+            Footer: () => <div style={{ height: 12 }} />,
           }}
           itemContent={(_index, item) => {
             if (item.type === 'date') return (
@@ -5174,7 +5232,7 @@ export function ChatScreen() {
               </div>
             );
             if (item.type === 'typing') return (
-              <div style={{display:'flex',gap:4,alignItems:'center',padding:'4px 24px 8px'}}>
+              <div style={{display:'flex',gap:4,alignItems:'center',padding:'6px 24px 14px'}}>
                 <div style={{color:'rgba(255,255,255,.6)',fontSize:13}}>{typing} печатает</div>
                 <div style={{display:'flex',gap:3}}>
                   {[0,1,2].map(i=>(
@@ -5207,6 +5265,37 @@ export function ChatScreen() {
             );
           }}
         />
+      )}
+
+      {/* Scroll-to-bottom floating button */}
+      {showScrollDown && flatItems.length > 5 && !(searchMode && searchResults !== null) && (
+        <button
+          onClick={() => {
+            forceScrollBottom.current = true;
+            virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'smooth' });
+            setTimeout(() => { forceScrollBottom.current = false; }, 500);
+          }}
+          aria-label="К последним сообщениям"
+          style={{
+            position: 'absolute',
+            right: 18,
+            bottom: imgPreviews.length > 0 ? 180 : 90,
+            width: 44, height: 44, borderRadius: '50%',
+            background: 'rgba(60,40,90,.85)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,.12)',
+            color: 'white', fontSize: 20, lineHeight: 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', zIndex: 50,
+            boxShadow: '0 4px 14px rgba(0,0,0,.35)',
+            transition: 'background .15s, transform .15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(80,55,120,.95)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(60,40,90,.85)'; }}
+        >
+          ↓
+        </button>
       )}
 
       {/* Image previews bar — до 10 миниатюр в ряд */}
@@ -5741,28 +5830,6 @@ export function ChatScreen() {
               </button>
             </div>
 
-            {/* Миниатюры внизу при множественных фото */}
-            {total > 1 && (
-              <div onClick={e => e.stopPropagation()}
-                style={{
-                  position:'absolute',bottom:90,left:'50%',transform:'translateX(-50%)',
-                  display:'flex',gap:6,padding:'8px 12px',
-                  background:'rgba(0,0,0,.5)',borderRadius:14,backdropFilter:'blur(8px)',
-                  maxWidth:'90vw',overflowX:'auto',
-                }}>
-                {urls.map((u, i) => (
-                  <img key={i} src={u} alt=""
-                    onClick={() => setLightbox({ urls, index: i })}
-                    style={{
-                      width:48,height:48,objectFit:'cover',borderRadius:6,
-                      cursor:'pointer',flexShrink:0,
-                      border: i === idx ? '2px solid rgba(180,140,255,.9)' : '2px solid transparent',
-                      opacity: i === idx ? 1 : .55,
-                      transition:'opacity .15s, border-color .15s',
-                    }}/>
-                ))}
-              </div>
-            )}
           </div>
         );
       })()}
