@@ -6,6 +6,7 @@ const NAV = [
   { to: '/admin',         label: '📊 Дашборд',          exact: true },
   { to: '/admin/users',   label: '👥 Пользователи' },
   { to: '/admin/moments', label: '✦ Моменты' },
+  { to: '/admin/reports', label: '🚩 Жалобы' },
   { to: '/admin/system',  label: '📢 HEY-заведующий' },
   { to: '/admin/logs',    label: '📋 Логи' },
 ];

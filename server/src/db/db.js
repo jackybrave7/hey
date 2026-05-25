@@ -527,6 +527,23 @@ function searchMessages(convId, query) {
   ).all(convId, `%${query}%`).map(_parseMsg);
 }
 
+// Глобальный поиск по сообщениям юзера — для поиска по всем чатам.
+// Возвращает массив с conversation_id чтобы клик мог открыть нужный чат.
+function searchAllMessages(userId, query) {
+  const q = `%${query.toLowerCase()}%`;
+  // Только из чатов, где пользователь состоит. case-insensitive (LOWER переопределён).
+  return db.prepare(
+    `SELECT m.id, m.conversation_id, m.text, m.sender_id, m.created_at,
+            u.name AS sender_name
+     FROM messages m
+     JOIN members mem ON mem.conversation_id = m.conversation_id AND mem.user_id = ?
+     JOIN users   u   ON u.id = m.sender_id
+     WHERE LOWER(m.text) LIKE ?
+     ORDER BY m.created_at DESC
+     LIMIT 100`
+  ).all(userId, q);
+}
+
 function getOrCreateDirectConversation(userId1, userId2) {
   // Self-chat — «Монолог»: пользователь пишет сам себе
   if (userId1 === userId2) return getOrCreateSelfChat(userId1);
@@ -773,7 +790,7 @@ function _parseMsg(m) {
   return { ...m, attachment: m.attachment ? JSON.parse(m.attachment) : null };
 }
 
-// Возвращает короткий snippet для цитаты — текст до 120 симв + тип вложения
+// Возвращает короткий snippet для цитаты — текст до 120 симв + тип/превью вложения
 function _replySnippet(replyToId) {
   if (!replyToId) return null;
   const r = db.prepare(
@@ -782,12 +799,20 @@ function _replySnippet(replyToId) {
      WHERE m.id=?`
   ).get(replyToId);
   if (!r) return null;
-  let attType = null;
-  try { attType = r.attachment ? JSON.parse(r.attachment)?.type || null : null; } catch {}
+  let attType = null, attUrl = null;
+  try {
+    if (r.attachment) {
+      const att = JSON.parse(r.attachment);
+      attType = att?.type || null;
+      if (attType === 'image')  attUrl = att.url || null;
+      if (attType === 'images') attUrl = (att.urls && att.urls[0]) || null;
+    }
+  } catch {}
   return {
     id: r.id, sender_id: r.sender_id, sender_name: r.sender_name,
     text: r.text ? r.text.slice(0, 120) : null,
     attachment_type: attType,
+    attachment_url:  attUrl,
   };
 }
 

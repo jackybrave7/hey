@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 const ITEMS = [
   { label: 'Моменты', icon: '✦', paths: ['/main', '/moments'] },
-  { label: 'Чаты',    icon: '💬', paths: ['/conversations'], badgeKey: 'unread' },
+  { label: 'Чаты',    icon: '💬', paths: ['/chats'], badgeKey: 'unread' },
   { label: 'Контакты',icon: '👥', paths: ['/contacts'] },
   { label: 'Я',       icon: null,  paths: ['/me'] },
 ];

@@ -1829,7 +1829,7 @@ export function MainScreen() {
   const nav = useNavigate();
   const items = [
     { label:'Контакты',        path:'/contacts' },
-    { label:'Сообщения',       path:'/conversations' },
+    { label:'Сообщения',       path:'/chats' },
     { label:'История звонков', path:'/calls' },
     { label:'Настройки',       path:'/settings' },
   ];
@@ -1864,6 +1864,26 @@ export function MainScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Show emoji avatar or first letter; never render long strings / URLs as text
+// Подсвечивает совпадения поискового запроса в тексте
+function Highlight({ text, q }) {
+  if (!text) return null;
+  if (!q) return text;
+  const lower = text.toLowerCase();
+  const ql = q.toLowerCase();
+  const idx = lower.indexOf(ql);
+  if (idx < 0) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark style={{
+        background:'rgba(255,210,100,.35)', color:'rgba(255,235,170,1)',
+        padding:'0 2px', borderRadius:3,
+      }}>{text.slice(idx, idx + q.length)}</mark>
+      {text.slice(idx + q.length)}
+    </>
+  );
+}
+
 // Рендер «О себе» с автоопределением ссылок и превращением их в <a>
 function BioWithLinks({ text }) {
   if (!text) return null;
@@ -2843,11 +2863,41 @@ export function ConversationsScreen() {
     });
   }), [user?.id]);
 
-  const normalConvs  = convs.filter(c => !c.is_request);
-  const requestConvs = convs.filter(c => c.is_request && c.request_from !== user?.id);
+  // ── Поиск по чатам ────────────────────────────────────────────────────
+  const [search, setSearch] = useState('');
+  const [searchMsgs, setSearchMsgs] = useState(null); // null | array
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) { setSearchMsgs(null); return; }
+    setSearchLoading(true);
+    const t = setTimeout(async () => {
+      try { setSearchMsgs(await api.searchAllMessages(q)); }
+      catch { setSearchMsgs([]); }
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Локальный фильтр по имени / телефону / тексту последнего сообщения
+  const q = search.trim().toLowerCase();
+  const matchConv = (c) => {
+    if (!q) return true;
+    return (
+      (c.name      || '').toLowerCase().includes(q) ||
+      (c.last_text || '').toLowerCase().includes(q)
+    );
+  };
+
+  const normalConvs  = convs.filter(c => !c.is_request).filter(matchConv);
+  const requestConvs = convs.filter(c => c.is_request && c.request_from !== user?.id).filter(matchConv);
   const pinnedConvs  = normalConvs.filter(c => c.is_pinned);
   const regularConvs = normalConvs.filter(c => !c.is_pinned);
   const [pinToast, setPinToast] = useState('');
+
+  // Карта convId → conv для быстрого доступа из поисковых результатов
+  const convsById = useMemo(() => Object.fromEntries(convs.map(c => [c.id, c])), [convs]);
 
   async function togglePin(c) {
     const wasPinned = c.is_pinned;
@@ -3009,9 +3059,108 @@ export function ConversationsScreen() {
 
       <div style={{maxWidth:680,margin:'0 auto',width:'100%'}}>
 
-        {normalConvs.length === 0 && requestConvs.length === 0 && (
+        {/* Поиск по чатам и сообщениям */}
+        <div style={{padding:'12px 20px',position:'relative'}}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Поиск по чатам, сообщениям"
+            style={{
+              width:'100%', boxSizing:'border-box',
+              background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.14)',
+              borderRadius:50, padding:'11px 40px 11px 18px',
+              color:'white', fontSize:14, fontFamily:'inherit', outline:'none',
+              transition:'border-color .15s',
+            }}
+            onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.55)'}
+            onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.14)'}
+          />
+          {search && (
+            <button onClick={() => setSearch('')}
+              style={{
+                position:'absolute',right:30,top:'50%',transform:'translateY(-50%)',
+                width:24,height:24,borderRadius:'50%',background:'rgba(255,255,255,.1)',
+                border:'none',color:'rgba(255,255,255,.7)',fontSize:14,cursor:'pointer',
+                display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,padding:0,
+              }}>✕</button>
+          )}
+        </div>
+
+        {/* Подзаголовок про поиск по сообщениям */}
+        {search.trim().length >= 2 && (
+          <>
+            {searchLoading && (
+              <div style={{color:'rgba(255,255,255,.4)',fontSize:12,padding:'4px 22px'}}>
+                Ищу в сообщениях…
+              </div>
+            )}
+
+            {/* Найденные сообщения */}
+            {!searchLoading && searchMsgs && searchMsgs.length > 0 && (
+              <>
+                <div style={{
+                  padding:'10px 22px 4px',color:'rgba(255,255,255,.5)',
+                  fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:1,
+                }}>
+                  В сообщениях · {searchMsgs.length}
+                </div>
+                {searchMsgs.slice(0, 20).map(m => {
+                  const c = convsById[m.conversation_id];
+                  if (!c) return null;
+                  return (
+                    <div key={m.id} onClick={() => nav(`/chat/${c.id}`)}
+                      style={{
+                        display:'flex',alignItems:'flex-start',gap:12,padding:'10px 20px',
+                        cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,.04)',
+                        transition:'background .12s',
+                      }}
+                      onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
+                      onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      <span style={{fontSize:18,marginTop:2}}>💬</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{color:'rgba(220,200,255,.95)',fontSize:13,fontWeight:600,
+                          overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {c.name || 'Диалог'}
+                          <span style={{color:'rgba(255,255,255,.4)',fontWeight:400,marginLeft:8,fontSize:11}}>
+                            · {new Date(m.created_at*1000).toLocaleDateString('ru',{day:'numeric',month:'short'})}
+                          </span>
+                        </div>
+                        <div style={{color:'rgba(255,255,255,.7)',fontSize:13,marginTop:2,
+                          overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                          <Highlight text={m.text} q={search.trim()}/>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {searchMsgs.length > 20 && (
+                  <div style={{padding:'8px 22px',color:'rgba(255,255,255,.4)',fontSize:11}}>
+                    + ещё {searchMsgs.length - 20}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Заголовок «Чаты» когда есть и то и другое */}
+            {(normalConvs.length > 0 || requestConvs.length > 0) && (
+              <div style={{
+                padding:'12px 22px 4px',color:'rgba(255,255,255,.5)',
+                fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:1,
+              }}>
+                Чаты
+              </div>
+            )}
+          </>
+        )}
+
+        {normalConvs.length === 0 && requestConvs.length === 0 && !search && (
           <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:60,fontSize:15,padding:'0 20px'}}>
             Нет активных диалогов.<br/>Перейди в Контакты, чтобы начать переписку.
+          </div>
+        )}
+        {normalConvs.length === 0 && requestConvs.length === 0 && search.trim().length >= 2 && (!searchMsgs || searchMsgs.length === 0) && !searchLoading && (
+          <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:40,fontSize:14,padding:'0 20px'}}>
+            🤷 Ничего не нашли по «{search.trim()}»
           </div>
         )}
 
@@ -3757,7 +3906,7 @@ export function GroupSettingsScreen() {
   async function leaveGroup() {
     if (!await customConfirm('Покинуть группу? Вы потеряете доступ к переписке.')) return;
     await api.removeGroupMember(convId, user.id);
-    nav('/conversations', { replace: true });
+    nav('/chats', { replace: true });
   }
 
   const nonMembers = contacts.filter(c => !members.find(m => m.id === c.id));
@@ -3918,21 +4067,38 @@ const MessageRow = memo(function MessageRow({
           {/* Quoted reply */}
           {m.reply_to && (() => {
             let preview = (m.reply_to.text || '').slice(0, 100);
-            if (!preview && m.reply_to.attachment_type) {
-              if (m.reply_to.attachment_type === 'image' || m.reply_to.attachment_type === 'images') preview = '🖼 Фото';
-              else if (m.reply_to.attachment_type === 'audio') preview = '🎙 Голосовое';
-            }
+            const isImg  = m.reply_to.attachment_type === 'image' || m.reply_to.attachment_type === 'images';
+            const isAud  = m.reply_to.attachment_type === 'audio';
+            if (!preview && isImg) preview = '🖼 Фото';
+            if (!preview && isAud) preview = '🎙 Голосовое';
             const accent = isOut ? 'rgba(255,255,255,.85)' : 'rgba(120,90,200,.85)';
             const subtxt = isOut ? 'rgba(255,255,255,.7)' : 'rgba(80,60,120,.85)';
             return (
               <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Скролл к оригинальному сообщению (если оно в текущем списке)
+                  window.dispatchEvent(new CustomEvent('hey:scroll-to-msg', { detail: m.reply_to.id }));
+                }}
+                title="Перейти к сообщению"
                 style={{
                   display:'flex', gap:8, padding:'6px 8px',
                   marginBottom: 6,
                   background: isOut ? 'rgba(255,255,255,.12)' : 'rgba(120,90,200,.1)',
                   borderRadius: 8,
                   borderLeft: `3px solid ${accent}`,
-                }}>
+                  cursor:'pointer',
+                  transition:'background .12s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = isOut ? 'rgba(255,255,255,.2)' : 'rgba(120,90,200,.18)'}
+                onMouseLeave={e => e.currentTarget.style.background = isOut ? 'rgba(255,255,255,.12)' : 'rgba(120,90,200,.1)'}>
+                {isImg && m.reply_to.attachment_url && (
+                  <img src={m.reply_to.attachment_url} alt=""
+                    style={{
+                      width:36, height:36, objectFit:'cover', borderRadius:6,
+                      flexShrink:0,
+                    }}/>
+                )}
                 <div style={{flex:1, minWidth:0}}>
                   <div style={{
                     fontSize:11, fontWeight:700, color: accent,
@@ -4316,6 +4482,27 @@ export function ChatScreen() {
     } catch {}
     finally { setLoadingMore(false); }
   }
+
+  // ── Scroll to specific message (клик на цитату) ──────────────────────
+  useEffect(() => {
+    function onScrollTo(e) {
+      const targetId = e.detail;
+      if (!targetId) return;
+      const idx = flatItems.findIndex(it => it.id === targetId);
+      if (idx < 0) {
+        heyToast('Сообщение не загружено — прокрути выше', 'info');
+        return;
+      }
+      virtuosoRef.current?.scrollToIndex({
+        index: idx, align: 'center', behavior: 'smooth',
+      });
+      // Подсветка целевого сообщения
+      setFlashMsgId(targetId);
+      setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
+    }
+    window.addEventListener('hey:scroll-to-msg', onScrollTo);
+    return () => window.removeEventListener('hey:scroll-to-msg', onScrollTo);
+  }, [flatItems]);
 
   // ── Lightbox: стрелки ←/→ для навигации ───────────────────────────────
   useEffect(() => {
@@ -5073,19 +5260,25 @@ export function ChatScreen() {
       {/* Reply banner */}
       {replyTo && !editingMsg && (() => {
         const isOwnReply = replyTo.sender_id === user?.id;
+        const att = replyTo.attachment;
         let preview = (replyTo.text || '').slice(0, 120);
-        if (!preview && replyTo.attachment) {
-          if (replyTo.attachment.type === 'image' || replyTo.attachment.type === 'images') preview = '🖼 Фото';
-          else if (replyTo.attachment.type === 'audio') preview = '🎙 Голосовое';
-        }
+        let thumbUrl = null;
+        if (att?.type === 'image')  thumbUrl = att.url;
+        if (att?.type === 'images') thumbUrl = (att.urls && att.urls[0]) || null;
+        if (!preview && (att?.type === 'image' || att?.type === 'images')) preview = '🖼 Фото';
+        if (!preview && att?.type === 'audio') preview = '🎙 Голосовое';
         return (
           <div style={{background:'rgba(100,78,148,.5)',flexShrink:0}}>
-            <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'8px 14px',
+            <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 14px',
               maxWidth:680,margin:'0 auto'}}>
               <div style={{
-                width:3,alignSelf:'stretch',
+                width:3,alignSelf:'stretch',minHeight:38,
                 background:'rgba(180,140,255,.85)',borderRadius:2,flexShrink:0,
               }}/>
+              {thumbUrl && (
+                <img src={thumbUrl} alt=""
+                  style={{width:40,height:40,objectFit:'cover',borderRadius:6,flexShrink:0}}/>
+              )}
               <div style={{flex:1,minWidth:0}}>
                 <div style={{color:'rgba(200,170,255,.95)',fontSize:12,fontWeight:700,
                   display:'flex',alignItems:'center',gap:6}}>
@@ -5205,7 +5398,7 @@ export function ChatScreen() {
               disabled={declining}
               onClick={async () => {
                 setDeclining(true);
-                try { await api.declineRequest(convId); nav('/conversations'); } catch {}
+                try { await api.declineRequest(convId); nav('/chats'); } catch {}
                 setDeclining(false);
               }}
               style={{
@@ -6769,7 +6962,7 @@ export function PublicProfileScreen() {
             background:'rgba(255,255,255,.05)', borderRadius:14,
             border:'1px solid rgba(255,255,255,.08)', padding:'12px 16px',
             color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.6,
-            marginBottom:20,wordBreak:'break-word',
+            marginBottom:20,wordBreak:'break-word',whiteSpace:'pre-wrap',
           }}>
             <BioWithLinks text={profile.bio}/>
           </div>

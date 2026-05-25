@@ -588,6 +588,13 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.searchMessages(req.params.id, q));
   });
 
+  // Глобальный поиск по сообщениям юзера (для поиска по всем чатам)
+  r.get('/search/messages', requireAuth, (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (!q || q.length < 2) return res.json([]);
+    res.json(db.searchAllMessages(req.user.id, q));
+  });
+
   r.get('/calls', requireAuth, (req, res) => {
     res.json(db.getCalls(req.user.id));
   });

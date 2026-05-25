@@ -21,6 +21,7 @@ import AdminUserDetail from './components/admin/AdminUserDetail';
 import AdminMoments from './components/admin/AdminMoments';
 import AdminLogs from './components/admin/AdminLogs';
 import AdminSystem from './components/admin/AdminSystem';
+import AdminReports from './components/admin/AdminReports';
 
 function useNotifications() {
   useEffect(() => {
@@ -80,13 +81,13 @@ function useUnreadCount() {
   useEffect(() => {
     return socket.on('message:new', ({ message }) => {
       if (message.sender_id === user?.id) return;
-      if (location.pathname === '/conversations') return;
+      if (location.pathname === '/chats') return;
       setUnread(n => n + 1);
     });
   }, [user?.id, location.pathname]);
 
   useEffect(() => {
-    if (location.pathname === '/conversations') setUnread(0);
+    if (location.pathname === '/chats') setUnread(0);
   }, [location.pathname]);
 
   return unread;
@@ -212,13 +213,15 @@ export default function App() {
           }/>
           <Route path="/moments" element={<Navigate to="/main" replace/>}/>
 
-          <Route path="/conversations" element={
+          <Route path="/chats" element={
             <Protected>
               <WithBottomNav>
                 <ConversationsScreen/>
               </WithBottomNav>
             </Protected>
           }/>
+          {/* Старый URL — редирект для совместимости */}
+          <Route path="/conversations" element={<Navigate to="/chats" replace/>}/>
 
           <Route path="/contacts" element={
             <Protected>
@@ -278,6 +281,11 @@ export default function App() {
           <Route path="/admin/system" element={
             <RequireAdmin>
               <AdminLayout><AdminSystem/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/reports" element={
+            <RequireAdmin>
+              <AdminLayout><AdminReports/></AdminLayout>
             </RequireAdmin>
           }/>
 

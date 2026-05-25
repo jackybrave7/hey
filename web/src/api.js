@@ -83,6 +83,7 @@ export const api = {
   // Media & search
   getMedia:         (convId)            => req('GET',    `/conversations/${convId}/media`),
   searchMessages:   (convId, q)         => req('GET',    `/conversations/${convId}/search?q=${encodeURIComponent(q)}`),
+  searchAllMessages:(q)                 => req('GET',    `/search/messages?q=${encodeURIComponent(q)}`),
 
   // Calls
   getCalls: ()     => req('GET', '/calls'),
