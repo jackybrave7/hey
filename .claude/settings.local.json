@@ -137,7 +137,14 @@
       "Bash(grep -o \"borderRadius:6.\\\\{0,100\\\\}\" C:/projects/hey/web/dist/assets/index-Bh-rlUG3.js)",
       "Bash(grep -o \"urls.map.\\\\{0,200\\\\}width:48\" C:/projects/hey/web/dist/assets/index-Bh-rlUG3.js)",
       "Bash(grep -o \".\\\\{200\\\\}bottom:90,left.\\\\{200\\\\}\" C:/projects/hey/web/dist/assets/index-Bh-rlUG3.js)",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "Bash(curl -sS -X POST \"https://hey-messenger.ru/api/integrations/awo/webhook\" -H \"Content-Type: application/json\" -d '{\"id_account\":\"smoke3\",\"id_account_status\":5,\"email\":\"test@example.com\",\"goods\":\"smoke\"}')",
+      "Bash(curl -sS -X POST \"https://hey-messenger.ru/api/integrations/awo/webhook?token=4f5ca463019b98e25be47cc5f274eecf29461b0eb20d379d\" -H \"Content-Type: application/json\" -d '{\"id_account\":\"smoke4\",\"id_account_status\":5,\"email\":\"test4@example.com\",\"goods\":\"smoke\"}')",
+      "Bash(curl -sS \"https://hey-messenger.ru/api/join/validate?email=studentx@example.com&course=Test%20Course&sig=20d0ea02d68f34c75e64595c5fa9f499\")",
+      "Bash(curl -sS \"https://hey-messenger.ru/api/join/validate?email=studentx@example.com&course=Test%20Course&sig=fake\")",
+      "WebFetch(domain:autoweboffice.com)",
+      "WebFetch(domain:wiki.autoweboffice.com)",
+      "Bash(node -e \"const express=require\\('express'\\); const app=express\\(\\); app.use\\('/api', require\\('./src/routes'\\)\\(require\\('./src/db/db'\\), \\(\\)=>{}\\)\\); console.log\\('ok'\\);\")"
     ]
   }
 }

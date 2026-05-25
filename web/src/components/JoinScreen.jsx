@@ -16,9 +16,9 @@ export default function JoinScreen() {
   const sig    = params.get('sig') || '';
 
   useEffect(() => {
-    if (!email || !sig) {
+    if (!email) {
       setState('invalid');
-      setError('Ссылка неполная — не хватает параметров');
+      setError('Ссылка неполная — нет email');
       return;
     }
     api.joinValidate(email, course, sig)

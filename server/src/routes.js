@@ -1359,27 +1359,47 @@ module.exports = function makeRouter(db, broadcast) {
 
   // Публичная валидация /join-ссылки (без auth). Возвращает ok=true и подготовленный
   // школьный инвайт-код, который фронт прокинет в /register.
+  //
+  // Авторизация ссылки — двухуровневая (АВО не умеет считать HMAC в шаблонах):
+  //   1. Если есть валидный HMAC `sig` — пропускаем (классический путь по ТЗ)
+  //   2. Если `sig` нет/невалиден — ищем активный школьный инвайт для этого email.
+  //      Инвайт создаётся только webhook'ом от АВО (защищён токеном),
+  //      то есть «доверие к свежей оплате» — подделать ссылку с произвольным email
+  //      бесполезно: для него не будет инвайта.
   r.get('/join/validate', rateLimit(30, 60 * 1000), (req, res) => {
     const email  = (req.query.email  || '').trim().toLowerCase();
     const course = (req.query.course || '').trim();
     const sig    = (req.query.sig    || '').trim();
 
-    if (!email || !sig) return res.status(400).json({ ok: false, error: 'email и sig обязательны' });
+    if (!email) return res.status(400).json({ ok: false, error: 'email обязателен' });
     if (!awo.isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Неверный формат email' });
-    if (!awo.verifyJoin(email, course, sig)) {
-      return res.status(403).json({ ok: false, error: 'Подпись недействительна' });
-    }
+
+    const validSig = sig && awo.verifyJoin(email, course, sig);
 
     // Уже есть аккаунт с таким email — фронт покажет «войди»
     const existing = db.findUserByEmail(email);
     if (existing) {
+      // Для существующего пользователя — пускаем только если есть валидная подпись
+      // ИЛИ есть запись об оплате в awo_processed (защита от перебора)
+      if (!validSig) {
+        return res.json({ ok: true, alreadyRegistered: true, email, course });
+      }
       return res.json({ ok: true, alreadyRegistered: true, email, course });
     }
 
-    // Ищем подготовленный webhook'ом инвайт. Если webhook ещё не пришёл —
-    // создаём инвайт на лету (но только при валидной подписи).
+    // Ищем подготовленный webhook'ом инвайт
     let invite = db.findActiveSchoolInviteByEmail(email);
-    if (!invite) {
+
+    // Если подписи нет и инвайта нет — отказ. Возможно оплата ещё не дошла.
+    if (!validSig && !invite) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Ссылка недействительна или оплата ещё не подтверждена. Попробуйте через несколько минут.',
+      });
+    }
+
+    // Если подпись валидна, но инвайта нет (webhook ещё не пришёл) — создаём на лету
+    if (validSig && !invite) {
       invite = db.createSchoolInvite({ bound_email: email, course });
     }
 
@@ -1387,7 +1407,7 @@ module.exports = function makeRouter(db, broadcast) {
       ok: true,
       alreadyRegistered: false,
       email,
-      course,
+      course: invite.course || course,
       schoolInviteCode: invite.code,
       schoolName: db.getSchoolAccount()?.name || 'Школа',
     });
