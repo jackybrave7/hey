@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
+import { useConfirm } from '../Screens';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -29,6 +30,7 @@ export default function AdminUserDetail() {
   const [toast, setToast]     = useState('');
   const [blockReason, setBlockReason] = useState('');
   const [showBlockForm, setShowBlockForm] = useState(false);
+  const [customConfirm, confirmModal] = useConfirm();
 
   function showMsg(msg) {
     setToast(msg);
@@ -48,7 +50,7 @@ export default function AdminUserDetail() {
   useEffect(() => { reload(); }, [id]);
 
   async function handleResetPassword() {
-    if (!confirm('Сбросить пароль пользователю?')) return;
+    if (!await customConfirm('Сбросить пароль пользователю?')) return;
     try {
       const res = await api.adminResetPassword(id);
       showMsg(`Новый пароль: ${res.newPassword}`);
@@ -74,7 +76,7 @@ export default function AdminUserDetail() {
   }
 
   async function handleMakeAdmin() {
-    if (!confirm('Назначить администратором?')) return;
+    if (!await customConfirm('Назначить администратором?')) return;
     try {
       await api.adminMakeAdmin(id);
       await reload();
@@ -83,7 +85,7 @@ export default function AdminUserDetail() {
   }
 
   async function handleRevokeAdmin() {
-    if (!confirm('Снять права администратора?')) return;
+    if (!await customConfirm('Снять права администратора?', { danger: true })) return;
     try {
       await api.adminRevokeAdmin(id);
       await reload();
@@ -92,7 +94,7 @@ export default function AdminUserDetail() {
   }
 
   async function handleMakeSuper() {
-    if (!confirm('Назначить статус Супер?')) return;
+    if (!await customConfirm('Назначить статус ✦ Супер?')) return;
     try {
       await api.adminMakeSuper(id);
       await reload();
@@ -101,7 +103,7 @@ export default function AdminUserDetail() {
   }
 
   async function handleRevokeSuper() {
-    if (!confirm('Снять статус Супер?')) return;
+    if (!await customConfirm('Снять статус ✦ Супер?', { danger: true })) return;
     try {
       await api.adminRevokeSuper(id);
       await reload();
@@ -110,16 +112,21 @@ export default function AdminUserDetail() {
   }
 
   async function handleDeleteUser() {
-    const phrase = 'УДАЛИТЬ';
-    const answer = prompt(
-      `Полностью удалить пользователя "${user.name}" (${user.phone})?\n\n` +
-      `Это действие необратимо. Данные будут анонимизированы:\n` +
-      `— имя заменится на «Удалённый пользователь»\n` +
-      `— телефон, email, аватар, био — очистятся\n` +
-      `— моменты и сообщения останутся, но без авторства\n\n` +
-      `Для подтверждения введи: ${phrase}`
+    const ok = await customConfirm(
+      <>
+        <div style={{fontWeight:700,fontSize:16,marginBottom:10}}>
+          Полностью удалить пользователя «{user.name}» ({user.phone})?
+        </div>
+        <div style={{color:'rgba(255,255,255,.65)',fontSize:13,lineHeight:1.6}}>
+          Это действие необратимо. Данные будут анонимизированы:<br/>
+          — имя заменится на «Удалённый пользователь»<br/>
+          — телефон, email, аватар, био — очистятся<br/>
+          — моменты и сообщения останутся, но без авторства
+        </div>
+      </>,
+      { requireWord: 'УДАЛИТЬ', danger: true }
     );
-    if (answer !== phrase) return;
+    if (!ok) return;
     try {
       await api.adminDeleteUser(id);
       showMsg('Пользователь удалён');
@@ -289,6 +296,7 @@ export default function AdminUserDetail() {
           {toast}
         </div>
       )}
+      {confirmModal}
     </div>
   );
 }

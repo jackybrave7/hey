@@ -133,7 +133,11 @@
       "Bash(node -e \"require\\('./src/awo.js'\\); console.log\\('awo ok'\\); const db=require\\('./src/db/db.js'\\); console.log\\('db ok, school:', db.SCHOOL_USER_ID, db.getSchoolAccount\\(\\)?.name\\);\")",
       "Bash(node -e \"const express=require\\('express'\\); const app=express\\(\\); const makeRouter=require\\('./src/routes.js'\\); app.use\\('/api', makeRouter\\(require\\('./src/db/db.js'\\), \\(\\)=>{}\\)\\); console.log\\('routes ok'\\);\")",
       "Bash(node -e \"const db=require\\('./src/db/db.js'\\); console.log\\('ok'\\);\")",
-      "Bash(node -e \"require\\('./src/ws.js'\\); require\\('./src/db/db.js'\\); console.log\\('ok'\\);\")"
+      "Bash(node -e \"require\\('./src/ws.js'\\); require\\('./src/db/db.js'\\); console.log\\('ok'\\);\")",
+      "Bash(grep -o \"borderRadius:6.\\\\{0,100\\\\}\" C:/projects/hey/web/dist/assets/index-Bh-rlUG3.js)",
+      "Bash(grep -o \"urls.map.\\\\{0,200\\\\}width:48\" C:/projects/hey/web/dist/assets/index-Bh-rlUG3.js)",
+      "Bash(grep -o \".\\\\{200\\\\}bottom:90,left.\\\\{200\\\\}\" C:/projects/hey/web/dist/assets/index-Bh-rlUG3.js)",
+      "Bash(git ls-tree *)"
     ]
   }
 }

@@ -185,11 +185,15 @@ export function ToastContainer() {
 // ConfirmModal + useConfirm
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ConfirmModal({ message, hint, requireWord, danger, onConfirm, onCancel }) {
+export function ConfirmModal({ message, hint, requireWord, promptInput, promptPlaceholder, danger, confirmLabel, onConfirm, onCancel }) {
   const [typed, setTyped] = useState('');
   const inputRef = useRef();
-  useEffect(() => { if (requireWord) setTimeout(() => inputRef.current?.focus(), 60); }, []);
+  useEffect(() => { if (requireWord || promptInput) setTimeout(() => inputRef.current?.focus(), 60); }, []);
   const canConfirm = !requireWord || typed.trim().toLowerCase() === requireWord.toLowerCase();
+  const submit = () => {
+    if (!canConfirm) return;
+    onConfirm(promptInput ? typed.trim() : true);
+  };
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:1000,
@@ -212,7 +216,7 @@ function ConfirmModal({ message, hint, requireWord, danger, onConfirm, onCancel 
             </div>
             <input ref={inputRef} value={typed} onChange={e=>setTyped(e.target.value)}
               placeholder={requireWord}
-              onKeyDown={e=>{ if(e.key==='Enter'&&canConfirm) onConfirm(); if(e.key==='Escape') onCancel(); }}
+              onKeyDown={e=>{ if(e.key==='Enter') submit(); if(e.key==='Escape') onCancel(); }}
               style={{
                 background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',
                 borderRadius:12,padding:'10px 14px',color:'white',fontSize:14,
@@ -224,6 +228,21 @@ function ConfirmModal({ message, hint, requireWord, danger, onConfirm, onCancel 
           </div>
         )}
 
+        {promptInput && !requireWord && (
+          <textarea ref={inputRef} value={typed} onChange={e=>setTyped(e.target.value)}
+            placeholder={promptPlaceholder || 'Введите текст…'}
+            rows={3}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); submit(); } if(e.key==='Escape') onCancel(); }}
+            style={{
+              background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.18)',
+              borderRadius:12,padding:'10px 14px',color:'white',fontSize:14,
+              fontFamily:'inherit',outline:'none',width:'100%',boxSizing:'border-box',
+              resize:'vertical',transition:'border-color .15s',lineHeight:1.5,
+            }}
+            onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.6)'}
+            onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.18)'}/>
+        )}
+
         <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
           <button onClick={onCancel}
             style={{padding:'10px 22px',borderRadius:14,fontSize:14,cursor:'pointer',
@@ -233,7 +252,7 @@ function ConfirmModal({ message, hint, requireWord, danger, onConfirm, onCancel 
             onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.09)'}>
             Отмена
           </button>
-          <button onClick={canConfirm ? onConfirm : undefined}
+          <button onClick={submit}
             style={{
               padding:'10px 22px',borderRadius:14,fontSize:14,
               cursor: canConfirm ? 'pointer' : 'not-allowed',
@@ -248,7 +267,7 @@ function ConfirmModal({ message, hint, requireWord, danger, onConfirm, onCancel 
             }}
             onMouseEnter={e=>{ if(canConfirm) e.currentTarget.style.opacity='.85'; }}
             onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-            {requireWord ? 'Удалить' : 'Подтвердить'}
+            {confirmLabel || (requireWord ? 'Удалить' : 'Подтвердить')}
           </button>
         </div>
       </div>
@@ -256,7 +275,7 @@ function ConfirmModal({ message, hint, requireWord, danger, onConfirm, onCancel 
   );
 }
 
-function useConfirm() {
+export function useConfirm() {
   const [dialog, setDialog] = useState(null);
   const resolveRef = useRef(null);
 
@@ -265,21 +284,38 @@ function useConfirm() {
     setDialog({ message, ...options });
   });
 
-  const handleConfirm = () => { resolveRef.current?.(true);  setDialog(null); };
-  const handleCancel  = () => { resolveRef.current?.(false); setDialog(null); };
+  // Стилизованный аналог window.prompt — возвращает строку или null если отмена
+  const promptText = (message, options = {}) => new Promise(resolve => {
+    resolveRef.current = resolve;
+    setDialog({ message, promptInput: true, ...options });
+  });
+
+  const handleConfirm = (val) => {
+    // Для promptInput val — строка; для обычного confirm — true
+    resolveRef.current?.(val === undefined ? true : val);
+    setDialog(null);
+  };
+  const handleCancel  = () => {
+    // Для promptInput возвращаем null (как у window.prompt), для confirm — false
+    resolveRef.current?.(dialog?.promptInput ? null : false);
+    setDialog(null);
+  };
 
   const modal = dialog ? (
     <ConfirmModal
       message={dialog.message}
       hint={dialog.hint}
       requireWord={dialog.requireWord}
+      promptInput={dialog.promptInput}
+      promptPlaceholder={dialog.promptPlaceholder}
+      confirmLabel={dialog.confirmLabel}
       danger={dialog.danger}
       onConfirm={handleConfirm}
       onCancel={handleCancel}
     />
   ) : null;
 
-  return [confirm, modal];
+  return [confirm, modal, promptText];
 }
 
 function FieldLine({ value }) {

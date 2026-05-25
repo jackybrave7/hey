@@ -1,6 +1,7 @@
 // AdminAwo.jsx — управление интеграцией с АвтоВебОфис (АВО)
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { useConfirm } from '../Screens';
 
 const cardStyle = {
   background: 'rgba(255,255,255,.04)',
@@ -52,6 +53,7 @@ export default function AdminAwo() {
 
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [customConfirm, confirmModal] = useConfirm();
 
   function notify(msg) {
     setToast(msg);
@@ -96,7 +98,7 @@ export default function AdminAwo() {
   }
 
   async function removeMapping(course) {
-    if (!confirm(`Удалить маппинг курса "${course}"?`)) return;
+    if (!await customConfirm(`Удалить маппинг курса «${course}»?`, { danger: true })) return;
     try {
       await api.adminDeleteAwoCourseChat(course);
       const m = await api.adminGetAwoCourseChats();
@@ -287,6 +289,7 @@ export default function AdminAwo() {
           </div>
         )}
       </div>
+      {confirmModal}
     </div>
   );
 }

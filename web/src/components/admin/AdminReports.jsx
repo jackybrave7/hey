@@ -1,6 +1,7 @@
 // AdminReports.jsx — список жалоб от пользователей
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { useConfirm } from '../Screens';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -25,6 +26,7 @@ export default function AdminReports() {
   const [status, setStatus]   = useState('open');
   const [loading, setLoading] = useState(true);
   const [toast, setToast]     = useState('');
+  const [customConfirm, confirmModal] = useConfirm();
 
   function showToast(msg) {
     setToast(msg);
@@ -46,7 +48,7 @@ export default function AdminReports() {
 
   async function resolve(r, action) {
     const label = action === 'resolved' ? 'отметить как решённую' : 'отклонить';
-    if (!confirm(`Действительно ${label} эту жалобу?`)) return;
+    if (!await customConfirm(`Действительно ${label} эту жалобу?`, { danger: action !== 'resolved' })) return;
     try {
       await api.adminResolveReport(r.id, action);
       showToast(action === 'resolved' ? '✓ Решена' : '✓ Отклонена');
@@ -247,6 +249,7 @@ export default function AdminReports() {
           {toast}
         </div>
       )}
+      {confirmModal}
     </div>
   );
 }

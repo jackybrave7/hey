@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
+import { useConfirm } from '../Screens';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -19,6 +20,7 @@ export default function AdminMoments() {
   const [toast, setToast]       = useState('');
   const [deleting, setDeleting] = useState(null);
   const [preview, setPreview]   = useState(null); // { url, type } для модалки увеличения
+  const [customConfirm, confirmModal, customPrompt] = useConfirm();
 
   function toggleSort(col) {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -45,7 +47,15 @@ export default function AdminMoments() {
   useEffect(() => { load(); }, [load]);
 
   async function handleDelete(moment) {
-    const reason = prompt(`Причина удаления момента "${moment.text?.slice(0, 60)}…"?\n(оставь пустым если нет)`);
+    const reason = await customPrompt(
+      <>
+        <div style={{fontWeight:600,marginBottom:8}}>Удалить момент?</div>
+        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:4}}>
+          «{(moment.text || '').slice(0, 120)}{(moment.text || '').length > 120 ? '…' : ''}»
+        </div>
+      </>,
+      { promptPlaceholder: 'Причина удаления (необязательно)', confirmLabel: 'Удалить', danger: true }
+    );
     if (reason === null) return; // cancelled
     try {
       await api.adminDeleteMoment(moment.id, reason || undefined);
@@ -279,6 +289,7 @@ export default function AdminMoments() {
           {toast}
         </div>
       )}
+      {confirmModal}
     </div>
   );
 }

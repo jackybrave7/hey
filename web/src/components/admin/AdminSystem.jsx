@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
+import { useConfirm } from '../Screens';
 
 export default function AdminSystem() {
   const [tab, setTab] = useState('broadcast'); // 'broadcast' | 'moment'
@@ -50,6 +51,7 @@ function ManagePublished() {
   const [editingBroadcastId, setEditingBroadcastId] = useState(null);
   const [editText, setEditText]     = useState('');
   const [toast, setToast]           = useState('');
+  const [customConfirm, confirmModal] = useConfirm();
 
   function showMsg(m) { setToast(m); setTimeout(() => setToast(''), 2500); }
 
@@ -71,7 +73,17 @@ function ManagePublished() {
   if (loading) return <div style={{padding:20,color:'rgba(255,255,255,.5)'}}>Загрузка…</div>;
 
   async function deleteMoment(m) {
-    if (!confirm(`Удалить момент?\n\n«${(m.text||'').slice(0, 80)}…»\n\nЭто действие необратимо.`)) return;
+    const ok = await customConfirm(
+      <>
+        <div style={{fontWeight:600,marginBottom:8}}>Удалить момент?</div>
+        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:6}}>
+          «{(m.text || '').slice(0, 120)}{(m.text || '').length > 120 ? '…' : ''}»
+        </div>
+        <div style={{color:'rgba(255,180,180,.7)',fontSize:12}}>Это действие необратимо.</div>
+      </>,
+      { danger: true, confirmLabel: 'Удалить' }
+    );
+    if (!ok) return;
     try { await api.adminSystemDeleteMoment(m.id); showMsg('✓ Момент удалён'); load(); }
     catch (e) { showMsg('Ошибка: ' + e.message); }
   }
@@ -82,7 +94,17 @@ function ManagePublished() {
     } catch (e) { showMsg('Ошибка: ' + e.message); }
   }
   async function deleteBroadcast(b) {
-    if (!confirm(`Удалить рассылку у ВСЕХ получателей (${b.recipients} чатов)?\n\nЭто действие необратимо.`)) return;
+    const ok = await customConfirm(
+      <>
+        <div style={{fontWeight:600,marginBottom:8}}>Удалить рассылку?</div>
+        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:6}}>
+          У всех получателей — это <strong>{b.recipients}</strong> чатов.
+        </div>
+        <div style={{color:'rgba(255,180,180,.7)',fontSize:12}}>Это действие необратимо.</div>
+      </>,
+      { danger: true, confirmLabel: 'Удалить' }
+    );
+    if (!ok) return;
     try { await api.adminSystemDeleteBroadcast(b.id); showMsg('✓ Рассылка удалена'); load(); }
     catch (e) { showMsg('Ошибка: ' + e.message); }
   }
@@ -178,6 +200,7 @@ function ManagePublished() {
           border:'1px solid rgba(255,255,255,.15)', boxShadow:'0 4px 20px rgba(0,0,0,.5)',
         }}>{toast}</div>
       )}
+      {confirmModal}
     </div>
   );
 }
