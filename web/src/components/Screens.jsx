@@ -3703,6 +3703,163 @@ function renderText(text) {
   return result;
 }
 
+// Модалка пересылки сообщения в один или несколько чатов
+function ForwardModal({ messageId, onClose, onDone }) {
+  const [convs, setConvs] = useState(null);
+  const [selected, setSelected] = useState(new Set());
+  const [search, setSearch] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.getConversations().then(setConvs).catch(e => setError(e.message));
+  }, []);
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function send() {
+    if (selected.size === 0) return;
+    setSending(true);
+    try {
+      await api.forwardMessage(messageId, Array.from(selected));
+      onDone?.(selected.size);
+      onClose();
+    } catch (e) {
+      setError(e.message || 'Не удалось переслать');
+    }
+    setSending(false);
+  }
+
+  const q = search.trim().toLowerCase();
+  const filtered = (convs || [])
+    .filter(c => !c.is_request)
+    .filter(c => !c.partner_is_system && !c.partner_is_blocked && !c.partner_is_deleted)
+    .filter(c => !q || (c.name || '').toLowerCase().includes(q));
+
+  return createPortal(
+    <div onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,.6)',
+        backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div style={{
+        width:'min(94vw,440px)',maxHeight:'80vh',background:'rgba(38,28,68,.97)',
+        backdropFilter:'blur(24px)',borderRadius:18,
+        boxShadow:'0 24px 64px rgba(0,0,0,.55)',
+        border:'1px solid rgba(255,255,255,.12)',
+        display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{padding:'18px 20px 12px',display:'flex',alignItems:'center',gap:10,
+          borderBottom:'1px solid rgba(255,255,255,.08)'}}>
+          <span style={{fontSize:20}}>➦</span>
+          <div style={{flex:1,color:'white',fontSize:16,fontWeight:700}}>Переслать в чат</div>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',color:'rgba(255,255,255,.5)',
+              fontSize:22,cursor:'pointer',lineHeight:1,padding:0}}>✕</button>
+        </div>
+
+        <div style={{padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} autoFocus
+            placeholder="🔍 Поиск по чатам…"
+            style={{width:'100%',boxSizing:'border-box',
+              background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)',
+              borderRadius:10,padding:'9px 13px',color:'white',fontSize:14,
+              fontFamily:'inherit',outline:'none'}}
+            onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.55)'}
+            onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.12)'}/>
+        </div>
+
+        <div style={{flex:1,overflowY:'auto',padding:'4px 0'}}>
+          {convs === null && (
+            <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:30,fontSize:14}}>
+              Загрузка…
+            </div>
+          )}
+          {convs !== null && filtered.length === 0 && (
+            <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:30,fontSize:14}}>
+              {q ? 'Никого не найдено' : 'Чатов нет'}
+            </div>
+          )}
+          {filtered.map(c => {
+            const isSel = selected.has(c.id);
+            const icon = c.type === 'group' ? (c.icon || '👥')
+                       : c.type === 'monolog' ? '📝' : null;
+            const iconIsImg = typeof icon === 'string' &&
+              (icon.startsWith('http') || icon.startsWith('/') || icon.startsWith('data:'));
+            return (
+              <div key={c.id} onClick={() => toggle(c.id)}
+                style={{display:'flex',alignItems:'center',gap:12,padding:'10px 18px',cursor:'pointer',
+                  background: isSel ? 'rgba(140,100,200,.18)' : 'transparent',
+                  transition:'background .12s'}}
+                onMouseEnter={e => { if (!isSel) e.currentTarget.style.background='rgba(255,255,255,.05)'; }}
+                onMouseLeave={e => { if (!isSel) e.currentTarget.style.background='transparent'; }}>
+                <div style={{width:38,height:38,borderRadius: c.type==='group' ? 12 : '50%',
+                  overflow:'hidden',flexShrink:0,
+                  background: iconIsImg ? '#0a0518' : 'rgba(140,100,200,.4)',
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>
+                  {c.type === 'direct'
+                    ? <AvatarDisplay avatar={c.avatar} name={c.name} size={38}/>
+                    : iconIsImg
+                      ? <img src={icon} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                      : icon}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{color:'white',fontSize:14,fontWeight:600,
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {c.name}
+                  </div>
+                  <div style={{color:'rgba(255,255,255,.4)',fontSize:11}}>
+                    {c.type === 'group' ? 'группа' : c.type === 'monolog' ? 'монолог' : 'личный'}
+                  </div>
+                </div>
+                <div style={{width:22,height:22,borderRadius:'50%',
+                  border: isSel ? '2px solid rgba(180,140,220,.95)' : '2px solid rgba(255,255,255,.25)',
+                  background: isSel ? 'rgba(180,140,220,.95)' : 'transparent',
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  flexShrink:0,transition:'all .15s',
+                  color:'white',fontSize:13,fontWeight:700}}>
+                  {isSel ? '✓' : ''}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {error && (
+          <div style={{padding:'8px 18px',color:'rgba(255,140,140,.95)',fontSize:13}}>
+            {error}
+          </div>
+        )}
+
+        <div style={{padding:'14px 18px',display:'flex',gap:10,
+          borderTop:'1px solid rgba(255,255,255,.08)'}}>
+          <button onClick={onClose}
+            style={{flex:1,padding:'11px 0',background:'rgba(255,255,255,.08)',
+              border:'1px solid rgba(255,255,255,.12)',borderRadius:12,color:'rgba(255,255,255,.85)',
+              fontSize:14,cursor:'pointer',fontFamily:'inherit'}}>
+            Отмена
+          </button>
+          <button onClick={send} disabled={sending || selected.size === 0}
+            style={{flex:1.4,padding:'11px 0',
+              background: selected.size === 0 ? 'rgba(255,255,255,.07)' : 'rgba(120,90,200,.85)',
+              border:'none',borderRadius:12,
+              color: selected.size === 0 ? 'rgba(255,255,255,.3)' : 'white',
+              fontSize:14,fontWeight:700,cursor: selected.size === 0 ? 'not-allowed' : 'pointer',
+              fontFamily:'inherit',transition:'background .15s'}}>
+            {sending ? 'Отправка…' : selected.size === 0
+              ? 'Выбери чат'
+              : `Переслать в ${selected.size}`}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function MediaViewerModal({ convId, onClose }) {
   const [tab,    setTab]    = useState('images');
   const [images, setImages] = useState([]);
@@ -4410,6 +4567,17 @@ const MessageRow = memo(function MessageRow({
               {m.sender_name}
             </div>
           )}
+          {/* Forwarded-from label */}
+          {m.forwarded_from && (
+            <div style={{
+              fontSize:11, fontWeight:600,
+              color: isOut ? 'rgba(255,255,255,.7)' : 'rgba(120,90,180,.85)',
+              marginBottom:4, display:'flex', alignItems:'center', gap:4,
+            }}>
+              <span>➦ Переслано от</span>
+              <span style={{fontWeight:700}}>{m.forwarded_from.name}</span>
+            </div>
+          )}
           {/* Quoted reply */}
           {m.reply_to && (() => {
             let preview = (m.reply_to.text || '').slice(0, 100);
@@ -4757,6 +4925,8 @@ export function ChatScreen() {
   const virtuosoRef        = useRef();
   const atBottomRef        = useRef(true);  // tracks whether list is scrolled to bottom
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [pinnedMessage, setPinnedMessage]   = useState(null); // {id, text, attachment, sender_name, ...}
+  const [forwardModal,  setForwardModal]    = useState(null); // {messageId} | null
   const typingTimer        = useRef();
   const textareaRef        = useRef();
   const fileInputRef       = useRef();
@@ -4820,6 +4990,7 @@ export function ChatScreen() {
     setHasMore(true);
     setLoadingMore(false);
     setFirstItemIndex(1_000_000); // reset Virtuoso prepend index on conv change
+    setPinnedMessage(null);
     api.getMessages(convId).then(data => {
       if (data?.locked) {
         setRequestLock({ requester: data.requester });
@@ -4831,6 +5002,8 @@ export function ChatScreen() {
       if (data.length < 50) setHasMore(false);
       markVisibleAsRead(data);
     }).catch(console.error);
+    // Закреплённое сообщение (если есть)
+    api.getPinnedMessage(convId).then(pm => setPinnedMessage(pm)).catch(() => {});
     setIsContact(false);
     Promise.all([api.getConversations(), api.getContacts()]).then(([convs, contacts]) => {
       const c = convs.find(c => c.id === convId);
@@ -4973,7 +5146,7 @@ export function ChatScreen() {
         : p);
     });
     const u6 = socket.on('chat:cleared', ({ conversationId }) => {
-      if (conversationId === convId) setMessages([]);
+      if (conversationId === convId) { setMessages([]); setPinnedMessage(null); }
     });
     const u6b = socket.on('conversation:deleted', ({ conversationId }) => {
       if (conversationId === convId) {
@@ -4986,7 +5159,10 @@ export function ChatScreen() {
         setMessages(prev => prev.map(m => m.id === message.id ? { ...m, text: message.text, edited_at: message.edited_at } : m));
     });
     const u8 = socket.on('message:deleted', ({ messageId, conversationId: cid }) => {
-      if (cid === convId) setMessages(prev => prev.filter(m => m.id !== messageId));
+      if (cid === convId) {
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+        setPinnedMessage(p => p && p.id === messageId ? null : p);
+      }
     });
     const u9 = socket.on('reaction:update', ({ messageId, reactions }) => {
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
@@ -5031,8 +5207,11 @@ export function ChatScreen() {
       }
     };
     document.addEventListener('visibilitychange', onVisible);
+    const u11 = socket.on('message:pinned', ({ conversationId, message }) => {
+      if (conversationId === convId) setPinnedMessage(message);
+    });
     return () => {
-      u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u6b(); u7(); u8(); u9(); u10();
+      u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u6b(); u7(); u8(); u9(); u10(); u11();
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [convId, user?.id]);
@@ -5404,6 +5583,32 @@ export function ChatScreen() {
     setMessages(prev => prev.filter(m => m.id !== msg.id));
   }
 
+  async function pinMsg(msg) {
+    setMsgMenu(null);
+    try {
+      await api.pinMessage(convId, msg.id);
+      // pinnedMessage обновится через WS-событие, но на всякий случай ставим оптимистически
+      setPinnedMessage(msg);
+    } catch (e) {
+      heyToast('Не удалось закрепить: ' + (e.message || ''), 'error');
+    }
+  }
+
+  async function unpinMsg() {
+    setMsgMenu(null);
+    try {
+      await api.unpinMessage(convId);
+      setPinnedMessage(null);
+    } catch (e) {
+      heyToast('Не удалось открепить: ' + (e.message || ''), 'error');
+    }
+  }
+
+  function openForwardModal(msg) {
+    setMsgMenu(null);
+    setForwardModal({ messageId: msg.id });
+  }
+
   function openMsgMenu(e, msg) {
     e.preventDefault();
     const MENU_W = 200, MENU_H = 100;
@@ -5682,6 +5887,54 @@ export function ChatScreen() {
           <DotsMenu items={chatMenuItems}/>
         </div>
       </div>
+
+      {/* Pinned message banner */}
+      {pinnedMessage && !searchMode && (() => {
+        const canUnpin = partner.isGroup ? (partner.admin_id === user?.id) : true;
+        let preview = pinnedMessage.text || '';
+        if (!preview && pinnedMessage.attachment) {
+          const t = pinnedMessage.attachment.type;
+          preview = t === 'image' || t === 'images' ? '🖼 Фото'
+                  : t === 'audio' ? '🎙 Голосовое'
+                  : t === 'file' ? `📎 ${pinnedMessage.attachment.name || 'Файл'}`
+                  : 'Вложение';
+        }
+        return (
+          <div style={{
+            background:'rgba(50,38,90,.85)', backdropFilter:'blur(12px)',
+            borderBottom:'1px solid rgba(180,140,220,.18)',
+            flexShrink:0,
+          }}>
+            <div style={{maxWidth:680,margin:'0 auto',
+              display:'flex',alignItems:'center',gap:10,padding:'8px 14px'}}>
+              <span style={{fontSize:18,flexShrink:0}}>📌</span>
+              <div onClick={() => {
+                  window.dispatchEvent(new CustomEvent('hey:scroll-to-msg', { detail: pinnedMessage.id }));
+                }}
+                style={{flex:1,minWidth:0,cursor:'pointer'}}>
+                <div style={{color:'rgba(200,170,240,.95)',fontSize:11,fontWeight:700,letterSpacing:.3}}>
+                  Закреплено
+                </div>
+                <div style={{color:'rgba(255,255,255,.85)',fontSize:13,
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:1}}>
+                  {preview.slice(0, 200)}
+                </div>
+              </div>
+              {canUnpin && (
+                <button onClick={unpinMsg} title="Открепить"
+                  style={{background:'rgba(255,255,255,.08)',border:'none',
+                    color:'rgba(255,255,255,.6)',fontSize:14,cursor:'pointer',
+                    width:28,height:28,borderRadius:'50%',flexShrink:0,
+                    display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.18)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}>
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Search bar */}
       {searchMode && (
@@ -6330,8 +6583,22 @@ export function ChatScreen() {
           {(() => {
             const isOwn   = msgMenu.msg.sender_id === user?.id;
             const canEdit = isOwn && (Date.now()/1000 - msgMenu.msg.created_at) < 3*60*60 && !!msgMenu.msg.text;
+            // Pin rights: в группе только админ, в direct/monolog — любой участник
+            const canPin  = partner.isGroup ? (partner.admin_id === user?.id) : true;
+            const isPinned = pinnedMessage && pinnedMessage.id === msgMenu.msg.id;
+            // Copy text — только если есть текст
+            const canCopy = !!msgMenu.msg.text;
+            const copyText = () => {
+              setMsgMenu(null);
+              try { navigator.clipboard.writeText(msgMenu.msg.text || ''); heyToast('Скопировано', 'success'); }
+              catch { heyToast('Не удалось скопировать', 'error'); }
+            };
             return [
               { label:'Ответить', icon:'↩', danger:false, action:() => { setReplyTo(msgMenu.msg); setMsgMenu(null); textareaRef.current?.focus(); } },
+              { label:'Переслать', icon:'➦', danger:false, action:() => openForwardModal(msgMenu.msg) },
+              canCopy && { label:'Копировать', icon:'⧉', danger:false, action: copyText },
+              canPin && !isPinned && { label:'Закрепить', icon:'📌', danger:false, action:() => pinMsg(msgMenu.msg) },
+              canPin &&  isPinned && { label:'Открепить', icon:'📌', danger:false, action:() => unpinMsg() },
               canEdit && { label:'Редактировать', icon:'✏️', danger:false, action:() => startEdit(msgMenu.msg) },
               isOwn  && { label:'Удалить', icon:'🗑️', danger:true, action:() => deleteMsg(msgMenu.msg) },
             ].filter(Boolean).map(({ label, icon, danger, action }) => (
@@ -6350,6 +6617,15 @@ export function ChatScreen() {
       {/* Media viewer */}
       {showMedia && (
         <MediaViewerModal convId={convId} onClose={()=>setShowMedia(false)}/>
+      )}
+
+      {/* Forward modal */}
+      {forwardModal && (
+        <ForwardModal
+          messageId={forwardModal.messageId}
+          onClose={() => setForwardModal(null)}
+          onDone={(count) => heyToast(`Переслано в ${count} ${count === 1 ? 'чат' : 'чатов'}`, 'success')}
+        />
       )}
 
       {/* Lightbox */}

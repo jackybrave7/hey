@@ -159,6 +159,9 @@ try { db.exec('ALTER TABLE moments ADD COLUMN mood_emoji TEXT'); } catch {}
 try { db.exec('ALTER TABLE moments ADD COLUMN media_position TEXT'); } catch {}  // CSS object-position, например "50% 30%"
 try { db.exec('ALTER TABLE messages ADD COLUMN reply_to_id TEXT'); } catch {}     // id сообщения на которое отвечаем
 try { db.exec('ALTER TABLE messages ADD COLUMN broadcast_id TEXT'); } catch {}    // группировка системных рассылок
+try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_user_id TEXT'); } catch {}    // переслано от автора
+try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_message_id TEXT'); } catch {} // ссылка на оригинал (опционально)
+try { db.exec('ALTER TABLE conversations ADD COLUMN pinned_message_id TEXT'); } catch {}    // одно закреплённое сообщение на чат
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id)'); } catch {}
 
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
@@ -881,6 +884,7 @@ function getConversationsForUser(userId) {
       is_request: isRequest,
       request_from: conv.request_from || null,
       is_pinned: pinnedSet.has(convId),
+      pinned_message_id: conv.pinned_message_id || null,
     };
   }).filter(Boolean).sort((a, b) => {
     if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
@@ -924,7 +928,19 @@ function isMember(convId, userId) {
 
 function _parseMsg(m) {
   if (!m) return null;
-  return { ...m, attachment: m.attachment ? JSON.parse(m.attachment) : null };
+  const parsed = { ...m, attachment: m.attachment ? JSON.parse(m.attachment) : null };
+  if (parsed.forwarded_from_user_id) {
+    const u = db.prepare('SELECT id, name, avatar, is_deleted FROM users WHERE id=?')
+      .get(parsed.forwarded_from_user_id);
+    if (u) {
+      parsed.forwarded_from = {
+        id: u.id,
+        name: u.is_deleted ? 'Удалённый пользователь' : u.name,
+        avatar: u.avatar || null,
+      };
+    }
+  }
+  return parsed;
 }
 
 // Возвращает короткий snippet для цитаты — текст до 120 симв + тип/превью вложения
@@ -980,20 +996,102 @@ function getMessages(convId, before, limit = 50) {
   });
 }
 
-function createMessage({ conversationId, senderId, text, attachment, replyToId, broadcastId }) {
+function createMessage({ conversationId, senderId, text, attachment, replyToId, broadcastId,
+  forwardedFromUserId, forwardedFromMessageId }) {
   const msg = { id: uuid(), conversation_id: conversationId, sender_id: senderId,
     text: text || null,
     attachment: attachment ? JSON.stringify(attachment) : null,
     status: 'sent', created_at: now(), edited_at: null,
     reply_to_id: replyToId || null,
-    broadcast_id: broadcastId || null };
+    broadcast_id: broadcastId || null,
+    forwarded_from_user_id: forwardedFromUserId || null,
+    forwarded_from_message_id: forwardedFromMessageId || null };
   db.prepare(
-    `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,status,created_at,reply_to_id,broadcast_id)
-     VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@status,@created_at,@reply_to_id,@broadcast_id)`
+    `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,status,created_at,
+                           reply_to_id,broadcast_id,forwarded_from_user_id,forwarded_from_message_id)
+     VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@status,@created_at,
+             @reply_to_id,@broadcast_id,@forwarded_from_user_id,@forwarded_from_message_id)`
   ).run(msg);
   const parsed = _parseMsg(msg);
   if (parsed && parsed.reply_to_id) parsed.reply_to = _replySnippet(parsed.reply_to_id);
   return parsed;
+}
+
+// ── Pin message ────────────────────────────────────────────────────────────
+// Закрепляется одно сообщение на чат (как в WhatsApp). Право:
+//   · group   — только админ группы
+//   · direct  — любой участник
+//   · monolog — только владелец (= единственный участник)
+function pinMessage(convId, messageId, byUserId) {
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
+  if (!conv) throw new Error('Чат не найден');
+  if (!isMember(convId, byUserId)) throw new Error('Вы не участник этого чата');
+  if (conv.type === 'group' && conv.admin_id !== byUserId) {
+    throw new Error('Только админ группы может закреплять сообщения');
+  }
+  const msg = db.prepare('SELECT id FROM messages WHERE id=? AND conversation_id=?')
+    .get(messageId, convId);
+  if (!msg) throw new Error('Сообщение не найдено в этом чате');
+  db.prepare('UPDATE conversations SET pinned_message_id=? WHERE id=?').run(messageId, convId);
+  return getPinnedMessage(convId);
+}
+
+function unpinMessage(convId, byUserId) {
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
+  if (!conv) throw new Error('Чат не найден');
+  if (!isMember(convId, byUserId)) throw new Error('Вы не участник этого чата');
+  if (conv.type === 'group' && conv.admin_id !== byUserId) {
+    throw new Error('Только админ группы может откреплять сообщения');
+  }
+  db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE id=?').run(convId);
+}
+
+function getPinnedMessage(convId) {
+  const conv = db.prepare('SELECT pinned_message_id FROM conversations WHERE id=?').get(convId);
+  if (!conv?.pinned_message_id) return null;
+  const row = db.prepare(
+    `SELECT m.*, u.name AS sender_name
+     FROM messages m JOIN users u ON u.id=m.sender_id
+     WHERE m.id=?`
+  ).get(conv.pinned_message_id);
+  if (!row) return null;
+  return _parseMsg(row);
+}
+
+// ── Forward ───────────────────────────────────────────────────────────────
+// Пересылает сообщение в несколько чатов от имени byUserId. Возвращает
+// массив созданных сообщений с conversationId. Допустимы только чаты, где
+// byUserId является участником.
+function forwardMessageToChats(originalMessageId, targetConvIds, byUserId) {
+  const original = db.prepare('SELECT * FROM messages WHERE id=?').get(originalMessageId);
+  if (!original) throw new Error('Исходное сообщение не найдено');
+  // Если исходное само было переслано — сохраняем исходного автора (chain shortening)
+  const trueAuthor = original.forwarded_from_user_id || original.sender_id;
+  const created = [];
+  for (const convId of targetConvIds) {
+    if (!isMember(convId, byUserId)) continue;
+    const conv = db.prepare('SELECT type FROM conversations WHERE id=?').get(convId);
+    if (!conv) continue;
+    // Запрет писать системному пользователю
+    if (conv.type === 'direct') {
+      const members = db.prepare('SELECT user_id FROM members WHERE conversation_id=?').all(convId).map(r => r.user_id);
+      const recipient = members.find(id => id !== byUserId);
+      if (recipient === SYSTEM_USER_ID && byUserId !== SYSTEM_USER_ID) continue;
+      const recUser = recipient ? findUserById(recipient) : null;
+      if (recUser?.is_blocked) continue;
+    }
+    const att = original.attachment ? JSON.parse(original.attachment) : null;
+    const msg = createMessage({
+      conversationId: convId,
+      senderId: byUserId,
+      text: original.text || null,
+      attachment: att,
+      forwardedFromUserId: trueAuthor,
+      forwardedFromMessageId: original.id,
+    });
+    created.push({ ...msg, conversationId: convId });
+  }
+  return created;
 }
 
 function updateMessageStatus(id, status) {
@@ -1020,6 +1118,7 @@ function getMessageById(id) {
 }
 
 function clearConversationMessages(convId) {
+  db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE id=?').run(convId);
   db.prepare('DELETE FROM messages WHERE conversation_id=?').run(convId);
 }
 
@@ -1030,6 +1129,8 @@ function editMessage(id, text) {
 }
 
 function deleteMessage(id) {
+  // Если это закреплённое сообщение — снять закрепление
+  db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE pinned_message_id=?').run(id);
   db.prepare('DELETE FROM messages WHERE id=?').run(id);
 }
 
@@ -1913,6 +2014,7 @@ module.exports = {
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
+  pinMessage, unpinMessage, getPinnedMessage, forwardMessageToChats,
   clearConversationMessages, editMessage, deleteMessage,
   getMediaMessages, searchMessages, searchAllMessages,
   getCalls, createCall,

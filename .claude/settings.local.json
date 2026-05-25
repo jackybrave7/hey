@@ -169,7 +169,8 @@
       "Bash(node -e \"console.log\\(encodeURIComponent\\('Тестовый курс Хей'\\)\\)\")",
       "Bash(curl -sS 'https://hey-messenger.ru/api/join/validate?email=__TRACKED_VAR__&course=__TRACKED_VAR__')",
       "Bash(grep -n \"isGroup.*icon\\\\|c.icon\\\\|partner.icon\\\\|\\\\\\\\.icon \\\\|\\\\\\\\.\\\\\\\\.\\\\\\\\.c.icon\\\\\\\\b\" C:/projects/hey/web/src/components/Screens.jsx)",
-      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app && git pull origin main 2>&1 | tail -2 && pm2 restart hey --update-env 2>&1 | tail -2\")"
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app && git pull origin main 2>&1 | tail -2 && pm2 restart hey --update-env 2>&1 | tail -2\")",
+      "Bash(node -e \"const express=require\\('express'\\); const app=express\\(\\); app.use\\('/api', require\\('./src/routes'\\)\\(require\\('./src/db/db'\\), \\(\\)=>{}\\)\\); console.log\\('routes ok'\\);\")"
     ]
   }
 }

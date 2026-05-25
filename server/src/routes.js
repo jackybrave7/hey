@@ -628,6 +628,70 @@ module.exports = function makeRouter(db, broadcast) {
     }
   });
 
+  // ── Pin message ────────────────────────────────────────────────────────
+  r.get('/conversations/:id/pinned', requireAuth, (req, res) => {
+    if (!db.isMember(req.params.id, req.user.id))
+      return res.status(403).json({ error: 'Not a member' });
+    const pinned = db.getPinnedMessage(req.params.id);
+    res.json(pinned || null);
+  });
+
+  r.post('/conversations/:id/pin', requireAuth, (req, res) => {
+    const { messageId } = req.body || {};
+    if (!messageId) return res.status(400).json({ error: 'messageId required' });
+    try {
+      const pinned = db.pinMessage(req.params.id, messageId, req.user.id);
+      const members = db.getConversationMembers(req.params.id);
+      broadcast(members, { type: 'message:pinned', conversationId: req.params.id, message: pinned });
+      res.json({ ok: true, pinned });
+    } catch (e) {
+      const msg = String(e.message || '');
+      const code = msg.includes('админ')      ? 403
+                 : msg.includes('участник')   ? 403
+                 : msg.includes('не найден') || msg.includes('не найдено') ? 404
+                 : 500;
+      res.status(code).json({ error: msg });
+    }
+  });
+
+  r.delete('/conversations/:id/pin', requireAuth, (req, res) => {
+    try {
+      db.unpinMessage(req.params.id, req.user.id);
+      const members = db.getConversationMembers(req.params.id);
+      broadcast(members, { type: 'message:pinned', conversationId: req.params.id, message: null });
+      res.json({ ok: true });
+    } catch (e) {
+      const msg = String(e.message || '');
+      const code = msg.includes('админ') || msg.includes('участник') ? 403 : 500;
+      res.status(code).json({ error: msg });
+    }
+  });
+
+  // ── Forward message ────────────────────────────────────────────────────
+  r.post('/messages/:id/forward', requireAuth, (req, res) => {
+    const { toConvIds } = req.body || {};
+    if (!Array.isArray(toConvIds) || toConvIds.length === 0) {
+      return res.status(400).json({ error: 'toConvIds (array) required' });
+    }
+    if (toConvIds.length > 20) {
+      return res.status(400).json({ error: 'Можно переслать максимум в 20 чатов за раз' });
+    }
+    try {
+      const created = db.forwardMessageToChats(req.params.id, toConvIds, req.user.id);
+      // Broadcast каждого нового сообщения участникам соответствующего чата
+      for (const msg of created) {
+        const members = db.getConversationMembers(msg.conversationId);
+        const full = { ...msg, sender_name: req.user.name };
+        broadcast(members, { type: 'message:new', message: full });
+      }
+      res.json({ ok: true, forwardedCount: created.length });
+    } catch (e) {
+      const msg = String(e.message || '');
+      const code = msg.includes('не найдено') ? 404 : 500;
+      res.status(code).json({ error: msg });
+    }
+  });
+
   r.delete('/conversations/:id/messages', requireAuth, (req, res) => {
     const convId = req.params.id;
     if (!db.isMember(convId, req.user.id))
