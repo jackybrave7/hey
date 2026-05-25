@@ -1522,16 +1522,6 @@ export function MyProfileScreen() {
             )}
           </div>
 
-          <button onClick={() => nav('/help')}
-            style={{
-              display:'flex',alignItems:'center',justifyContent:'space-between',
-              padding:'13px 18px',borderRadius:14,cursor:'pointer',
-              background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',
-              color:'white',fontSize:14,fontWeight:500,
-            }}>
-            <span>📖 Руководство</span>
-            <span style={{opacity:.4}}>›</span>
-          </button>
           <button onClick={() => nav('/settings')}
             style={{
               display:'flex',alignItems:'center',justifyContent:'space-between',
@@ -7515,6 +7505,10 @@ export function SettingsScreen() {
 
             <div style={dividerStyle}>
               <Row icon="⚫" label="Чёрный список" onClick={() => setShowBlacklist(true)}/>
+            </div>
+            <div style={dividerStyle}>
+              <Row icon="📖" label="Руководство" sub="Все функции HEY с поиском"
+                onClick={() => nav('/help')}/>
             </div>
             <Row icon="💬" label="Написать разработчику" onClick={() => setShowFeedback(true)}/>
           </div>
