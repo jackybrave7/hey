@@ -69,6 +69,12 @@ export const api = {
   pinMessage:        (convId, messageId)  => req('POST',   `/conversations/${convId}/pin`, { messageId }),
   unpinMessage:      (convId)             => req('DELETE', `/conversations/${convId}/pin`),
   forwardMessage:    (messageId, toConvIds) => req('POST', `/messages/${messageId}/forward`, { toConvIds }),
+
+  // Web Push
+  getPushPublicKey:  ()                    => req('GET',  '/push/public-key'),
+  pushSubscribe:     (subscription)        => req('POST', '/push/subscribe', subscription),
+  pushUnsubscribe:   (endpoint)            => req('POST', '/push/unsubscribe', { endpoint }),
+  pushTest:          ()                    => req('POST', '/push/test'),
   pinConversation:   (convId)             => req('POST',   `/conversations/${convId}/pin`),
   unpinConversation: (convId)             => req('DELETE', `/conversations/${convId}/pin`),
   acceptRequest:    (convId)              => req('POST',   `/conversations/${convId}/accept`),

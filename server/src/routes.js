@@ -11,6 +11,7 @@ const { detectTags, detectMoodEmoji } = require('./auto-tags');
 const { parseEmbeddedVideo } = require('./video-embed');
 const storage = require('./storage');
 const awo = require('./awo');
+const push = require('./push');
 
 // ── requireAdmin middleware ────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
@@ -1661,6 +1662,50 @@ module.exports = function makeRouter(db, broadcast) {
     const base = process.env.PUBLIC_URL || (req.protocol + '://' + req.get('host'));
     const url = `${base}/join?email=${encodeURIComponent(email)}&course=${encodeURIComponent(course)}&sig=${sig}`;
     res.json({ url, sig });
+  });
+
+  // ── Web Push ──────────────────────────────────────────────────────────────
+  r.get('/push/public-key', (_, res) => {
+    res.json({ publicKey: push.getPublicKey() });
+  });
+
+  r.post('/push/subscribe', requireAuth, (req, res) => {
+    const { endpoint, keys } = req.body || {};
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ error: 'Invalid subscription' });
+    }
+    try {
+      db.pushSubscribe({
+        userId: req.user.id,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth:   keys.auth,
+        userAgent: req.get('User-Agent') || null,
+      });
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  r.post('/push/unsubscribe', requireAuth, (req, res) => {
+    const { endpoint } = req.body || {};
+    if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+    db.pushUnsubscribe(endpoint);
+    res.json({ ok: true });
+  });
+
+  // Тестовый пуш самому себе (для проверки настройки)
+  r.post('/push/test', requireAuth, async (req, res) => {
+    const subs = db.getPushSubscriptions(req.user.id);
+    if (!subs.length) return res.status(400).json({ error: 'Нет активных подписок' });
+    const gone = await push.sendPushToUser(subs, {
+      title: 'HEY',
+      body:  'Тестовое уведомление работает ✓',
+      url:   '/chats',
+    });
+    if (gone.length) db.removePushSubscriptions(gone);
+    res.json({ ok: true, sent: subs.length - gone.length, cleaned: gone.length });
   });
 
   r.get('/health', (_, res) => res.json({ ok: true }));

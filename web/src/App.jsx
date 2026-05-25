@@ -25,6 +25,7 @@ import AdminReports from './components/admin/AdminReports';
 import AdminAwo from './components/admin/AdminAwo';
 import JoinScreen from './components/JoinScreen';
 import UserGuide from './components/UserGuide';
+import { ensurePushIfGranted } from './lib/push';
 
 function useNotifications() {
   useEffect(() => {
@@ -123,6 +124,25 @@ function GlobalHandlers() {
   useEffect(() => {
     if (user?.must_change_password) setShowMustChangePwd(true);
   }, [user?.must_change_password]);
+
+  // При логине — если permission на push уже granted, пере-подписываем (для
+  // случая переустановки браузера / обновления SW).
+  useEffect(() => {
+    if (user?.id) ensurePushIfGranted();
+  }, [user?.id]);
+
+  // Слушаем сообщение от service worker — клик по push-уведомлению должен
+  // привести нас на нужный URL в SPA.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMsg = (e) => {
+      if (e.data?.type === 'hey:navigate' && e.data.url) {
+        window.location.href = e.data.url;
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker.removeEventListener('message', onMsg);
+  }, []);
 
   // Listen for runtime events from api.js
   useEffect(() => {

@@ -5,6 +5,7 @@ import { useNavigate, useParams, useLocation, useSearchParams } from 'react-rout
 import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
 import { uploadMedia, previewUrl, uploadAvatar, uploadAudioBlob, uploadFile } from '../lib/uploadMedia';
+import { subscribeToPush, unsubscribeFromPush, isPushSupported } from '../lib/push';
 import SuperLimitPopup from './super/SuperLimitPopup';
 import { useAuth } from '../AuthContext';
 import {
@@ -7133,10 +7134,47 @@ export function SettingsScreen() {
 
   function showSettingsToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000); }
 
-  async function requestNotifications() {
-    if (!('Notification' in window)) return;
-    const perm = await Notification.requestPermission();
-    setNotifPerm(perm);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  async function enablePush() {
+    if (!isPushSupported()) {
+      showSettingsToast('Браузер не поддерживает push-уведомления');
+      return;
+    }
+    setPushBusy(true);
+    try {
+      const res = await subscribeToPush();
+      setNotifPerm(Notification.permission);
+      if (res.ok) showSettingsToast('✓ Push-уведомления включены');
+      else if (res.reason === 'denied') showSettingsToast('Разрешите уведомления в настройках браузера');
+      else showSettingsToast('Не удалось включить: ' + res.reason);
+    } catch (e) {
+      showSettingsToast('Ошибка: ' + (e.message || ''));
+    }
+    setPushBusy(false);
+  }
+
+  async function disablePush() {
+    setPushBusy(true);
+    try {
+      await unsubscribeFromPush();
+      showSettingsToast('Push отключены на этом устройстве');
+    } catch (e) {
+      showSettingsToast('Ошибка: ' + (e.message || ''));
+    }
+    setPushBusy(false);
+  }
+
+  async function testPush() {
+    setPushBusy(true);
+    try {
+      const r = await api.pushTest();
+      if (r.sent > 0) showSettingsToast(`✓ Тест отправлен (${r.sent})`);
+      else showSettingsToast('Нет активных подписок');
+    } catch (e) {
+      showSettingsToast('Ошибка теста: ' + (e.message || ''));
+    }
+    setPushBusy(false);
   }
 
   async function submitPasswordChange() {
@@ -7254,29 +7292,58 @@ export function SettingsScreen() {
               {showNotif && (
                 <div style={{padding:'4px 18px 14px', display:'flex', flexDirection:'column', gap:10}}>
                   <div style={{color:'rgba(255,255,255,.78)', fontSize:13, lineHeight:1.6}}>
-                    Получайте уведомления о новых сообщениях, когда приложение свёрнуто.
+                    Получайте push-уведомления о новых сообщениях, даже когда HEY свёрнут или вкладка закрыта.
                   </div>
                   {notifPerm === 'unsupported' && (
-                    <div style={{color:'rgba(255,210,120,.95)', fontSize:13}}>Браузер не поддерживает уведомления</div>
+                    <div style={{color:'rgba(255,210,120,.95)', fontSize:13}}>
+                      Браузер не поддерживает уведомления
+                    </div>
                   )}
                   {notifPerm === 'denied' && (
                     <div style={{color:'rgba(255,160,160,.95)', fontSize:13, fontWeight:500}}>
-                      Разрешите уведомления в настройках браузера и перезагрузите страницу.
+                      Разрешите уведомления в настройках браузера для этого сайта и перезагрузите страницу.
                     </div>
                   )}
-                  {notifPerm === 'default' && (
-                    <button onClick={requestNotifications} style={{
-                      alignSelf:'flex-start', background:'rgba(120,90,200,.75)', border:'none',
-                      borderRadius:50, padding:'9px 20px', color:'white',
-                      fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
-                    }}>
-                      Включить уведомления
-                    </button>
+                  {(notifPerm === 'default' || (notifPerm === 'granted' && !pushBusy)) && (
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                      <button onClick={enablePush} disabled={pushBusy} style={{
+                        background:'rgba(120,90,200,.75)', border:'none',
+                        borderRadius:50, padding:'9px 20px', color:'white',
+                        fontSize:13, fontWeight:600, cursor: pushBusy ? 'wait' : 'pointer',
+                        fontFamily:'inherit', opacity: pushBusy ? .6 : 1,
+                      }}>
+                        {pushBusy ? 'Подключаю…' :
+                         notifPerm === 'granted' ? 'Переподключить' : 'Включить уведомления'}
+                      </button>
+                      {notifPerm === 'granted' && (
+                        <>
+                          <button onClick={testPush} disabled={pushBusy} style={{
+                            background:'rgba(255,255,255,.1)', border:'1px solid rgba(255,255,255,.18)',
+                            borderRadius:50, padding:'9px 16px', color:'rgba(255,255,255,.85)',
+                            fontSize:13, cursor: pushBusy ? 'wait' : 'pointer',
+                            fontFamily:'inherit', opacity: pushBusy ? .6 : 1,
+                          }}>
+                            ✉ Тест
+                          </button>
+                          <button onClick={disablePush} disabled={pushBusy} style={{
+                            background:'rgba(255,80,80,.18)', border:'1px solid rgba(255,120,120,.3)',
+                            borderRadius:50, padding:'9px 16px', color:'rgba(255,180,180,.95)',
+                            fontSize:13, cursor: pushBusy ? 'wait' : 'pointer',
+                            fontFamily:'inherit', opacity: pushBusy ? .6 : 1,
+                          }}>
+                            Отключить
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                   {notifPerm === 'granted' && (
-                    <div style={{display:'flex', alignItems:'center', gap:8}}>
-                      <div style={{width:8, height:8, borderRadius:'50%', background:'#2ecc71'}}/>
-                      <span style={{color:'rgba(255,255,255,.7)', fontSize:13}}>Уведомления включены</span>
+                    <div style={{display:'flex', alignItems:'center', gap:8, marginTop:4}}>
+                      <div style={{width:8, height:8, borderRadius:'50%', background:'#2ecc71',
+                        boxShadow:'0 0 6px rgba(46,204,113,.5)'}}/>
+                      <span style={{color:'rgba(255,255,255,.65)', fontSize:12}}>
+                        Подписка активна. Отключить можно отдельно на этом устройстве.
+                      </span>
                     </div>
                   )}
                 </div>

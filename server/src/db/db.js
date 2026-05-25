@@ -162,6 +162,17 @@ try { db.exec('ALTER TABLE messages ADD COLUMN broadcast_id TEXT'); } catch {}  
 try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_user_id TEXT'); } catch {}    // переслано от автора
 try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_message_id TEXT'); } catch {} // ссылка на оригинал (опционально)
 try { db.exec('ALTER TABLE conversations ADD COLUMN pinned_message_id TEXT'); } catch {}    // одно закреплённое сообщение на чат
+
+// Web Push подписки (один юзер — много устройств/браузеров)
+try { db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+  endpoint    TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  p256dh      TEXT NOT NULL,
+  auth        TEXT NOT NULL,
+  user_agent  TEXT,
+  created_at  INTEGER NOT NULL
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id)'); } catch {}
 
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
@@ -1022,6 +1033,32 @@ function createMessage({ conversationId, senderId, text, attachment, replyToId, 
 //   · group   — только админ группы
 //   · direct  — любой участник
 //   · monolog — только владелец (= единственный участник)
+// ── Push subscriptions ────────────────────────────────────────────────────
+function pushSubscribe({ userId, endpoint, p256dh, auth, userAgent }) {
+  db.prepare(`INSERT INTO push_subscriptions
+    (endpoint, user_id, p256dh, auth, user_agent, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(endpoint) DO UPDATE SET
+      user_id=excluded.user_id, p256dh=excluded.p256dh,
+      auth=excluded.auth, user_agent=excluded.user_agent`)
+    .run(endpoint, userId, p256dh, auth, userAgent || null, now());
+}
+
+function pushUnsubscribe(endpoint) {
+  db.prepare('DELETE FROM push_subscriptions WHERE endpoint=?').run(endpoint);
+}
+
+function getPushSubscriptions(userId) {
+  return db.prepare('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id=?')
+    .all(userId);
+}
+
+function removePushSubscriptions(endpoints) {
+  if (!endpoints || !endpoints.length) return;
+  const ph = endpoints.map(() => '?').join(',');
+  db.prepare(`DELETE FROM push_subscriptions WHERE endpoint IN (${ph})`).run(...endpoints);
+}
+
 function pinMessage(convId, messageId, byUserId) {
   const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
   if (!conv) throw new Error('Чат не найден');
@@ -2015,6 +2052,7 @@ module.exports = {
   getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
   pinMessage, unpinMessage, getPinnedMessage, forwardMessageToChats,
+  pushSubscribe, pushUnsubscribe, getPushSubscriptions, removePushSubscriptions,
   clearConversationMessages, editMessage, deleteMessage,
   getMediaMessages, searchMessages, searchAllMessages,
   getCalls, createCall,

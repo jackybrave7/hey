@@ -101,13 +101,47 @@ module.exports = function setupWS(server) {
           const full = { ...saved, sender_name: user.name, tempId, conversationId };
           broadcast(members, { type: 'message:new', message: full });
 
-          // Mark delivered for recipients who are online
+          // Mark delivered for recipients who are online + push для оффлайн
+          const offlineRecipients = [];
           members.forEach(uid => {
-            if (uid !== user.id && clients.has(uid)) {
+            if (uid === user.id) return;
+            if (clients.has(uid)) {
               db.updateMessageStatus(saved.id, 'delivered');
               broadcast([user.id], { type: 'message:status', id: saved.id, status: 'delivered' });
+            } else {
+              offlineRecipients.push(uid);
             }
           });
+
+          // Web Push для оффлайн участников
+          if (offlineRecipients.length) {
+            const push = require('./push');
+            const conv = db.getConversationById(conversationId);
+            const isGroup = conv?.type === 'group';
+            const title = isGroup
+              ? `${user.name} в «${conv.name || 'группе'}»`
+              : (user.name || 'HEY');
+            let body = (text?.trim() || '').slice(0, 140);
+            if (!body) {
+              const a = attachment;
+              body = a?.type === 'image'  || a?.type === 'images' ? '🖼 Фото'
+                   : a?.type === 'audio'  ? '🎙 Голосовое сообщение'
+                   : a?.type === 'file'   ? `📎 ${a.name || 'Файл'}`
+                   : 'Новое сообщение';
+            }
+            const payload = {
+              title, body,
+              url: `/chat/${conversationId}`,
+              tag: `msg:${conversationId}`,
+              messageId: saved.id,
+            };
+            offlineRecipients.forEach(async uid => {
+              const subs = db.getPushSubscriptions(uid);
+              if (!subs.length) return;
+              const gone = await push.sendPushToUser(subs, payload);
+              if (gone.length) db.removePushSubscriptions(gone);
+            });
+          }
           break;
         }
 
