@@ -3814,7 +3814,7 @@ const MessageRow = memo(function MessageRow({
         marginBottom: hasReactions ? 8 : 2}}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onContextMenu={isOut ? (e) => onOpenMenu(e, m) : undefined}>
+      onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Reaction button — left side for incoming */}
       {!isOut && (
@@ -3853,6 +3853,41 @@ const MessageRow = memo(function MessageRow({
               {m.sender_name}
             </div>
           )}
+          {/* Quoted reply */}
+          {m.reply_to && (() => {
+            let preview = (m.reply_to.text || '').slice(0, 100);
+            if (!preview && m.reply_to.attachment_type) {
+              if (m.reply_to.attachment_type === 'image' || m.reply_to.attachment_type === 'images') preview = '🖼 Фото';
+              else if (m.reply_to.attachment_type === 'audio') preview = '🎙 Голосовое';
+            }
+            const accent = isOut ? 'rgba(255,255,255,.85)' : 'rgba(120,90,200,.85)';
+            const subtxt = isOut ? 'rgba(255,255,255,.7)' : 'rgba(80,60,120,.85)';
+            return (
+              <div
+                style={{
+                  display:'flex', gap:8, padding:'6px 8px',
+                  marginBottom: 6,
+                  background: isOut ? 'rgba(255,255,255,.12)' : 'rgba(120,90,200,.1)',
+                  borderRadius: 8,
+                  borderLeft: `3px solid ${accent}`,
+                }}>
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{
+                    fontSize:11, fontWeight:700, color: accent,
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                  }}>
+                    ↩ {m.reply_to.sender_name || '…'}
+                  </div>
+                  <div style={{
+                    fontSize:12, color: subtxt,
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                  }}>
+                    {preview || '…'}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           {m.attachment?.type === 'image' && (() => {
             const src = m.attachment.url;
             if (!src) return (
@@ -4071,6 +4106,7 @@ export function ChatScreen() {
   const [partner,     setPartner]     = useState({ name:'Диалог', online:false, id:null, isGroup:false, icon:null, admin_id:null, avatar:null, isDeleted:false });
   const [editingMsg,  setEditingMsg]  = useState(null);
   const [msgMenu,     setMsgMenu]     = useState(null);
+  const [replyTo,     setReplyTo]     = useState(null); // message object to reply to
   const [imgPreviews, setImgPreviews] = useState([]); // [{dataUrl, file, uploading?}]
   const [lightbox,    setLightbox]    = useState(null);
   const [showMedia,   setShowMedia]   = useState(false);
@@ -4230,6 +4266,7 @@ export function ChatScreen() {
       if (reactionPicker)        { setReactionPicker(null);      return; }
       if (showEmoji)             { setShowEmoji(false);          return; }
       if (editingMsg)            { cancelEdit();                 return; }
+      if (replyTo)               { setReplyTo(null);              return; }
       if (imgPreviews.length)    {
         imgPreviews.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
         setImgPreviews([]);
@@ -4239,7 +4276,7 @@ export function ChatScreen() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [lightbox, showMedia, msgMenu, reactionPicker, showEmoji, editingMsg, imgPreviews, searchMode]);
+  }, [lightbox, showMedia, msgMenu, reactionPicker, showEmoji, editingMsg, replyTo, imgPreviews, searchMode]);
 
   // Scroll to bottom on initial load or after send — Virtuoso's followOutput handles the rest
   useEffect(() => {
@@ -4542,17 +4579,20 @@ export function ChatScreen() {
         : { type: 'images', urls };
 
       const tempId = 'tmp-' + Date.now();
+      const reply = replyTo ? makeReplySnippet(replyTo) : null;
       forceScrollBottom.current = true;
       setMessages(prev => [...prev, {
         id: tempId, text: capturedText || null, attachment, sender_id: user.id,
         sender_name: user.name, status: 'sent',
         created_at: Math.floor(Date.now() / 1000),
+        reply_to_id: replyTo?.id || null, reply_to: reply,
       }]);
-      socket.sendMessage(convId, capturedText || '', tempId, attachment);
+      socket.sendMessage(convId, capturedText || '', tempId, attachment, replyTo?.id);
       // Освобождаем object URLs
       captured.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
       setImgPreviews([]);
       setText('');
+      setReplyTo(null);
       return;
     }
 
@@ -4568,15 +4608,32 @@ export function ChatScreen() {
     }
 
     const tempId = 'tmp-' + Date.now();
+    const reply  = replyTo ? makeReplySnippet(replyTo) : null;
     forceScrollBottom.current = true;
     setMessages(prev => [...prev, {
       id: tempId, text: t, sender_id: user.id,
       sender_name: user.name, status:'sent',
-      created_at: Math.floor(Date.now()/1000)
+      created_at: Math.floor(Date.now()/1000),
+      reply_to_id: replyTo?.id || null, reply_to: reply,
     }]);
-    socket.sendMessage(convId, t, tempId);
+    socket.sendMessage(convId, t, tempId, null, replyTo?.id);
     setText('');
+    setReplyTo(null);
     socket.stopTyping(convId);
+  }
+
+  // Локальный snippet для оптимистического показа цитаты (до прихода реального с сервера)
+  function makeReplySnippet(m) {
+    if (!m) return null;
+    let attType = null;
+    if (m.attachment?.type) attType = m.attachment.type;
+    return {
+      id: m.id,
+      sender_id: m.sender_id,
+      sender_name: m.sender_id === user?.id ? (user?.name || 'Вы') : (m.sender_name || partner.name),
+      text: m.text ? m.text.slice(0, 120) : null,
+      attachment_type: attType,
+    };
   }
 
   function startEdit(msg) {
@@ -4930,6 +4987,41 @@ export function ChatScreen() {
           </div>
         </div>
       )}
+
+      {/* Reply banner */}
+      {replyTo && !editingMsg && (() => {
+        const isOwnReply = replyTo.sender_id === user?.id;
+        let preview = (replyTo.text || '').slice(0, 120);
+        if (!preview && replyTo.attachment) {
+          if (replyTo.attachment.type === 'image' || replyTo.attachment.type === 'images') preview = '🖼 Фото';
+          else if (replyTo.attachment.type === 'audio') preview = '🎙 Голосовое';
+        }
+        return (
+          <div style={{background:'rgba(100,78,148,.5)',flexShrink:0}}>
+            <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'8px 14px',
+              maxWidth:680,margin:'0 auto'}}>
+              <div style={{
+                width:3,alignSelf:'stretch',
+                background:'rgba(180,140,255,.85)',borderRadius:2,flexShrink:0,
+              }}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:'rgba(200,170,255,.95)',fontSize:12,fontWeight:700,
+                  display:'flex',alignItems:'center',gap:6}}>
+                  <span>↩</span>
+                  <span>В ответ {isOwnReply ? 'себе' : (replyTo.sender_name || partner.name)}</span>
+                </div>
+                <div style={{color:'rgba(255,255,255,.7)',fontSize:13,
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:2}}>
+                  {preview || '…'}
+                </div>
+              </div>
+              <button onClick={() => setReplyTo(null)}
+                style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
+                  fontSize:22,cursor:'pointer',lineHeight:1,padding:'0 4px'}}>✕</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Edit banner */}
       {editingMsg && (
@@ -5288,10 +5380,12 @@ export function ChatScreen() {
             boxShadow:'0 8px 32px rgba(0,0,0,.4)'
           }}>
           {(() => {
-            const canEdit = (Date.now()/1000 - msgMenu.msg.created_at) < 3*60*60 && !!msgMenu.msg.text;
+            const isOwn   = msgMenu.msg.sender_id === user?.id;
+            const canEdit = isOwn && (Date.now()/1000 - msgMenu.msg.created_at) < 3*60*60 && !!msgMenu.msg.text;
             return [
+              { label:'Ответить', icon:'↩', danger:false, action:() => { setReplyTo(msgMenu.msg); setMsgMenu(null); textareaRef.current?.focus(); } },
               canEdit && { label:'Редактировать', icon:'✏️', danger:false, action:() => startEdit(msgMenu.msg) },
-              { label:'Удалить', icon:'🗑️', danger:true, action:() => deleteMsg(msgMenu.msg) },
+              isOwn  && { label:'Удалить', icon:'🗑️', danger:true, action:() => deleteMsg(msgMenu.msg) },
             ].filter(Boolean).map(({ label, icon, danger, action }) => (
               <div key={label} onClick={action}
                 style={{padding:'13px 18px',color:danger?'#ff6b6b':'white',fontSize:15,

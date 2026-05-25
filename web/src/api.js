@@ -231,8 +231,8 @@ class HeySocket {
   }
 
   // Message actions
-  sendMessage(conversationId, text, tempId, attachment) {
-    this.send('message:send', { conversationId, text, tempId, attachment });
+  sendMessage(conversationId, text, tempId, attachment, replyToId) {
+    this.send('message:send', { conversationId, text, tempId, attachment, replyToId });
   }
 
   // Send "read up to this message" — server marks all prior unread as read in one query

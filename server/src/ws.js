@@ -61,7 +61,7 @@ module.exports = function setupWS(server) {
       switch (msg.type) {
 
         case 'message:send': {
-          const { conversationId, text, attachment, tempId } = msg;
+          const { conversationId, text, attachment, tempId, replyToId } = msg;
           if (!conversationId || (!text?.trim() && !attachment)) return;
           if (!db.isMember(conversationId, user.id)) return;
 
@@ -85,6 +85,7 @@ module.exports = function setupWS(server) {
             conversationId, senderId: user.id,
             text: text?.trim() || null,
             attachment: attachment || null,
+            replyToId: replyToId || null,
           });
           const full = { ...saved, sender_name: user.name, tempId, conversationId };
           broadcast(members, { type: 'message:new', message: full });

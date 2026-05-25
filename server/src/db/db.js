@@ -157,6 +157,7 @@ try { db.exec('ALTER TABLE moments ADD COLUMN moment_order INTEGER DEFAULT 0'); 
 try { db.exec('ALTER TABLE moments ADD COLUMN embedded_video TEXT'); } catch {}
 try { db.exec('ALTER TABLE moments ADD COLUMN mood_emoji TEXT'); } catch {}
 try { db.exec('ALTER TABLE moments ADD COLUMN media_position TEXT'); } catch {}  // CSS object-position, например "50% 30%"
+try { db.exec('ALTER TABLE messages ADD COLUMN reply_to_id TEXT'); } catch {}     // id сообщения на которое отвечаем
 
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
@@ -762,6 +763,24 @@ function _parseMsg(m) {
   return { ...m, attachment: m.attachment ? JSON.parse(m.attachment) : null };
 }
 
+// Возвращает короткий snippet для цитаты — текст до 120 симв + тип вложения
+function _replySnippet(replyToId) {
+  if (!replyToId) return null;
+  const r = db.prepare(
+    `SELECT m.id, m.sender_id, m.text, m.attachment, u.name AS sender_name
+     FROM messages m JOIN users u ON u.id=m.sender_id
+     WHERE m.id=?`
+  ).get(replyToId);
+  if (!r) return null;
+  let attType = null;
+  try { attType = r.attachment ? JSON.parse(r.attachment)?.type || null : null; } catch {}
+  return {
+    id: r.id, sender_id: r.sender_id, sender_name: r.sender_name,
+    text: r.text ? r.text.slice(0, 120) : null,
+    attachment_type: attType,
+  };
+}
+
 function getMessages(convId, before, limit = 50) {
   // Не таскаем avatar инлайн — он берётся через /api/avatars/:userId с долгим кешем.
   // Возвращаем только sender_avatar как ссылку, чтобы UI мог рендерить <img src>.
@@ -777,19 +796,27 @@ function getMessages(convId, before, limit = 50) {
      ORDER BY m.created_at ASC
      LIMIT ?`
   ).all(convId, before, limit);
-  return rows.map(r => { delete r._sender_id_for_avatar; return _parseMsg(r); });
+  return rows.map(r => {
+    delete r._sender_id_for_avatar;
+    const parsed = _parseMsg(r);
+    if (parsed && parsed.reply_to_id) parsed.reply_to = _replySnippet(parsed.reply_to_id);
+    return parsed;
+  });
 }
 
-function createMessage({ conversationId, senderId, text, attachment }) {
+function createMessage({ conversationId, senderId, text, attachment, replyToId }) {
   const msg = { id: uuid(), conversation_id: conversationId, sender_id: senderId,
     text: text || null,
     attachment: attachment ? JSON.stringify(attachment) : null,
-    status: 'sent', created_at: now(), edited_at: null };
+    status: 'sent', created_at: now(), edited_at: null,
+    reply_to_id: replyToId || null };
   db.prepare(
-    `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,status,created_at)
-     VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@status,@created_at)`
+    `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,status,created_at,reply_to_id)
+     VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@status,@created_at,@reply_to_id)`
   ).run(msg);
-  return _parseMsg(msg);
+  const parsed = _parseMsg(msg);
+  if (parsed && parsed.reply_to_id) parsed.reply_to = _replySnippet(parsed.reply_to_id);
+  return parsed;
 }
 
 function updateMessageStatus(id, status) {

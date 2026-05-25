@@ -982,7 +982,7 @@ module.exports = function makeRouter(db, broadcast) {
       });
       // Лог админ-действия
       if (db.logAdminAction) {
-        db.logAdminAction(req.user.id, 'system_moment_create', null, `moment=${moment.id}`);
+        db.logAdminAction({ adminId: req.user.id, action: 'system_moment_create', targetMomentId: moment.id });
       }
       // Бродкаст всем юзерам у которых системный в контактах (это все юзеры по сути)
       const allUserIds = db.getContactOwners(db.SYSTEM_USER_ID);
@@ -1040,8 +1040,11 @@ module.exports = function makeRouter(db, broadcast) {
         }
       }
       if (db.logAdminAction) {
-        db.logAdminAction(req.user.id, 'system_broadcast', null,
-          `recipients=${delivered}; text="${trimmed.slice(0, 100)}"`);
+        db.logAdminAction({
+          adminId: req.user.id,
+          action: 'system_broadcast',
+          reason: `recipients=${delivered}; text="${trimmed.slice(0, 100)}"`,
+        });
       }
       res.json({ ok: true, delivered, total: recipients.length });
     } catch (err) {
@@ -1116,7 +1119,12 @@ module.exports = function makeRouter(db, broadcast) {
     if (user.id === req.user.id) return res.status(400).json({ error: 'Нельзя удалить свой аккаунт через админку' });
     if (user.is_admin)             return res.status(400).json({ error: 'Сначала снимите права администратора' });
     db.deleteUserAccount(req.params.id);
-    if (db.logAdminAction) db.logAdminAction(req.user.id, 'delete_user', req.params.id, `phone=${user.phone}`);
+    if (db.logAdminAction) db.logAdminAction({
+      adminId: req.user.id,
+      action: 'delete_user',
+      targetUserId: req.params.id,
+      reason: `phone=${user.phone}`,
+    });
     res.json({ ok: true });
   });
 

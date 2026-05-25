@@ -126,7 +126,8 @@
       "Bash(curl -s -w '\\\\nHTTP %{http_code}\\\\n' -X POST http://localhost:3001/api/login -H \"Content-Type: application/json\" -d '{\"phone\":\"+79999999999\",\"password\":\"wrong\"}')",
       "Bash(taskkill /F /IM node.exe)",
       "Bash(curl -s http://localhost:5174/src/components/Screens.jsx)",
-      "Bash(kill %1)"
+      "Bash(kill %1)",
+      "Bash(node -e \"require\\('./server/src/routes.js'\\); console.log\\('routes OK'\\);\")"
     ]
   }
 }
