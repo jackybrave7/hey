@@ -956,6 +956,10 @@ function _replySnippet(replyToId) {
 function getMessages(convId, before, limit = 50) {
   // Не таскаем avatar инлайн — он берётся через /api/avatars/:userId с долгим кешем.
   // Возвращаем только sender_avatar как ссылку, чтобы UI мог рендерить <img src>.
+  // ВАЖНО: берём САМЫЕ СВЕЖИЕ N сообщений до `before` (DESC), затем разворачиваем
+  // обратно в ASC чтобы UI рендерил старые сверху, новые снизу. Раньше тут было
+  // ORDER BY ASC → возвращались первые 50 сообщений от начала чата, и новые
+  // не попадали в выдачу когда история длиннее 50.
   const rows = db.prepare(
     `SELECT m.*, u.name AS sender_name, u.id AS _sender_id_for_avatar,
             CASE
@@ -965,9 +969,9 @@ function getMessages(convId, before, limit = 50) {
             END AS sender_avatar
      FROM messages m JOIN users u ON u.id=m.sender_id
      WHERE m.conversation_id=? AND m.created_at<?
-     ORDER BY m.created_at ASC
+     ORDER BY m.created_at DESC
      LIMIT ?`
-  ).all(convId, before, limit);
+  ).all(convId, before, limit).reverse();
   return rows.map(r => {
     delete r._sender_id_for_avatar;
     const parsed = _parseMsg(r);
