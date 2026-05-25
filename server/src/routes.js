@@ -612,6 +612,22 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  r.delete('/conversations/:id', requireAuth, (req, res) => {
+    try {
+      const { memberIds, type } = db.deleteConversation(req.params.id, req.user.id);
+      broadcast(memberIds, { type: 'conversation:deleted', conversationId: req.params.id, convType: type });
+      res.json({ ok: true });
+    } catch (e) {
+      const msg = String(e.message || '');
+      const code = msg.includes('админ') ? 403
+                 : msg.includes('Монолог') ? 400
+                 : msg.includes('участник') ? 403
+                 : msg.includes('не найден') ? 404
+                 : 500;
+      res.status(code).json({ error: msg || 'Не удалось удалить чат' });
+    }
+  });
+
   r.delete('/conversations/:id/messages', requireAuth, (req, res) => {
     const convId = req.params.id;
     if (!db.isMember(convId, req.user.id))

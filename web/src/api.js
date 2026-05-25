@@ -64,6 +64,7 @@ export const api = {
   getMessages:      (convId, before) =>
     req('GET', `/conversations/${convId}/messages${before ? `?before=${before}` : ''}`),
   clearMessages:    (convId)              => req('DELETE', `/conversations/${convId}/messages`),
+  deleteConversation:(convId)             => req('DELETE', `/conversations/${convId}`),
   pinConversation:   (convId)             => req('POST',   `/conversations/${convId}/pin`),
   unpinConversation: (convId)             => req('DELETE', `/conversations/${convId}/pin`),
   acceptRequest:    (convId)              => req('POST',   `/conversations/${convId}/accept`),

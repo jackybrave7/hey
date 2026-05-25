@@ -2962,6 +2962,10 @@ export function ConversationsScreen() {
         .sort((a, b) => b.last_at - a.last_at);
     });
   }), [user?.id]);
+  // Удалённые чаты (другой стороной или админом группы) убираем из списка
+  useEffect(() => socket.on('conversation:deleted', ({ conversationId }) => {
+    setConvs(prev => prev.filter(c => c.id !== conversationId));
+  }), []);
 
   // ── Поиск по чатам ────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
@@ -4729,6 +4733,12 @@ export function ChatScreen() {
     const u6 = socket.on('chat:cleared', ({ conversationId }) => {
       if (conversationId === convId) setMessages([]);
     });
+    const u6b = socket.on('conversation:deleted', ({ conversationId }) => {
+      if (conversationId === convId) {
+        heyToast('Чат удалён', 'info');
+        nav('/chats');
+      }
+    });
     const u7 = socket.on('message:edited', ({ message }) => {
       if (message.conversation_id === convId)
         setMessages(prev => prev.map(m => m.id === message.id ? { ...m, text: message.text, edited_at: message.edited_at } : m));
@@ -4780,7 +4790,7 @@ export function ChatScreen() {
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u7(); u8(); u9(); u10();
+      u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u6b(); u7(); u8(); u9(); u10();
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [convId, user?.id]);
@@ -5204,6 +5214,36 @@ export function ChatScreen() {
     URL.revokeObjectURL(a.href);
   }
 
+  async function handleDeleteConversation() {
+    const isGroup = partner.isGroup;
+    const title = isGroup
+      ? <>
+          <div style={{fontWeight:700,fontSize:16,marginBottom:8}}>
+            Удалить группу «{partner.name}»?
+          </div>
+          <div style={{color:'rgba(255,255,255,.65)',fontSize:13,lineHeight:1.6}}>
+            Группа исчезнет у всех участников. Все сообщения, реакции и медиа удалятся безвозвратно.
+          </div>
+        </>
+      : <>
+          <div style={{fontWeight:700,fontSize:16,marginBottom:8}}>
+            Удалить чат с {partner.name}?
+          </div>
+          <div style={{color:'rgba(255,255,255,.65)',fontSize:13,lineHeight:1.6}}>
+            Переписка удалится <strong>у обоих</strong>. Все сообщения, реакции и медиа — безвозвратно.
+          </div>
+        </>;
+    const ok = await customConfirm(title, { requireWord: 'УДАЛИТЬ', danger: true });
+    if (!ok) return;
+    try {
+      await api.deleteConversation(convId);
+      // broadcast 'conversation:deleted' тоже придёт, но мы уже навигируемся
+      nav('/chats');
+    } catch (e) {
+      heyToast('Не удалось удалить: ' + (e.message || 'ошибка'), 'error');
+    }
+  }
+
   async function handleLeaveGroup() {
     if (!await customConfirm(
       `Покинуть группу «${partner.name}»? Вы потеряете доступ к переписке.`,
@@ -5244,8 +5284,10 @@ export function ChatScreen() {
   const isGroupAdmin = partner.isGroup && partner.admin_id === user?.id;
   const canClearChat = !partner.isGroup || isGroupAdmin;
   // Админ группы не выходит через «выйти» — должен сначала передать админство
-  // или удалить группу через настройки
+  // или удалить группу полностью
   const canLeaveGroup = partner.isGroup && !isGroupAdmin;
+  // Полное удаление чата: direct — любой участник, group — только админ. Monolog нельзя.
+  const canDeleteChat = !partner.isMonolog && (partner.isGroup ? isGroupAdmin : true);
 
   const chatMenuItems = [
     { label: 'Поиск в чате',            icon: '🔍', danger: false, onClick: () => { setSearchMode(true); setTimeout(()=>searchRef.current?.focus(),50); } },
@@ -5263,6 +5305,10 @@ export function ChatScreen() {
     ] : []),
     ...(canLeaveGroup ? [
       { label: 'Выйти из группы',         icon: '🚪', danger: true,  onClick: handleLeaveGroup },
+    ] : []),
+    ...(canDeleteChat ? [
+      { label: partner.isGroup ? 'Удалить группу' : 'Удалить чат',
+        icon: '❌', danger: true, onClick: handleDeleteConversation },
     ] : []),
   ];
 

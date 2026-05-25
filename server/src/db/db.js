@@ -713,6 +713,36 @@ function acceptRequest(convId, acceptorId) {
   return requesterId;
 }
 
+// Полное удаление переписки (включая все сообщения и связи).
+// Право:
+//   · direct  — любой участник
+//   · group   — только админ группы
+//   · monolog — нельзя (self-chat)
+function deleteConversation(convId, userId) {
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
+  if (!conv) throw new Error('Чат не найден');
+  if (conv.type === 'monolog') throw new Error('Монолог удалить нельзя');
+  if (conv.type === 'group' && conv.admin_id !== userId) {
+    throw new Error('Только админ группы может удалить её');
+  }
+  if (!isMember(convId, userId)) {
+    throw new Error('Вы не участник этого чата');
+  }
+  // Список участников нужен ДО удаления — для broadcast уведомления
+  const memberIds = db.prepare('SELECT user_id FROM members WHERE conversation_id=?')
+    .all(convId).map(r => r.user_id);
+  db.transaction(() => {
+    // Реакции на сообщения этого чата
+    db.prepare(`DELETE FROM reactions WHERE message_id IN
+      (SELECT id FROM messages WHERE conversation_id=?)`).run(convId);
+    db.prepare('DELETE FROM messages WHERE conversation_id=?').run(convId);
+    db.prepare('DELETE FROM members WHERE conversation_id=?').run(convId);
+    db.prepare('DELETE FROM pinned_conversations WHERE conv_id=?').run(convId);
+    db.prepare('DELETE FROM conversations WHERE id=?').run(convId);
+  })();
+  return { memberIds, type: conv.type };
+}
+
 // Decline a request: delete the whole conversation
 function declineRequest(convId, userId) {
   // Only the recipient can decline
@@ -1875,7 +1905,7 @@ module.exports = {
   createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount,
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
-  getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest,
+  getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
