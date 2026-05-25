@@ -213,7 +213,14 @@ module.exports = function makeRouter(db, broadcast) {
     if (!user) return res.status(401).json({ error: 'Неверный телефон или пароль' });
     if (!bcrypt.compareSync(password, user.password))
       return res.status(401).json({ error: 'Неверный телефон или пароль' });
-    if (user.is_blocked) return res.status(403).json({ error: 'Неверный телефон или пароль' });
+    // Сначала верифицируем пароль, потом проверяем блокировку — чтобы
+    // блокировка не была способом проверить, существует ли аккаунт по телефону.
+    if (user.is_blocked) {
+      return res.status(403).json({
+        error: 'Аккаунт заблокирован администрацией',
+        code: 'BLOCKED',
+      });
+    }
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
     const { password: _, ...safe } = user;
     res.json({ token, user: safe });

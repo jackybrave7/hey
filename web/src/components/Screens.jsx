@@ -4513,6 +4513,7 @@ export function ChatScreen() {
         setPartner(p => ({ ...p, name: c.name||'Диалог', id: c.partner_id||null,
           isGroup:false, avatar: c.avatar||null,
           isDeleted: !!c.partner_is_deleted,
+          isBlocked: !!c.partner_is_blocked,
           isSuper:   !!c.partner_is_super,
           isSystem:  !!c.partner_is_system,
           online:    !!c.partner_online,
@@ -5552,8 +5553,24 @@ export function ChatScreen() {
         </div>
       )}
 
+      {/* Blocked-by-admin user banner */}
+      {partner.isBlocked && !partner.isDeleted && (
+        <div style={{
+          flexShrink:0, padding:'12px 20px',
+          background:'rgba(200,80,80,.12)',
+          borderTop:'1px solid rgba(255,120,120,.2)',
+          textAlign:'center',
+          color:'rgba(255,180,180,.85)', fontSize:13, lineHeight:1.5,
+        }}>
+          🚫 Пользователь заблокирован администрацией<br/>
+          <span style={{color:'rgba(255,180,180,.5)',fontSize:12}}>
+            Отправка сообщений недоступна
+          </span>
+        </div>
+      )}
+
       {/* Input bar */}
-      {!requestLock && !partner.isDeleted && <div style={{flexShrink:0}}>
+      {!requestLock && !partner.isDeleted && !partner.isBlocked && <div style={{flexShrink:0}}>
 
         {/* ── Voice: recording bar ── */}
         {voiceState === 'recording' && (

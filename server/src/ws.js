@@ -79,6 +79,17 @@ module.exports = function setupWS(server) {
                 error: 'HEY-заведующий не отвечает на сообщения',
               }));
             }
+            // Запрет отправки сообщений админ-заблокированному пользователю
+            if (recipientId) {
+              const recipient = db.findUserById(recipientId);
+              if (recipient?.is_blocked) {
+                return ws.send(JSON.stringify({
+                  type: 'error',
+                  tempId,
+                  error: 'Пользователь заблокирован администрацией',
+                }));
+              }
+            }
           }
 
           const saved = db.createMessage({

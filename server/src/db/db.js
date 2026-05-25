@@ -839,6 +839,7 @@ function getConversationsForUser(userId) {
       admin_id: conv.admin_id || null, partner_id: partnerId,
       avatar: partnerAvatar,
       partner_is_deleted: !!(partnerUser?.is_deleted),
+      partner_is_blocked: !!(partnerUser?.is_blocked),
       partner_is_super:   !!(partnerUser?.is_super),
       partner_is_system:  !!(partnerUser?.is_system),
       partner_online:     !!(partnerId && presenceMap[partnerId]?.online),

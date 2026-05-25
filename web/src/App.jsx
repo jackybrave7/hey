@@ -127,7 +127,11 @@ function GlobalHandlers() {
   useEffect(() => {
     const onBlocked = () => {
       setBlockedOverlay(true);
-      setTimeout(() => { logout(); }, 2800);
+      // Если был залогинен — выкидываем; на /login (когда токена нет) — оставляем
+      // оверлей, пока пользователь сам не нажмёт «Понятно».
+      if (localStorage.getItem('hey_token')) {
+        setTimeout(() => { logout(); }, 2800);
+      }
     };
     const onMustChange = () => setShowMustChangePwd(true);
     window.addEventListener('hey:blocked', onBlocked);
@@ -157,15 +161,27 @@ function GlobalHandlers() {
           position:'fixed', inset:0, zIndex:9999,
           background:'rgba(10,5,25,.97)', backdropFilter:'blur(24px)',
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-          gap:18, animation:'fadeIn .25s ease',
+          gap:18, animation:'fadeIn .25s ease', padding:24,
         }}>
           <div style={{fontSize:56}}>🚫</div>
           <div style={{color:'white', fontSize:22, fontWeight:800, letterSpacing:-.3}}>
             Аккаунт заблокирован
           </div>
-          <div style={{color:'rgba(255,255,255,.45)', fontSize:14, textAlign:'center', maxWidth:260, lineHeight:1.6}}>
-            Доступ к аккаунту ограничен администратором
+          <div style={{color:'rgba(255,255,255,.5)', fontSize:14, textAlign:'center', maxWidth:320, lineHeight:1.6}}>
+            Доступ ограничен администрацией.<br/>
+            По вопросам — напишите в поддержку.
           </div>
+          <button
+            onClick={() => setBlockedOverlay(false)}
+            style={{
+              marginTop:6, padding:'11px 28px', borderRadius:12, border:'none',
+              background:'rgba(140,110,220,.6)', color:'white',
+              fontSize:14, fontWeight:600, cursor:'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background='rgba(160,130,240,.75)'}
+            onMouseLeave={e => e.currentTarget.style.background='rgba(140,110,220,.6)'}>
+            Понятно
+          </button>
         </div>
       )}
       {showMustChangePwd && user && (
