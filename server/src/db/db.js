@@ -1276,13 +1276,22 @@ function getDisciplinesCloud(userId) {
 // ── Admin ──────────────────────────────────────────────────────────────────
 
 function getAdminStats() {
-  const users   = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
+  const users   = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_deleted = 0').get().c;
   const blocked = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_blocked=1').get().c;
   const admins  = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_admin=1').get().c;
   const moments = db.prepare("SELECT COUNT(*) as c FROM moments WHERE status != 'deleted'").get().c;
   const activeMoments = db.prepare("SELECT COUNT(*) as c FROM moments WHERE status='active'").get().c;
   const reactions = db.prepare('SELECT COUNT(*) as c FROM moment_reactions').get().c;
-  return { users, blocked, admins, moments, activeMoments, reactions };
+  const messages  = db.prepare('SELECT COUNT(*) as c FROM messages').get().c;
+  const openReports = db.prepare("SELECT COUNT(*) as c FROM reports WHERE status='open'").get().c;
+  // Активные за последние 3 дня (по presence.last_seen)
+  const threeDaysAgo = now() - 3 * 24 * 60 * 60;
+  const activeUsers = db.prepare(
+    `SELECT COUNT(DISTINCT p.user_id) as c FROM presence p
+     JOIN users u ON u.id = p.user_id
+     WHERE p.last_seen >= ? AND u.is_blocked = 0 AND u.is_deleted = 0`
+  ).get(threeDaysAgo).c;
+  return { users, blocked, admins, moments, activeMoments, reactions, messages, openReports, activeUsers };
 }
 
 // ── Системные публикации HEY-заведующего ────────────────────────────────
