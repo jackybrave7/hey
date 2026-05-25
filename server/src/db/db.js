@@ -1843,7 +1843,7 @@ module.exports = {
   getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
   clearConversationMessages, editMessage, deleteMessage,
-  getMediaMessages, searchMessages,
+  getMediaMessages, searchMessages, searchAllMessages,
   getCalls, createCall,
   setOnline, getPresence,
   toggleReaction, getMessageReactions, getReactionsForMessages,
