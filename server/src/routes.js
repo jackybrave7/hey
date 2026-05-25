@@ -569,6 +569,23 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   r.get('/conversations/:id/messages', requireAuth, (req, res) => {
+    // Pending приглашение в группу — возвращаем lock с инфой кто пригласил
+    if (db.isPendingMember(req.params.id, req.user.id)) {
+      const conv = db.getConversationById(req.params.id);
+      // Найдём кто пригласил
+      const row = require('./db/db'); // already imported as db, no-op
+      const inviterRow = db.getInviterForPendingMember
+        ? db.getInviterForPendingMember(req.params.id, req.user.id)
+        : null;
+      return res.json({
+        groupInvite: true,
+        conversation: {
+          id: conv.id, type: conv.type, name: conv.name, icon: conv.icon || null,
+          admin_id: conv.admin_id || null,
+        },
+        invitedBy: inviterRow || null,
+      });
+    }
     if (!db.isMember(req.params.id, req.user.id))
       return res.status(403).json({ error: 'Not a member' });
     // Lock messages for the recipient of an unaccepted request
@@ -717,8 +734,10 @@ module.exports = function makeRouter(db, broadcast) {
     const { name, icon, memberIds = [] } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'name required' });
     const group = db.createGroup({ creatorId: req.user.id, name: name.trim(), icon, memberIds });
-    const members = db.getConversationMembers(group.id);
-    broadcast(members.filter(id => id !== req.user.id), { type: 'group:created', conversationId: group.id });
+    // Приглашённые получают 'group:invited' — у них появится pending-чат в списке
+    if (group.invitedIds?.length) {
+      broadcast(group.invitedIds, { type: 'group:invited', conversationId: group.id });
+    }
     res.json(group);
   });
 
@@ -733,17 +752,21 @@ module.exports = function makeRouter(db, broadcast) {
 
   r.get('/groups/:id/members', requireAuth, (req, res) => {
     if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Forbidden' });
-    res.json(db.getGroupMembers(req.params.id));
+    // Админ группы видит и pending — чтобы понимать кто ещё не подтвердил
+    const conv = db.getConversationById(req.params.id);
+    const includePending = conv?.admin_id === req.user.id;
+    res.json(db.getGroupMembers(req.params.id, includePending));
   });
 
   r.post('/groups/:id/members', requireAuth, (req, res) => {
     try {
       const target = db.findUserById(req.body.userId);
       if (!target) return res.status(404).json({ error: 'User not found' });
-      db.addGroupMember(req.params.id, req.user.id, req.body.userId);
-      const members = db.getConversationMembers(req.params.id);
-      broadcast(members, { type: 'group:member_added', conversationId: req.params.id, userId: req.body.userId });
-      res.json({ ok: true });
+      const r2 = db.addGroupMember(req.params.id, req.user.id, req.body.userId);
+      // Уведомление приглашённому — обновить список чатов
+      broadcast([req.body.userId], { type: 'group:invited', conversationId: req.params.id });
+      // Существующим активным членам — заявка ещё не активна, поэтому не шлём member_added
+      res.json({ ok: true, status: r2?.status || 'pending', alreadyMember: !!r2?.alreadyMember });
     } catch(e) { res.status(403).json({ error: e.message }); }
   });
 
@@ -752,8 +775,32 @@ module.exports = function makeRouter(db, broadcast) {
       const members = db.getConversationMembers(req.params.id);
       db.removeGroupMember(req.params.id, req.user.id, req.params.userId);
       broadcast(members, { type: 'group:member_removed', conversationId: req.params.id, userId: req.params.userId });
+      // Удаляемого тоже уведомляем (вдруг он сейчас в чате)
+      broadcast([req.params.userId], { type: 'group:member_removed', conversationId: req.params.id, userId: req.params.userId });
       res.json({ ok: true });
     } catch(e) { res.status(403).json({ error: e.message }); }
+  });
+
+  // Принять приглашение в группу (pending → active)
+  r.post('/groups/:id/accept', requireAuth, (req, res) => {
+    try {
+      const r2 = db.acceptGroupInvite(req.params.id, req.user.id);
+      const members = db.getConversationMembers(req.params.id);
+      // Уведомляем активных участников — у них в списке появится новый участник
+      broadcast(members, { type: 'group:member_added', conversationId: req.params.id, userId: req.user.id });
+      // Себя тоже — фронт должен перезагрузить список чатов
+      broadcast([req.user.id], { type: 'group:invite_accepted', conversationId: req.params.id });
+      res.json({ ok: true, alreadyActive: !!r2?.alreadyActive });
+    } catch (e) {
+      res.status(404).json({ error: e.message });
+    }
+  });
+
+  // Отклонить приглашение в группу — запись удаляется
+  r.post('/groups/:id/decline', requireAuth, (req, res) => {
+    db.declineGroupInvite(req.params.id, req.user.id);
+    broadcast([req.user.id], { type: 'group:invite_declined', conversationId: req.params.id });
+    res.json({ ok: true });
   });
 
   // ── Media & Search ────────────────────────────────────────────────────────

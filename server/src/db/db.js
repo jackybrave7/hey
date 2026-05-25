@@ -163,6 +163,13 @@ try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_user_id TEXT'); } 
 try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_message_id TEXT'); } catch {} // ссылка на оригинал (опционально)
 try { db.exec('ALTER TABLE conversations ADD COLUMN pinned_message_id TEXT'); } catch {}    // одно закреплённое сообщение на чат
 
+// Статус участника группы: 'active' (обычно) | 'pending' (приглашён, ждёт подтверждения)
+// + кто пригласил (чтобы показать ученику «Иван пригласил тебя в …»)
+try { db.exec("ALTER TABLE members ADD COLUMN status TEXT DEFAULT 'active'"); } catch {}
+try { db.exec('ALTER TABLE members ADD COLUMN invited_by TEXT'); } catch {}
+// Заполняем status для существующих записей (миграция, ОДИН раз — UPDATE no-op если уже 'active')
+try { db.exec("UPDATE members SET status='active' WHERE status IS NULL"); } catch {}
+
 // Web Push подписки (один юзер — много устройств/браузеров)
 try { db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
   endpoint    TEXT PRIMARY KEY,
@@ -588,14 +595,19 @@ function getContactOwners(userId) {
 
 function createGroup({ creatorId, name, icon, memberIds }) {
   const id = uuid(), t = now();
-  const all = [creatorId, ...memberIds.filter(id => id !== creatorId)];
+  const invitees = memberIds.filter(uid => uid !== creatorId);
   db.transaction(() => {
     db.prepare(`INSERT INTO conversations (id,type,name,icon,admin_id,created_at) VALUES (?,?,?,?,?,?)`)
       .run(id, 'group', name, icon || null, creatorId, t);
-    const ins = db.prepare(`INSERT OR IGNORE INTO members (conversation_id,user_id,joined_at) VALUES (?,?,?)`);
-    all.forEach(uid => ins.run(id, uid, t));
+    // Создатель — сразу active
+    db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at,status,invited_by)
+      VALUES (?,?,?,'active',NULL)`).run(id, creatorId, t);
+    // Остальные — pending (ждут подтверждения)
+    const insInvited = db.prepare(`INSERT OR IGNORE INTO members
+      (conversation_id,user_id,joined_at,status,invited_by) VALUES (?,?,?,'pending',?)`);
+    invitees.forEach(uid => insInvited.run(id, uid, t, creatorId));
   })();
-  return { id };
+  return { id, invitedIds: invitees };
 }
 
 function updateGroup(convId, adminId, fields) {
@@ -607,11 +619,19 @@ function updateGroup(convId, adminId, fields) {
     .run({ ...fields, id: convId });
 }
 
+// Добавляет пользователя в группу СО СТАТУСОМ 'pending' — он получит
+// приглашение и должен сам его принять. Если такая запись уже есть —
+// ничего не меняем (повторное добавление не сбрасывает статус).
 function addGroupMember(convId, requesterId, userId) {
   const conv = db.prepare('SELECT admin_id FROM conversations WHERE id=?').get(convId);
   if (conv?.admin_id !== requesterId) throw new Error('Not authorized');
-  db.prepare(`INSERT OR IGNORE INTO members (conversation_id,user_id,joined_at) VALUES (?,?,?)`)
-    .run(convId, userId, now());
+  const existing = db.prepare('SELECT status FROM members WHERE conversation_id=? AND user_id=?')
+    .get(convId, userId);
+  if (existing) return { alreadyMember: true, status: existing.status };
+  db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at,status,invited_by)
+     VALUES (?,?,?,'pending',?)`)
+    .run(convId, userId, now(), requesterId);
+  return { alreadyMember: false, status: 'pending' };
 }
 
 function removeGroupMember(convId, requesterId, userId) {
@@ -620,12 +640,34 @@ function removeGroupMember(convId, requesterId, userId) {
   db.prepare('DELETE FROM members WHERE conversation_id=? AND user_id=?').run(convId, userId);
 }
 
-function getGroupMembers(convId) {
+// Принять приглашение в группу — переводит запись из pending в active.
+function acceptGroupInvite(convId, userId) {
+  const row = db.prepare('SELECT status FROM members WHERE conversation_id=? AND user_id=?')
+    .get(convId, userId);
+  if (!row) throw new Error('Приглашение не найдено');
+  if (row.status === 'active') return { alreadyActive: true };
+  db.prepare(`UPDATE members SET status='active', joined_at=? WHERE conversation_id=? AND user_id=?`)
+    .run(now(), convId, userId);
+  return { alreadyActive: false };
+}
+
+// Отклонить приглашение в группу — просто удаляем запись.
+function declineGroupInvite(convId, userId) {
+  db.prepare(`DELETE FROM members WHERE conversation_id=? AND user_id=? AND status='pending'`)
+    .run(convId, userId);
+}
+
+// Возвращает участников группы. По умолчанию только active (для broadcast и т.п.).
+// includePending=true — для UI настроек группы, чтобы админ видел кто ещё не ответил.
+function getGroupMembers(convId, includePending = false) {
+  const where = includePending
+    ? `m.conversation_id=?`
+    : `m.conversation_id=? AND m.status='active'`;
   return db.prepare(
-    `SELECT u.id, u.name, u.avatar, u.phone, p.online
+    `SELECT u.id, u.name, u.avatar, u.phone, p.online, m.status
      FROM members m JOIN users u ON u.id=m.user_id
      LEFT JOIN presence p ON p.user_id=m.user_id
-     WHERE m.conversation_id=?`
+     WHERE ${where}`
   ).all(convId).map(r => ({ ...r, online: !!r.online }));
 }
 
@@ -782,10 +824,15 @@ function getUnreadCounts(userId, convIds) {
 }
 
 function getConversationsForUser(userId) {
-  const convIds = db.prepare(
-    'SELECT conversation_id FROM members WHERE user_id=?'
-  ).all(userId).map(r => r.conversation_id);
-  if (!convIds.length) return [];
+  // Включаем и активные, и pending членства — pending покажем как «приглашение»
+  const memberRows = db.prepare(
+    'SELECT conversation_id, status, invited_by FROM members WHERE user_id=?'
+  ).all(userId);
+  if (!memberRows.length) return [];
+  const convIds = memberRows.map(r => r.conversation_id);
+  const memberMeta = Object.fromEntries(
+    memberRows.map(r => [r.conversation_id, { status: r.status || 'active', invited_by: r.invited_by }])
+  );
 
   const ph = convIds.map(() => '?').join(',');
 
@@ -856,6 +903,17 @@ function getConversationsForUser(userId) {
   const blockedIds = new Set(getBlockedByIds(userId));
   const pinnedSet  = new Set(getPinnedConvIds(userId));
 
+  // Имена тех кто пригласил в pending-группы (для UI «X пригласил тебя в …»)
+  const inviterIds = [...new Set(memberRows
+    .filter(r => r.status === 'pending' && r.invited_by)
+    .map(r => r.invited_by))];
+  const inviterNames = {};
+  if (inviterIds.length) {
+    const iph = inviterIds.map(() => '?').join(',');
+    db.prepare(`SELECT id, name FROM users WHERE id IN (${iph})`).all(...inviterIds)
+      .forEach(u => { inviterNames[u.id] = u.name; });
+  }
+
   return convIds.map(convId => {
     const conv = convsMap[convId];
     if (!conv) return null;
@@ -877,6 +935,9 @@ function getConversationsForUser(userId) {
     const isRecipient = isRequest && conv.request_from !== userId;
     const last = lastMap[convId];
 
+    const meta = memberMeta[convId] || { status: 'active', invited_by: null };
+    const isGroupInvite = conv.type === 'group' && meta.status === 'pending';
+
     const partnerUser = conv.type === 'direct' && partnerId ? usersMap[partnerId] : null;
     return {
       id: convId, type: conv.type, name, icon: conv.icon || null,
@@ -888,14 +949,19 @@ function getConversationsForUser(userId) {
       partner_is_system:  !!(partnerUser?.is_system),
       partner_online:     !!(partnerId && presenceMap[partnerId]?.online),
       partner_last_seen:  partnerId ? (presenceMap[partnerId]?.last_seen || null) : null,
-      last_text: isRecipient ? null : (last?.text || null),
+      // Для pending group приглашений скрываем превью + не считаем непрочитанные
+      last_text: (isRecipient || isGroupInvite) ? null : (last?.text || null),
       last_at:   last?.created_at || conv.created_at,
       last_sender_id: isRecipient ? null : (last?.sender_id || null),
-      unread_count: isRecipient ? 0 : (unreadMap[convId] || 0),
+      unread_count: (isRecipient || isGroupInvite) ? 0 : (unreadMap[convId] || 0),
       is_request: isRequest,
       request_from: conv.request_from || null,
       is_pinned: pinnedSet.has(convId),
       pinned_message_id: conv.pinned_message_id || null,
+      // Pending group invite
+      is_group_invite: isGroupInvite,
+      group_invited_by_id:   isGroupInvite ? meta.invited_by : null,
+      group_invited_by_name: isGroupInvite && meta.invited_by ? (inviterNames[meta.invited_by] || null) : null,
     };
   }).filter(Boolean).sort((a, b) => {
     if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
@@ -927,12 +993,33 @@ function getConversationById(convId) {
 }
 
 function getConversationMembers(convId) {
-  return db.prepare('SELECT user_id FROM members WHERE conversation_id=?')
+  // Только активные участники — pending исключаются из broadcast (они ещё
+  // не приняли приглашение, нечего им слать новые сообщения)
+  return db.prepare(`SELECT user_id FROM members WHERE conversation_id=? AND status='active'`)
     .all(convId).map(r => r.user_id);
 }
 
+// Member со статусом 'active' — может писать, видеть историю, получать broadcast
 function isMember(convId, userId) {
-  return !!db.prepare('SELECT 1 FROM members WHERE conversation_id=? AND user_id=?').get(convId, userId);
+  return !!db.prepare(`SELECT 1 FROM members WHERE conversation_id=? AND user_id=? AND status='active'`)
+    .get(convId, userId);
+}
+
+// Pending — приглашён, но ещё не подтвердил
+function isPendingMember(convId, userId) {
+  return !!db.prepare(`SELECT 1 FROM members WHERE conversation_id=? AND user_id=? AND status='pending'`)
+    .get(convId, userId);
+}
+
+// Возвращает {id, name, avatar} того кто пригласил данного pending-юзера
+function getInviterForPendingMember(convId, userId) {
+  const row = db.prepare(
+    `SELECT u.id, u.name, u.avatar FROM members m
+     JOIN users u ON u.id = m.invited_by
+     WHERE m.conversation_id=? AND m.user_id=? AND m.status='pending'`
+  ).get(convId, userId);
+  if (!row) return null;
+  return { id: row.id, name: row.name, avatar: row.avatar || null };
 }
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -2047,6 +2134,7 @@ module.exports = {
   createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount,
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
+  acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,
   getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,

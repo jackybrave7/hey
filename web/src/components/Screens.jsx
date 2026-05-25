@@ -2970,6 +2970,15 @@ export function ConversationsScreen() {
   useEffect(() => socket.on('conversation:deleted', ({ conversationId }) => {
     setConvs(prev => prev.filter(c => c.id !== conversationId));
   }), []);
+  // Приглашения в группы — могут прилететь как новые «чаты» в списке
+  useEffect(() => socket.on('group:invited', () => { reload(); }), []);
+  useEffect(() => socket.on('group:invite_accepted', () => { reload(); }), []);
+  useEffect(() => socket.on('group:invite_declined', ({ conversationId }) => {
+    setConvs(prev => prev.filter(c => c.id !== conversationId));
+  }), []);
+  useEffect(() => socket.on('group:member_removed', ({ conversationId, userId }) => {
+    if (userId === user?.id) setConvs(prev => prev.filter(c => c.id !== conversationId));
+  }), [user?.id]);
 
   // ── Поиск по чатам ────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
@@ -3090,6 +3099,13 @@ export function ConversationsScreen() {
           </div>
           {isRequest ? (
             <div style={{color:'rgba(180,140,220,.8)',fontSize:13}}>хочет написать вам</div>
+          ) : c.is_group_invite ? (
+            <div style={{color:'rgba(180,140,220,.85)',fontSize:13,whiteSpace:'nowrap',
+              overflow:'hidden',textOverflow:'ellipsis'}}>
+              {c.group_invited_by_name
+                ? `${c.group_invited_by_name} приглашает в группу`
+                : 'приглашение в группу'}
+            </div>
           ) : c.partner_is_deleted ? (
             <div style={{color:'rgba(255,255,255,.3)',fontSize:13,fontStyle:'italic'}}>
               Пользователь удалил аккаунт
@@ -3107,6 +3123,11 @@ export function ConversationsScreen() {
               background:'rgba(120,90,200,.5)',border:'1px solid rgba(180,140,220,.4)',
               borderRadius:20,padding:'3px 10px',fontSize:11,color:'rgba(220,200,255,.9)',fontWeight:600,
             }}>Запрос</div>
+          ) : c.is_group_invite ? (
+            <div style={{
+              background:'rgba(140,100,210,.55)',border:'1px solid rgba(180,140,220,.45)',
+              borderRadius:20,padding:'3px 10px',fontSize:11,color:'rgba(230,210,255,.95)',fontWeight:700,
+            }}>📩 Приглашение</div>
           ) : (
             <>
               {/* Pin toggle — visible on hover */}
@@ -4345,8 +4366,19 @@ export function GroupSettingsScreen() {
   }
 
   async function addMember(userId) {
-    await api.addGroupMember(convId, userId);
-    api.getGroupMembers(convId).then(setMembers);
+    try {
+      const r = await api.addGroupMember(convId, userId);
+      api.getGroupMembers(convId).then(setMembers);
+      if (r?.alreadyMember && r.status === 'pending') {
+        heyToast('Приглашение уже отправлено — ждём ответа', 'info');
+      } else if (r?.alreadyMember) {
+        heyToast('Уже в группе', 'info');
+      } else {
+        heyToast('Приглашение отправлено — ждём подтверждения', 'success');
+      }
+    } catch (e) {
+      heyToast('Не удалось пригласить: ' + (e.message || ''), 'error');
+    }
   }
 
   async function removeMember(userId) {
@@ -4373,7 +4405,7 @@ export function GroupSettingsScreen() {
 
   return (
     <div className="screen">
-      <TopBar title="Настройки группы" onBack={() => nav(-1)}/>
+      <TopBar title="Настройки группы" onBack={() => nav(-1)} right={<span/>}/>
       <div style={{flex:1,overflowY:'auto',maxWidth:680,margin:'0 auto',width:'100%',padding:'20px 24px'}}>
         {/* Group header */}
         <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:24}}>
@@ -4462,12 +4494,20 @@ export function GroupSettingsScreen() {
               {m.name[0].toUpperCase()}
             </div>
             <div style={{flex:1}}>
-              <div style={{color:'white',fontSize:14}}>{m.name}
-                {m.id === info.admin_id && <span style={{fontSize:11,color:'rgba(180,140,220,.8)',marginLeft:6}}>админ</span>}
+              <div style={{color:'white',fontSize:14,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                {m.name}
+                {m.id === info.admin_id && <span style={{fontSize:11,color:'rgba(180,140,220,.8)'}}>админ</span>}
+                {m.status === 'pending' && (
+                  <span style={{fontSize:11,color:'rgba(255,200,120,.85)',
+                    background:'rgba(255,200,120,.12)',borderRadius:6,padding:'2px 7px',fontWeight:600}}>
+                    🕓 ждёт подтверждения
+                  </span>
+                )}
               </div>
             </div>
             {isAdmin && m.id !== user.id && (
               <button onClick={()=>removeMember(m.id)}
+                title={m.status === 'pending' ? 'Отозвать приглашение' : 'Удалить участника'}
                 style={{background:'none',border:'none',color:'rgba(255,80,80,.7)',fontSize:18,cursor:'pointer'}}>✕</button>
             )}
           </div>
@@ -4933,6 +4973,7 @@ export function ChatScreen() {
   // Message request state
   const [requestLock,  setRequestLock]  = useState(null); // { requester: {id,name,avatar} } | null
   const [requesterProfile, setRequesterProfile] = useState(null);
+  const [groupInvite,  setGroupInvite]  = useState(null); // { conversation, invitedBy } | null
   const [accepting,    setAccepting]    = useState(false);
   const [declining,    setDeclining]    = useState(false);
   const [reactionPicker,setReactionPicker] = useState(null); // { msgId, x, y }
@@ -5023,7 +5064,13 @@ export function ChatScreen() {
     setLoadingMore(false);
     setFirstItemIndex(1_000_000); // reset Virtuoso prepend index on conv change
     setPinnedMessage(null);
+    setGroupInvite(null);
     api.getMessages(convId).then(data => {
+      if (data?.groupInvite) {
+        setGroupInvite({ conversation: data.conversation, invitedBy: data.invitedBy });
+        setHasMore(false);
+        return;
+      }
       if (data?.locked) {
         setRequestLock({ requester: data.requester });
         setHasMore(false);
@@ -6024,7 +6071,7 @@ export function ChatScreen() {
       )}
 
       {/* Messages — virtualized list, DOM nodes fixed at ~50 regardless of history size */}
-      {!requestLock && !(searchMode && searchResults !== null) && (
+      {!requestLock && !groupInvite && !(searchMode && searchResults !== null) && (
         <Virtuoso
           ref={virtuosoRef}
           style={{ flex: 1, overscrollBehavior: 'contain' }}
@@ -6279,6 +6326,91 @@ export function ChatScreen() {
         </div>
       )}
 
+      {/* ── Group invite overlay ─────────────────────────────────────── */}
+      {groupInvite && (
+        <div style={{
+          flex:1, display:'flex', flexDirection:'column',
+          alignItems:'center', justifyContent:'center',
+          padding:'28px 24px', gap:18,
+        }}>
+          {(() => {
+            const ic = groupInvite.conversation?.icon || '';
+            const isImg = ic.startsWith('http') || ic.startsWith('/') || ic.startsWith('data:');
+            return (
+              <div style={{
+                width:96, height:96, borderRadius:'50%', overflow:'hidden',
+                background: isImg ? '#0a0518' : 'rgba(140,100,200,.5)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                fontSize:46, color:'white',
+                border:'3px solid rgba(255,255,255,.25)',
+                boxShadow:'0 4px 24px rgba(120,80,200,.35)',
+              }}>
+                {isImg
+                  ? <img src={ic} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : (ic || '👥')}
+              </div>
+            );
+          })()}
+          <div style={{textAlign:'center'}}>
+            <div style={{color:'rgba(200,170,250,.95)',fontSize:12,fontWeight:700,
+              letterSpacing:.8,textTransform:'uppercase',marginBottom:8}}>
+              📩 Приглашение в группу
+            </div>
+            <div style={{color:'white', fontSize:22, fontWeight:800, marginBottom:8}}>
+              {groupInvite.conversation?.name || 'Группа'}
+            </div>
+            {groupInvite.invitedBy?.name && (
+              <div style={{color:'rgba(255,255,255,.6)', fontSize:14, lineHeight:1.5}}>
+                {groupInvite.invitedBy.name} приглашает тебя в группу
+              </div>
+            )}
+          </div>
+
+          <div style={{display:'flex', gap:12, width:'100%', maxWidth:340, marginTop:8}}>
+            <button
+              disabled={declining}
+              onClick={async () => {
+                setDeclining(true);
+                try { await api.declineGroupInvite(convId); nav('/chats'); }
+                catch (e) { heyToast('Ошибка: ' + (e.message || ''), 'error'); }
+                setDeclining(false);
+              }}
+              style={{
+                flex:1, padding:'13px', borderRadius:14, fontSize:14, fontWeight:600,
+                background:'rgba(255,80,80,.15)', border:'1px solid rgba(255,120,120,.35)',
+                color:'rgba(255,180,180,.95)', cursor:'pointer', opacity: declining ? .6 : 1,
+                fontFamily:'inherit',
+              }}>
+              {declining ? '…' : 'Отклонить'}
+            </button>
+            <button
+              disabled={accepting}
+              onClick={async () => {
+                setAccepting(true);
+                try {
+                  await api.acceptGroupInvite(convId);
+                  setGroupInvite(null);
+                  const msgs = await api.getMessages(convId);
+                  setMessages(Array.isArray(msgs) ? msgs : []);
+                  heyToast('✓ Вы вступили в группу', 'success');
+                } catch (e) {
+                  heyToast('Ошибка: ' + (e.message || ''), 'error');
+                }
+                setAccepting(false);
+              }}
+              style={{
+                flex:2, padding:'13px', borderRadius:14, fontSize:14, fontWeight:700,
+                background:'rgba(120,90,200,.85)', border:'1px solid rgba(180,140,220,.5)',
+                color:'white', cursor:'pointer', opacity: accepting ? .6 : 1,
+                fontFamily:'inherit',
+                boxShadow:'0 2px 12px rgba(120,80,200,.4)',
+              }}>
+              {accepting ? '…' : '✓ Принять'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Request lock overlay ─────────────────────────────────────── */}
       {requestLock && (
         <div style={{
@@ -6404,7 +6536,7 @@ export function ChatScreen() {
       )}
 
       {/* Input bar */}
-      {!requestLock && !partner.isDeleted && !partner.isBlocked && <div style={{flexShrink:0}}>
+      {!requestLock && !groupInvite && !partner.isDeleted && !partner.isBlocked && <div style={{flexShrink:0}}>
 
         {/* ── Voice: recording bar ── */}
         {voiceState === 'recording' && (
