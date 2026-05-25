@@ -4691,7 +4691,47 @@ export function ChatScreen() {
       setFlashMsgId(messageId);
       setTimeout(() => setFlashMsgId(curr => curr === messageId ? null : curr), 1000);
     });
-    return () => { u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u7(); u8(); u9(); };
+    // На reconnect WS — могли пропустить message:new из-за оборвавшегося соединения
+    // (типичный сценарий на мобильном с плохой сетью). Подтягиваем свежие сообщения.
+    const u10 = socket.on('connected', () => {
+      if (isInitialLoad.current) return; // первичная загрузка уже выкачает
+      api.getMessages(convId).then(data => {
+        if (!Array.isArray(data)) return;
+        setMessages(prev => {
+          // Сливаем: для каждого id берём более «свежую» (с реальным id или со статусом дальше)
+          const byId = new Map();
+          for (const m of prev) byId.set(m.id, m);
+          for (const m of data) {
+            const existing = byId.get(m.id);
+            // Берём серверную версию (она канонична)
+            byId.set(m.id, existing ? { ...existing, ...m } : m);
+          }
+          return Array.from(byId.values()).sort((a, b) => a.created_at - b.created_at);
+        });
+      }).catch(() => {});
+    });
+    // Возврат во вкладку (мобильный «свернул-развернул») — тоже пересинхрон
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !isInitialLoad.current) {
+        api.getMessages(convId).then(data => {
+          if (!Array.isArray(data)) return;
+          setMessages(prev => {
+            const byId = new Map();
+            for (const m of prev) byId.set(m.id, m);
+            for (const m of data) {
+              const existing = byId.get(m.id);
+              byId.set(m.id, existing ? { ...existing, ...m } : m);
+            }
+            return Array.from(byId.values()).sort((a, b) => a.created_at - b.created_at);
+          });
+        }).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u7(); u8(); u9(); u10();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [convId, user?.id]);
 
   function handleInput(e) {
