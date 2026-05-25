@@ -144,7 +144,11 @@
       "Bash(curl -sS \"https://hey-messenger.ru/api/join/validate?email=studentx@example.com&course=Test%20Course&sig=fake\")",
       "WebFetch(domain:autoweboffice.com)",
       "WebFetch(domain:wiki.autoweboffice.com)",
-      "Bash(node -e \"const express=require\\('express'\\); const app=express\\(\\); app.use\\('/api', require\\('./src/routes'\\)\\(require\\('./src/db/db'\\), \\(\\)=>{}\\)\\); console.log\\('ok'\\);\")"
+      "Bash(node -e \"const express=require\\('express'\\); const app=express\\(\\); app.use\\('/api', require\\('./src/routes'\\)\\(require\\('./src/db/db'\\), \\(\\)=>{}\\)\\); console.log\\('ok'\\);\")",
+      "Bash(curl -sS -X POST \"https://hey-messenger.ru/api/integrations/awo/webhook?token=4f5ca463019b98e25be47cc5f274eecf29461b0eb20d379d\" -H \"Content-Type: application/json\" -d '{\"id_account\":\"flow_test_1\",\"id_account_status\":5,\"email\":\"student.test@example.com\",\"goods\":\"Test Course\",\"name\":\"Test Student\"}')",
+      "Bash(curl -sS \"https://hey-messenger.ru/api/join/validate?email=student.test@example.com&course=Test%20Course\")",
+      "Bash(curl -sS \"https://hey-messenger.ru/api/join/validate?email=attacker@example.com&course=Test%20Course\")",
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app && git pull origin main 2>&1 | tail -2 && pm2 restart hey --update-env\")"
     ]
   }
 }

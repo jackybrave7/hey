@@ -16,6 +16,9 @@ const PORT = process.env.PORT || 3001;
 // API/WS through the host's loopback, but the browser-side origin can be any LAN IP).
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '30mb' }));
+// AWO webhook отправляет данные в формате application/x-www-form-urlencoded —
+// добавляем парсер, чтобы req.body содержал поля
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Static uploads
 app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
