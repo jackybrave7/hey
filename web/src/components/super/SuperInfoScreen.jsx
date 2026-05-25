@@ -3,10 +3,8 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
   const features = [
     { icon: '✦', text: '3 момента одновременно (вместо 1)' },
     { icon: '🎙', text: 'Голосовые до 5 минут (вместо 1)' },
-    { icon: '🎬', text: 'Видео в моменте до 3 минут' },
     { icon: '📊', text: 'Детальная аналитика — кто видел и резонирует' },
     { icon: '📌', text: 'До 15 закреплённых чатов' },
-    { icon: '📦', text: 'Архив-портфолио с публичной ссылкой' },
   ];
 
   return (
