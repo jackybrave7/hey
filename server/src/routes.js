@@ -125,26 +125,10 @@ module.exports = function makeRouter(db, broadcast) {
       if (inviter && !inviter.is_blocked) {
         try { db.addContact(user.id, inviter.id, null); } catch {}
         try { db.addContact(inviter.id, user.id, null); } catch {}
-        // Реферальная механика
-        try {
-          const referral = db.processReferral(inviteUserId);
-          if (referral.superGranted) {
-            const expiryDate = new Date(referral.superExpiresAt * 1000).toLocaleDateString('ru', {day:'numeric',month:'long',year:'numeric'});
-            broadcast([inviteUserId], {
-              type: 'system:notification',
-              text: `✨ Поздравляем! Ты пригласил 3 друзей и получил HEY СУПЕР на 3 месяца. До ${expiryDate}.`,
-              kind: 'super_granted',
-            });
-          }
-          if (referral.newBadge) {
-            broadcast([inviteUserId], {
-              type: 'system:notification',
-              text: `🏅 Получен значок «${referral.newBadge.label}» за ${referral.newBadge.count} приглашённых.`,
-              kind: 'badge_granted',
-              badge: referral.newBadge.key,
-            });
-          }
-        } catch(e) { console.error('[REFERRAL]', e.message); }
+        // Реферальная запись создалась в createUser (referral_by + referrals row).
+        // Сам зачёт inviter'у произойдёт когда новый юзер напишет первое сообщение
+        // (см. ws.js → confirmReferralIfPending). Так требует спека:
+        // «должны зарегистрироваться И написать хотя бы 1 сообщение».
       }
     }
 

@@ -160,7 +160,7 @@ export default function SuperStatusCard({ user, onInvite }) {
             color: 'rgba(200,170,255,.9)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
             transition: 'all .18s',
           }}>
-            🔗 Пригласи 3 друзей — получи ещё 3 месяца
+            🔗 Пригласи 3 друзей — активируй бонус 3 месяца
           </button>
           {/* TODO: enable when payments are ready */}
           {false && <button>Продлить</button>}
@@ -186,7 +186,7 @@ export default function SuperStatusCard({ user, onInvite }) {
               color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer',
               transition: 'all .18s',
             }}>
-              🎁 Пригласи 3 друзей — получи 3 месяца
+              🎁 Пригласи 3 друзей — получи 3 месяца СУПЕР
             </button>
             <button onClick={() => setShowInfo(true)} style={{
               width: '100%', padding: '10px', borderRadius: 12,

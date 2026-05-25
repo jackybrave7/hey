@@ -47,6 +47,9 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS referrals (
   created_at  INTEGER NOT NULL,
   PRIMARY KEY (invitee_id)
 )`); } catch {}
+// confirmed_at — момент подтверждения реферала (написал первое сообщение).
+// До этого реферал считается «pending» и не идёт в зачёт.
+try { db.exec('ALTER TABLE referrals ADD COLUMN confirmed_at INTEGER'); } catch {}
 // ── Moments tables ────────────────────────────────────────────────────────────
 try { db.exec(`CREATE TABLE IF NOT EXISTS moments (
   id             TEXT PRIMARY KEY,
@@ -1904,14 +1907,17 @@ function extendSuper(userId, months) {
   return newExpiry;
 }
 
-function processReferral(inviterId) {
+// Засчитать реферала: вызывается из confirmReferralIfPending — только когда
+// приглашённый написал ПЕРВОЕ сообщение. До этого момента реферал болтается
+// как pending (есть запись в referrals с confirmed_at=NULL).
+function _grantReferralCredit(inviterId) {
   db.prepare('UPDATE users SET invited_count = invited_count + 1 WHERE id=?').run(inviterId);
   const inviter = findUserById(inviterId);
   const count = inviter.invited_count;
   const result = { superGranted: false, newBadge: null, invitedCount: count };
 
   // 3-й приглашённый — разовый бонус 3 мес СУПЕР
-  if (count === 3 && !inviter.super_bonus_claimed) {
+  if (count >= 3 && !inviter.super_bonus_claimed) {
     const expiresAt = extendSuper(inviterId, 3);
     db.prepare('UPDATE users SET super_bonus_claimed=1 WHERE id=?').run(inviterId);
     result.superGranted = true;
@@ -1935,6 +1941,25 @@ function processReferral(inviterId) {
     db.prepare("UPDATE users SET achievements=? WHERE id=?").run(JSON.stringify(achievements), inviterId);
   }
   return result;
+}
+
+// Старый процессор оставлен для обратной совместимости — теперь это no-op
+// (запись о рефералке создаётся в createUser, зачёт идёт только после первого
+// сообщения через confirmReferralIfPending).
+function processReferral(/* inviterId */) {
+  return { superGranted: false, newBadge: null, invitedCount: 0 };
+}
+
+// Если у приглашённого ещё нет confirmed_at — отмечает реферала подтверждённым
+// и засчитывает inviter'у. Идемпотентно (повторные вызовы — no-op).
+// Вызывается из ws.js при отправке первого сообщения пользователем.
+function confirmReferralIfPending(inviteeId) {
+  const ref = db.prepare(
+    'SELECT inviter_id, confirmed_at FROM referrals WHERE invitee_id=?'
+  ).get(inviteeId);
+  if (!ref || ref.confirmed_at) return null;
+  db.prepare('UPDATE referrals SET confirmed_at=? WHERE invitee_id=?').run(now(), inviteeId);
+  return { inviterId: ref.inviter_id, credit: _grantReferralCredit(ref.inviter_id) };
 }
 
 function checkAndExpireSuper(userId) {
@@ -2155,7 +2180,7 @@ module.exports = {
   awoIsProcessed, awoMarkProcessed, awoListProcessed,
   setAwoCourseChat, deleteAwoCourseChat, getChatForCourse, listAwoCourseChats, listAllGroupChats,
   getSetting, setSetting, getAwoSettings, setAwoSettings,
-  extendSuper, processReferral, checkAndExpireSuper,
+  extendSuper, processReferral, confirmReferralIfPending, checkAndExpireSuper,
   // Moments
   getMomentFeed, getMyMoments, getMomentById, getActiveMoment, getActiveMoments, getActiveMomentCount,
   createMoment, updateMoment, archiveMoment, restoreMoment, deleteMomentForever, reorderMoments,

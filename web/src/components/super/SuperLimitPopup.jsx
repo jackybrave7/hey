@@ -35,8 +35,8 @@ export default function SuperLimitPopup({ onClose, onInvite }) {
           <div style={{ color: 'white', fontSize: 17, fontWeight: 700, marginBottom: 8 }}>
             Голосовое больше минуты — в СУПЕР
           </div>
-          <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 14, lineHeight: 1.5 }}>
-            Пригласи 3 друзей в HEY и получи 3 месяца бесплатно
+          <div style={{ color: 'rgba(255,255,255,.6)', fontSize: 14, lineHeight: 1.5 }}>
+            Пригласи 3 друзей в HEY и получи 3 месяца СУПЕР — разовая акция для новых пользователей.
           </div>
         </div>
 

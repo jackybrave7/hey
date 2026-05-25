@@ -1,11 +1,30 @@
 // SuperInfoScreen.jsx — полноэкранный попап с информацией о HEY СУПЕР
+import { useAuth } from '../../AuthContext';
+import { heyToast } from '../Screens';
+
 export default function SuperInfoScreen({ onClose, onInvite }) {
+  const { user } = useAuth();
   const features = [
     { icon: '✦', text: '3 момента одновременно (вместо 1)' },
     { icon: '🎙', text: 'Голосовые до 5 минут (вместо 1)' },
     { icon: '📊', text: 'Детальная аналитика — кто видел и резонирует' },
     { icon: '📌', text: 'До 15 закреплённых чатов' },
   ];
+
+  function copyInviteLink() {
+    if (!user?.id) {
+      heyToast('Нужно войти в аккаунт', 'error');
+      return;
+    }
+    const link = `${window.location.origin}/register?invite=${user.id}`;
+    try {
+      navigator.clipboard.writeText(link);
+      heyToast('✓ Ссылка скопирована — поделись с друзьями', 'success');
+    } catch {
+      heyToast('Не удалось скопировать. Скопируй вручную: ' + link, 'error');
+    }
+    onClose?.();
+  }
 
   return (
     <div
@@ -87,20 +106,22 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
           }}>
             <div style={{ fontSize: 28, marginBottom: 10 }}>🎁</div>
             <div style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
-              Пригласи 3 друзей — получи 3 месяца
+              Пригласи 3 друзей — получи 3 месяца СУПЕР
             </div>
-            <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
-              Каждый приглашённый друг даёт тебе месяц СУПЕР бесплатно
+            <div style={{ color: 'rgba(255,255,255,.6)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+              Разовая акция для новых пользователей.<br/>
+              Друг засчитывается когда зарегистрируется по твоей ссылке
+              и напишет хотя бы одно сообщение.
             </div>
-            <button onClick={onInvite} style={{
+            <button onClick={copyInviteLink} style={{
               width: '100%', padding: '13px', borderRadius: 14,
               background: 'rgba(120,90,200,.85)', border: '1px solid rgba(180,140,255,.4)',
               color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer',
               transition: 'all .18s',
             }}>
-              🔗 Пригласить друзей
+              🔗 Скопировать пригласительную ссылку
             </button>
-            <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 11, marginTop: 12 }}>
+            <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11, marginTop: 12 }}>
               Прямая покупка появится позже
             </div>
           </div>

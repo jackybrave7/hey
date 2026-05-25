@@ -101,6 +101,30 @@ module.exports = function setupWS(server) {
           const full = { ...saved, sender_name: user.name, tempId, conversationId };
           broadcast(members, { type: 'message:new', message: full });
 
+          // Реферальный учёт: если это был первый message за всю жизнь —
+          // подтверждаем реферал и засчитываем приглашающему. Идемпотентно
+          // (после первого вызова функция вернёт null).
+          try {
+            const referralResult = db.confirmReferralIfPending(user.id);
+            if (referralResult?.credit?.superGranted) {
+              const expiryDate = new Date(referralResult.credit.superExpiresAt * 1000)
+                .toLocaleDateString('ru', { day:'numeric', month:'long', year:'numeric' });
+              broadcast([referralResult.inviterId], {
+                type: 'system:notification',
+                text: `✨ Поздравляем! Ты пригласил 3 друзей и получил HEY СУПЕР на 3 месяца. До ${expiryDate}.`,
+                kind: 'super_granted',
+              });
+            }
+            if (referralResult?.credit?.newBadge) {
+              broadcast([referralResult.inviterId], {
+                type: 'system:notification',
+                text: `🏅 Получен значок «${referralResult.credit.newBadge.label}» за ${referralResult.credit.newBadge.count} приглашённых.`,
+                kind: 'badge_granted',
+                badge: referralResult.credit.newBadge.key,
+              });
+            }
+          } catch (e) { console.error('[REFERRAL_CONFIRM]', e.message); }
+
           // Mark delivered for recipients who are online + push для оффлайн
           const offlineRecipients = [];
           members.forEach(uid => {
