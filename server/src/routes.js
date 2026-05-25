@@ -1004,33 +1004,26 @@ module.exports = function makeRouter(db, broadcast) {
 
       // Все юзеры кроме самого системного и удалённых
       const recipients = db.getContactOwners(db.SYSTEM_USER_ID); // у всех системный в контактах
+      const broadcastId = 'br_' + Math.random().toString(36).slice(2, 14);
       let delivered = 0;
       for (const userId of recipients) {
         try {
           // Создаём (если нет) диалог с системным
           const conv = db.getOrCreateDirectConversation(userId, db.SYSTEM_USER_ID);
-          // Если был request — снимаем (системный = одобренный по умолчанию)
-          if (conv.request_from) {
-            // через прямой UPDATE — без логики acceptRequest (она пыталась бы добавить в контакты)
-            // в схеме допустимо так:
-            require('./db/db.js'); // no-op import — оставляем для ясности
-          }
-          // Создаём сообщение от имени системного юзера
-          db.createMessage({
+          // Создаём сообщение от имени системного юзера с общим broadcast_id
+          const saved = db.createMessage({
             conversationId: conv.id,
             senderId: db.SYSTEM_USER_ID,
             text: trimmed,
             attachment: null,
+            broadcastId,
           });
           // Бродкастим получателю
           broadcast([userId], {
             type: 'message:new',
             message: {
-              conversation_id: conv.id,
-              sender_id: db.SYSTEM_USER_ID,
+              ...saved,
               sender_name: 'HEY-заведующий',
-              text: trimmed,
-              created_at: db.now(),
               conversationId: conv.id,
             },
           });
@@ -1046,10 +1039,105 @@ module.exports = function makeRouter(db, broadcast) {
           reason: `recipients=${delivered}; text="${trimmed.slice(0, 100)}"`,
         });
       }
-      res.json({ ok: true, delivered, total: recipients.length });
+      res.json({ ok: true, delivered, total: recipients.length, broadcastId });
     } catch (err) {
       console.error('POST /admin/system/broadcast error:', err);
       res.status(500).json({ error: err.message || 'Internal error' });
+    }
+  });
+
+  // ── HEY-заведующий: чтение моментов и рассылок (admin only) ────────────
+  r.get('/admin/system/moments', requireAdmin, (req, res) => {
+    const status = req.query.status || 'all';
+    res.json(db.getSystemMoments({ status }));
+  });
+
+  r.get('/admin/system/broadcasts', requireAdmin, (req, res) => {
+    res.json(db.getSystemBroadcasts({}));
+  });
+
+  // Редактировать системный момент
+  r.patch('/admin/system/moments/:id', requireAdmin, async (req, res) => {
+    try {
+      const m = db.getMomentById(req.params.id);
+      if (!m || m.user_id !== db.SYSTEM_USER_ID) return res.status(404).json({ error: 'Not found' });
+      const { text, mediaUrl, mediaType, moodEmoji, mediaPosition } = req.body;
+      const newText = (text ?? m.text)?.trim();
+      if (!newText) return res.status(400).json({ error: 'text required' });
+      const embeddedVideo = await parseEmbeddedVideo(newText);
+      const autoTags = detectTags(newText, mediaType ?? m.media_type, !!embeddedVideo);
+      const updated = db.updateMoment(req.params.id, {
+        text: newText,
+        mediaUrl:  mediaUrl  !== undefined ? mediaUrl  : m.media_url,
+        mediaType: mediaType !== undefined ? mediaType : m.media_type,
+        autoTags,
+        embeddedVideo,
+        moodEmoji:     moodEmoji     !== undefined ? moodEmoji     : undefined,
+        mediaPosition: mediaPosition !== undefined ? mediaPosition : undefined,
+      });
+      if (db.logAdminAction) db.logAdminAction({
+        adminId: req.user.id, action: 'system_moment_edit', targetMomentId: req.params.id,
+      });
+      // Рассылаем обновление всем кто видит этот момент (контакты системного = все)
+      const recipients = db.getContactOwners(db.SYSTEM_USER_ID);
+      broadcast(recipients, { type: 'moment:updated', moment: updated });
+      res.json({ ok: true, moment: updated });
+    } catch (e) {
+      console.error('PATCH /admin/system/moments/:id', e);
+      res.status(500).json({ error: e.message || 'Internal error' });
+    }
+  });
+
+  // Удалить системный момент
+  r.delete('/admin/system/moments/:id', requireAdmin, (req, res) => {
+    try {
+      const m = db.getMomentById(req.params.id);
+      if (!m || m.user_id !== db.SYSTEM_USER_ID) return res.status(404).json({ error: 'Not found' });
+      db.deleteMomentForever(req.params.id);
+      if (db.logAdminAction) db.logAdminAction({
+        adminId: req.user.id, action: 'system_moment_delete', targetMomentId: req.params.id,
+      });
+      const recipients = db.getContactOwners(db.SYSTEM_USER_ID);
+      broadcast(recipients, { type: 'moment:deleted', momentId: req.params.id });
+      res.json({ ok: true });
+    } catch (e) {
+      console.error('DELETE /admin/system/moments/:id', e);
+      res.status(500).json({ error: e.message || 'Internal error' });
+    }
+  });
+
+  // Редактировать ВСЮ рассылку (текст меняется во всех копиях у каждого юзера)
+  r.patch('/admin/system/broadcasts/:id', requireAdmin, (req, res) => {
+    try {
+      const { text } = req.body;
+      const trimmed = (text || '').trim();
+      if (!trimmed) return res.status(400).json({ error: 'text required' });
+      if (trimmed.length > 2000) return res.status(400).json({ error: 'Слишком длинно' });
+      const changed = db.editBroadcast(req.params.id, trimmed);
+      if (!changed) return res.status(404).json({ error: 'Not found' });
+      if (db.logAdminAction) db.logAdminAction({
+        adminId: req.user.id, action: 'system_broadcast_edit',
+        reason: `broadcast=${req.params.id}; changed=${changed}`,
+      });
+      res.json({ ok: true, changed });
+    } catch (e) {
+      console.error('PATCH /admin/system/broadcasts/:id', e);
+      res.status(500).json({ error: e.message || 'Internal error' });
+    }
+  });
+
+  // Удалить ВСЮ рассылку (все сообщения с этим broadcast_id у всех юзеров)
+  r.delete('/admin/system/broadcasts/:id', requireAdmin, (req, res) => {
+    try {
+      const changed = db.deleteBroadcast(req.params.id);
+      if (db.logAdminAction) db.logAdminAction({
+        adminId: req.user.id, action: 'system_broadcast_delete',
+        reason: `broadcast=${req.params.id}; deleted=${changed}`,
+      });
+      res.json({ ok: true, deleted: changed });
+    } catch (e) {
+      console.error('DELETE /admin/system/broadcasts/:id', e);
+      res.status(500).json({ error: e.message || 'Internal error' });
     }
   });
 

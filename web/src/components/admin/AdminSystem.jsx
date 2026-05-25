@@ -1,5 +1,5 @@
 // AdminSystem.jsx — публикации от лица HEY-заведующего
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 
@@ -16,10 +16,11 @@ export default function AdminSystem() {
       </p>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {[
           { v: 'broadcast', l: '💬 Рассылка сообщения' },
           { v: 'moment',    l: '✦ Момент'             },
+          { v: 'manage',    l: '📋 Опубликованное'    },
         ].map(t => (
           <button key={t.v} onClick={() => setTab(t.v)}
             style={{
@@ -35,9 +36,218 @@ export default function AdminSystem() {
 
       {tab === 'broadcast' && <BroadcastForm/>}
       {tab === 'moment'    && <MomentForm/>}
+      {tab === 'manage'    && <ManagePublished/>}
     </div>
   );
 }
+
+// ── Управление опубликованным — моменты и рассылки ─────────────────────
+function ManagePublished() {
+  const [moments, setMoments]       = useState([]);
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [editingMomentId, setEditingMomentId] = useState(null);
+  const [editingBroadcastId, setEditingBroadcastId] = useState(null);
+  const [editText, setEditText]     = useState('');
+  const [toast, setToast]           = useState('');
+
+  function showMsg(m) { setToast(m); setTimeout(() => setToast(''), 2500); }
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [ms, bs] = await Promise.all([
+        api.adminSystemListMoments(),
+        api.adminSystemListBroadcasts(),
+      ]);
+      setMoments(ms);
+      setBroadcasts(bs);
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  if (loading) return <div style={{padding:20,color:'rgba(255,255,255,.5)'}}>Загрузка…</div>;
+
+  async function deleteMoment(m) {
+    if (!confirm(`Удалить момент?\n\n«${(m.text||'').slice(0, 80)}…»\n\nЭто действие необратимо.`)) return;
+    try { await api.adminSystemDeleteMoment(m.id); showMsg('✓ Момент удалён'); load(); }
+    catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+  async function saveMomentEdit(m) {
+    try {
+      await api.adminSystemEditMoment(m.id, { text: editText });
+      setEditingMomentId(null); setEditText(''); showMsg('✓ Сохранено'); load();
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+  async function deleteBroadcast(b) {
+    if (!confirm(`Удалить рассылку у ВСЕХ получателей (${b.recipients} чатов)?\n\nЭто действие необратимо.`)) return;
+    try { await api.adminSystemDeleteBroadcast(b.id); showMsg('✓ Рассылка удалена'); load(); }
+    catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+  async function saveBroadcastEdit(b) {
+    try {
+      await api.adminSystemEditBroadcast(b.id, editText);
+      setEditingBroadcastId(null); setEditText(''); showMsg('✓ Сохранено'); load();
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    return new Date(ts * 1000).toLocaleString('ru', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  }
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:24}}>
+      {/* Моменты */}
+      <Section title={`✦ Моменты от HEY-заведующего (${moments.length})`}>
+        {moments.length === 0 && <Empty>Ничего не опубликовано</Empty>}
+        {moments.map(m => (
+          <Card key={m.id}>
+            {editingMomentId === m.id ? (
+              <>
+                <textarea value={editText} onChange={e=>setEditText(e.target.value.slice(0, 2000))}
+                  rows={4} style={editTextareaStyle}/>
+                <Actions>
+                  <BtnSecondary onClick={() => { setEditingMomentId(null); setEditText(''); }}>Отмена</BtnSecondary>
+                  <BtnPrimary onClick={() => saveMomentEdit(m)}>Сохранить</BtnPrimary>
+                </Actions>
+              </>
+            ) : (
+              <>
+                <Meta>
+                  <Status status={m.status}/>
+                  <span>{fmtDate(m.created_at)}</span>
+                  {m.media_type && <Badge>{m.media_type}</Badge>}
+                </Meta>
+                <Text>{m.text}</Text>
+                <Actions>
+                  <BtnSecondary onClick={() => { setEditingMomentId(m.id); setEditText(m.text || ''); }}>
+                    ✏ Изменить
+                  </BtnSecondary>
+                  <BtnDanger onClick={() => deleteMoment(m)}>🗑 Удалить</BtnDanger>
+                </Actions>
+              </>
+            )}
+          </Card>
+        ))}
+      </Section>
+
+      {/* Рассылки */}
+      <Section title={`💬 Рассылки сообщений (${broadcasts.length})`}>
+        {broadcasts.length === 0 && <Empty>Рассылок ещё не было</Empty>}
+        {broadcasts.map(b => (
+          <Card key={b.id}>
+            {editingBroadcastId === b.id ? (
+              <>
+                <div style={{ color:'rgba(255,200,120,.85)', fontSize:12, marginBottom:8 }}>
+                  ⚠ Изменение текста применится у всех {b.recipients} получателей
+                </div>
+                <textarea value={editText} onChange={e=>setEditText(e.target.value.slice(0, 2000))}
+                  rows={4} style={editTextareaStyle}/>
+                <Actions>
+                  <BtnSecondary onClick={() => { setEditingBroadcastId(null); setEditText(''); }}>Отмена</BtnSecondary>
+                  <BtnPrimary onClick={() => saveBroadcastEdit(b)}>Сохранить у всех</BtnPrimary>
+                </Actions>
+              </>
+            ) : (
+              <>
+                <Meta>
+                  <span>{fmtDate(b.sent_at)}</span>
+                  <Badge>📨 {b.recipients} получателей</Badge>
+                </Meta>
+                <Text>{b.text}</Text>
+                <Actions>
+                  <BtnSecondary onClick={() => { setEditingBroadcastId(b.id); setEditText(b.text || ''); }}>
+                    ✏ Изменить у всех
+                  </BtnSecondary>
+                  <BtnDanger onClick={() => deleteBroadcast(b)}>🗑 Удалить у всех</BtnDanger>
+                </Actions>
+              </>
+            )}
+          </Card>
+        ))}
+      </Section>
+
+      {toast && (
+        <div style={{
+          position:'fixed', bottom:30, left:'50%', transform:'translateX(-50%)',
+          background:'rgba(22,15,50,.97)', borderRadius:50, padding:'10px 20px',
+          color:'white', fontSize:14, fontWeight:600, zIndex:1000,
+          border:'1px solid rgba(255,255,255,.15)', boxShadow:'0 4px 20px rgba(0,0,0,.5)',
+        }}>{toast}</div>
+      )}
+    </div>
+  );
+}
+
+// Маленькие хелперы для секции
+function Section({ title, children }) {
+  return (
+    <div>
+      <div style={{
+        color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:700, textTransform:'uppercase',
+        letterSpacing:.8, marginBottom:10, paddingLeft:2,
+      }}>{title}</div>
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>{children}</div>
+    </div>
+  );
+}
+function Card({ children }) {
+  return (
+    <div style={{
+      background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)',
+      borderRadius:14, padding:'14px 16px',
+    }}>{children}</div>
+  );
+}
+function Meta({ children }) {
+  return <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,
+    color:'rgba(255,255,255,.5)',fontSize:12}}>{children}</div>;
+}
+function Text({ children }) {
+  return <div style={{color:'rgba(255,255,255,.9)',fontSize:14,lineHeight:1.5,
+    marginBottom:12,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{children}</div>;
+}
+function Actions({ children }) {
+  return <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{children}</div>;
+}
+function Status({ status }) {
+  const map = {
+    active:   { bg:'rgba(60,180,100,.15)',  color:'rgba(120,230,160,.95)', label:'активен' },
+    archived: { bg:'rgba(180,140,90,.15)',  color:'rgba(230,200,140,.95)', label:'архив'   },
+    deleted:  { bg:'rgba(180,80,80,.15)',   color:'rgba(255,140,140,.95)', label:'удалён'  },
+  };
+  const s = map[status] || map.active;
+  return <span style={{background:s.bg,color:s.color,borderRadius:6,padding:'2px 8px',fontSize:11,fontWeight:700}}>{s.label}</span>;
+}
+function Badge({ children }) {
+  return <span style={{background:'rgba(255,255,255,.08)',borderRadius:6,padding:'2px 8px',fontSize:11}}>{children}</span>;
+}
+function Empty({ children }) {
+  return <div style={{padding:'20px',textAlign:'center',color:'rgba(255,255,255,.35)',fontSize:13,
+    background:'rgba(255,255,255,.03)',borderRadius:12,border:'1px dashed rgba(255,255,255,.08)'}}>{children}</div>;
+}
+function BtnSecondary({ children, ...p }) {
+  return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer',
+    border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.05)',color:'white',fontFamily:'inherit'}}>{children}</button>;
+}
+function BtnPrimary({ children, ...p }) {
+  return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',
+    border:'none',background:'rgba(120,90,200,.85)',color:'white',fontFamily:'inherit'}}>{children}</button>;
+}
+function BtnDanger({ children, ...p }) {
+  return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer',
+    border:'1px solid rgba(255,80,80,.35)',background:'rgba(255,80,80,.12)',color:'rgba(255,170,170,.95)',fontFamily:'inherit'}}>{children}</button>;
+}
+const editTextareaStyle = {
+  width:'100%', boxSizing:'border-box',
+  background:'rgba(0,0,0,.35)', border:'1px solid rgba(255,255,255,.15)',
+  borderRadius:10, padding:'10px 12px', color:'white', fontSize:14,
+  fontFamily:'inherit', resize:'vertical', outline:'none', lineHeight:1.5,
+  marginBottom:10,
+};
 
 // ── Рассылка сообщения ─────────────────────────────────────────────────
 function BroadcastForm() {

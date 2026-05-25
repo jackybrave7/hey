@@ -158,6 +158,8 @@ try { db.exec('ALTER TABLE moments ADD COLUMN embedded_video TEXT'); } catch {}
 try { db.exec('ALTER TABLE moments ADD COLUMN mood_emoji TEXT'); } catch {}
 try { db.exec('ALTER TABLE moments ADD COLUMN media_position TEXT'); } catch {}  // CSS object-position, например "50% 30%"
 try { db.exec('ALTER TABLE messages ADD COLUMN reply_to_id TEXT'); } catch {}     // id сообщения на которое отвечаем
+try { db.exec('ALTER TABLE messages ADD COLUMN broadcast_id TEXT'); } catch {}    // группировка системных рассылок
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id)'); } catch {}
 
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
@@ -236,9 +238,17 @@ db.prepare(`
 // Создаётся один раз, если ещё нет в БД. Используется для сервисных уведомлений.
 // Юзеры не могут отправлять ему сообщения, но могут получать.
 const SYSTEM_USER_ID = 'system_hey_official';
+const SYSTEM_AVATAR  = '/favicon.svg'; // лого HEY как аватар сервисного аккаунта
+
 (function ensureSystemUser() {
-  const existing = db.prepare('SELECT id FROM users WHERE id=?').get(SYSTEM_USER_ID);
-  if (existing) return;
+  const existing = db.prepare('SELECT id, avatar FROM users WHERE id=?').get(SYSTEM_USER_ID);
+  if (existing) {
+    // Если аватар не выставлен или устарел — обновим до текущего лого
+    if (existing.avatar !== SYSTEM_AVATAR) {
+      db.prepare('UPDATE users SET avatar=? WHERE id=?').run(SYSTEM_AVATAR, SYSTEM_USER_ID);
+    }
+    return;
+  }
   try {
     db.prepare(`
       INSERT INTO users (id, name, phone, password, avatar, created_at,
@@ -250,7 +260,7 @@ const SYSTEM_USER_ID = 'system_hey_official';
       'HEY-заведующий',
       '+0',
       '$disabled$', // невозможно войти под этим аккаунтом
-      null,
+      SYSTEM_AVATAR,
       Math.floor(Date.now() / 1000),
       'Сервисный аккаунт HEY. Сюда приходят системные уведомления и анонсы.',
       'HEYSYSTEM1',
@@ -804,15 +814,16 @@ function getMessages(convId, before, limit = 50) {
   });
 }
 
-function createMessage({ conversationId, senderId, text, attachment, replyToId }) {
+function createMessage({ conversationId, senderId, text, attachment, replyToId, broadcastId }) {
   const msg = { id: uuid(), conversation_id: conversationId, sender_id: senderId,
     text: text || null,
     attachment: attachment ? JSON.stringify(attachment) : null,
     status: 'sent', created_at: now(), edited_at: null,
-    reply_to_id: replyToId || null };
+    reply_to_id: replyToId || null,
+    broadcast_id: broadcastId || null };
   db.prepare(
-    `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,status,created_at,reply_to_id)
-     VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@status,@created_at,@reply_to_id)`
+    `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,status,created_at,reply_to_id,broadcast_id)
+     VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@status,@created_at,@reply_to_id,@broadcast_id)`
   ).run(msg);
   const parsed = _parseMsg(msg);
   if (parsed && parsed.reply_to_id) parsed.reply_to = _replySnippet(parsed.reply_to_id);
@@ -1249,6 +1260,48 @@ function getAdminStats() {
   return { users, blocked, admins, moments, activeMoments, reactions };
 }
 
+// ── Системные публикации HEY-заведующего ────────────────────────────────
+function getSystemMoments({ status = 'all', limit = 100 } = {}) {
+  const where = status === 'all' ? '' : 'AND m.status = ?';
+  const params = [SYSTEM_USER_ID];
+  if (status !== 'all') params.push(status);
+  params.push(limit);
+  const rows = db.prepare(
+    `SELECT m.*
+     FROM moments m
+     WHERE m.user_id = ? ${where}
+     ORDER BY m.created_at DESC LIMIT ?`
+  ).all(...params);
+  return rows.map(_parseMoment);
+}
+
+// Группирует системные сообщения по broadcast_id: возвращает уникальные рассылки
+// с превью текста и количеством получателей.
+function getSystemBroadcasts({ limit = 50 } = {}) {
+  return db.prepare(
+    `SELECT broadcast_id AS id, MAX(created_at) AS sent_at,
+            COUNT(*) AS recipients, MAX(text) AS text
+     FROM messages
+     WHERE sender_id = ? AND broadcast_id IS NOT NULL
+     GROUP BY broadcast_id
+     ORDER BY sent_at DESC LIMIT ?`
+  ).all(SYSTEM_USER_ID, limit);
+}
+
+function deleteBroadcast(broadcastId) {
+  const info = db.prepare('DELETE FROM messages WHERE broadcast_id=? AND sender_id=?')
+    .run(broadcastId, SYSTEM_USER_ID);
+  return info.changes;
+}
+
+function editBroadcast(broadcastId, newText) {
+  const t = now();
+  const info = db.prepare(
+    `UPDATE messages SET text=?, edited_at=? WHERE broadcast_id=? AND sender_id=?`
+  ).run(newText, t, broadcastId, SYSTEM_USER_ID);
+  return info.changes;
+}
+
 // Search users by name or phone (для контактов; case-insensitive в том числе и для кириллицы)
 function searchUsers(query, excludeUserId) {
   const q = `%${(query || '').toLowerCase()}%`;
@@ -1515,6 +1568,8 @@ module.exports = {
   createReport, getReports, resolveReport,
   // Waitlist
   addToWaitlist, getWaitlist,
+  // System (HEY-заведующий)
+  getSystemMoments, getSystemBroadcasts, deleteBroadcast, editBroadcast,
   // Admin
   getAdminStats, getAdminUsers, getAdminUserById,
   adminResetPassword, adminBlockUser, adminUnblockUser,

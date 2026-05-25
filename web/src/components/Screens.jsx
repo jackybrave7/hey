@@ -120,6 +120,68 @@ function TopBar({ title, onBack, right, avatar, online }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Toast (in-app уведомления) — заменяет native alert()
+// Использование: heyToast('Сохранено') или heyToast('Ошибка', 'error')
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function heyToast(message, type = 'info') {
+  window.dispatchEvent(new CustomEvent('hey:toast', { detail: { message, type } }));
+}
+
+export function ToastContainer() {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    function onToast(e) {
+      const id = Math.random().toString(36).slice(2, 9);
+      const t  = { id, message: e.detail.message, type: e.detail.type || 'info' };
+      setItems(prev => [...prev, t]);
+      setTimeout(() => setItems(prev => prev.filter(x => x.id !== id)), 3500);
+    }
+    window.addEventListener('hey:toast', onToast);
+    return () => window.removeEventListener('hey:toast', onToast);
+  }, []);
+  if (!items.length) return null;
+  const colors = {
+    info:    { bg:'rgba(28,18,58,.98)',  border:'rgba(180,140,220,.3)', text:'rgba(235,225,255,.95)' },
+    success: { bg:'rgba(20,40,30,.98)',  border:'rgba(80,200,140,.4)',  text:'rgba(180,255,210,.98)' },
+    error:   { bg:'rgba(50,20,28,.98)',  border:'rgba(255,100,100,.4)', text:'rgba(255,180,180,.98)' },
+    warning: { bg:'rgba(50,40,18,.98)',  border:'rgba(255,180,80,.4)',  text:'rgba(255,220,150,.98)' },
+  };
+  return createPortal(
+    <div style={{
+      position:'fixed', bottom:30, left:'50%', transform:'translateX(-50%)',
+      zIndex:99999, display:'flex', flexDirection:'column', gap:8, alignItems:'center',
+      pointerEvents:'none',
+    }}>
+      {items.map(t => {
+        const c = colors[t.type] || colors.info;
+        return (
+          <div key={t.id}
+            style={{
+              background:c.bg, border:`1px solid ${c.border}`,
+              borderRadius:14, padding:'12px 20px',
+              color:c.text, fontSize:14, fontWeight:500,
+              boxShadow:'0 8px 32px rgba(0,0,0,.45)', backdropFilter:'blur(20px)',
+              maxWidth:'min(92vw, 420px)', lineHeight:1.45,
+              animation:'heyToastIn .25s ease-out',
+              pointerEvents:'auto',
+            }}>
+            {t.message}
+          </div>
+        );
+      })}
+      <style>{`
+        @keyframes heyToastIn {
+          from { opacity:0; transform:translateY(8px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+      `}</style>
+    </div>,
+    document.body
+  );
+}
+
 // ConfirmModal + useConfirm
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1290,7 +1352,7 @@ export function MyProfileScreen() {
             background:'rgba(255,255,255,.05)', borderRadius:14,
             border:'1px solid rgba(255,255,255,.08)', padding:'12px 16px',
             color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.6,
-            wordBreak:'break-word',
+            wordBreak:'break-word', whiteSpace:'pre-wrap',
           }}>
             <BioWithLinks text={user.bio}/>
           </div>
@@ -3897,7 +3959,7 @@ const MessageRow = memo(function MessageRow({
             );
             return (
               <img src={src} alt=""
-                onClick={() => onLightbox(src)}
+                onClick={() => onLightbox(src, [src])}
                 style={{maxWidth:'100%',maxHeight:300,borderRadius:10,
                   display:'block',marginBottom: m.text ? 6 : 2,
                   cursor:'zoom-in'}}/>
@@ -3920,7 +3982,7 @@ const MessageRow = memo(function MessageRow({
               }}>
                 {urls.map((u, i) => (
                   <img key={i} src={u} alt=""
-                    onClick={() => onLightbox(u)}
+                    onClick={() => onLightbox(u, urls)}
                     style={{
                       width:'100%', aspectRatio:'1 / 1',
                       objectFit:'cover', borderRadius:8,
@@ -4108,7 +4170,7 @@ export function ChatScreen() {
   const [msgMenu,     setMsgMenu]     = useState(null);
   const [replyTo,     setReplyTo]     = useState(null); // message object to reply to
   const [imgPreviews, setImgPreviews] = useState([]); // [{dataUrl, file, uploading?}]
-  const [lightbox,    setLightbox]    = useState(null);
+  const [lightbox,    setLightbox]    = useState(null); // null | { urls: string[], index: number }
   const [showMedia,   setShowMedia]   = useState(false);
   const [searchMode,  setSearchMode]  = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -4254,6 +4316,19 @@ export function ChatScreen() {
     } catch {}
     finally { setLoadingMore(false); }
   }
+
+  // ── Lightbox: стрелки ←/→ для навигации ───────────────────────────────
+  useEffect(() => {
+    if (!lightbox || lightbox.urls.length <= 1) return;
+    function onKey(e) {
+      if (e.key === 'ArrowLeft'  && lightbox.index > 0)
+        setLightbox(l => l && ({ ...l, index: l.index - 1 }));
+      if (e.key === 'ArrowRight' && lightbox.index < lightbox.urls.length - 1)
+        setLightbox(l => l && ({ ...l, index: l.index + 1 }));
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox]);
 
   // ── Esc — закрыть самый верхний попап чата ────────────────────────────
   useEffect(() => {
@@ -4529,23 +4604,23 @@ export function ChatScreen() {
 
     const MAX_TOTAL = 10;
     const remaining = MAX_TOTAL - imgPreviews.length;
-    if (remaining <= 0) { alert(`Можно прикрепить максимум ${MAX_TOTAL} изображений`); return; }
+    if (remaining <= 0) { heyToast(`Можно прикрепить максимум ${MAX_TOTAL} изображений`, 'warning'); return; }
 
     const added = [];
     for (const file of files.slice(0, remaining)) {
       if (!file.type.startsWith('image/')) {
-        alert(`«${file.name}» — не изображение, пропущено`);
+        heyToast(`«${file.name}» — не изображение`, 'warning');
         continue;
       }
       if (file.size > 10 * 1024 * 1024) {
-        alert(`«${file.name}» слишком большой (макс. 10 МБ)`);
+        heyToast(`«${file.name}» слишком большой (макс. 10 МБ)`, 'warning');
         continue;
       }
       added.push({ dataUrl: previewUrl(file), file, uploading: false });
     }
     if (added.length) setImgPreviews(prev => [...prev, ...added]);
     if (files.length > remaining) {
-      alert(`Лимит ${MAX_TOTAL} картинок — лишние не добавлены`);
+      heyToast(`Лимит ${MAX_TOTAL} картинок — лишние не добавлены`, 'warning');
     }
   }
 
@@ -4568,7 +4643,7 @@ export function ChatScreen() {
         ));
         urls = results.map(r => r.url);
       } catch (err) {
-        alert(err.message || 'Не удалось загрузить изображения');
+        heyToast(err.message || 'Не удалось загрузить изображения', 'error');
         setImgPreviews(prev => prev.map(p => ({ ...p, uploading: false })));
         return;
       }
@@ -4761,7 +4836,14 @@ export function ChatScreen() {
 
   // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
   const handleOpenMenu  = useCallback((e, m) => openMsgMenu(e, m), []);
-  const handleLightbox  = useCallback((src) => setLightbox(src), []);
+  const handleLightbox  = useCallback((src, urls) => {
+    if (Array.isArray(urls) && urls.length > 1) {
+      const idx = Math.max(0, urls.indexOf(src));
+      setLightbox({ urls, index: idx });
+    } else {
+      setLightbox({ urls: [src], index: 0 });
+    }
+  }, []);
   const handleToggleRxn = useCallback((msgId, emoji) => {
     socket.send('reaction:toggle', { messageId: msgId, conversationId: convId, emoji });
     setReactionPicker(null);
@@ -5405,30 +5487,93 @@ export function ChatScreen() {
       )}
 
       {/* Lightbox */}
-      {lightbox && (
-        <div onClick={() => setLightbox(null)}
-          style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,.88)',
-            display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-            backdropFilter:'blur(8px)'}}>
-          <img src={lightbox} alt=""
-            onClick={e => e.stopPropagation()}
-            style={{maxWidth:'90vw',maxHeight:'80vh',borderRadius:14,
-              boxShadow:'0 8px 48px rgba(0,0,0,.6)',objectFit:'contain'}}/>
-          <div style={{display:'flex',gap:12,marginTop:20}} onClick={e=>e.stopPropagation()}>
-            <a href={lightbox} download
-              style={{background:'rgba(255,255,255,.15)',backdropFilter:'blur(6px)',
-                borderRadius:12,padding:'10px 24px',color:'white',fontSize:14,
-                textDecoration:'none',border:'1px solid rgba(255,255,255,.2)'}}>
-              ⬇ Скачать
-            </a>
-            <button onClick={() => setLightbox(null)}
-              style={{background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',
-                borderRadius:12,padding:'10px 24px',color:'white',fontSize:14,cursor:'pointer'}}>
-              Закрыть
-            </button>
+      {lightbox && (() => {
+        const urls    = lightbox.urls || [];
+        const idx     = lightbox.index || 0;
+        const total   = urls.length;
+        const current = urls[idx];
+        const canPrev = idx > 0;
+        const canNext = idx < total - 1;
+        return (
+          <div onClick={() => setLightbox(null)}
+            style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,.92)',
+              display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+              backdropFilter:'blur(8px)'}}>
+            {/* Стрелки навигации (если в галерее больше одной) */}
+            {canPrev && (
+              <button onClick={(e) => { e.stopPropagation(); setLightbox({ urls, index: idx - 1 }); }}
+                style={{position:'absolute',left:20,top:'50%',transform:'translateY(-50%)',zIndex:2,
+                  width:48,height:48,borderRadius:'50%',
+                  background:'rgba(255,255,255,.12)',backdropFilter:'blur(8px)',
+                  border:'1px solid rgba(255,255,255,.18)',color:'white',
+                  fontSize:24,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                ‹
+              </button>
+            )}
+            {canNext && (
+              <button onClick={(e) => { e.stopPropagation(); setLightbox({ urls, index: idx + 1 }); }}
+                style={{position:'absolute',right:20,top:'50%',transform:'translateY(-50%)',zIndex:2,
+                  width:48,height:48,borderRadius:'50%',
+                  background:'rgba(255,255,255,.12)',backdropFilter:'blur(8px)',
+                  border:'1px solid rgba(255,255,255,.18)',color:'white',
+                  fontSize:24,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                ›
+              </button>
+            )}
+
+            <img src={current} alt=""
+              onClick={e => e.stopPropagation()}
+              style={{maxWidth:'90vw',maxHeight:'80vh',borderRadius:14,
+                boxShadow:'0 8px 48px rgba(0,0,0,.6)',objectFit:'contain'}}/>
+
+            <div style={{display:'flex',gap:12,marginTop:20,alignItems:'center'}}
+              onClick={e=>e.stopPropagation()}>
+              {total > 1 && (
+                <div style={{
+                  background:'rgba(255,255,255,.12)',borderRadius:50,padding:'8px 14px',
+                  color:'rgba(255,255,255,.85)',fontSize:13,fontWeight:600,
+                }}>
+                  {idx + 1} / {total}
+                </div>
+              )}
+              <a href={current} download
+                style={{background:'rgba(255,255,255,.15)',backdropFilter:'blur(6px)',
+                  borderRadius:12,padding:'10px 24px',color:'white',fontSize:14,
+                  textDecoration:'none',border:'1px solid rgba(255,255,255,.2)'}}>
+                ⬇ Скачать
+              </a>
+              <button onClick={() => setLightbox(null)}
+                style={{background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',
+                  borderRadius:12,padding:'10px 24px',color:'white',fontSize:14,cursor:'pointer'}}>
+                Закрыть
+              </button>
+            </div>
+
+            {/* Миниатюры внизу при множественных фото */}
+            {total > 1 && (
+              <div onClick={e => e.stopPropagation()}
+                style={{
+                  position:'absolute',bottom:90,left:'50%',transform:'translateX(-50%)',
+                  display:'flex',gap:6,padding:'8px 12px',
+                  background:'rgba(0,0,0,.5)',borderRadius:14,backdropFilter:'blur(8px)',
+                  maxWidth:'90vw',overflowX:'auto',
+                }}>
+                {urls.map((u, i) => (
+                  <img key={i} src={u} alt=""
+                    onClick={() => setLightbox({ urls, index: i })}
+                    style={{
+                      width:48,height:48,objectFit:'cover',borderRadius:6,
+                      cursor:'pointer',flexShrink:0,
+                      border: i === idx ? '2px solid rgba(180,140,255,.9)' : '2px solid transparent',
+                      opacity: i === idx ? 1 : .55,
+                      transition:'opacity .15s, border-color .15s',
+                    }}/>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
 <style>{`@keyframes typing{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}`}</style>
       {confirmModal}

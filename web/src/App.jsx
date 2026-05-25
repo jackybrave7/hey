@@ -10,6 +10,7 @@ import {
   ChatScreen, CallsScreen, CallDetailScreen, SettingsScreen,
   GroupCreateScreen, GroupSettingsScreen,
   ForcePasswordModal, PublicProfileScreen, MomentPage,
+  ToastContainer,
 } from './components/Screens';
 import MomentsFeed from './components/moments/MomentsFeed';
 import BottomNav from './components/BottomNav';
@@ -191,6 +192,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <GlobalHandlers />
+        <ToastContainer />
         <Routes>
           {/* Public */}
           <Route path="/"         element={<SplashScreen/>}/>
