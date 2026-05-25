@@ -5039,6 +5039,19 @@ export function ChatScreen() {
     URL.revokeObjectURL(a.href);
   }
 
+  async function handleLeaveGroup() {
+    if (!await customConfirm(
+      `Покинуть группу «${partner.name}»? Вы потеряете доступ к переписке.`,
+      { danger: true, confirmLabel: 'Покинуть' }
+    )) return;
+    try {
+      await api.removeGroupMember(convId, user.id);
+      nav('/chats');
+    } catch (e) {
+      heyToast('Не удалось выйти: ' + (e.message || 'ошибка'), 'error');
+    }
+  }
+
   async function handleSearch(q) {
     setSearchQuery(q);
     if (!q.trim()) { setSearchResults(null); return; }
@@ -5063,7 +5076,11 @@ export function ChatScreen() {
   }
 
   // В группе содержимое может чистить только админ; в direct/monolog — любой участник
-  const canClearChat = !partner.isGroup || partner.admin_id === user?.id;
+  const isGroupAdmin = partner.isGroup && partner.admin_id === user?.id;
+  const canClearChat = !partner.isGroup || isGroupAdmin;
+  // Админ группы не выходит через «выйти» — должен сначала передать админство
+  // или удалить группу через настройки
+  const canLeaveGroup = partner.isGroup && !isGroupAdmin;
 
   const chatMenuItems = [
     { label: 'Поиск в чате',            icon: '🔍', danger: false, onClick: () => { setSearchMode(true); setTimeout(()=>searchRef.current?.focus(),50); } },
@@ -5078,6 +5095,9 @@ export function ChatScreen() {
     ]),
     ...(canClearChat ? [
       { label: 'Удалить содержимое чата', icon: '🗑️', danger: true,  onClick: handleClearChat },
+    ] : []),
+    ...(canLeaveGroup ? [
+      { label: 'Выйти из группы',         icon: '🚪', danger: true,  onClick: handleLeaveGroup },
     ] : []),
   ];
 
