@@ -598,6 +598,15 @@ module.exports = function makeRouter(db, broadcast) {
     const convId = req.params.id;
     if (!db.isMember(convId, req.user.id))
       return res.status(403).json({ error: 'Not a member' });
+    // Для групповых чатов содержимое может удалить только админ группы.
+    // Direct-чаты (1-на-1) и monolog — любой участник.
+    const conv = db.getConversationById(convId);
+    if (conv?.type === 'group' && conv.admin_id !== req.user.id) {
+      return res.status(403).json({
+        error: 'Только администратор группы может удалить содержимое чата',
+        code: 'ADMIN_ONLY',
+      });
+    }
     db.clearConversationMessages(convId);
     const members = db.getConversationMembers(convId);
     broadcast(members, { type: 'chat:cleared', conversationId: convId });

@@ -5062,6 +5062,9 @@ export function ChatScreen() {
     }
   }
 
+  // В группе содержимое может чистить только админ; в direct/monolog — любой участник
+  const canClearChat = !partner.isGroup || partner.admin_id === user?.id;
+
   const chatMenuItems = [
     { label: 'Поиск в чате',            icon: '🔍', danger: false, onClick: () => { setSearchMode(true); setTimeout(()=>searchRef.current?.focus(),50); } },
     { label: 'Медиа и ссылки',          icon: '🖼️', danger: false, onClick: () => setShowMedia(true) },
@@ -5073,7 +5076,9 @@ export function ChatScreen() {
       ] : []),
       { label: 'Экспортировать чат',    icon: '📥', danger: false, onClick: handleExportChat },
     ]),
-    { label: 'Удалить содержимое чата', icon: '🗑️', danger: true,  onClick: handleClearChat },
+    ...(canClearChat ? [
+      { label: 'Удалить содержимое чата', icon: '🗑️', danger: true,  onClick: handleClearChat },
+    ] : []),
   ];
 
   // Flat item list for Virtuoso: date separators interleaved with messages + typing

@@ -164,7 +164,10 @@
       "Bash(curl -sS https://www.githubstatus.com/api/v2/status.json)",
       "Bash(scp -o BatchMode=yes C:/projects/hey/server/src/db/db.js root@72.56.16.44:/app/server/src/db/db.js)",
       "Bash(scp -r -o BatchMode=yes C:/projects/hey/web/dist/* root@72.56.16.44:/app/web/dist/)",
-      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"pm2 restart hey --update-env\")"
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"pm2 restart hey --update-env\")",
+      "Bash(python3 -c \"import urllib.parse; print\\(urllib.parse.quote\\('Тестовый курс Хей'\\)\\)\")",
+      "Bash(node -e \"console.log\\(encodeURIComponent\\('Тестовый курс Хей'\\)\\)\")",
+      "Bash(curl -sS 'https://hey-messenger.ru/api/join/validate?email=__TRACKED_VAR__&course=__TRACKED_VAR__')"
     ]
   }
 }
