@@ -13,6 +13,19 @@ function fmtDate(ts) {
 }
 
 // Рендерит текст с кликабельными ссылками. Длинные ссылки сокращаются для отображения.
+// Обрезает завершающую пунктуацию с URL: «...html.» → «...html»
+function trimUrlTail(url) {
+  let u = url.replace(/[.,;:!?»"'`]+$/, '');
+  while (/[)\]}]$/.test(u)) {
+    const closing = u.slice(-1);
+    const opening = closing === ')' ? '(' : closing === ']' ? '[' : '{';
+    const opens   = (u.match(new RegExp('\\' + opening, 'g')) || []).length;
+    const closes  = (u.match(new RegExp('\\' + closing, 'g')) || []).length;
+    if (closes > opens) u = u.slice(0, -1); else break;
+  }
+  return u;
+}
+
 export function TextWithLinks({ text, linkColor = 'rgba(180,140,255,.95)' }) {
   if (!text) return null;
   const re = /https?:\/\/[^\s<>"']+/gi;
@@ -20,7 +33,10 @@ export function TextWithLinks({ text, linkColor = 'rgba(180,140,255,.95)' }) {
   let last = 0, m;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push({ t: text.slice(last, m.index), link: false });
-    parts.push({ t: m[0], link: true });
+    const cleanUrl = trimUrlTail(m[0]);
+    const tail     = m[0].slice(cleanUrl.length);
+    parts.push({ t: cleanUrl, link: true });
+    if (tail) parts.push({ t: tail, link: false });
     last = m.index + m[0].length;
   }
   if (last < text.length) parts.push({ t: text.slice(last), link: false });

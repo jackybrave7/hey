@@ -1969,7 +1969,10 @@ function BioWithLinks({ text }) {
   let m;
   while ((m = urlRe.exec(text)) !== null) {
     if (m.index > lastIdx) parts.push({ t: text.slice(lastIdx, m.index), link: false });
-    parts.push({ t: m[0], link: true });
+    const cleanUrl = trimUrlTail(m[0]);
+    const tail = m[0].slice(cleanUrl.length);
+    parts.push({ t: cleanUrl, link: true });
+    if (tail) parts.push({ t: tail, link: false });
     lastIdx = m.index + m[0].length;
   }
   if (lastIdx < text.length) parts.push({ t: text.slice(lastIdx), link: false });
@@ -3657,6 +3660,24 @@ function renderMarkdown(text, keyOffset = 0) {
   return result;
 }
 
+// Обрезает завершающую пунктуацию с URL: «http://example.com.» → «http://example.com».
+// Также балансирует скобки: если в URL ')' больше чем '(', лишние ')' отрезаются.
+function trimUrlTail(url) {
+  let u = url;
+  // Сначала пунктуация в конце (не часть URL по семантике предложения)
+  u = u.replace(/[.,;:!?»"'`]+$/, '');
+  // Затем висящие закрывающие скобки если в URL не было открывающей
+  while (/[)\]}]$/.test(u)) {
+    const closing = u.slice(-1);
+    const opening = closing === ')' ? '(' : closing === ']' ? '[' : '{';
+    const opens   = (u.match(new RegExp('\\' + opening, 'g')) || []).length;
+    const closes  = (u.match(new RegExp('\\' + closing, 'g')) || []).length;
+    if (closes > opens) u = u.slice(0, -1);
+    else break;
+  }
+  return u;
+}
+
 function renderText(text) {
   // Сначала вытаскиваем URL и custom-эмодзи (они не должны попадать под markdown),
   // потом простой текст между ними прогоняем через renderMarkdown.
@@ -3674,7 +3695,8 @@ function renderText(text) {
       i += 100; // запас по ключам для md
     }
     if (m[1]) {
-      const url = m[1];
+      const url     = trimUrlTail(m[1]);
+      const tailLen = m[1].length - url.length;
       if (isChatVideoUrl(url)) {
         result.push(<ChatVideoCard key={i++} url={url}/>);
       } else {
@@ -3684,6 +3706,9 @@ function renderText(text) {
             onClick={e => e.stopPropagation()}>{url}</a>
         );
       }
+      last = m.index + m[1].length - tailLen;
+      // Хвост (например '.') остаётся как текст — обработается в следующей итерации
+      continue;
     } else if (m[2] && HEY_EMOJI_SET.has(m[2])) {
       result.push(
         <img key={i++} src={`/emoji/${encodeURIComponent(m[2])}.svg`} alt={m[2]}
