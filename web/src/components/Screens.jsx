@@ -1129,6 +1129,7 @@ export function MyProfileScreen() {
 
   // Archive popup
   const [archiveSelected, setArchiveSelected] = useState(null);
+  const [archiveOpen, setArchiveOpen] = useState(false); // модалка со списком архивных моментов
   // Active moment popup
   const [activePopupIdx, setActivePopupIdx] = useState(null);
 
@@ -1561,22 +1562,34 @@ export function MyProfileScreen() {
             const archivedMoments = myMoments.filter(m => m.status === 'archived');
             const maxActive = user?.is_super ? 3 : 1;
             return (<>
-          <div style={{display:'flex',gap:8,marginBottom:14}}>
-            {[
-              { key:'active',   label: activeMoments.length > 0 ? `Активные (${activeMoments.length})` : 'Активные' },
-              { key:'archived', label:`Архив (${archivedMoments.length})` },
-            ].map(tab => (
-              <button key={tab.key} onClick={() => setMomentsTab(tab.key)}
+          <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+            {/* «Активные» — обычный таб (всегда активен) */}
+            <button
+              style={{
+                padding:'7px 18px',borderRadius:50,fontSize:13,fontWeight:600,cursor:'default',
+                background:'rgba(120,90,200,.8)',
+                border:'1px solid rgba(180,140,255,.4)',
+                color:'white',
+              }}>
+              {activeMoments.length > 0 ? `Активные (${activeMoments.length})` : 'Активные'}
+            </button>
+            {/* «Архив» — открывает поп-ап */}
+            {archivedMoments.length > 0 && (
+              <button onClick={() => setArchiveOpen(true)}
                 style={{
-                  padding:'7px 18px',borderRadius:50,fontSize:13,fontWeight:600,cursor:'pointer',
-                  background: momentsTab === tab.key ? 'rgba(120,90,200,.8)' : 'rgba(255,255,255,.08)',
-                  border: momentsTab === tab.key ? '1px solid rgba(180,140,255,.4)' : '1px solid rgba(255,255,255,.1)',
-                  color: momentsTab === tab.key ? 'white' : 'rgba(255,255,255,.5)',
+                  padding:'7px 16px',borderRadius:50,fontSize:13,fontWeight:600,cursor:'pointer',
+                  background:'rgba(255,255,255,.08)',
+                  border:'1px solid rgba(255,255,255,.1)',
+                  color:'rgba(255,255,255,.6)',
                   transition:'all .18s',
-                }}>
-                {tab.label}
+                  display:'flex',alignItems:'center',gap:6,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.14)'}
+                onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,.08)'}>
+                <span>📦 Архив ({archivedMoments.length})</span>
+                <span style={{opacity:.5}}>›</span>
               </button>
-            ))}
+            )}
           </div>
 
           {/* Active tab */}
@@ -1651,23 +1664,9 @@ export function MyProfileScreen() {
             </div>
           )}</>) })()}
 
-          {/* Archive tab */}
-          {momentsTab === 'archived' && (() => {
+          {/* Archive — теперь в поп-апе (см. ниже {archiveOpen && ...}) */}
+          {false && (() => {
             const archived = myMoments.filter(m => m.status === 'archived');
-            if (archived.length === 0) {
-              return (
-                <div style={{background:'rgba(255,255,255,.04)',borderRadius:16,
-                  padding:'24px',textAlign:'center',border:'2px dashed rgba(255,255,255,.1)'}}>
-                  <div style={{fontSize:28,marginBottom:10,opacity:.6}}>📦</div>
-                  <div style={{color:'rgba(255,255,255,.6)',fontSize:14,fontWeight:600}}>
-                    Архив пуст
-                  </div>
-                  <div style={{color:'rgba(255,255,255,.35)',fontSize:12,marginTop:6}}>
-                    Архивные моменты появятся здесь после того, как ты сам уберёшь их с публикации
-                  </div>
-                </div>
-              );
-            }
             return (
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                 {archived.map(m => {
@@ -1840,6 +1839,128 @@ export function MyProfileScreen() {
           onDelete={() => {}}
         />
       )}
+
+      {/* Archive list popup — модалка со всеми архивными моментами (может быть много) */}
+      {archiveOpen && (() => {
+        const archived = myMoments.filter(m => m.status === 'archived');
+        return createPortal(
+          <div onMouseDown={e => { if (e.target === e.currentTarget) setArchiveOpen(false); }}
+            style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.6)',
+              backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+            <div style={{
+              width:'min(94vw,640px)',maxHeight:'88vh',
+              background:'rgba(38,28,68,.97)',backdropFilter:'blur(24px)',
+              borderRadius:18,
+              boxShadow:'0 24px 64px rgba(0,0,0,.55)',
+              border:'1px solid rgba(255,255,255,.12)',
+              display:'flex',flexDirection:'column',overflow:'hidden'}}>
+              <div style={{padding:'16px 20px 12px',display:'flex',alignItems:'center',gap:10,
+                borderBottom:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
+                <span style={{fontSize:22}}>📦</span>
+                <div style={{flex:1}}>
+                  <div style={{color:'white',fontSize:17,fontWeight:700}}>Архив моментов</div>
+                  <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginTop:1}}>
+                    {archived.length} {archived.length === 1 ? 'момент' :
+                      (archived.length % 10 >= 2 && archived.length % 10 <= 4 && (archived.length % 100 < 10 || archived.length % 100 >= 20) ? 'момента' : 'моментов')}
+                  </div>
+                </div>
+                <button onClick={() => setArchiveOpen(false)}
+                  style={{background:'none',border:'none',color:'rgba(255,255,255,.5)',
+                    fontSize:24,cursor:'pointer',lineHeight:1,padding:0}}>✕</button>
+              </div>
+              <div style={{flex:1,overflowY:'auto',padding:14}}>
+                {archived.length === 0 ? (
+                  <div style={{background:'rgba(255,255,255,.04)',borderRadius:16,
+                    padding:'30px 20px',textAlign:'center',border:'2px dashed rgba(255,255,255,.1)'}}>
+                    <div style={{fontSize:32,marginBottom:10,opacity:.6}}>📦</div>
+                    <div style={{color:'rgba(255,255,255,.6)',fontSize:14,fontWeight:600}}>
+                      Архив пуст
+                    </div>
+                    <div style={{color:'rgba(255,255,255,.35)',fontSize:12,marginTop:6}}>
+                      Архивные моменты появятся здесь после того, как ты сам уберёшь их с публикации
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:10}}>
+                    {archived.map(m => {
+                      const hasImg = m.media_url && m.media_type === 'image';
+                      const isAudio = m.media_url && m.media_type === 'audio';
+                      return (
+                        <div key={m.id} onClick={() => { setArchiveOpen(false); setArchiveSelected(m); }}
+                          style={{background:'rgba(255,255,255,.06)',borderRadius:14,
+                            border:'1px solid rgba(255,255,255,.1)',overflow:'hidden',
+                            cursor:'pointer',transition:'background .15s',
+                            display:'flex',flexDirection:'column'}}
+                          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.1)'}
+                          onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.06)'}>
+                          {hasImg ? (
+                            <img src={m.media_url} alt=""
+                              style={{width:'100%',height:100,objectFit:'cover',
+                                objectPosition: m.media_position || '50% 50%',display:'block'}}/>
+                          ) : isAudio ? (
+                            <div style={{width:'100%',height:100,
+                              background:'linear-gradient(135deg,#1a0a38,#2a1858)',
+                              display:'flex',alignItems:'center',justifyContent:'center',
+                              fontSize:36,color:'rgba(255,255,255,.7)'}}>🎵</div>
+                          ) : (
+                            <div style={{width:'100%',height:100,overflow:'hidden'}}>
+                              <MoodEmoji type={m.mood_emoji || 'calm'} size={56}/>
+                            </div>
+                          )}
+                          <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:8}}>
+                            <div style={{color:'rgba(255,255,255,.85)',fontSize:12,lineHeight:1.45,
+                              overflow:'hidden',display:'-webkit-box',
+                              WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>
+                              {m.text}
+                            </div>
+                            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:'auto'}}>
+                              <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>👁 {m.views || 0}</span>
+                              <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>✨ {m.stats?.resonate || 0}</span>
+                              <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>🤝 {m.stats?.talk || 0}</span>
+                            </div>
+                            <div style={{color:'rgba(255,255,255,.3)',fontSize:11,
+                              display:'flex',alignItems:'center',gap:4}}>
+                              📦 {m.archived_at
+                                ? new Date(m.archived_at * 1000).toLocaleDateString('ru', {day:'numeric',month:'short'})
+                                : 'в архиве'}
+                            </div>
+                            <div style={{display:'flex',gap:6,marginTop:4}}>
+                              <button onClick={(e) => { e.stopPropagation(); restoreFromArchive(m); }}
+                                style={{
+                                  flex:1,padding:'7px 4px',borderRadius:10,
+                                  background:'rgba(120,90,200,.5)',border:'1px solid rgba(180,140,220,.3)',
+                                  color:'white',fontSize:11,fontWeight:600,cursor:'pointer',
+                                  transition:'background .15s',whiteSpace:'nowrap',
+                                }}
+                                onMouseEnter={e=>e.currentTarget.style.background='rgba(120,90,200,.7)'}
+                                onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.5)'}>
+                                ↩ Восстановить
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); deleteForever(m); }}
+                                style={{
+                                  padding:'7px 9px',borderRadius:10,
+                                  background:'rgba(255,80,80,.12)',border:'1px solid rgba(255,80,80,.3)',
+                                  color:'rgba(255,140,140,.95)',fontSize:13,cursor:'pointer',
+                                  transition:'background .15s',flexShrink:0,
+                                }}
+                                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,80,80,.22)'}
+                                onMouseLeave={e=>e.currentTarget.style.background='rgba(255,80,80,.12)'}
+                                title="Удалить навсегда">
+                                🗑
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* Archive moment popup */}
       {archiveSelected && (() => {
