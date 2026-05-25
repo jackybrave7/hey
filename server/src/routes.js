@@ -51,7 +51,7 @@ function saveFeedbackToFile(subject, body) {
 
 const UPLOAD_DIR = path.join(__dirname, '../data/uploads');
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_BYTES = 3 * 1024 * 1024; // 3 MB after compression
+const MAX_BYTES = 8 * 1024 * 1024; // 8 MB после ресайза (соответствует chat-image лимиту в presign)
 
 // In-memory rate limiter — no extra dependencies needed
 const _buckets = new Map();
@@ -495,7 +495,7 @@ module.exports = function makeRouter(db, broadcast) {
     const MB = 1024 * 1024;
     const isSuper = !!req.user.is_super;
     const limits = {
-      'chat-image':    3 * MB,
+      'chat-image':    isSuper ? 15 * MB : 8 * MB,
       'chat-audio':    10 * MB,                       // голосовухи — короткие
       'moment-image':  isSuper ? 15 * MB : 5 * MB,
       'moment-video':  isSuper ? 50 * MB : 20 * MB,
@@ -539,7 +539,7 @@ module.exports = function makeRouter(db, broadcast) {
       const [, mime, b64] = match;
       if (!ALLOWED_MIME.includes(mime)) return res.status(400).json({ error: 'Unsupported type. Use JPEG, PNG, WebP or GIF' });
       const buf = Buffer.from(b64, 'base64');
-      if (buf.length > MAX_BYTES) return res.status(400).json({ error: 'Image too large (max 3 MB)' });
+      if (buf.length > MAX_BYTES) return res.status(400).json({ error: 'Файл слишком большой. Максимум 8 МБ' });
       const baseKey = 'chat/' + uuid();
       const { fullUrl } = await storage.uploadImage(buf, baseKey);
       res.json({ url: fullUrl });

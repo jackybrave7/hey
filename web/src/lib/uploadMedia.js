@@ -4,28 +4,47 @@
 
 // ── Client-side image resize ──────────────────────────────────────────────────
 // Returns { blob, contentType }. GIFs pass through unchanged to preserve animation.
-function resizeToBlob(file, maxPx = 1920) {
+// Если после первого прохода блоб > targetBytes — пробуем снизить размеры/качество
+// (важно для фото с современных смартфонов 12+ МП, которые после resize@1920 всё
+// ещё могут быть 6-10 МБ из-за высокой детализации).
+function resizeToBlob(file, maxPx = 1920, targetBytes = 6 * 1024 * 1024) {
   if (file.type === 'image/gif') return Promise.resolve({ blob: file, contentType: file.type });
+
   return new Promise(resolve => {
-    const img  = new Image();
+    const img    = new Image();
     const objUrl = URL.createObjectURL(file);
-    img.onload = () => {
+
+    img.onload = async () => {
       URL.revokeObjectURL(objUrl);
-      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-      const w = Math.round(img.width  * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(
-        blob => resolve(blob
-          ? { blob, contentType: 'image/webp' }
-          : { blob: file, contentType: file.type }   // canvas.toBlob failed
-        ),
-        'image/webp', 0.85
-      );
+
+      // Прогрессивная компрессия: 3 попытки с уменьшающимися параметрами
+      const passes = [
+        { px: maxPx, q: 0.85 },
+        { px: Math.min(maxPx, 1600), q: 0.8 },
+        { px: Math.min(maxPx, 1280), q: 0.75 },
+      ];
+
+      let result = null;
+      for (const pass of passes) {
+        const scale = Math.min(1, pass.px / Math.max(img.width, img.height));
+        const w = Math.round(img.width  * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', pass.q));
+        if (!blob) continue;
+        result = { blob, contentType: 'image/webp' };
+        if (blob.size <= targetBytes) break;
+      }
+
+      resolve(result || { blob: file, contentType: file.type });
     };
-    img.onerror = () => resolve({ blob: file, contentType: file.type });
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objUrl);
+      resolve({ blob: file, contentType: file.type });
+    };
     img.src = objUrl;
   });
 }
