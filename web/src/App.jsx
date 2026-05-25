@@ -24,6 +24,7 @@ import AdminSystem from './components/admin/AdminSystem';
 import AdminReports from './components/admin/AdminReports';
 import AdminAwo from './components/admin/AdminAwo';
 import JoinScreen from './components/JoinScreen';
+import UserGuide from './components/UserGuide';
 
 function useNotifications() {
   useEffect(() => {
@@ -270,6 +271,7 @@ export default function App() {
           <Route path="/calls"                   element={<Protected><CallsScreen/></Protected>}/>
           <Route path="/calls/:callId"           element={<Protected><CallDetailScreen/></Protected>}/>
           <Route path="/settings"                element={<Protected><SettingsScreen/></Protected>}/>
+          <Route path="/help"                    element={<Protected><UserGuide/></Protected>}/>
 
           {/* Admin panel */}
           <Route path="/admin" element={
