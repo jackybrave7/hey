@@ -2214,7 +2214,7 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
                 color:'rgba(255,255,255,.88)', fontSize:13, lineHeight:1.5,
                 textAlign:'left', whiteSpace:'pre-wrap', wordBreak:'break-word',
               }}>
-                {merged.bio}
+                <BioWithLinks text={merged.bio}/>
               </div>
             )}
           </div>
