@@ -7657,19 +7657,6 @@ export function SettingsScreen() {
           </div>
         </div>
 
-        {/* Данные */}
-        <div>
-          <div style={sectionLabelStyle}>Данные</div>
-          <div style={cardStyle}>
-            <Row icon="🗑" label="Очистить данные и выйти" danger
-              onClick={async () => {
-                if (await customConfirm('Очистить все локальные данные?', { danger:true, requireWord:'удалить' })) {
-                  localStorage.clear(); logout(); nav('/login');
-                }
-              }}/>
-          </div>
-        </div>
-
         {/* Выйти */}
         <button onClick={async () => {
           if (await customConfirm('Выйти из аккаунта?')) { logout(); nav('/login'); }
