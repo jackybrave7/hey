@@ -1433,14 +1433,15 @@ module.exports = function makeRouter(db, broadcast) {
       return res.status(400).json({ error: 'id_account required' });
     }
 
-    // Только статус «оплачен»
+    // Только статус «оплачен». Промежуточные статусы (1=создан, и т.д.) —
+    // только логируем, НЕ пишем в awo_processed (иначе при последующем status=5
+    // тот же id_account будет считаться обработанным и пропустится).
     if (id_account_status !== awo.AWO_STATUS_PAID) {
-      db.awoMarkProcessed({ id_account, email: rawEmail, phone: rawPhone, course: goods,
-        result: 'ignored_status_' + id_account_status, raw_payload: payload });
-      return res.json({ ok: true, ignored: 'status' });
+      console.log(`[AWO] счёт ${id_account} статус=${id_account_status} — пропускаем`);
+      return res.json({ ok: true, ignored: 'status_' + id_account_status });
     }
 
-    // Идемпотентность
+    // Идемпотентность — срабатывает только для уже финально обработанных оплат
     if (db.awoIsProcessed(id_account)) {
       return res.json({ ok: true, ignored: 'already_processed' });
     }
