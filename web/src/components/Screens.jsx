@@ -3620,22 +3620,63 @@ const HEY_EMOJI = [
 const HEY_EMOJI_SET = new Set(HEY_EMOJI);
 const EMOJI_RE = new RegExp('\\[(' + HEY_EMOJI.map(n => n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')\\]', 'g');
 
+// Inline markdown:
+//   **bold**          — жирный
+//   __underline__     — подчёркнутый
+//   ~~strikethrough~~ — зачёркнутый
+//   `code`            — моноширинный
+// Применяется к простым текстовым фрагментам (НЕ внутри URL и эмодзи).
+function renderMarkdown(text, keyOffset = 0) {
+  if (!text) return text;
+  // Один регекс на все 4 формата с capture-группами
+  const MD = /\*\*([^*\n]+?)\*\*|__([^_\n]+?)__|~~([^~\n]+?)~~|`([^`\n]+?)`/g;
+  const result = [];
+  let last = 0, i = keyOffset;
+  let m;
+  while ((m = MD.exec(text)) !== null) {
+    if (m.index > last) result.push(text.slice(last, m.index));
+    if (m[1] !== undefined) {
+      result.push(<strong key={'md'+(i++)} style={{fontWeight:700}}>{m[1]}</strong>);
+    } else if (m[2] !== undefined) {
+      result.push(<u key={'md'+(i++)} style={{textDecoration:'underline'}}>{m[2]}</u>);
+    } else if (m[3] !== undefined) {
+      result.push(<s key={'md'+(i++)} style={{textDecoration:'line-through',opacity:.75}}>{m[3]}</s>);
+    } else if (m[4] !== undefined) {
+      result.push(
+        <code key={'md'+(i++)} style={{
+          fontFamily:'ui-monospace,Menlo,Consolas,monospace',
+          background:'rgba(0,0,0,.18)', borderRadius:4,
+          padding:'1px 5px', fontSize:'.92em',
+        }}>{m[4]}</code>
+      );
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) result.push(text.slice(last));
+  return result;
+}
+
 function renderText(text) {
-  // Split by emoji shortcodes AND urls
+  // Сначала вытаскиваем URL и custom-эмодзи (они не должны попадать под markdown),
+  // потом простой текст между ними прогоняем через renderMarkdown.
   const TOKEN = /(https?:\/\/[^\s]+)|\[([^\]]+)\]/g;
   const result = [];
   let last = 0, i = 0;
   let m;
   TOKEN.lastIndex = 0;
   while ((m = TOKEN.exec(text)) !== null) {
-    if (m.index > last) result.push(text.slice(last, m.index));
+    if (m.index > last) {
+      const plain = text.slice(last, m.index);
+      const rendered = renderMarkdown(plain, i);
+      if (Array.isArray(rendered)) result.push(...rendered);
+      else result.push(rendered);
+      i += 100; // запас по ключам для md
+    }
     if (m[1]) {
       const url = m[1];
       if (isChatVideoUrl(url)) {
-        // Video URL — render as card
         result.push(<ChatVideoCard key={i++} url={url}/>);
       } else {
-        // Regular URL
         result.push(
           <a key={i++} href={url} target="_blank" rel="noopener noreferrer"
             style={{color:'inherit',textDecoration:'underline',wordBreak:'break-all'}}
@@ -3643,7 +3684,6 @@ function renderText(text) {
         );
       }
     } else if (m[2] && HEY_EMOJI_SET.has(m[2])) {
-      // Custom emoji
       result.push(
         <img key={i++} src={`/emoji/${encodeURIComponent(m[2])}.svg`} alt={m[2]}
           style={{width:24,height:24,verticalAlign:'middle',display:'inline-block',
@@ -3654,29 +3694,41 @@ function renderText(text) {
     }
     last = m.index + m[0].length;
   }
-  if (last < text.length) result.push(text.slice(last));
+  if (last < text.length) {
+    const plain = text.slice(last);
+    const rendered = renderMarkdown(plain, i);
+    if (Array.isArray(rendered)) result.push(...rendered);
+    else result.push(rendered);
+  }
   return result;
 }
 
 function MediaViewerModal({ convId, onClose }) {
   const [tab,    setTab]    = useState('images');
-  const [media,  setMedia]  = useState([]);
+  const [images, setImages] = useState([]);
+  const [files,  setFiles]  = useState([]);
+  const [audios, setAudios] = useState([]);
   const [links,  setLinks]  = useState([]);
   const [loading,setLoading]= useState(true);
   const [light,  setLight]  = useState(null);
 
   useEffect(() => {
     api.getMedia(convId).then(msgs => {
-      // Берём как одиночные, так и галереи; разворачиваем галереи в отдельные элементы
-      const flat = [];
+      // Распределяем вложения по категориям
+      const imgs = [], fls = [], auds = [];
       for (const m of msgs) {
         const a = m.attachment;
-        if (a?.type === 'image' && a.url) flat.push({ ...m, attachment: a });
-        else if (a?.type === 'images' && Array.isArray(a.urls)) {
-          a.urls.forEach((u, i) => flat.push({ ...m, id: m.id + '_' + i, attachment: { type:'image', url:u } }));
+        if (!a) continue;
+        if (a.type === 'image' && a.url) imgs.push({ ...m, attachment: a });
+        else if (a.type === 'images' && Array.isArray(a.urls)) {
+          a.urls.forEach((u, i) => imgs.push({ ...m, id: m.id + '_' + i, attachment: { type:'image', url:u } }));
         }
+        else if (a.type === 'file') fls.push({ ...m, attachment: a });
+        else if (a.type === 'audio') auds.push({ ...m, attachment: a });
       }
-      setMedia(flat);
+      setImages(imgs);
+      setFiles(fls);
+      setAudios(auds);
       setLoading(false);
     }).catch(console.error);
     api.searchMessages(convId, 'http').then(msgs => {
@@ -3689,11 +3741,35 @@ function MediaViewerModal({ convId, onClose }) {
     }).catch(console.error);
   }, [convId]);
 
+  function fmtSize(bytes) {
+    if (bytes == null) return '';
+    if (bytes < 1024) return bytes + ' Б';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+  }
+  function fileEmoji(name, mime) {
+    const n = (name || '').toLowerCase();
+    if (mime === 'application/pdf' || n.endsWith('.pdf')) return '📕';
+    if (n.endsWith('.doc') || n.endsWith('.docx')) return '📘';
+    if (n.endsWith('.xls') || n.endsWith('.xlsx')) return '📗';
+    if (n.endsWith('.ppt') || n.endsWith('.pptx')) return '📙';
+    if (n.endsWith('.zip') || n.endsWith('.rar')) return '🗜️';
+    if (n.endsWith('.txt') || mime?.startsWith?.('text/')) return '📄';
+    return '📎';
+  }
+
   const overlay = { position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.6)',
     backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center' };
   const modal = { width:'min(94vw,480px)',maxHeight:'80vh',background:'rgba(45,36,80,.97)',
     borderRadius:20,display:'flex',flexDirection:'column',overflow:'hidden',
     boxShadow:'0 16px 48px rgba(0,0,0,.5)' };
+
+  const TABS = [
+    ['images', `Фото${images.length ? ` (${images.length})` : ''}`],
+    ['files',  `Файлы${files.length ? ` (${files.length})` : ''}`],
+    ['audios', `Аудио${audios.length ? ` (${audios.length})` : ''}`],
+    ['links',  `Ссылки${links.length ? ` (${links.length})` : ''}`],
+  ];
 
   return (
     <div style={overlay} onClick={onClose}>
@@ -3702,24 +3778,28 @@ function MediaViewerModal({ convId, onClose }) {
           <span style={{flex:1,color:'white',fontSize:17,fontWeight:600}}>Медиа и ссылки</span>
           <button onClick={onClose} style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',fontSize:22,cursor:'pointer'}}>✕</button>
         </div>
-        <div style={{display:'flex',gap:0,padding:'12px 20px 0',borderBottom:'1px solid rgba(255,255,255,.1)'}}>
-          {[['images','Медиа'],['links','Ссылки']].map(([id,label])=>(
+        <div style={{display:'flex',gap:0,padding:'12px 16px 0',borderBottom:'1px solid rgba(255,255,255,.1)',
+          overflowX:'auto'}}>
+          {TABS.map(([id,label])=>(
             <button key={id} onClick={()=>setTab(id)} style={{
-              background:'none',border:'none',padding:'8px 18px',cursor:'pointer',fontSize:14,
+              background:'none',border:'none',padding:'8px 14px',cursor:'pointer',fontSize:13,
+              whiteSpace:'nowrap',fontFamily:'inherit',
               color: tab===id ? 'white' : 'rgba(255,255,255,.45)',
               borderBottom: tab===id ? '2px solid rgba(180,140,220,.9)' : '2px solid transparent',
-              marginBottom:-1,transition:'color .15s'}}>
+              marginBottom:-1,transition:'color .15s',
+              fontWeight: tab===id ? 600 : 500}}>
               {label}
             </button>
           ))}
         </div>
         <div style={{flex:1,overflowY:'auto',padding:16}}>
           {loading && <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Загрузка…</div>}
+
           {!loading && tab==='images' && (
-            media.length === 0
-              ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет медиафайлов</div>
+            images.length === 0
+              ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет фото</div>
               : <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:4}}>
-                  {media.map(m => {
+                  {images.map(m => {
                     const src = m.attachment.url;
                     if (!src) return null;
                     return (
@@ -3730,6 +3810,56 @@ function MediaViewerModal({ convId, onClose }) {
                   })}
                 </div>
           )}
+
+          {!loading && tab==='files' && (
+            files.length === 0
+              ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет файлов</div>
+              : <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {files.map(m => {
+                    const a = m.attachment;
+                    return (
+                      <a key={m.id} href={a.url} target="_blank" rel="noreferrer" download={a.name}
+                        style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',
+                          borderRadius:10, background:'rgba(255,255,255,.06)',
+                          border:'1px solid rgba(255,255,255,.08)',color:'inherit',textDecoration:'none',
+                          transition:'background .15s'}}
+                        onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.12)'}
+                        onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,.06)'}>
+                        <span style={{fontSize:24,flexShrink:0,lineHeight:1}}>
+                          {fileEmoji(a.name, a.mime)}
+                        </span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{color:'white',fontSize:13,fontWeight:600,
+                            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                            {a.name || 'Файл'}
+                          </div>
+                          <div style={{color:'rgba(255,255,255,.45)',fontSize:11,marginTop:2}}>
+                            {fmtSize(a.size)}{m.sender_name ? ` · ${m.sender_name}` : ''} · {fmtTime(m.created_at)}
+                          </div>
+                        </div>
+                        <span style={{color:'rgba(255,255,255,.4)',fontSize:14}}>⬇</span>
+                      </a>
+                    );
+                  })}
+                </div>
+          )}
+
+          {!loading && tab==='audios' && (
+            audios.length === 0
+              ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет голосовых</div>
+              : <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {audios.map(m => (
+                    <div key={m.id} style={{padding:'10px 12px',borderRadius:10,
+                      background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)'}}>
+                      <AudioPlayer url={m.attachment.url} duration={m.attachment.duration} isOut={false}/>
+                      <div style={{color:'rgba(255,255,255,.45)',fontSize:11,marginTop:6}}>
+                        {m.sender_name || ''} · {fmtTime(m.created_at)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+          )}
+
           {!loading && tab==='links' && (
             links.length === 0
               ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет ссылок</div>
