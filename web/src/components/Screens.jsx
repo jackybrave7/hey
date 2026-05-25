@@ -4940,6 +4940,7 @@ const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut })
 
 export function ChatScreen() {
   const nav = useNavigate();
+  const location = useLocation();
   const { convId } = useParams();
   const { user } = useAuth();
 
@@ -5889,7 +5890,12 @@ export function ChatScreen() {
       {/* TopBar — клик на аватар/имя собеседника открывает его профиль */}
       <div className="topbar">
         <div className="topbar-inner">
-          <button className="back-btn" onClick={() => nav(-1)}>‹</button>
+          <button className="back-btn" onClick={() => {
+            // Если есть история в SPA — назад; иначе явно идём в список чатов
+            // (важно для прямых ссылок, refresh, push-навигации)
+            if (window.history.length > 1 && location.key !== 'default') nav(-1);
+            else nav('/chats');
+          }}>‹</button>
           {partner.isMonolog ? (
             <div style={{width:36,height:36,borderRadius:'12px',flexShrink:0,
               background:'linear-gradient(135deg,#5a4090,#8060c0)',
