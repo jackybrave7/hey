@@ -135,6 +135,29 @@ export async function uploadAudioBlob(blob, apiFns) {
 }
 
 /**
+ * Upload an arbitrary file (PDF, DOC, ZIP и т.п.) — без ресайза, как есть.
+ *
+ * @param {File} file
+ * @param {{ getPresignUrl }} apiFns
+ * @returns {Promise<{ url: string, name: string, size: number, mime: string }>}
+ */
+export async function uploadFile(file, apiFns) {
+  const contentType = file.type || 'application/octet-stream';
+  const presign = await apiFns.getPresignUrl('chat-file', contentType, file.size);
+  if (presign.uploadUrl) {
+    await putToS3(presign.uploadUrl, file, contentType, presign.headers || {});
+    return {
+      url:  presign.publicUrl,
+      name: file.name,
+      size: file.size,
+      mime: contentType,
+    };
+  }
+  // Local dev fallback не поддерживается для произвольных файлов
+  throw new Error('Загрузка файлов недоступна в локальной разработке без S3');
+}
+
+/**
  * Create an object URL for local preview without reading the whole file.
  * Remember to call URL.revokeObjectURL(url) when the preview is no longer needed.
  */

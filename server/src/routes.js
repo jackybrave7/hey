@@ -483,6 +483,21 @@ module.exports = function makeRouter(db, broadcast) {
     const allowed = {
       'chat-image':    ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
       'chat-audio':    ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'],
+      'chat-file':     [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/plain',
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/x-rar-compressed',
+        'application/vnd.rar',
+        'application/octet-stream', // fallback для ZIP/RAR на некоторых браузерах
+      ],
       'moment-image':  ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
       'moment-video':  ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'],
       'moment-audio':  ['audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/webm'],
@@ -497,6 +512,7 @@ module.exports = function makeRouter(db, broadcast) {
     const limits = {
       'chat-image':    isSuper ? 15 * MB : 8 * MB,
       'chat-audio':    10 * MB,                       // голосовухи — короткие
+      'chat-file':     isSuper ? 50 * MB : 25 * MB,   // документы и архивы
       'moment-image':  isSuper ? 15 * MB : 5 * MB,
       'moment-video':  isSuper ? 50 * MB : 20 * MB,
       'moment-audio':  isSuper ? 30 * MB : 5 * MB,
@@ -513,9 +529,11 @@ module.exports = function makeRouter(db, broadcast) {
     }
 
     const ext   = contentType.split('/')[1].split(';')[0].replace('quicktime','mov').replace('x-matroska','mkv');
+    // Расширение для chat-file берётся из имени файла на клиенте — здесь не критично
     const keyMap = {
       'chat-image':   `chat/${uuid()}.${ext}`,
       'chat-audio':   `chat/audio/${uuid()}.${ext}`,
+      'chat-file':    `chat/files/${uuid()}`,
       'moment-image': `moments/${uuid()}/media.${ext}`,
       'moment-video': `moments/${uuid()}/video.${ext}`,
       'moment-audio': `moments/${uuid()}/audio.${ext}`,

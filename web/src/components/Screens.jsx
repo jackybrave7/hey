@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
-import { uploadMedia, previewUrl, uploadAvatar, uploadAudioBlob } from '../lib/uploadMedia';
+import { uploadMedia, previewUrl, uploadAvatar, uploadAudioBlob, uploadFile } from '../lib/uploadMedia';
 import SuperLimitPopup from './super/SuperLimitPopup';
 import { useAuth } from '../AuthContext';
 import {
@@ -4255,6 +4255,46 @@ const MessageRow = memo(function MessageRow({
               isOut={isOut}
             />
           )}
+          {m.attachment?.type === 'file' && (
+            <a href={m.attachment.url} target="_blank" rel="noreferrer" download={m.attachment.name}
+              style={{
+                display:'flex', alignItems:'center', gap:10,
+                padding:'10px 12px', borderRadius:10, marginBottom: m.text ? 6 : 2,
+                background: isOut ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.18)',
+                border:'1px solid rgba(255,255,255,.1)',
+                color:'inherit', textDecoration:'none', maxWidth:300,
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = isOut ? 'rgba(255,255,255,.18)' : 'rgba(0,0,0,.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = isOut ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.18)'}>
+              <span style={{fontSize:28,flexShrink:0,lineHeight:1}}>
+                {(() => {
+                  const n = (m.attachment.name || '').toLowerCase();
+                  const mime = m.attachment.mime || '';
+                  if (mime === 'application/pdf' || n.endsWith('.pdf')) return '📕';
+                  if (n.endsWith('.doc') || n.endsWith('.docx')) return '📘';
+                  if (n.endsWith('.xls') || n.endsWith('.xlsx')) return '📗';
+                  if (n.endsWith('.ppt') || n.endsWith('.pptx')) return '📙';
+                  if (n.endsWith('.zip') || n.endsWith('.rar')) return '🗜️';
+                  if (n.endsWith('.txt') || mime.startsWith('text/')) return '📄';
+                  return '📎';
+                })()}
+              </span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600,overflow:'hidden',
+                  textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {m.attachment.name || 'Файл'}
+                </div>
+                <div style={{fontSize:11,opacity:.6,marginTop:2}}>
+                  {m.attachment.size != null ? (
+                    m.attachment.size < 1024 ? m.attachment.size + ' Б' :
+                    m.attachment.size < 1024 * 1024 ? (m.attachment.size / 1024).toFixed(1) + ' КБ' :
+                    (m.attachment.size / (1024 * 1024)).toFixed(1) + ' МБ'
+                  ) : 'Скачать'}
+                </div>
+              </div>
+              <span style={{fontSize:14,opacity:.6,flexShrink:0}}>⬇</span>
+            </a>
+          )}
           {m.text && <div style={{wordBreak:'break-word',whiteSpace:'pre-wrap'}}>{renderText(m.text)}</div>}
           <div style={{fontSize:11,opacity:.6,textAlign:'right',marginTop:3,display:'flex',justifyContent:'flex-end',gap:4}}>
             {m.edited_at && <span>изм.</span>}
@@ -4426,6 +4466,7 @@ export function ChatScreen() {
   const [msgMenu,     setMsgMenu]     = useState(null);
   const [replyTo,     setReplyTo]     = useState(null); // message object to reply to
   const [imgPreviews, setImgPreviews] = useState([]); // [{dataUrl, file, uploading?}]
+  const [filePreview, setFilePreview] = useState(null); // { file, uploading?: bool }
   const [lightbox,    setLightbox]    = useState(null); // null | { urls: string[], index: number }
   const [showMedia,   setShowMedia]   = useState(false);
   const [searchMode,  setSearchMode]  = useState(false);
@@ -4900,26 +4941,65 @@ export function ChatScreen() {
     e.target.value = '';
     if (!files.length) return;
 
-    const MAX_TOTAL = 10;
-    const remaining = MAX_TOTAL - imgPreviews.length;
-    if (remaining <= 0) { heyToast(`Можно прикрепить максимум ${MAX_TOTAL} изображений`, 'warning'); return; }
+    // Разделяем: изображения → в preview-бар (галерея до 10),
+    //            прочие файлы → в filePreview (один файл, отправляется один сообщением)
+    const images = files.filter(f => f.type.startsWith('image/'));
+    const others = files.filter(f => !f.type.startsWith('image/'));
 
-    const added = [];
-    for (const file of files.slice(0, remaining)) {
-      if (!file.type.startsWith('image/')) {
-        heyToast(`«${file.name}» — не изображение`, 'warning');
-        continue;
+    if (images.length) {
+      const MAX_TOTAL = 10;
+      const remaining = MAX_TOTAL - imgPreviews.length;
+      if (remaining <= 0) {
+        heyToast(`Можно прикрепить максимум ${MAX_TOTAL} изображений`, 'warning');
+      } else {
+        const added = [];
+        for (const file of images.slice(0, remaining)) {
+          if (file.size > 10 * 1024 * 1024) {
+            heyToast(`«${file.name}» слишком большой (макс. 10 МБ)`, 'warning');
+            continue;
+          }
+          added.push({ dataUrl: previewUrl(file), file, uploading: false });
+        }
+        if (added.length) setImgPreviews(prev => [...prev, ...added]);
+        if (images.length > remaining) {
+          heyToast(`Лимит ${MAX_TOTAL} картинок — лишние не добавлены`, 'warning');
+        }
       }
-      if (file.size > 10 * 1024 * 1024) {
-        heyToast(`«${file.name}» слишком большой (макс. 10 МБ)`, 'warning');
-        continue;
+    }
+
+    if (others.length) {
+      if (filePreview) {
+        heyToast('Файл уже выбран — отправь или удали его', 'warning');
+        return;
       }
-      added.push({ dataUrl: previewUrl(file), file, uploading: false });
+      const file = others[0];
+      const maxMb = user?.is_super ? 50 : 25;
+      if (file.size > maxMb * 1024 * 1024) {
+        heyToast(`«${file.name}» слишком большой (макс. ${maxMb} МБ)`, 'warning');
+        return;
+      }
+      if (others.length > 1) {
+        heyToast('Можно прикрепить только один файл за раз', 'warning');
+      }
+      setFilePreview({ file, uploading: false });
     }
-    if (added.length) setImgPreviews(prev => [...prev, ...added]);
-    if (files.length > remaining) {
-      heyToast(`Лимит ${MAX_TOTAL} картинок — лишние не добавлены`, 'warning');
-    }
+  }
+
+  function fmtFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' Б';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+  }
+
+  function fileIcon(mime, name) {
+    const lname = (name || '').toLowerCase();
+    if (mime === 'application/pdf' || lname.endsWith('.pdf')) return '📕';
+    if (lname.endsWith('.doc') || lname.endsWith('.docx')) return '📘';
+    if (lname.endsWith('.xls') || lname.endsWith('.xlsx')) return '📗';
+    if (lname.endsWith('.ppt') || lname.endsWith('.pptx')) return '📙';
+    if (lname.endsWith('.zip') || lname.endsWith('.rar')) return '🗜️';
+    if (lname.endsWith('.txt') || mime?.startsWith('text/')) return '📄';
+    return '📎';
   }
 
   async function send() {
@@ -4964,6 +5044,41 @@ export function ChatScreen() {
       // Освобождаем object URLs
       captured.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
       setImgPreviews([]);
+      setText('');
+      setReplyTo(null);
+      return;
+    }
+
+    // Отправка файла (PDF/DOC/архив и т.п.)
+    if (filePreview) {
+      const f = filePreview.file;
+      setFilePreview(p => p ? { ...p, uploading: true } : p);
+      let uploaded;
+      try {
+        uploaded = await uploadFile(f, { getPresignUrl: api.getPresignUrl });
+      } catch (err) {
+        heyToast(err.message || 'Не удалось загрузить файл', 'error');
+        setFilePreview(p => p ? { ...p, uploading: false } : p);
+        return;
+      }
+      const attachment = {
+        type: 'file',
+        url: uploaded.url,
+        name: uploaded.name,
+        size: uploaded.size,
+        mime: uploaded.mime,
+      };
+      const tempId = 'tmp-' + Date.now();
+      const reply  = replyTo ? makeReplySnippet(replyTo) : null;
+      forceScrollBottom.current = true;
+      setMessages(prev => [...prev, {
+        id: tempId, text: t || null, attachment, sender_id: user.id,
+        sender_name: user.name, status:'sent',
+        created_at: Math.floor(Date.now()/1000),
+        reply_to_id: replyTo?.id || null, reply_to: reply,
+      }]);
+      socket.sendMessage(convId, t || '', tempId, attachment, replyTo?.id);
+      setFilePreview(null);
       setText('');
       setReplyTo(null);
       return;
@@ -5419,6 +5534,35 @@ export function ChatScreen() {
         </button>
       )}
 
+      {/* File preview bar — один файл с именем/размером */}
+      {filePreview && (
+        <div style={{background:'rgba(100,78,148,.45)',flexShrink:0}}>
+          <div style={{padding:'10px 14px',maxWidth:680,margin:'0 auto',
+            display:'flex',alignItems:'center',gap:12}}>
+            <span style={{fontSize:28,flexShrink:0}}>
+              {fileIcon(filePreview.file.type, filePreview.file.name)}
+            </span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:'white',fontSize:14,fontWeight:600,
+                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {filePreview.file.name}
+              </div>
+              <div style={{color:'rgba(255,255,255,.55)',fontSize:12,marginTop:2}}>
+                {fmtFileSize(filePreview.file.size)}
+                {filePreview.uploading && ' · отправка…'}
+              </div>
+            </div>
+            <button onClick={() => setFilePreview(null)}
+              disabled={filePreview.uploading}
+              style={{background:'rgba(0,0,0,.4)',border:'none',color:'white',
+                fontSize:14,cursor: filePreview.uploading ? 'wait' : 'pointer',
+                width:28,height:28,borderRadius:'50%',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                flexShrink:0,lineHeight:1}}>✕</button>
+          </div>
+        </div>
+      )}
+
       {/* Image previews bar — до 10 миниатюр в ряд */}
       {imgPreviews.length > 0 && (
         <div style={{background:'rgba(100,78,148,.45)',flexShrink:0}}>
@@ -5779,7 +5923,7 @@ export function ChatScreen() {
                 style={{width:22,height:22,display:'block',pointerEvents:'none'}}/>
             </button>
             {/* Attach */}
-            <button onClick={() => fileInputRef.current?.click()} title="Прикрепить изображение"
+            <button onClick={() => fileInputRef.current?.click()} title="Прикрепить файл или картинку"
               style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
                 padding:4,opacity:.8,transition:'opacity .15s'}}
               onMouseEnter={e=>e.currentTarget.style.opacity='1'}
@@ -5789,10 +5933,10 @@ export function ChatScreen() {
                   filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
             </button>
             <input ref={fileInputRef} type="file" multiple
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
               style={{display:'none'}} onChange={handleFileSelect}/>
             {/* Mic / Send — inside the pill */}
-            {text.trim() || imgPreviews.length > 0 ? (
+            {text.trim() || imgPreviews.length > 0 || filePreview ? (
               <button onClick={send} title="Отправить"
                 style={{width:36,height:36,background:'rgba(100,78,148,.85)',border:'none',
                   borderRadius:18,cursor:'pointer',display:'flex',alignItems:'center',
