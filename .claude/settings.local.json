@@ -169,7 +169,19 @@
       "Bash(node -e \"console.log\\(encodeURIComponent\\('Тестовый курс Хей'\\)\\)\")",
       "Bash(curl -sS 'https://hey-messenger.ru/api/join/validate?email=__TRACKED_VAR__&course=__TRACKED_VAR__')",
       "Bash(grep -n \"isGroup.*icon\\\\|c.icon\\\\|partner.icon\\\\|\\\\\\\\.icon \\\\|\\\\\\\\.\\\\\\\\.\\\\\\\\.c.icon\\\\\\\\b\" C:/projects/hey/web/src/components/Screens.jsx)",
-      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app && git pull origin main 2>&1 | tail -2 && pm2 restart hey --update-env 2>&1 | tail -2\")"
+      "Bash(ssh -o BatchMode=yes root@72.56.16.44 \"cd /app && git pull origin main 2>&1 | tail -2 && pm2 restart hey --update-env 2>&1 | tail -2\")",
+      "Bash(where pdftk *)",
+      "Bash(where pdftoppm *)",
+      "Bash(where pdftotext *)",
+      "Bash(where gs *)",
+      "Bash(powershell -Command \"Get-Command pdftk,pdftoppm,pdftotext,gs -ErrorAction SilentlyContinue | Select-Object Name, Source\")",
+      "Bash(pdftotext -l 20 -layout \"Евгений/HEY/prilozhenie-2.pdf\" /tmp/pdf_preview.txt)",
+      "Bash(where pdftoppm.exe)",
+      "Bash(pdftotext -l 10 -layout \"/c/Users/User/Desktop/Евгений/HEY/prilozhenie-1.pdf\" /tmp/p1.txt)",
+      "Bash(where magick *)",
+      "Bash(powershell \"Get-Command magick,convert,python3,python -ErrorAction SilentlyContinue | Select Name,Source\")",
+      "Bash(python3 -c \"import fitz; print\\(fitz.__version__\\)\")",
+      "Bash(python3 -m pip install --quiet pymupdf)"
     ]
   }
 }

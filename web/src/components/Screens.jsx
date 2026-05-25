@@ -351,6 +351,24 @@ function fmtLastSeenShort(ts) {
   return new Date(ts * 1000).toLocaleDateString('ru', { day:'numeric', month:'short' });
 }
 
+// Длинная форма «заходила 15 марта в 17:55» для шапки чата (как в дизайне)
+function fmtLastSeenLong(ts, isFemale) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  const diffMin = Math.floor((Date.now() - ts * 1000) / 60000);
+  const verb = isFemale ? 'заходила' : 'заходил';
+  if (diffMin < 1)  return 'только что';
+  if (diffMin < 60) return `${verb} ${diffMin} мин назад`;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const msgDay = new Date(d); msgDay.setHours(0,0,0,0);
+  const time = d.toLocaleTimeString('ru', { hour:'2-digit', minute:'2-digit' });
+  if (msgDay.getTime() === today.getTime())     return `${verb} сегодня в ${time}`;
+  if (msgDay.getTime() === yesterday.getTime()) return `${verb} вчера в ${time}`;
+  const date = d.toLocaleDateString('ru', { day:'numeric', month:'long' });
+  return `${verb} ${date} в ${time}`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SplashScreen
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4268,11 +4286,12 @@ const MessageRow = memo(function MessageRow({
           style={{
             background: editingMsgId === m.id
               ? 'rgba(160,120,210,.85)'
-              : isOut ? 'rgba(110,80,155,.70)' : 'rgba(255,255,255,.90)',
-            borderRadius: isOut ? '20px 20px 5px 20px' : '20px 20px 20px 5px',
-            padding:'10px 13px 6px',
-            color: isOut ? 'white' : '#2a2040',
+              : isOut ? 'rgba(77,45,122,.82)' : 'rgba(250,243,242,.94)',
+            borderRadius: isOut ? '22px 22px 6px 22px' : '22px 22px 22px 6px',
+            padding:'11px 14px 7px',
+            color: isOut ? 'white' : '#352244',
             fontSize:14, lineHeight:'1.5',
+            boxShadow: isOut ? '0 2px 8px rgba(60,30,100,.18)' : '0 2px 8px rgba(60,30,100,.1)',
             transition:'background .2s'
           }}>
           {isGroup && !isOut && (
@@ -4429,25 +4448,31 @@ const MessageRow = memo(function MessageRow({
           </div>
         </div>
 
-        {/* Reaction chips */}
+        {/* Reaction chips — компактный пилюлеобразный чип под пузырём */}
         {hasReactions && (
-          <div style={{display:'flex', flexWrap:'wrap', gap:4, marginTop:5}}>
+          <div style={{display:'flex', flexWrap:'wrap', gap:4,
+            marginTop:-10, marginLeft: isOut ? 0 : 12, marginRight: isOut ? 12 : 0,
+            position:'relative', zIndex:1}}>
             {Object.entries(m.reactions).map(([emoji, userIds]) => {
               const iReacted = userIds.includes(currentUserId);
               return (
                 <button key={emoji} onClick={() => onToggleReaction(m.id, emoji)}
                   title={emoji}
                   style={{
-                    background: iReacted ? 'rgba(130,100,190,.6)' : 'rgba(255,255,255,.18)',
-                    border: iReacted ? '1px solid rgba(170,130,220,.75)' : '1px solid rgba(255,255,255,.12)',
-                    borderRadius:14, padding:'2px 8px', cursor:'pointer',
-                    display:'flex', alignItems:'center', gap:4, fontSize:12,
-                    color:'white', transition:'background .15s'
+                    background: iReacted ? 'rgba(140,110,210,.85)' : 'rgba(255,255,255,.95)',
+                    border: iReacted
+                      ? '1px solid rgba(180,150,230,.6)'
+                      : '1px solid rgba(170,140,210,.4)',
+                    borderRadius:16, padding:'3px 9px 3px 7px', cursor:'pointer',
+                    display:'flex', alignItems:'center', gap:5, fontSize:11,
+                    color: iReacted ? 'white' : '#4a2a70',
+                    boxShadow:'0 2px 6px rgba(60,30,100,.18)',
+                    transition:'background .15s'
                   }}>
                   <img src={`/emoji/${encodeURIComponent(emoji)}.svg`} alt={emoji}
-                    style={{width:16, height:16,
-                      filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
-                  <span style={{fontWeight:600}}>{userIds.length}</span>
+                    style={{width:14, height:14,
+                      filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.3))'}}/>
+                  <span style={{fontWeight:700}}>{userIds.length}</span>
                 </button>
               );
             })}
@@ -5483,13 +5508,14 @@ export function ChatScreen() {
       background:'var(--grad)',
     }}>
       {/* TopBar — клик на аватар/имя собеседника открывает его профиль */}
-      <div className="topbar">
+      <div className="topbar" style={{paddingTop:6,paddingBottom:8}}>
         <div className="topbar-inner">
           <button className="back-btn" onClick={() => nav(-1)}>‹</button>
           {partner.isMonolog ? (
-            <div style={{width:36,height:36,borderRadius:'12px',flexShrink:0,
+            <div style={{width:44,height:44,borderRadius:'50%',flexShrink:0,
               background:'linear-gradient(135deg,#5a4090,#8060c0)',
-              display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>
+              border:'2px solid rgba(255,255,255,.25)',
+              display:'flex',alignItems:'center',justifyContent:'center',fontSize:22}}>
               📝
             </div>
           ) : partner.isGroup ? (() => {
@@ -5497,9 +5523,10 @@ export function ChatScreen() {
             const isImg = ic.startsWith('http') || ic.startsWith('/') || ic.startsWith('data:');
             return (
               <div onClick={() => nav(`/groups/${convId}/settings`)}
-                style={{width:36,height:36,borderRadius:'12px',flexShrink:0,cursor:'pointer',overflow:'hidden',
+                style={{width:44,height:44,borderRadius:'50%',flexShrink:0,cursor:'pointer',overflow:'hidden',
+                  border:'2px solid rgba(255,255,255,.25)',
                   background: isImg ? '#0a0518' : 'rgba(140,100,200,.5)',
-                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,transition:'transform .15s'}}
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,transition:'transform .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'}
                 onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
                 {isImg
@@ -5510,18 +5537,21 @@ export function ChatScreen() {
           })() : (
             <div onClick={() => partner.id && nav(`/profile/${partner.id}`)}
               style={{cursor: partner.id ? 'pointer' : 'default',transition:'transform .15s',
-                position:'relative',width:36,height:36,flexShrink:0}}
+                position:'relative',width:44,height:44,flexShrink:0,
+                borderRadius:'50%',
+                border:'2px solid rgba(255,255,255,.25)',
+                overflow:'hidden'}}
               onMouseEnter={e=>{ if(partner.id) e.currentTarget.style.transform='scale(1.05)'; }}
               onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-              <AvatarDisplay avatar={partner.avatar} name={partner.name} size={36}/>
+              <AvatarDisplay avatar={partner.avatar} name={partner.name} size={40}/>
               {partner.isSuper && (
                 <div style={{
-                  position:'absolute',bottom:-1,right:-1,
-                  width:14,height:14,borderRadius:'50%',
+                  position:'absolute',bottom:-2,right:-2,
+                  width:16,height:16,borderRadius:'50%',
                   background:'linear-gradient(135deg,#c8a8ff,#7858b0)',
                   border:'2px solid var(--topbar-bg,#1a0e36)',
                   display:'flex',alignItems:'center',justifyContent:'center',
-                  fontSize:7,color:'white',fontWeight:700,
+                  fontSize:8,color:'white',fontWeight:700,
                   pointerEvents:'none',
                 }}>✦</div>
               )}
@@ -5531,24 +5561,33 @@ export function ChatScreen() {
               if (partner.isGroup) nav(`/groups/${convId}/settings`);
               else if (partner.id) nav(`/profile/${partner.id}`);
             }}
-            style={{flex:1,marginLeft:8,minWidth:0,
+            style={{flex:1,marginLeft:10,minWidth:0,
               cursor: (partner.isGroup || partner.id) ? 'pointer' : 'default'}}>
-            <div className="topbar-title" style={{flex:'unset'}}>{partner.name}</div>
-            {partner.isGroup && <div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>группа</div>}
-            {/* Super видит когда собеседник был онлайн в чате */}
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <div className="topbar-title" style={{flex:'unset'}}>{partner.name}</div>
+              {partner.online && !partner.isGroup && !partner.isMonolog && (
+                <span style={{
+                  width:8,height:8,borderRadius:'50%',
+                  background:'rgba(110,235,150,.95)',
+                  boxShadow:'0 0 6px rgba(110,235,150,.6)',
+                  flexShrink:0,
+                }}/>
+              )}
+            </div>
+            {partner.isGroup && <div style={{fontSize:11,color:'rgba(255,255,255,.55)'}}>группа</div>}
+            {/* Super видит когда собеседник был онлайн в чате — расширенный формат */}
             {!partner.isGroup && !partner.isMonolog && partner.id && user?.is_super && (
               partner.online ? (
-                <div style={{fontSize:11,color:'rgba(110,235,150,.95)',fontWeight:500}}>
+                <div style={{fontSize:12,color:'rgba(255,255,255,.65)',fontWeight:500}}>
                   онлайн
                 </div>
               ) : partner.lastSeen ? (
-                <div style={{fontSize:11,color:'rgba(255,255,255,.55)'}}>
-                  был {fmtLastSeenShort(partner.lastSeen)}
+                <div style={{fontSize:12,color:'rgba(255,255,255,.6)'}}>
+                  {fmtLastSeenLong(partner.lastSeen, true)}
                 </div>
               ) : null
             )}
           </div>
-          {partner.online && !partner.isGroup && !partner.isMonolog && <div className="online-dot"/>}
           <DotsMenu items={chatMenuItems}/>
         </div>
       </div>
@@ -5634,9 +5673,10 @@ export function ChatScreen() {
           }}
           itemContent={(_index, item) => {
             if (item.type === 'date') return (
-              <div style={{display:'flex',justifyContent:'center',margin:'8px 16px'}}>
-                <div style={{background:'rgba(100,72,140,.38)',borderRadius:14,padding:'4px 14px',
-                  color:'rgba(255,255,255,.7)',fontSize:13,fontWeight:600}}>
+              <div style={{display:'flex',justifyContent:'center',margin:'14px 16px 10px'}}>
+                <div style={{background:'rgba(140,110,180,.32)',backdropFilter:'blur(6px)',
+                  borderRadius:18,padding:'6px 16px',
+                  color:'rgba(255,255,255,.78)',fontSize:13,fontWeight:600,letterSpacing:.2}}>
                   {item.label}
                 </div>
               </div>
@@ -6073,10 +6113,13 @@ export function ChatScreen() {
 
         {/* ── Normal text input bar (hidden while recording/preview/system) ── */}
         {!voiceState && !partner.isSystem && (
-        <div style={{padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
+        <div style={{padding:'8px 14px 14px',maxWidth:680,margin:'0 auto',
+          display:'flex',alignItems:'center',gap:10}}>
+          {/* Pill: textarea + emoji + paperclip */}
           <div style={{
+            flex:1,
             borderRadius:26,
-            display:'flex', alignItems:'center', padding:'8px 8px 8px 14px', gap:6,
+            display:'flex', alignItems:'center', padding:'8px 12px 8px 16px', gap:8,
             backgroundImage:'url(/input-bg.jpg)',
             backgroundSize:'cover',
             backgroundPosition:'center',
@@ -6109,29 +6152,33 @@ export function ChatScreen() {
             <input ref={fileInputRef} type="file" multiple
               accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
               style={{display:'none'}} onChange={handleFileSelect}/>
-            {/* Mic / Send — inside the pill */}
-            {text.trim() || imgPreviews.length > 0 || filePreview ? (
-              <button onClick={send} title="Отправить"
-                style={{width:36,height:36,background:'rgba(100,78,148,.85)',border:'none',
-                  borderRadius:18,cursor:'pointer',display:'flex',alignItems:'center',
-                  justifyContent:'center',flexShrink:0,fontSize:17,color:'white',
-                  transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.95)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.85)'}>
-                ➤
-              </button>
-            ) : (
-              <button onClick={startRecording} title="Голосовое сообщение"
-                style={{width:36,height:36,background:'rgba(100,78,148,.85)',border:'none',
-                  borderRadius:18,cursor:'pointer',display:'flex',alignItems:'center',
-                  justifyContent:'center',flexShrink:0,fontSize:17,color:'white',
-                  transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.95)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.85)'}>
-                🎙
-              </button>
-            )}
           </div>
+          {/* Mic / Send — отдельная круглая кнопка снаружи пилюли */}
+          {text.trim() || imgPreviews.length > 0 || filePreview ? (
+            <button onClick={send} title="Отправить"
+              style={{width:46,height:46,background:'linear-gradient(135deg,rgba(120,90,200,.95),rgba(80,55,150,.95))',
+                border:'none',borderRadius:'50%',cursor:'pointer',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                flexShrink:0,fontSize:18,color:'white',
+                boxShadow:'0 4px 14px rgba(60,30,120,.4)',
+                transition:'transform .15s,filter .15s'}}
+              onMouseEnter={e=>{ e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.filter='brightness(1.1)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.filter='brightness(1)'; }}>
+              ➤
+            </button>
+          ) : (
+            <button onClick={startRecording} title="Голосовое сообщение"
+              style={{width:46,height:46,background:'linear-gradient(135deg,rgba(120,90,200,.95),rgba(80,55,150,.95))',
+                border:'none',borderRadius:'50%',cursor:'pointer',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                flexShrink:0,fontSize:18,color:'white',
+                boxShadow:'0 4px 14px rgba(60,30,120,.4)',
+                transition:'transform .15s,filter .15s'}}
+              onMouseEnter={e=>{ e.currentTarget.style.transform='scale(1.05)'; e.currentTarget.style.filter='brightness(1.1)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.filter='brightness(1)'; }}>
+              🎙
+            </button>
+          )}
         </div>
         )}
 
