@@ -237,7 +237,7 @@ function ReportModal({ targetType, targetId, onClose, onSent }) {
   const [sending, setSending] = useState(false);
   const [error, setError]   = useState('');
 
-  const MIN = 20;
+  const MIN = 5;
   const MAX = 1000;
   const trimmed = text.trim();
   const canSend = trimmed.length >= MIN && trimmed.length <= MAX;
@@ -927,7 +927,9 @@ export default function MomentDetailPopup({
         onClose={() => setReportOpen(false)}
         onSent={() => {
           setReportOpen(false);
-          alert('✓ Жалоба отправлена. Спасибо, мы рассмотрим её.');
+          window.dispatchEvent(new CustomEvent('hey:toast', {
+            detail: { message: '✓ Жалоба отправлена. Спасибо, мы рассмотрим её.', type: 'success' }
+          }));
         }}
       />
     )}
