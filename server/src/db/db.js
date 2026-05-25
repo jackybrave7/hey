@@ -481,17 +481,23 @@ function getContacts(ownerId) {
 
 function deleteUserAccount(userId) {
   const t = now();
+  // phone имеет NOT NULL + UNIQUE — нельзя выставлять NULL.
+  // Подставляем уникальный плейсхолдер, чтобы освободить «настоящий» телефон
+  // для повторной регистрации и не нарушать constraint.
+  const placeholderPhone = `_deleted_${userId.replace(/-/g,'').slice(0,12)}_${t}`;
   db.transaction(() => {
-    // Anonymise personal data
     db.prepare(
       `UPDATE users SET
          is_deleted=1, deleted_at=?,
          name='Удалённый пользователь',
-         phone=NULL,
+         phone=?,
+         email=NULL,
          avatar=NULL,
+         bio=NULL,
+         headline=NULL,
          password=?
        WHERE id=?`
-    ).run(t, `DELETED_${userId}_${t}`, userId);
+    ).run(t, placeholderPhone, `DELETED_${userId}_${t}`, userId);
     // Archive all active moments so they vanish from feeds
     db.prepare(
       `UPDATE moments SET status='archived' WHERE user_id=? AND status='active'`

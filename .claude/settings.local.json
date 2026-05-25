@@ -131,7 +131,8 @@
       "Bash(git checkout *)",
       "Bash(grep -n \"^function\\\\|^const stmt\\\\|^app\\\\\\\\.\\\\\\\\|router\\\\\\\\.\\\\\\\\|makeRouter\\\\\\\\|module.exports\\\\\\\\|require\\\\\\\\\\(\" C:/projects/hey/server/src/routes.js)",
       "Bash(node -e \"require\\('./src/awo.js'\\); console.log\\('awo ok'\\); const db=require\\('./src/db/db.js'\\); console.log\\('db ok, school:', db.SCHOOL_USER_ID, db.getSchoolAccount\\(\\)?.name\\);\")",
-      "Bash(node -e \"const express=require\\('express'\\); const app=express\\(\\); const makeRouter=require\\('./src/routes.js'\\); app.use\\('/api', makeRouter\\(require\\('./src/db/db.js'\\), \\(\\)=>{}\\)\\); console.log\\('routes ok'\\);\")"
+      "Bash(node -e \"const express=require\\('express'\\); const app=express\\(\\); const makeRouter=require\\('./src/routes.js'\\); app.use\\('/api', makeRouter\\(require\\('./src/db/db.js'\\), \\(\\)=>{}\\)\\); console.log\\('routes ok'\\);\")",
+      "Bash(node -e \"const db=require\\('./src/db/db.js'\\); console.log\\('ok'\\);\")"
     ]
   }
 }
