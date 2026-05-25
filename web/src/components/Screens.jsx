@@ -7453,6 +7453,22 @@ export function SettingsScreen() {
                   <div style={{color:'rgba(255,255,255,.78)', fontSize:13, lineHeight:1.6}}>
                     Получайте push-уведомления о новых сообщениях, даже когда HEY свёрнут или вкладка закрыта.
                   </div>
+                  <button onClick={() => nav('/help#notifications')}
+                    style={{
+                      alignSelf:'flex-start',
+                      background:'rgba(120,90,200,.18)',
+                      border:'1px solid rgba(180,140,220,.35)',
+                      borderRadius:10, padding:'7px 14px',
+                      color:'rgba(220,200,255,.95)', fontSize:12, fontWeight:600,
+                      cursor:'pointer', fontFamily:'inherit',
+                      display:'flex', alignItems:'center', gap:6,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background='rgba(120,90,200,.32)'}
+                    onMouseLeave={e => e.currentTarget.style.background='rgba(120,90,200,.18)'}>
+                    <span>📖</span>
+                    <span>Подробная инструкция по браузерам</span>
+                    <span style={{opacity:.6}}>→</span>
+                  </button>
                   {notifPerm === 'unsupported' && (
                     <div style={{color:'rgba(255,210,120,.95)', fontSize:13}}>
                       Браузер не поддерживает уведомления
