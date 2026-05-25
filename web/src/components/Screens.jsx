@@ -3923,10 +3923,10 @@ function MediaViewerModal({ convId, onClose }) {
     boxShadow:'0 16px 48px rgba(0,0,0,.5)' };
 
   const TABS = [
-    ['images', `Фото${images.length ? ` (${images.length})` : ''}`],
-    ['files',  `Файлы${files.length ? ` (${files.length})` : ''}`],
-    ['audios', `Аудио${audios.length ? ` (${audios.length})` : ''}`],
-    ['links',  `Ссылки${links.length ? ` (${links.length})` : ''}`],
+    ['images', '🖼', 'Фото',   images.length],
+    ['files',  '📎', 'Файлы',  files.length],
+    ['audios', '🎙', 'Аудио',  audios.length],
+    ['links',  '🔗', 'Ссылки', links.length],
   ];
 
   return (
@@ -3936,17 +3936,23 @@ function MediaViewerModal({ convId, onClose }) {
           <span style={{flex:1,color:'white',fontSize:17,fontWeight:600}}>Медиа и ссылки</span>
           <button onClick={onClose} style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',fontSize:22,cursor:'pointer'}}>✕</button>
         </div>
-        <div style={{display:'flex',gap:0,padding:'12px 16px 0',borderBottom:'1px solid rgba(255,255,255,.1)',
-          overflowX:'auto'}}>
-          {TABS.map(([id,label])=>(
+        <div style={{display:'flex',gap:0,padding:'10px 8px 0',borderBottom:'1px solid rgba(255,255,255,.1)'}}>
+          {TABS.map(([id,icon,label,count])=>(
             <button key={id} onClick={()=>setTab(id)} style={{
-              background:'none',border:'none',padding:'8px 14px',cursor:'pointer',fontSize:13,
-              whiteSpace:'nowrap',fontFamily:'inherit',
-              color: tab===id ? 'white' : 'rgba(255,255,255,.45)',
+              flex:1, background:'none',border:'none',padding:'8px 4px',cursor:'pointer',
+              fontFamily:'inherit',
+              display:'flex',flexDirection:'column',alignItems:'center',gap:2,
+              color: tab===id ? 'white' : 'rgba(255,255,255,.5)',
               borderBottom: tab===id ? '2px solid rgba(180,140,220,.9)' : '2px solid transparent',
               marginBottom:-1,transition:'color .15s',
-              fontWeight: tab===id ? 600 : 500}}>
-              {label}
+              fontWeight: tab===id ? 600 : 500,
+              minWidth:0,
+            }}>
+              <span style={{fontSize:18,lineHeight:1}}>{icon}</span>
+              <span style={{fontSize:11,whiteSpace:'nowrap',
+                overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>
+                {label}{count > 0 ? ` · ${count}` : ''}
+              </span>
             </button>
           ))}
         </div>
