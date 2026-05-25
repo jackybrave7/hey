@@ -252,24 +252,82 @@ const editTextareaStyle = {
 // ── Рассылка сообщения ─────────────────────────────────────────────────
 function BroadcastForm() {
   const [text, setText]       = useState('');
+  const [imgs, setImgs]       = useState([]); // [{dataUrl, file, uploading, url?}]
   const [sending, setSending] = useState(false);
   const [result, setResult]   = useState(null);
   const [error, setError]     = useState('');
   const [confirming, setConfirming] = useState(false);
+  const fileRef = useRef();
+
+  const MAX_IMGS = 10;
+  const canSend = (text.trim().length > 0 || imgs.length > 0) && !imgs.some(i => i.uploading);
+
+  function handleFiles(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    const remaining = MAX_IMGS - imgs.length;
+    if (remaining <= 0) { setError(`Максимум ${MAX_IMGS} картинок`); return; }
+    setError('');
+    const added = [];
+    for (const f of files.slice(0, remaining)) {
+      if (!f.type.startsWith('image/'))    { setError(`«${f.name}» не картинка`); continue; }
+      if (f.size > 10 * 1024 * 1024)       { setError(`«${f.name}» больше 10 МБ`); continue; }
+      added.push({ dataUrl: previewUrl(f), file: f, uploading: false });
+    }
+    if (added.length) setImgs(prev => [...prev, ...added]);
+  }
+
+  function removeImg(idx) {
+    setImgs(prev => {
+      const item = prev[idx];
+      if (item?.dataUrl) { try { URL.revokeObjectURL(item.dataUrl); } catch {} }
+      return prev.filter((_, i) => i !== idx);
+    });
+  }
+
+  async function uploadAll() {
+    setImgs(prev => prev.map(p => p.url ? p : ({ ...p, uploading: true })));
+    const updated = [...imgs];
+    for (let i = 0; i < updated.length; i++) {
+      if (updated[i].url) continue; // уже загружено
+      try {
+        const res = await uploadMedia(updated[i].file, 'chat-image', {
+          getPresignUrl: api.getPresignUrl,
+          uploadImage:   api.uploadImage,
+        });
+        updated[i] = { ...updated[i], url: res.url, uploading: false };
+      } catch (e) {
+        throw new Error(`Не удалось загрузить «${updated[i].file.name}»: ${e.message}`);
+      }
+    }
+    setImgs(updated);
+    return updated.map(p => p.url).filter(Boolean);
+  }
 
   async function send() {
     setError('');
-    const trimmed = text.trim();
-    if (trimmed.length < 5) { setError('Слишком короткое сообщение'); return; }
     if (!confirming) { setConfirming(true); return; }
     setSending(true);
     setConfirming(false);
     try {
-      const res = await api.adminSystemBroadcast(trimmed);
+      let attachment = null;
+      if (imgs.length === 1) {
+        const urls = await uploadAll();
+        attachment = { type: 'image', url: urls[0] };
+      } else if (imgs.length > 1) {
+        const urls = await uploadAll();
+        attachment = { type: 'images', urls };
+      }
+      const res = await api.adminSystemBroadcast(text.trim(), attachment);
       setResult(res);
+      // Очистка
+      imgs.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
+      setImgs([]);
       setText('');
     } catch (e) {
       setError(e.message || 'Ошибка отправки');
+      setImgs(prev => prev.map(p => ({ ...p, uploading: false })));
     }
     setSending(false);
   }
@@ -279,7 +337,7 @@ function BroadcastForm() {
       background: 'rgba(255,255,255,.04)', borderRadius: 14,
       border: '1px solid rgba(255,255,255,.08)', padding: 20,
     }}>
-      <div style={{ color: 'rgba(255,255,255,.65)', fontSize: 13, marginBottom: 8 }}>
+      <div style={{ color: 'rgba(255,255,255,.7)', fontSize: 13, marginBottom: 8 }}>
         Текст сообщения (придёт всем юзерам в чат с HEY-заведующим):
       </div>
       <textarea
@@ -296,21 +354,65 @@ function BroadcastForm() {
         }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4,
-        fontSize: 11, color: 'rgba(255,255,255,.35)' }}>
-        <span/>
+        fontSize: 11, color: 'rgba(255,255,255,.5)' }}>
+        <span>Можно добавить картинки (до {MAX_IMGS})</span>
         <span>{text.length} / 2000</span>
+      </div>
+
+      {/* Image attachments */}
+      <div style={{ marginTop: 12 }}>
+        {imgs.length > 0 && (
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom: 10 }}>
+            {imgs.map((p, idx) => (
+              <div key={idx} style={{ position:'relative' }}>
+                <img src={p.dataUrl} alt=""
+                  style={{
+                    width:64, height:64, objectFit:'cover', borderRadius:10,
+                    opacity: p.uploading ? .5 : 1,
+                    border:'1px solid rgba(255,255,255,.15)',
+                  }}/>
+                {!p.uploading && (
+                  <button onClick={() => removeImg(idx)}
+                    style={{
+                      position:'absolute', top:-4, right:-4,
+                      width:20, height:20, borderRadius:'50%',
+                      background:'rgba(0,0,0,.85)', border:'none', color:'white',
+                      fontSize:13, cursor:'pointer', padding:0, lineHeight:1,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                    }}>✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={() => fileRef.current?.click()}
+          disabled={imgs.length >= MAX_IMGS || sending}
+          style={{
+            padding:'8px 14px', borderRadius:10, fontSize:13, fontWeight:600,
+            cursor: imgs.length >= MAX_IMGS ? 'not-allowed' : 'pointer',
+            border:'1px dashed rgba(180,140,220,.4)',
+            background:'rgba(120,90,200,.08)',
+            color:'rgba(220,200,255,.85)',
+            fontFamily:'inherit',
+            opacity: imgs.length >= MAX_IMGS ? .5 : 1,
+          }}>
+          📎 {imgs.length === 0 ? 'Прикрепить картинки' : `+ ещё (${MAX_IMGS - imgs.length} осталось)`}
+        </button>
+        <input ref={fileRef} type="file" multiple
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          onChange={handleFiles} style={{ display:'none' }}/>
       </div>
 
       {error && (
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10,
-          background: 'rgba(255,80,80,.12)', color: 'rgba(255,160,160,.95)', fontSize: 13 }}>
+          background: 'rgba(255,80,80,.15)', color: 'rgba(255,170,170,.98)', fontSize: 13 }}>
           {error}
         </div>
       )}
 
       {result && (
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10,
-          background: 'rgba(46,204,113,.15)', color: 'rgba(180,255,200,.95)', fontSize: 13 }}>
+          background: 'rgba(46,204,113,.18)', color: 'rgba(190,255,210,.98)', fontSize: 13 }}>
           ✓ Доставлено {result.delivered} из {result.total}
         </div>
       )}
@@ -319,17 +421,21 @@ function BroadcastForm() {
         {confirming ? (
           <>
             <button onClick={() => setConfirming(false)} disabled={sending}
-              style={btnStyle('rgba(255,255,255,.08)', 'rgba(255,255,255,.7)')}>
+              style={btnStyle('rgba(255,255,255,.08)', 'rgba(255,255,255,.85)')}>
               Отмена
             </button>
             <button onClick={send} disabled={sending}
-              style={btnStyle('rgba(200,80,80,.8)', 'white')}>
+              style={btnStyle('rgba(200,80,80,.85)', 'white')}>
               {sending ? 'Отправка…' : '⚠ Подтверди — это уйдёт ВСЕМ'}
             </button>
           </>
         ) : (
-          <button onClick={send} disabled={sending || text.trim().length < 5}
-            style={btnStyle('rgba(120,90,200,.75)', 'white')}>
+          <button onClick={send} disabled={sending || !canSend}
+            style={{
+              ...btnStyle('rgba(120,90,200,.85)', 'white'),
+              opacity: (!canSend || sending) ? .5 : 1,
+              cursor:  (!canSend || sending) ? 'not-allowed' : 'pointer',
+            }}>
             Отправить всем →
           </button>
         )}

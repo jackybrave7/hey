@@ -213,8 +213,24 @@ export default function AdminReports() {
                   </div>
                 )}
                 {r.status !== 'open' && r.resolved_at && (
-                  <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11 }}>
-                    Закрыта {fmtDate(r.resolved_at)}
+                  <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 12,
+                    display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    <span>
+                      {r.status === 'resolved' ? '✓ Приняты меры' : '◇ Отклонена'}
+                    </span>
+                    <span>·</span>
+                    <span>{fmtDate(r.resolved_at)}</span>
+                    {r.resolved_by_name && (
+                      <>
+                        <span>·</span>
+                        <span>
+                          администратор{' '}
+                          <strong style={{color:'rgba(200,180,255,.95)', fontWeight:600}}>
+                            {r.resolved_by_name}
+                          </strong>
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

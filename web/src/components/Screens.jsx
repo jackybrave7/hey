@@ -4483,27 +4483,6 @@ export function ChatScreen() {
     finally { setLoadingMore(false); }
   }
 
-  // ── Scroll to specific message (клик на цитату) ──────────────────────
-  useEffect(() => {
-    function onScrollTo(e) {
-      const targetId = e.detail;
-      if (!targetId) return;
-      const idx = flatItems.findIndex(it => it.id === targetId);
-      if (idx < 0) {
-        heyToast('Сообщение не загружено — прокрути выше', 'info');
-        return;
-      }
-      virtuosoRef.current?.scrollToIndex({
-        index: idx, align: 'center', behavior: 'smooth',
-      });
-      // Подсветка целевого сообщения
-      setFlashMsgId(targetId);
-      setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
-    }
-    window.addEventListener('hey:scroll-to-msg', onScrollTo);
-    return () => window.removeEventListener('hey:scroll-to-msg', onScrollTo);
-  }, [flatItems]);
-
   // ── Lightbox: стрелки ←/→ для навигации ───────────────────────────────
   useEffect(() => {
     if (!lightbox || lightbox.urls.length <= 1) return;
@@ -5020,6 +4999,26 @@ export function ChatScreen() {
     if (typing) result.push({ type: 'typing', id: 'typing' });
     return result;
   }, [messages, typing]);
+
+  // ── Scroll to specific message (клик на цитату) ──────────────────────
+  useEffect(() => {
+    function onScrollTo(e) {
+      const targetId = e.detail;
+      if (!targetId) return;
+      const idx = flatItems.findIndex(it => it.id === targetId);
+      if (idx < 0) {
+        heyToast('Сообщение не загружено — прокрути выше', 'info');
+        return;
+      }
+      virtuosoRef.current?.scrollToIndex({
+        index: idx, align: 'center', behavior: 'smooth',
+      });
+      setFlashMsgId(targetId);
+      setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
+    }
+    window.addEventListener('hey:scroll-to-msg', onScrollTo);
+    return () => window.removeEventListener('hey:scroll-to-msg', onScrollTo);
+  }, [flatItems]);
 
   // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
   const handleOpenMenu  = useCallback((e, m) => openMsgMenu(e, m), []);

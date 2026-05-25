@@ -1357,11 +1357,13 @@ function createReport({ reporterId, targetType, targetId, targetUserId, reason }
 function getReports({ status = 'open', limit = 100 } = {}) {
   const rows = db.prepare(
     `SELECT r.*,
-            u1.name AS reporter_name, u1.avatar AS reporter_avatar,
-            u2.name AS target_user_name, u2.avatar AS target_user_avatar
+            u1.name AS reporter_name,    u1.avatar AS reporter_avatar,
+            u2.name AS target_user_name, u2.avatar AS target_user_avatar,
+            u3.name AS resolved_by_name
      FROM reports r
      LEFT JOIN users u1 ON u1.id = r.reporter_id
      LEFT JOIN users u2 ON u2.id = r.target_user_id
+     LEFT JOIN users u3 ON u3.id = r.resolved_by
      ${status === 'all' ? '' : 'WHERE r.status = ?'}
      ORDER BY r.created_at DESC LIMIT ?`
   ).all(...(status === 'all' ? [limit] : [status, limit]));

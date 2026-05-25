@@ -1004,10 +1004,19 @@ module.exports = function makeRouter(db, broadcast) {
   // Массовая рассылка сообщения от HEY-заведующего всем юзерам
   r.post('/admin/system/broadcast', requireAdmin, (req, res) => {
     try {
-      const { text } = req.body;
+      const { text, attachment } = req.body;
       const trimmed = (text || '').trim();
-      if (!trimmed) return res.status(400).json({ error: 'text required' });
+      // Можно либо текст, либо вложение, либо то и другое
+      if (!trimmed && !attachment) return res.status(400).json({ error: 'Нужен текст или вложение' });
       if (trimmed.length > 2000) return res.status(400).json({ error: 'Слишком длинно (макс. 2000)' });
+      // Минимальная валидация attachment
+      if (attachment) {
+        const okType = ['image', 'images', 'audio'].includes(attachment.type);
+        if (!okType) return res.status(400).json({ error: 'Неверный тип вложения' });
+        if (attachment.type === 'image'  && !attachment.url)  return res.status(400).json({ error: 'Нет url' });
+        if (attachment.type === 'images' && (!Array.isArray(attachment.urls) || !attachment.urls.length))
+          return res.status(400).json({ error: 'Нет urls' });
+      }
 
       // Все юзеры кроме самого системного и удалённых
       const recipients = db.getContactOwners(db.SYSTEM_USER_ID); // у всех системный в контактах
@@ -1021,8 +1030,8 @@ module.exports = function makeRouter(db, broadcast) {
           const saved = db.createMessage({
             conversationId: conv.id,
             senderId: db.SYSTEM_USER_ID,
-            text: trimmed,
-            attachment: null,
+            text: trimmed || null,
+            attachment: attachment || null,
             broadcastId,
           });
           // Бродкастим получателю
