@@ -5179,11 +5179,29 @@ export function ChatScreen() {
 
       {/* Search results */}
       {searchMode && searchResults !== null && (
-        <div style={{flex:1,overflowY:'auto',padding:'8px 16px',display:'flex',flexDirection:'column',gap:6}}>
+        <div style={{flex:1,overflowY:'auto'}}>
+          <div style={{maxWidth:680,margin:'0 auto',padding:'8px 16px',
+            display:'flex',flexDirection:'column',gap:6}}>
           {searchResults.length === 0
             ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',marginTop:40}}>Ничего не найдено</div>
             : searchResults.map(m => (
-                <div key={m.id} style={{background:'rgba(255,255,255,.08)',borderRadius:12,padding:'10px 14px'}}>
+                <div
+                  key={m.id}
+                  onClick={() => {
+                    // Закрываем поиск и переходим к сообщению в чате
+                    setSearchMode(false);
+                    setSearchQuery('');
+                    setSearchResults(null);
+                    // Даём Virtuoso перерисоваться, потом скроллим
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('hey:scroll-to-msg', { detail: m.id }));
+                    }, 50);
+                  }}
+                  style={{background:'rgba(255,255,255,.08)',borderRadius:12,padding:'10px 14px',
+                    cursor:'pointer',transition:'background .15s'}}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.13)'}
+                  onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,.08)'}
+                >
                   <div style={{color:'rgba(255,255,255,.5)',fontSize:11,marginBottom:4}}>
                     {m.sender_name} · {fmtTime(m.created_at)}
                   </div>
@@ -5195,6 +5213,7 @@ export function ChatScreen() {
                 </div>
               ))
           }
+          </div>
         </div>
       )}
 

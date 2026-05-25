@@ -1208,19 +1208,23 @@ function getSavedMoments(userId) {
 }
 
 function getMomentReactorsList(momentId) {
-  // Реакции (resonate, talk)
+  // Реакции (resonate, talk) — moment_reactions имеет UNIQUE(moment_id, user_id),
+  // но на всякий случай дедуплицируем по (user_id, reaction)
   const reactions = db.prepare(
-    `SELECT mr.user_id AS id, mr.reaction, mr.created_at, u.name, u.avatar
+    `SELECT mr.user_id AS id, mr.reaction, MAX(mr.created_at) AS created_at, u.name, u.avatar
      FROM moment_reactions mr JOIN users u ON u.id=mr.user_id
      WHERE mr.moment_id=? AND u.is_blocked=0 AND u.is_deleted=0
-     ORDER BY mr.created_at DESC`
+     GROUP BY mr.user_id, mr.reaction
+     ORDER BY created_at DESC`
   ).all(momentId);
-  // Просмотры — выдаём как псевдо-реакцию 'see'
+  // Просмотры — один user_id = одна запись. PK (moment_id,user_id), но всё равно
+  // оборачиваем в GROUP BY на случай legacy-данных.
   const views = db.prepare(
-    `SELECT mv.user_id AS id, 'see' AS reaction, mv.viewed_at AS created_at, u.name, u.avatar
+    `SELECT mv.user_id AS id, 'see' AS reaction, MAX(mv.viewed_at) AS created_at, u.name, u.avatar
      FROM moment_views mv JOIN users u ON u.id=mv.user_id
      WHERE mv.moment_id=? AND u.is_blocked=0 AND u.is_deleted=0
-     ORDER BY mv.viewed_at DESC`
+     GROUP BY mv.user_id
+     ORDER BY created_at DESC`
   ).all(momentId);
   return normalizeAvatars([...reactions, ...views]);
 }

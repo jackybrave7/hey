@@ -118,7 +118,13 @@ const REACTION_META = {
 
 function ReactorsModal({ filter, reactors, loading, onClose, onOpenUser }) {
   // filter = 'see' | 'resonate' | 'talk'
-  const list = !reactors ? [] : reactors.filter(r => r.reaction === filter);
+  // Дедуп по user.id — на случай если бэк вернул того же юзера дважды
+  const list = !reactors ? [] : (() => {
+    const seen = new Set();
+    return reactors
+      .filter(r => r.reaction === filter)
+      .filter(r => seen.has(r.id) ? false : (seen.add(r.id), true));
+  })();
   const meta = REACTION_META[filter] || { icon: '✦', title: 'Отклик' };
 
   function fmtTime(ts) {

@@ -1,5 +1,6 @@
 // AdminMoments.jsx — all moments with moderation tools
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../api';
 
 function fmtDate(ts) {
@@ -17,6 +18,7 @@ export default function AdminMoments() {
   const [error, setError]       = useState('');
   const [toast, setToast]       = useState('');
   const [deleting, setDeleting] = useState(null);
+  const [preview, setPreview]   = useState(null); // { url, type } для модалки увеличения
 
   function toggleSort(col) {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -151,7 +153,16 @@ export default function AdminMoments() {
               {sorted.map(m => (
                 <tr key={m.id}>
                   <td style={cell}>
-                    <div style={{ color: 'white', fontWeight: 600 }}>{m.author_name}</div>
+                    {m.user_id ? (
+                      <Link to={`/admin/users/${m.user_id}`}
+                        style={{ color: 'rgba(180,150,250,.95)', fontWeight: 600, textDecoration: 'none' }}
+                        onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                        onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}>
+                        {m.author_name}
+                      </Link>
+                    ) : (
+                      <div style={{ color: 'white', fontWeight: 600 }}>{m.author_name}</div>
+                    )}
                     <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11 }}>{m.author_phone}</div>
                   </td>
                   <td style={{ ...cell, maxWidth: 260 }}>
@@ -170,12 +181,37 @@ export default function AdminMoments() {
                     )}
                   </td>
                   <td style={cell}>
-                    {m.media_type ? (
+                    {!m.media_type && '—'}
+                    {m.media_type === 'image' && m.media_url && (
+                      <img src={m.media_url} alt="" loading="lazy"
+                        onClick={() => setPreview({ url: m.media_url, type: 'image' })}
+                        style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover',
+                          cursor: 'zoom-in', border: '1px solid rgba(255,255,255,.12)' }}/>
+                    )}
+                    {m.media_type === 'video' && m.media_url && (
+                      <div onClick={() => setPreview({ url: m.media_url, type: 'video' })}
+                        style={{ position: 'relative', width: 64, height: 64, borderRadius: 8,
+                          overflow: 'hidden', cursor: 'pointer', background: 'rgba(0,0,0,.4)',
+                          border: '1px solid rgba(255,255,255,.12)' }}>
+                        <video src={m.media_url + '#t=0.1'} preload="metadata" muted
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          fontSize: 22, color: 'white', textShadow: '0 1px 4px rgba(0,0,0,.7)' }}>▶</div>
+                      </div>
+                    )}
+                    {m.media_type === 'audio' && (
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)',
+                        background: 'rgba(255,255,255,.08)', borderRadius: 4, padding: '2px 6px' }}>
+                        🎤 audio
+                      </span>
+                    )}
+                    {m.media_type && !['image','video','audio'].includes(m.media_type) && (
                       <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)',
                         background: 'rgba(255,255,255,.08)', borderRadius: 4, padding: '2px 6px' }}>
                         {m.media_type}
                       </span>
-                    ) : '—'}
+                    )}
                   </td>
                   <td style={{ ...cell, textAlign: 'center' }}>{m.views}</td>
                   <td style={{ ...cell, textAlign: 'center' }}>
@@ -212,6 +248,28 @@ export default function AdminMoments() {
       <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 12, marginTop: 12 }}>
         {moments.length} моментов{search.trim() && ` · показано совпадений`}
       </div>
+
+      {/* Lightbox preview */}
+      {preview && (
+        <div onClick={() => setPreview(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.88)',
+            backdropFilter: 'blur(18px)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', cursor: 'zoom-out', padding: 40 }}>
+          {preview.type === 'image' && (
+            <img src={preview.url} alt="" onClick={e => e.stopPropagation()}
+              style={{ maxWidth: '95vw', maxHeight: '92vh', objectFit: 'contain',
+                borderRadius: 12, cursor: 'default' }}/>
+          )}
+          {preview.type === 'video' && (
+            <video src={preview.url} controls autoPlay onClick={e => e.stopPropagation()}
+              style={{ maxWidth: '95vw', maxHeight: '92vh', borderRadius: 12, cursor: 'default' }}/>
+          )}
+          <button onClick={() => setPreview(null)}
+            style={{ position: 'absolute', top: 20, right: 24, background: 'rgba(255,255,255,.1)',
+              border: 'none', borderRadius: '50%', width: 40, height: 40,
+              color: 'white', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+        </div>
+      )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
