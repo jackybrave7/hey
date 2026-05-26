@@ -132,9 +132,34 @@ const VIDEO_POOL = [
   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
 ];
 
-// Картинки: Picsum даёт стабильное по seed фото 640x800 — много вариативности
-function imageFromSeed(seed) {
-  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/640/800`;
+// Картинки: используем Picsum с фиксированными ID (вместо seed, который иногда
+// рейт-лимитится). Picsum имеет ~1000 курированных фото; каждый id всегда
+// возвращает одну и ту же картинку. Подобраны живые ID с разными цветами/композициями.
+const PICSUM = (id) => `https://picsum.photos/id/${id}/640/800`;
+
+// Курированные picsum ID — разные пейзажи, объекты, портреты, абстракции.
+// Распределены по темам ради смысла, но любой ID гарантированно рендерится.
+const IMAGE_POOLS = {
+  artist:       [102, 103, 145, 167, 175, 250, 367],
+  musician:     [145, 250, 277, 326, 428, 549, 626],
+  filmmaker:    [1015, 1018, 1019, 1036, 1043, 1058],
+  actor:        [177, 219, 338, 433, 491, 627, 823],
+  poet:         [24, 365, 411, 459, 466, 538, 590],
+  photographer: [29, 110, 122, 152, 200, 218, 1015],
+  dancer:       [177, 219, 338, 1003, 1012, 1027, 1074],
+  writer:       [24, 365, 459, 538, 590, 866, 916],
+  sculptor:     [177, 219, 250, 326, 367, 472, 663],
+  designer:     [180, 250, 367, 428, 549, 626, 866],
+};
+const IMAGE_POOL_UNIVERSAL = [100, 200, 300, 400, 500, 600, 700, 800, 900];
+
+// Детерминированный выбор картинки из тематического пула по seed-строке.
+function pickImage(theme, seed) {
+  const pool = IMAGE_POOLS[theme] || IMAGE_POOL_UNIVERSAL;
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  const idx = Math.abs(h) % pool.length;
+  return PICSUM(pool[idx]);
 }
 
 // Тематические подборки моментов по профессии: текст + опц. медиа + mood
@@ -263,7 +288,16 @@ function generateTestUsers(count = 100) {
       while (attempt++ < 8) {
         const m = pick(usePool, rng);
         const key = (m.text || '').slice(0, 24);
-        if (!seen.has(key)) { seen.add(key); moments.push(m); break; }
+        if (!seen.has(key)) {
+          seen.add(key);
+          // Резолвим image URL по теме+seed → стабильная картинка из пула
+          const resolved = { ...m };
+          if (m.type === 'image' && m.seed) {
+            resolved.url = pickImage(theme.key, m.seed);
+          }
+          moments.push(resolved);
+          break;
+        }
       }
     }
 

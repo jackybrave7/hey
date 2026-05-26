@@ -2216,9 +2216,10 @@ function seedTestUsers() {
       const auto_tags = '[]';
       // Определяем тип медиа и URL
       let mediaType = null, mediaUrl = null, mediaDuration = null;
-      if (m.type === 'image' && m.seed) {
+      if (m.type === 'image' && m.url) {
+        // URL уже сформирован в testUsersData.pickImage()
         mediaType = 'image';
-        mediaUrl  = `https://picsum.photos/seed/${encodeURIComponent(m.seed)}/640/800`;
+        mediaUrl  = m.url;
       } else if (m.type === 'video' && m.video) {
         mediaType = 'video';
         mediaUrl  = m.video;

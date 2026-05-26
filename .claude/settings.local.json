@@ -189,7 +189,16 @@
       "Bash(node -e \"const {generateTestUsers}=require\\('./src/testUsersData'\\); const u=generateTestUsers\\(8\\); for\\(const x of u\\){console.log\\(x.name,'|',x.headline,'| moments:'\\); for\\(const m of x.moments\\)console.log\\('  ', m.type||'text', '|', \\(m.text||''\\).slice\\(0,40\\), '| mood:', m.mood, '| audio:', m.audio?'y':'-', '| video:', m.video?'y':'-', '| seed:', m.seed||'-'\\);}\")",
       "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git fetch && git checkout feat/messaging-extras && git pull && cd web && npm run build 2>&1 | tail -5 && pm2 restart hey-api 2>&1 | tail -3\")",
       "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json && git pull && cd web && npm install lucide-react@0.469.0 --no-save 2>&1 | tail -3 && npm run build 2>&1 | tail -5 && pm2 restart hey-api 2>&1 | tail -3\")",
-      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd web && npm run build 2>&1 | tail -3 && pm2 restart hey 2>&1 | tail -3\")"
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd web && npm run build 2>&1 | tail -3 && pm2 restart hey 2>&1 | tail -3\")",
+      "Bash(curl -sI -L \"https://picsum.photos/seed/musician-1/640/800\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{size_download}b %{url_effective}\\\\n\" -L --max-time 15 \"https://picsum.photos/seed/sunset-sea-7/640/800\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{size_download}b\\\\n\" -L --max-time 15 \"https://randomuser.me/api/portraits/men/5.jpg\")",
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && sqlite3 data/hey.db 'SELECT user_id, media_type, substr\\(media_url,1,80\\) FROM moments WHERE user_id LIKE \\\\\"test-user-%\\\\\" LIMIT 20'\")",
+      "Bash(curl -sL --max-time 15 \"https://picsum.photos/seed/sunset-sea-7/640/800\" -o /tmp/test_img.jpg)",
+      "Bash(curl -sI -L \"https://hey-messenger.ru/main\")",
+      "Bash(curl -sI -L \"https://hey-messenger.ru/\")",
+      "Bash(curl -sL \"https://hey-messenger.ru/\")",
+      "Bash(node -e \"const {generateTestUsers}=require\\('./src/testUsersData'\\); const u=generateTestUsers\\(8\\); for\\(const x of u\\) for\\(const m of x.moments\\) if\\(m.type==='image'\\) console.log\\(x.headline, '|', m.url\\);\")"
     ]
   }
 }
