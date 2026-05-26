@@ -92,6 +92,9 @@ export const api = {
   removeGroupMember:(id, userId)        => req('DELETE', `/groups/${id}/members/${userId}`),
   acceptGroupInvite:(id)                => req('POST',   `/groups/${id}/accept`),
   declineGroupInvite:(id)               => req('POST',   `/groups/${id}/decline`),
+  groupInviteLink:  (id)                => req('POST',   `/groups/${id}/invite-link`),
+  groupInvitePreview:(token)            => req('GET',    `/group-invite/${encodeURIComponent(token)}`),
+  groupInviteAccept:(token)             => req('POST',   `/group-invite/${encodeURIComponent(token)}/accept`),
 
   // Media & search
   getMedia:         (convId)            => req('GET',    `/conversations/${convId}/media`),

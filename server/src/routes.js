@@ -77,7 +77,24 @@ module.exports = function makeRouter(db, broadcast) {
   authModule.init(db); // inject DB into auth for block checks
 
   r.post('/register', rateLimit(5, 15 * 60 * 1000), (req, res) => {
-    const { phone, name, password, birthday, avatar, inviteUserId, email, schoolInviteCode } = req.body;
+    const { phone, name, password, birthday, avatar, inviteUserId, email, schoolInviteCode, groupInviteToken } = req.body;
+
+    // Если есть groupInviteToken — валидируем заранее и достаём inviterId
+    // (он же становится referrer'ом, как обычная invite-ссылка)
+    let groupInvite = null;
+    if (groupInviteToken) {
+      const data = awo.verifyGroupInvite(groupInviteToken);
+      if (data) {
+        const conv = db.getConversationById(data.groupId);
+        const inv  = db.findUserById(data.inviterId);
+        if (conv && conv.type === 'group' && inv && conv.admin_id === inv.id && !inv.is_blocked) {
+          groupInvite = { groupId: conv.id, inviterId: inv.id };
+        }
+      }
+    }
+    // Если регистрация через group-invite — приравниваем к inviteUserId
+    // (чтобы пройти проверку «только по приглашению» и записался referral)
+    const effectiveInviteUserId = inviteUserId || (groupInvite ? groupInvite.inviterId : null);
     if (!phone || !name || !password)
       return res.status(400).json({ error: 'phone, name, password required' });
     if (password.length < 8)
@@ -91,9 +108,9 @@ module.exports = function makeRouter(db, broadcast) {
       if (schoolInvite.used_at) return res.status(400).json({ error: 'Школьный инвайт уже использован' });
     }
 
-    // Пока открыта регистрация только по инвайту (личному или школьному)
+    // Пока открыта регистрация только по инвайту (личному, школьному или групповому)
     const openSignup = process.env.OPEN_SIGNUP === '1';
-    if (!openSignup && !inviteUserId && !schoolInvite) {
+    if (!openSignup && !effectiveInviteUserId && !schoolInvite) {
       return res.status(403).json({
         error: 'Регистрация пока только по приглашению. Попроси ссылку у знакомых.',
         code: 'INVITE_REQUIRED',
@@ -119,9 +136,9 @@ module.exports = function makeRouter(db, broadcast) {
     // Создаём self-chat «Монолог»
     try { db.getOrCreateSelfChat(user.id); } catch {}
 
-    // Auto-add mutual contacts if registered via invite link
-    if (inviteUserId) {
-      const inviter = db.findUserById(inviteUserId);
+    // Auto-add mutual contacts if registered via invite link (личной или групповой)
+    if (effectiveInviteUserId) {
+      const inviter = db.findUserById(effectiveInviteUserId);
       if (inviter && !inviter.is_blocked) {
         try { db.addContact(user.id, inviter.id, null); } catch {}
         try { db.addContact(inviter.id, user.id, null); } catch {}
@@ -163,6 +180,23 @@ module.exports = function makeRouter(db, broadcast) {
           console.warn(`[awo] нет маппинга курса "${schoolInvite.course}" → чат`);
         }
       }
+    }
+
+    // Авто-вступление в группу по invite-ссылке (если регистрация шла через /gjoin)
+    if (groupInvite) {
+      try {
+        db.joinGroupViaInvite(groupInvite.groupId, user.id, groupInvite.inviterId);
+        const members = db.getGroupMembers(groupInvite.groupId, false).map(m => m.id);
+        try { broadcast(members, { type: 'group:member_joined', conversationId: groupInvite.groupId, userId: user.id }); } catch {}
+        try { broadcast([user.id], { type: 'conversation:added', chat_id: groupInvite.groupId }); } catch {}
+        try {
+          db.createMessage({
+            conversationId: groupInvite.groupId,
+            senderId: db.SYSTEM_USER_ID,
+            text: `👋 ${user.name} присоединился по приглашению`,
+          });
+        } catch {}
+      } catch (e) { console.error('[group-invite-register]', e.message); }
     }
 
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
@@ -785,6 +819,70 @@ module.exports = function makeRouter(db, broadcast) {
     db.declineGroupInvite(req.params.id, req.user.id);
     broadcast([req.user.id], { type: 'group:invite_declined', conversationId: req.params.id });
     res.json({ ok: true });
+  });
+
+  // ── Group invite links (admin shares a link, anyone can join) ────────────
+  // Только админ группы может сгенерировать ссылку. Сама ссылка self-contained
+  // (HMAC-подписанный токен), без записи в БД.
+  r.post('/groups/:id/invite-link', requireAuth, (req, res) => {
+    const conv = db.getConversationById(req.params.id);
+    if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Группа не найдена' });
+    if (conv.admin_id !== req.user.id) return res.status(403).json({ error: 'Только админ группы может создавать ссылки' });
+    const token = awo.signGroupInvite(conv.id, req.user.id);
+    res.json({ token, ttl_days: 30 });
+  });
+
+  // Публичное превью группы по токену (без auth) — для landing-страницы /gjoin.
+  r.get('/group-invite/:token', (req, res) => {
+    const data = awo.verifyGroupInvite(req.params.token);
+    if (!data) return res.status(400).json({ error: 'Ссылка недействительна или устарела' });
+    const conv = db.getConversationById(data.groupId);
+    if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Группа не найдена' });
+    const inviter = db.findUserById(data.inviterId);
+    if (!inviter || inviter.is_blocked) return res.status(404).json({ error: 'Приглашающий недоступен' });
+    // Если приглашающий уже не админ — ссылка теряет силу
+    if (conv.admin_id !== inviter.id) return res.status(400).json({ error: 'Приглашающий больше не админ группы' });
+    const memberCount = db.getGroupMembers(conv.id, false).length;
+    res.json({
+      group:   { id: conv.id, name: conv.name, icon: conv.icon, member_count: memberCount },
+      inviter: { id: inviter.id, name: inviter.name, avatar: inviter.avatar },
+    });
+  });
+
+  // Принять приглашение (auth required). Добавляет юзера в группу сразу как active.
+  r.post('/group-invite/:token/accept', requireAuth, (req, res) => {
+    const data = awo.verifyGroupInvite(req.params.token);
+    if (!data) return res.status(400).json({ error: 'Ссылка недействительна или устарела' });
+    const conv = db.getConversationById(data.groupId);
+    if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Группа не найдена' });
+    const inviter = db.findUserById(data.inviterId);
+    if (!inviter || conv.admin_id !== inviter.id) {
+      return res.status(400).json({ error: 'Ссылка недействительна' });
+    }
+    try {
+      const result = db.joinGroupViaInvite(conv.id, req.user.id, data.inviterId);
+      // Приглашающего сразу в контакты к новичку
+      try { db.addContact(req.user.id, data.inviterId, null); } catch {}
+      // Уведомить участников и нового юзера о появлении чата
+      try {
+        const members = db.getGroupMembers(conv.id, false).map(m => m.id);
+        broadcast(members, { type: 'group:member_joined', conversationId: conv.id, userId: req.user.id });
+        broadcast([req.user.id], { type: 'conversation:added', chat_id: conv.id });
+      } catch {}
+      // Системное сообщение в чат
+      if (!result.alreadyActive) {
+        try {
+          db.createMessage({
+            conversationId: conv.id,
+            senderId: db.SYSTEM_USER_ID,
+            text: `👋 ${req.user.name} присоединился по приглашению`,
+          });
+        } catch {}
+      }
+      res.json({ ok: true, conversationId: conv.id, alreadyActive: !!result.alreadyActive });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // ── Media & Search ────────────────────────────────────────────────────────

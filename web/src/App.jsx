@@ -25,6 +25,7 @@ import AdminReports from './components/admin/AdminReports';
 import AdminAwo from './components/admin/AdminAwo';
 import AdminTestUsers from './components/admin/AdminTestUsers';
 import JoinScreen from './components/JoinScreen';
+import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
 import { ensurePushIfGranted } from './lib/push';
 
@@ -242,6 +243,7 @@ export default function App() {
           <Route path="/login"    element={<GuestOnly><LoginScreen/></GuestOnly>}/>
           <Route path="/register" element={<GuestOnly><RegisterScreen/></GuestOnly>}/>
           <Route path="/join"     element={<GuestOnly><JoinScreen/></GuestOnly>}/>
+          <Route path="/gjoin/:token" element={<GroupJoinScreen/>}/>
           <Route path="/success"  element={<SuccessScreen/>}/>
           <Route path="/welcome"  element={<WelcomeScreen/>}/>
 

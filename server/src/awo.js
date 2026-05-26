@@ -49,6 +49,44 @@ function checkWebhookToken(req) {
 // id_account_status === 5 значит «оплачен» (по документации АВО)
 const AWO_STATUS_PAID = 5;
 
+// ── Group invite tokens ───────────────────────────────────────────────
+// Подписанный токен для приглашения в группу. Никакой записи в БД не нужно —
+// токен self-contained: { groupId, inviterId, ts } + HMAC.
+// Срок жизни — 30 дней (защита от устаревших ссылок).
+const GROUP_INVITE_TTL_MS = 30 * 24 * 3600 * 1000;
+
+function signGroupInvite(groupId, inviterId) {
+  const ts = Date.now();
+  const payload = `${groupId}.${inviterId}.${ts}`;
+  const sig = crypto.createHmac('sha256', JOIN_SECRET).update(payload).digest('hex').slice(0, 24);
+  // base64url(payload) + '.' + sig
+  const b64 = Buffer.from(payload).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `${b64}.${sig}`;
+}
+
+function verifyGroupInvite(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [b64, sig] = parts;
+  let payload;
+  try {
+    payload = Buffer.from(b64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  } catch { return null; }
+  const expected = crypto.createHmac('sha256', JOIN_SECRET).update(payload).digest('hex').slice(0, 24);
+  if (expected.length !== sig.length) return null;
+  let ok;
+  try { ok = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig)); } catch { return null; }
+  if (!ok) return null;
+  const [groupId, inviterId, tsStr] = payload.split('.');
+  if (!groupId || !inviterId || !tsStr) return null;
+  const ts = Number(tsStr);
+  if (!Number.isFinite(ts)) return null;
+  if (Date.now() - ts > GROUP_INVITE_TTL_MS) return null;
+  return { groupId, inviterId, ts };
+}
+
 module.exports = {
   signJoin,
   verifyJoin,
@@ -56,4 +94,7 @@ module.exports = {
   isValidEmail,
   checkWebhookToken,
   AWO_STATUS_PAID,
+  signGroupInvite,
+  verifyGroupInvite,
+  GROUP_INVITE_TTL_MS,
 };

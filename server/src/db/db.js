@@ -641,6 +641,27 @@ function addGroupMember(convId, requesterId, userId) {
   return { alreadyMember: false, status: 'pending' };
 }
 
+// Прямое добавление в группу как active member (для invite-link flow,
+// когда пользователь сам активно вступает по ссылке — pending не нужен).
+function joinGroupViaInvite(convId, userId, invitedBy) {
+  const conv = db.prepare('SELECT id, admin_id, type FROM conversations WHERE id=?').get(convId);
+  if (!conv) throw new Error('Группа не найдена');
+  if (conv.type !== 'group') throw new Error('Это не групповой чат');
+  const existing = db.prepare('SELECT status FROM members WHERE conversation_id=? AND user_id=?')
+    .get(convId, userId);
+  if (existing) {
+    if (existing.status === 'active') return { alreadyActive: true };
+    // pending → переводим в active
+    db.prepare(`UPDATE members SET status='active', joined_at=? WHERE conversation_id=? AND user_id=?`)
+      .run(now(), convId, userId);
+    return { alreadyActive: false, fromPending: true };
+  }
+  db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at,status,invited_by)
+     VALUES (?,?,?,'active',?)`)
+    .run(convId, userId, now(), invitedBy || conv.admin_id);
+  return { alreadyActive: false, fromPending: false };
+}
+
 function removeGroupMember(convId, requesterId, userId) {
   const conv = db.prepare('SELECT admin_id FROM conversations WHERE id=?').get(convId);
   if (conv?.admin_id !== requesterId && requesterId !== userId) throw new Error('Not authorized');
@@ -2254,6 +2275,7 @@ module.exports = {
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,
+  joinGroupViaInvite,
   getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,

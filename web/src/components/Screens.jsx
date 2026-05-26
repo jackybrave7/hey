@@ -533,6 +533,8 @@ export function HeyScreen() {
 export function LoginScreen() {
   const nav = useNavigate();
   const { login } = useAuth();
+  const [searchParams] = useSearchParams();
+  const gjoinToken = searchParams.get('gjoin');
   const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr]           = useState('');
@@ -547,7 +549,9 @@ export function LoginScreen() {
     try {
       const res = await api.login({ phone: pv.normalized, password });
       login(res.token, res.user);
-      nav('/main');
+      // Если пришли с /gjoin/:token — возвращаемся туда, чтобы юзер нажал «Войти в группу»
+      if (gjoinToken) nav('/gjoin/' + gjoinToken);
+      else nav('/main');
     } catch(e) {
       setErr('Неверный телефон или пароль');
     }
@@ -741,6 +745,13 @@ export function RegisterScreen() {
       return raw ? JSON.parse(raw) : null;
     } catch { return null; }
   });
+  // Group invite — кладётся в sessionStorage страницей /gjoin
+  const [groupInvite, setGroupInvite] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('hey_group_invite');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
 
   const [name, setName]         = useState('');
   const [phone, setPhone]       = useState('');
@@ -749,7 +760,7 @@ export function RegisterScreen() {
   const [loading, setLoading]   = useState(false);
   const [inviter, setInviter]   = useState(null);
 
-  const hasInvite = !!inviteCode || !!schoolInvite;
+  const hasInvite = !!inviteCode || !!schoolInvite || !!groupInvite;
 
   // Load inviter info if invite code present
   useEffect(() => {
@@ -771,9 +782,11 @@ export function RegisterScreen() {
         name: name.trim(), phone: pv.normalized, password,
         ...(inviteCode    ? { inviteUserId: inviteCode } : {}),
         ...(schoolInvite  ? { schoolInviteCode: schoolInvite.code, email: schoolInvite.email } : {}),
+        ...(groupInvite   ? { groupInviteToken: groupInvite.token } : {}),
       });
       // Чистим sessionStorage после успеха
       if (schoolInvite) sessionStorage.removeItem('hey_school_invite');
+      if (groupInvite)  sessionStorage.removeItem('hey_group_invite');
       login(res.token, res.user);
       nav('/welcome', { state: { isNewUser: true, userName: name.trim() } });
     } catch(e) { setErr(e.message); }
@@ -802,6 +815,24 @@ export function RegisterScreen() {
               <div style={{fontWeight:700, color:'white'}}>{schoolInvite.schoolName} приглашает</div>
               {schoolInvite.course && <div style={{opacity:.75, marginTop:2}}>Курс «{schoolInvite.course}»</div>}
               <div style={{opacity:.65, marginTop:2, fontSize:12}}>{schoolInvite.email}</div>
+            </div>
+          </div>
+        )}
+
+        {groupInvite && (
+          <div style={{
+            background:'rgba(120,90,200,.2)', border:'1px solid rgba(180,140,220,.4)',
+            borderRadius:14, padding:'12px 16px', marginBottom:18,
+            display:'flex', alignItems:'center', gap:10,
+            animation: 'authFadeUp .6s ease-out .1s both',
+          }}>
+            <Icon name="users" size={20}/>
+            <div style={{fontSize:13, color:'rgba(235,225,255,.95)'}}>
+              <div style={{fontWeight:700, color:'white'}}>Приглашение в группу</div>
+              <div style={{opacity:.85, marginTop:2}}>«{groupInvite.groupName}»</div>
+              {groupInvite.inviterName && (
+                <div style={{opacity:.65, marginTop:2, fontSize:12}}>от {groupInvite.inviterName}</div>
+              )}
             </div>
           </div>
         )}
@@ -6202,6 +6233,19 @@ export function ChatScreen() {
     { label: 'Медиа и ссылки',          icon: <Icon name="image"  size={18}/>, danger: false, onClick: () => setShowMedia(true) },
     ...(partner.isGroup ? [
       { label: 'Настройки группы',      icon: <Icon name="settings" size={18}/>, danger: false, onClick: () => nav(`/groups/${convId}/settings`) },
+      ...(isGroupAdmin ? [
+        { label: 'Скопировать ссылку-приглашение', icon: <Icon name="link" size={18}/>, danger: false, onClick: async () => {
+          try {
+            const { token } = await api.groupInviteLink(convId);
+            const url = window.location.origin + '/gjoin/' + token;
+            try { await navigator.clipboard.writeText(url); } catch {
+              const ta = document.createElement('textarea'); ta.value = url; document.body.appendChild(ta);
+              ta.select(); try { document.execCommand('copy'); } catch {} document.body.removeChild(ta);
+            }
+            heyToast('Ссылка скопирована — отправь её другу', 'success');
+          } catch (e) { heyToast(e.message || 'Не удалось создать ссылку', 'error'); }
+        } },
+      ] : []),
     ] : [
       ...(!isContact && partner.id && !partner.isDeleted ? [
         { label: 'Добавить в контакты', icon: <Icon name="user-plus" size={18}/>, danger: false, onClick: handleAddContact },
