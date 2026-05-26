@@ -717,7 +717,7 @@ function AvatarPicker({ avatar, onChange, size = 136, disabled = false }) {
         }}
           onMouseEnter={e => e.currentTarget.style.opacity = '1'}
           onMouseLeave={e => e.currentTarget.style.opacity = '0'}
-        >📷<br/>Сменить</div>
+        ><div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Icon name="camera" size={20}/>Сменить</div></div>
       )}
       <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleFile}/>
     </div>
