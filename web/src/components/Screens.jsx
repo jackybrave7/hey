@@ -5033,7 +5033,7 @@ const MessageRow = memo(function MessageRow({
 // AudioPlayer — compact player for voice messages in bubbles
 // ─────────────────────────────────────────────────────────────────────────────
 
-const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut }) {
+export const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut, wide = false }) {
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [total,   setTotal]   = useState(initDur || 0);
@@ -5095,31 +5095,54 @@ const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut })
   const textColor  = isOut ? 'rgba(255,255,255,.75)' : 'rgba(60,40,100,.65)';
 
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:170, maxWidth:240 }}>
-      <audio ref={audioRef} src={url} preload="auto" playsInline style={{ display:'none' }} />
+    <div style={{ display:'flex', alignItems:'center', gap: wide ? 14 : 8,
+      minWidth: wide ? 0 : 170,
+      maxWidth: wide ? '100%' : 240,
+      width: wide ? '100%' : 'auto' }}>
+      <audio ref={audioRef} src={url} preload="auto" playsInline
+        controlsList="nodownload" disableRemotePlayback style={{ display:'none' }} />
       <button onClick={toggle} style={{
-        width:36, height:36, borderRadius:'50%', flexShrink:0,
-        background: isOut ? 'rgba(255,255,255,.2)' : 'rgba(100,70,160,.15)',
-        border: isOut ? '1.5px solid rgba(255,255,255,.4)' : '1.5px solid rgba(100,70,160,.3)',
+        width: wide ? 52 : 36, height: wide ? 52 : 36,
+        borderRadius:'50%', flexShrink:0,
+        background: wide ? 'rgba(140,100,220,.45)'
+                  : isOut ? 'rgba(255,255,255,.2)' : 'rgba(100,70,160,.15)',
+        border: wide ? '1.5px solid rgba(180,140,255,.55)'
+              : isOut ? '1.5px solid rgba(255,255,255,.4)' : '1.5px solid rgba(100,70,160,.3)',
         cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
-        fontSize:14, color: isOut ? 'white' : '#4a2a90', transition:'background .15s',
-      }}>
+        fontSize: wide ? 20 : 14,
+        color: wide ? 'white' : (isOut ? 'white' : '#4a2a90'),
+        transition:'background .15s, transform .12s',
+      }}
+        onMouseEnter={wide ? (e=>e.currentTarget.style.transform='scale(1.05)') : undefined}
+        onMouseLeave={wide ? (e=>e.currentTarget.style.transform='scale(1)') : undefined}>
         {playing ? '⏸' : '▶'}
       </button>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{
-          height:3, borderRadius:2, background:trackColor,
-          overflow:'hidden', marginBottom:4, cursor:'pointer',
+          height: wide ? 6 : 3, borderRadius: wide ? 4 : 2,
+          background: wide ? 'rgba(255,255,255,.15)' : trackColor,
+          overflow:'hidden', marginBottom: wide ? 8 : 4, cursor:'pointer',
         }} onClick={e => {
           const a = audioRef.current;
           if (!a || !total) return;
           const rect = e.currentTarget.getBoundingClientRect();
           a.currentTime = ((e.clientX - rect.left) / rect.width) * total;
         }}>
-          <div style={{ width:`${progress*100}%`, height:'100%', background:barColor, borderRadius:2, transition:'width .1s linear' }} />
+          <div style={{ width:`${progress*100}%`, height:'100%',
+            background: wide ? 'linear-gradient(90deg,rgba(180,140,255,.95),rgba(140,100,220,.95))' : barColor,
+            borderRadius: wide ? 4 : 2, transition:'width .1s linear' }} />
         </div>
-        <div style={{ fontSize:11, color: error ? '#ff8080' : textColor }}>
-          {error ? `⚠ ${error}` : <>{playing ? fmtSec(current) : fmtSec(total)} 🎙</>}
+        <div style={{ fontSize: wide ? 13 : 11,
+          color: error ? '#ff8080' : (wide ? 'rgba(255,255,255,.75)' : textColor),
+          display:'flex', alignItems:'center', gap:8, fontVariantNumeric:'tabular-nums' }}>
+          {error
+            ? <span>⚠ {error}</span>
+            : <>
+                <span>{fmtSec(current)}</span>
+                {wide && <span style={{opacity:.5}}>/</span>}
+                {wide && <span style={{opacity:.7}}>{fmtSec(total)}</span>}
+                {!wide && <span>🎙</span>}
+              </>}
         </div>
       </div>
     </div>
@@ -8049,10 +8072,11 @@ export function MomentPage() {
                   style={{ width:'100%', display:'block', background:'#000' }}/>
               )}
               {moment.media_type === 'audio' && (
-                <div style={{ padding:'24px 20px', display:'flex', flexDirection:'column', gap:12,
+                <div style={{ padding:'28px 22px 24px', display:'flex', flexDirection:'column', gap:14,
                   background:'linear-gradient(135deg,#1a0a38,#2a1858)' }}>
-                  <div style={{ fontSize:32, textAlign:'center' }}>🎵</div>
-                  <audio src={moment.media_url} controls style={{ width:'100%' }}/>
+                  <div style={{ fontSize:34, textAlign:'center', opacity:.9 }}>🎵</div>
+                  <AudioPlayer url={moment.media_url}
+                    duration={moment.media_duration} wide={true}/>
                 </div>
               )}
             </div>

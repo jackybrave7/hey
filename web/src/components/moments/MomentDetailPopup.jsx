@@ -6,6 +6,7 @@ import { api } from '../../api';
 import MoodEmoji from './MoodEmoji';
 import EmbeddedVideoPreview from './EmbeddedVideoPreview';
 import SuperInfoScreen from '../super/SuperInfoScreen';
+import { AudioPlayer } from '../Screens';
 
 function fmtDate(ts) {
   if (!ts) return '';
@@ -646,10 +647,11 @@ export default function MomentDetailPopup({
                 style={{width:'100%',maxHeight:'45vh',display:'block',background:'#000'}}/>
             )}
             {moment.media_type === 'audio' && (
-              <div style={{padding:'24px 20px',display:'flex',flexDirection:'column',gap:12,
+              <div style={{padding:'28px 22px 24px',display:'flex',flexDirection:'column',gap:14,
                 background:'linear-gradient(135deg,#1a0a38,#2a1858)'}}>
-                <div style={{fontSize:32,textAlign:'center'}}>🎵</div>
-                <audio src={moment.media_url} controls style={{width:'100%'}}/>
+                <div style={{fontSize:34,textAlign:'center',opacity:.9}}>🎵</div>
+                <AudioPlayer url={moment.media_url}
+                  duration={moment.media_duration} wide={true}/>
               </div>
             )}
             <button onClick={onClose} style={{position:'absolute',top:12,right:12,
