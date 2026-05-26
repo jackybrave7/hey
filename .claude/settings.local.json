@@ -198,7 +198,8 @@
       "Bash(curl -sI -L \"https://hey-messenger.ru/main\")",
       "Bash(curl -sI -L \"https://hey-messenger.ru/\")",
       "Bash(curl -sL \"https://hey-messenger.ru/\")",
-      "Bash(node -e \"const {generateTestUsers}=require\\('./src/testUsersData'\\); const u=generateTestUsers\\(8\\); for\\(const x of u\\) for\\(const m of x.moments\\) if\\(m.type==='image'\\) console.log\\(x.headline, '|', m.url\\);\")"
+      "Bash(node -e \"const {generateTestUsers}=require\\('./src/testUsersData'\\); const u=generateTestUsers\\(8\\); for\\(const x of u\\) for\\(const m of x.moments\\) if\\(m.type==='image'\\) console.log\\(x.headline, '|', m.url\\);\")",
+      "Bash(node -e \"const db=require\\('./src/db/db'\\); console.log\\(JSON.stringify\\(db.getAwoSettings\\(\\),null,2\\)\\);\")"
     ]
   }
 }

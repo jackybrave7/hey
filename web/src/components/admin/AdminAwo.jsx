@@ -42,6 +42,12 @@ export default function AdminAwo() {
   const [chatExcludes, setChatExcludes] = useState('слушатель,запись');
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // School account binding
+  const [accountSearch, setAccountSearch] = useState('');
+  const [accountResults, setAccountResults] = useState([]);
+  const [accountSearching, setAccountSearching] = useState(false);
+  const [bindingAccount, setBindingAccount] = useState(false);
+
   const [mappings, setMappings] = useState([]);
   const [groupChats, setGroupChats] = useState([]);
   const [newCourse, setNewCourse] = useState('');
@@ -133,6 +139,57 @@ export default function AdminAwo() {
     } catch (e) { setError(e.message); }
   }
 
+  async function searchUsers(q) {
+    setAccountSearch(q);
+    if (q.trim().length < 2) { setAccountResults([]); return; }
+    setAccountSearching(true);
+    try {
+      const list = await api.adminGetUsers({ search: q });
+      // Не показываем заблокированных и системных юзеров кроме SCHOOL_USER_ID-дефолта
+      setAccountResults((list || []).filter(u => !u.is_blocked).slice(0, 10));
+    } catch (e) { setError(e.message); }
+    setAccountSearching(false);
+  }
+
+  async function bindSchoolAccount(userId, userName) {
+    const ok = await customConfirm(
+      <>
+        <div style={{fontWeight:700,marginBottom:6}}>
+          Привязать «{userName}» как официальный школьный аккаунт?
+        </div>
+        <div style={{color:'rgba(255,255,255,.65)',fontSize:13,lineHeight:1.55}}>
+          От его имени будут отправляться приветствия в чаты курсов и приглашения
+          из АВО. Можно сменить в любой момент.
+        </div>
+      </>,
+      { confirmLabel: 'Привязать' }
+    );
+    if (!ok) return;
+    setBindingAccount(true);
+    try {
+      const s = await api.adminSetAwoSettings({ school_account_id: userId });
+      setSettings(s);
+      setAccountSearch(''); setAccountResults([]);
+      notify('Школьный аккаунт обновлён');
+    } catch (e) { setError(e.message); }
+    setBindingAccount(false);
+  }
+
+  async function unbindSchoolAccount() {
+    if (!await customConfirm(
+      'Отвязать школьный аккаунт? Вернётся системный дефолтный аккаунт.',
+      { confirmLabel: 'Отвязать' }
+    )) return;
+    setBindingAccount(true);
+    try {
+      // Передаём пустую строку — сервер сбросит на дефолт
+      const s = await api.adminSetAwoSettings({ school_account_id: '' });
+      setSettings(s);
+      notify('Сброшено на системный аккаунт');
+    } catch (e) { setError(e.message); }
+    setBindingAccount(false);
+  }
+
   return (
     <div style={{ padding: '28px 32px', maxWidth: 920 }}>
       <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
@@ -154,6 +211,105 @@ export default function AdminAwo() {
           {toast}
         </div>
       )}
+
+      {/* Официальный школьный аккаунт */}
+      <div style={cardStyle}>
+        <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+          🎓 Официальный аккаунт школы
+        </h3>
+        <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginBottom: 16, lineHeight:1.55 }}>
+          От имени этого аккаунта школа общается с учениками в HEY: появляется в контактах
+          у новых учеников после регистрации по /join-ссылке и отправляет приветствия
+          «🎓 X присоединился к курсу» в чатах курсов.
+        </p>
+
+        {/* Current */}
+        {settings?.school_account ? (
+          <div style={{ display:'flex', alignItems:'center', gap:12,
+            padding:'12px 14px', background:'rgba(120,90,200,.14)',
+            border:'1px solid rgba(180,140,220,.3)', borderRadius:12, marginBottom:14 }}>
+            {settings.school_account.avatar && /^https?:|^\//.test(settings.school_account.avatar) ? (
+              <img src={settings.school_account.avatar} alt=""
+                style={{ width:44, height:44, borderRadius:'50%', objectFit:'cover' }}/>
+            ) : (
+              <div style={{ width:44, height:44, borderRadius:'50%',
+                background:'rgba(120,90,200,.5)', color:'white',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:18, fontWeight:700 }}>
+                {(settings.school_account.name || '?')[0].toUpperCase()}
+              </div>
+            )}
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ color:'white', fontSize:15, fontWeight:600,
+                overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {settings.school_account.name}
+              </div>
+              <div style={{ color:'rgba(255,255,255,.5)', fontSize:12, marginTop:2 }}>
+                {settings.school_account.is_default
+                  ? 'системный дефолтный аккаунт'
+                  : (settings.school_account.phone || 'привязанный пользователь')}
+              </div>
+            </div>
+            {!settings.school_account.is_default && (
+              <button style={btnGhost} onClick={unbindSchoolAccount} disabled={bindingAccount}>
+                Отвязать
+              </button>
+            )}
+          </div>
+        ) : (
+          <div style={{ color:'rgba(255,200,100,.85)', fontSize:13, marginBottom:14 }}>
+            Аккаунт не настроен — используется системный дефолт.
+          </div>
+        )}
+
+        {/* Search & pick */}
+        <div style={{ marginBottom: 6 }}>
+          <div style={labelStyle}>Привязать другого пользователя</div>
+          <input style={inputStyle} value={accountSearch}
+            onChange={e => searchUsers(e.target.value)}
+            placeholder="Имя или телефон (минимум 2 символа)"/>
+        </div>
+        {accountSearching && (
+          <div style={{ color:'rgba(255,255,255,.4)', fontSize:12, marginTop:6 }}>Поиск…</div>
+        )}
+        {accountResults.length > 0 && (
+          <div style={{ marginTop: 8, display:'flex', flexDirection:'column', gap:6,
+            maxHeight: 240, overflowY:'auto',
+            background:'rgba(0,0,0,.18)', borderRadius:10, padding:6 }}>
+            {accountResults.map(u => (
+              <button key={u.id} onClick={() => bindSchoolAccount(u.id, u.name)}
+                disabled={bindingAccount || u.id === settings?.school_account?.id}
+                style={{
+                  display:'flex', alignItems:'center', gap:10, padding:'8px 10px',
+                  background: u.id === settings?.school_account?.id ? 'rgba(120,200,140,.15)' : 'rgba(255,255,255,.04)',
+                  border:'1px solid rgba(255,255,255,.08)', borderRadius:8,
+                  color:'white', fontSize:13, cursor: bindingAccount ? 'wait' : 'pointer',
+                  textAlign:'left', fontFamily:'inherit', width:'100%',
+                  opacity: u.id === settings?.school_account?.id ? 0.65 : 1,
+                }}>
+                {u.avatar && /^https?:|^\//.test(u.avatar) ? (
+                  <img src={u.avatar} alt="" style={{ width:28, height:28, borderRadius:'50%', objectFit:'cover' }}/>
+                ) : (
+                  <div style={{ width:28, height:28, borderRadius:'50%',
+                    background:'rgba(120,90,200,.5)', display:'flex',
+                    alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}>
+                    {(u.name||'?')[0].toUpperCase()}
+                  </div>
+                )}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {u.name} {u.is_super ? '✦' : ''}
+                  </div>
+                  <div style={{ color:'rgba(255,255,255,.4)', fontSize:11 }}>{u.phone}</div>
+                </div>
+                {u.id === settings?.school_account?.id && (
+                  <span style={{ color:'rgba(110,235,150,.95)', fontSize:11 }}>текущий</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Настройки */}
       <div style={cardStyle}>

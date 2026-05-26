@@ -488,8 +488,20 @@ function findUserByEmailOrPhone(email, phone) {
   return null;
 }
 
+// Возвращает id официального школьного аккаунта.
+// По умолчанию это системный SCHOOL_USER_ID, но админ может привязать
+// в /admin/awo обычного пользователя — тогда возвращается его id.
+function getSchoolUserId() {
+  const configured = getSetting('awo_school_account_id', null);
+  if (!configured) return SCHOOL_USER_ID;
+  // Защита: если привязанный юзер удалён/заблокирован — откатываемся на дефолт
+  const u = db.prepare('SELECT id, is_blocked FROM users WHERE id=?').get(configured);
+  if (!u || u.is_blocked) return SCHOOL_USER_ID;
+  return configured;
+}
+
 function getSchoolAccount() {
-  return findUserById(SCHOOL_USER_ID);
+  return findUserById(getSchoolUserId());
 }
 
 // ── Contacts ───────────────────────────────────────────────────────────────
@@ -2254,17 +2266,36 @@ function clearTestUsers() {
 }
 
 function getAwoSettings() {
+  const accountId = getSchoolUserId();
+  const account   = findUserById(accountId);
   return {
     test_mode:    !!getSetting('awo_test_mode', false),
     test_course:  getSetting('awo_test_course', ''),
     chat_excludes: getSetting('awo_chat_excludes', 'слушатель,запись'),
+    school_account: account ? {
+      id:     account.id,
+      name:   account.name,
+      avatar: account.avatar,
+      phone:  account.phone,
+      is_default: account.id === SCHOOL_USER_ID,
+    } : null,
   };
 }
 
-function setAwoSettings({ test_mode, test_course, chat_excludes }) {
+function setAwoSettings({ test_mode, test_course, chat_excludes, school_account_id }) {
   if (test_mode != null)     setSetting('awo_test_mode', !!test_mode);
   if (test_course != null)   setSetting('awo_test_course', String(test_course || ''));
   if (chat_excludes != null) setSetting('awo_chat_excludes', String(chat_excludes || ''));
+  if (school_account_id !== undefined) {
+    if (!school_account_id || school_account_id === SCHOOL_USER_ID) {
+      setSetting('awo_school_account_id', null);
+    } else {
+      const u = findUserById(school_account_id);
+      if (!u) throw new Error('Пользователь не найден');
+      if (u.is_blocked) throw new Error('Пользователь заблокирован');
+      setSetting('awo_school_account_id', school_account_id);
+    }
+  }
   return getAwoSettings();
 }
 
@@ -2290,7 +2321,7 @@ module.exports = {
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes,
   getReferralCount, findUserByInviteCode,
-  findUserByEmail, findUserByEmailOrPhone, getSchoolAccount,
+  findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   // AWO integration
   createSchoolInvite, findSchoolInviteByCode, findActiveSchoolInviteByEmail, markSchoolInviteUsed,
   addUserToChat,

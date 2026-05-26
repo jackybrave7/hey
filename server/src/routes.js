@@ -169,7 +169,7 @@ module.exports = function makeRouter(db, broadcast) {
               try {
                 db.createMessage({
                   conversationId: chatId,
-                  senderId: db.SCHOOL_USER_ID,
+                  senderId: db.getSchoolUserId(),
                   text: `🎓 ${user.name} присоединился к курсу «${schoolInvite.course}»`,
                 });
               } catch {}
@@ -1718,7 +1718,7 @@ module.exports = function makeRouter(db, broadcast) {
               try {
                 db.createMessage({
                   conversationId: chatId,
-                  senderId: db.SCHOOL_USER_ID,
+                  senderId: db.getSchoolUserId(),
                   text: `🎓 ${existing.name} присоединился к курсу «${goods}»`,
                 });
               } catch {}
