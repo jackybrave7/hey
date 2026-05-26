@@ -1694,7 +1694,15 @@ module.exports = function makeRouter(db, broadcast) {
 
     const id_account        = payload.id_account || payload.invoice_id || payload.id;
     const id_account_status = Number(payload.id_account_status ?? payload.status ?? 0);
-    const goods             = (payload.goods || payload.product || payload.course || '').toString().trim();
+    // АВО кладёт товары в payload.lines = { lineId: { goods: '...', id_goods, ... } }.
+    // Берём первый goods из lines (обычно заказ из одной позиции). Fallback на
+    // корневые поля для совместимости с альтернативными webhook-форматами.
+    let goodsFromLines = '';
+    if (payload.lines && typeof payload.lines === 'object') {
+      const first = Object.values(payload.lines).find(l => l && (l.goods || l.product));
+      if (first) goodsFromLines = (first.goods || first.product || '').toString().trim();
+    }
+    const goods             = (goodsFromLines || payload.goods || payload.product || payload.course || '').toString().trim();
     const rawEmail          = (payload.email || '').toString().trim().toLowerCase();
     const rawPhone          = payload.phone_number || payload.phone || null;
 
