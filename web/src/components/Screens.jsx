@@ -689,7 +689,7 @@ function AvatarPicker({ avatar, onChange, size = 136, disabled = false }) {
   function handleFile(e) {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { alert('Файл больше 10 МБ'); return; }
+    if (file.size > 10 * 1024 * 1024) { heyToast('Файл больше 10 МБ', 'error'); return; }
     const localUrl = URL.createObjectURL(file);
     onChange(localUrl, file);
   }
@@ -1288,9 +1288,9 @@ export function MyProfileScreen() {
     const urls = (bio || '').match(/https?:\/\/\S+/gi) || [];
     const maxLinks = user?.is_super ? 5 : 1;
     if (urls.length > maxLinks) {
-      alert(user?.is_super
+      heyToast(user?.is_super
         ? `В описании можно до ${maxLinks} ссылок (у тебя ${urls.length}). Лишние нужно убрать.`
-        : `В описании можно только 1 ссылку (у тебя ${urls.length}). В ✦ Super — до 5. Лишние нужно убрать.`);
+        : `В описании можно только 1 ссылку (у тебя ${urls.length}). В ✦ Super — до 5. Лишние нужно убрать.`, 'error');
       return;
     }
     setSaving(true);
@@ -1313,7 +1313,7 @@ export function MyProfileScreen() {
       setEditing(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch(e) { alert(e.message); }
+    } catch(e) { heyToast(e.message, 'error'); }
     finally { setSaving(false); }
   }
 
@@ -2202,6 +2202,7 @@ export function GlobalUserCardMount() {
   const [blocked, setBlocked] = useState([]);
   const nav = useNavigate();
   const { user: me } = useAuth();
+  const [customConfirm, confirmModal] = useConfirm();
 
   useEffect(() => {
     function onOpen(e) {
@@ -2226,7 +2227,8 @@ export function GlobalUserCardMount() {
     try { setBlocked(await api.getBlocked()); }   catch {}
   }
 
-  return (
+  return (<>
+    {confirmModal}
     <ContactCardModal
       contact={contactObj}
       isBlocked={isBlocked}
@@ -2247,14 +2249,17 @@ export function GlobalUserCardMount() {
         } catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
       }}
       onRemoveContact={async () => {
-        if (!confirm('Удалить из контактов? Чат и переписка останутся.')) return;
+        const ok = await customConfirm('Удалить из контактов? Чат и переписка останутся.',
+            { confirmLabel: 'Удалить' });
+        if (!ok) return;
         try {
           await api.deleteContact(userId);
           await refreshLists();
         } catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
       }}
       onBlock={async () => {
-        if (!confirm('Заблокировать пользователя?')) return;
+        if (!await customConfirm('Заблокировать пользователя? Он не сможет писать тебе и видеть твои моменты.',
+            { confirmLabel: 'Заблокировать', danger: true })) return;
         try {
           await api.blockUser(userId);
           await refreshLists();
@@ -2270,7 +2275,7 @@ export function GlobalUserCardMount() {
       onNotesChange={() => refreshLists()}
       onOpenMoment={(m) => { setUserId(null); nav(`/moments/${m.id}`); }}
     />
-  );
+  </>);
 }
 
 function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
@@ -3032,7 +3037,7 @@ export function ContactsScreen() {
     const looksLikePhone = /^[\d\s\-\+\(\)]{7,}$/.test(q);
     if (looksLikePhone) {
       const pv = validatePhone(q);
-      if (!pv.ok) { alert(pv.msg); return; }
+      if (!pv.ok) { heyToast(pv.msg, 'error'); return; }
       try {
         const c = await api.addContact({ phone: pv.normalized });
         setContacts(prev => prev.find(x => x.id === c.id) ? prev : [...prev, c]);
@@ -3043,7 +3048,7 @@ export function ContactsScreen() {
         if (e.message?.includes('не найден') || e.message?.includes('404') || e.status === 404) {
           setInviteTarget(pv.normalized);
         } else {
-          alert(e.message);
+          heyToast(e.message, 'error');
         }
       }
     }
@@ -3056,7 +3061,7 @@ export function ContactsScreen() {
     try {
       const conv = await api.openConversation(contactId);
       nav(`/chat/${conv.id}`);
-    } catch(e) { alert(e.message); }
+    } catch(e) { heyToast(e.message, 'error'); }
   }
 
   async function handleBlock(contact) {
@@ -3250,7 +3255,7 @@ export function ContactsScreen() {
           onChat={() => openChat(card.id)}
           onAddContact={() => {}} /* уже в контактах — кнопка не показывается */
           onRemoveContact={async () => {
-            if (!confirm('Удалить из контактов? Чат и переписка останутся.')) return;
+            if (!await customConfirm('Удалить из контактов? Чат и переписка останутся.', { confirmLabel: 'Удалить' })) return;
             try { await api.deleteContact(card.id); setContacts(prev => prev.filter(c => c.id !== card.id)); setCard(null); }
             catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
           }}
@@ -4522,7 +4527,7 @@ export function GroupCreateScreen() {
       const url = await uploadAvatar(file, { getPresignUrl: api.getPresignUrl });
       setAvatarUrl(url);
     } catch(err) {
-      alert(err.message || 'Не удалось загрузить аватар');
+      heyToast(err.message || 'Не удалось загрузить аватар', 'error');
     }
     setUploading(false);
   }
@@ -4533,15 +4538,15 @@ export function GroupCreateScreen() {
   }
 
   async function create() {
-    if (!name.trim()) { alert('Введите название группы'); return; }
-    if (selected.size === 0) { alert('Добавьте хотя бы одного участника'); return; }
+    if (!name.trim()) { heyToast('Введите название группы', 'error'); return; }
+    if (selected.size === 0) { heyToast('Добавьте хотя бы одного участника', 'error'); return; }
     setSaving(true);
     try {
       // приоритет: кастомный аватар → emoji
       const groupIcon = avatarUrl || icon;
       const { id } = await api.createGroup({ name: name.trim(), icon: groupIcon, memberIds: [...selected] });
       nav(`/chat/${id}`, { replace: true });
-    } catch(e) { alert(e.message); setSaving(false); }
+    } catch(e) { heyToast(e.message, 'error'); setSaving(false); }
   }
 
   // ── Фильтрация контактов по поиску ──────────────────────────────────────
@@ -5804,7 +5809,7 @@ export function ChatScreen() {
         });
       }, 1000);
     } catch {
-      alert('Нет доступа к микрофону');
+      heyToast('Нет доступа к микрофону', 'error');
     }
   }
 
@@ -5849,7 +5854,7 @@ export function ChatScreen() {
     try {
       url = await uploadAudioBlob(blob, { getPresignUrl: api.getPresignUrl });
     } catch(e) {
-      alert('Не удалось отправить голосовое: ' + e.message);
+      heyToast('Не удалось отправить голосовое: ' + e.message, 'error');
       return;
     }
     const attachment = { type: 'audio', url, duration: Math.round(dur) };
@@ -6022,7 +6027,7 @@ export function ChatScreen() {
     if (editingMsg) {
       api.editMessage(convId, editingMsg.id, t)
         .then(updated => setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, text: updated.text, edited_at: updated.edited_at } : m)))
-        .catch(e => alert(e.message));
+        .catch(e => heyToast(e.message, 'error'));
       setEditingMsg(null);
       setText('');
       return;
@@ -6215,7 +6220,7 @@ export function ChatScreen() {
       await api.addContact({ userId: partner.id });
       setIsContact(true);
     } catch(e) {
-      alert(e.message || 'Не удалось добавить в контакты');
+      heyToast(e.message || 'Не удалось добавить в контакты', 'error');
     }
   }
 
@@ -7388,7 +7393,7 @@ export function CallDetailScreen() {
     try {
       const conv = await api.openConversation(partnerId);
       nav(`/chat/${conv.id}`);
-    } catch(e) { alert(e.message); }
+    } catch(e) { heyToast(e.message, 'error'); }
   }
 
   const row = (label, value) => (
