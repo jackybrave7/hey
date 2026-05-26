@@ -8183,9 +8183,9 @@ export function MomentPage() {
 
   const isMine = moment?.user_id === user?.id;
   const REACTIONS = [
-    { id: 'see',      label: 'Вижу',       icon: '👁' },
-    { id: 'resonate', label: 'Резонирует', icon: '✨' },
-    { id: 'talk',     label: 'Поговорить', icon: '🤝' },
+    { id: 'see',      label: 'Вижу',       iconName: 'eye' },
+    { id: 'resonate', label: 'Резонирует', iconName: 'sparkle' },
+    { id: 'talk',     label: 'Поговорить', iconName: 'chat' },
   ];
 
   if (loading) return (
@@ -8334,7 +8334,7 @@ export function MomentPage() {
                           border: myReaction===r.id ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.12)',
                           color: myReaction===r.id ? 'white' : 'rgba(255,255,255,.7)',
                         }}>
-                        <div style={{ fontSize:18 }}>{r.icon}</div>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name={r.iconName} size={17}/></div>
                         <div style={{ fontSize:11, marginTop:2 }}>{r.label}</div>
                       </button>
                     ))}

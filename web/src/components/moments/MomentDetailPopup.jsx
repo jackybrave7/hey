@@ -7,6 +7,7 @@ import MoodEmoji from './MoodEmoji';
 import EmbeddedVideoPreview from './EmbeddedVideoPreview';
 import SuperInfoScreen from '../super/SuperInfoScreen';
 import { AudioPlayer } from '../Screens';
+import Icon from '../Icon';
 
 function fmtDate(ts) {
   if (!ts) return '';
@@ -128,9 +129,9 @@ function ForeignAuthorMenu({ open, onToggle, onReport }) {
 // ── Модалка «Пожаловаться» ─────────────────────────────────────────────
 // ── Reactors list modal — кто отреагировал (Super-функция) ──────────────
 const REACTION_META = {
-  see:      { icon: '👁', title: 'Просмотры'  },
-  resonate: { icon: '✨', title: 'Резонирует' },
-  talk:     { icon: '🤝', title: 'Поговорить' },
+  see:      { iconName: 'eye',     title: 'Просмотры'  },
+  resonate: { iconName: 'sparkle', title: 'Резонирует' },
+  talk:     { iconName: 'chat',    title: 'Поговорить' },
 };
 
 function ReactorsModal({ filter, reactors, loading, onClose, onOpenUser }) {
@@ -142,7 +143,7 @@ function ReactorsModal({ filter, reactors, loading, onClose, onOpenUser }) {
       .filter(r => r.reaction === filter)
       .filter(r => seen.has(r.id) ? false : (seen.add(r.id), true));
   })();
-  const meta = REACTION_META[filter] || { icon: '✦', title: 'Отклик' };
+  const meta = REACTION_META[filter] || { iconName: 'sparkle', title: 'Отклик' };
 
   function fmtTime(ts) {
     if (!ts) return '';
@@ -169,7 +170,7 @@ function ReactorsModal({ filter, reactors, loading, onClose, onOpenUser }) {
         {/* Header */}
         <div style={{padding:'16px 20px 14px',borderBottom:'1px solid rgba(255,255,255,.08)',
           display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-          <span style={{fontSize:24}}>{meta.icon}</span>
+          <span style={{display:'inline-flex',alignItems:'center',color:'rgba(255,255,255,.9)'}}><Icon name={meta.iconName} size={22}/></span>
           <div style={{flex:1}}>
             <div style={{color:'white',fontSize:16,fontWeight:700}}>{meta.title}</div>
             <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginTop:2}}>
@@ -350,9 +351,9 @@ function ReportModal({ targetType, targetId, onClose, onSent }) {
 }
 
 const REACTIONS = [
-  { id: 'see',       label: 'Вижу',       icon: '👁' },
-  { id: 'resonate',  label: 'Резонирует', icon: '✨' },
-  { id: 'talk',      label: 'Поговорить', icon: '🤝' },
+  { id: 'see',       label: 'Вижу',       iconName: 'eye' },
+  { id: 'resonate',  label: 'Резонирует', iconName: 'sparkle' },
+  { id: 'talk',      label: 'Поговорить', iconName: 'chat' },
 ];
 
 function copyText(text) {
@@ -789,9 +790,9 @@ export default function MomentDetailPopup({
                   <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'8px',
                     display:'flex',gap:4}}>
                     {[
-                      { key: 'see',      icon: '👁', count: moment.stats?.see || 0,      label: 'просмотры'   },
-                      { key: 'resonate', icon: '✨', count: moment.stats?.resonate || 0, label: 'резонирует' },
-                      { key: 'talk',     icon: '🤝', count: moment.stats?.talk || 0,     label: 'поговорить' },
+                      { key: 'see',      iconName: 'eye',     count: moment.stats?.see || 0,      label: 'просмотры'   },
+                      { key: 'resonate', iconName: 'sparkle', count: moment.stats?.resonate || 0, label: 'резонирует' },
+                      { key: 'talk',     iconName: 'chat',    count: moment.stats?.talk || 0,     label: 'поговорить' },
                     ].map(stat => (
                       <button key={stat.key}
                         onClick={() => {
@@ -812,7 +813,7 @@ export default function MomentDetailPopup({
                         }}
                         onMouseEnter={e => { if (stat.count > 0) e.currentTarget.style.background='rgba(255,255,255,.09)'; }}
                         onMouseLeave={e => { if (stat.count > 0) e.currentTarget.style.background='rgba(255,255,255,.04)'; }}>
-                        <span style={{fontSize:18,lineHeight:1}}>{stat.icon}</span>
+                        <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',height:18}}><Icon name={stat.iconName} size={17}/></span>
                         <span style={{fontSize:15,fontWeight:700,lineHeight:1}}>{stat.count}</span>
                       </button>
                     ))}
@@ -848,7 +849,7 @@ export default function MomentDetailPopup({
                         color: active ? 'white' : 'rgba(255,255,255,.65)',
                         fontFamily:'inherit',
                       }}>
-                      <span style={{fontSize:16,lineHeight:1}}>{r.icon}</span>
+                      <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center'}}><Icon name={r.iconName} size={15}/></span>
                       <span style={{fontSize:12,fontWeight:500}}>{r.label}</span>
                     </button>
                   );
