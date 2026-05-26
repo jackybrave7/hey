@@ -3,29 +3,36 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
 
+// Тёмные карточки + высоко-контрастный текст — фон админки имеет светлые
+// области градиента, поэтому используем не прозрачно-белые, а тёмные подложки.
 const cardStyle = {
-  background: 'rgba(255,255,255,.04)',
-  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(20,12,40,.65)',
+  border: '1px solid rgba(255,255,255,.12)',
   borderRadius: 14,
   padding: '20px 22px',
   marginBottom: 18,
+  backdropFilter: 'blur(8px)',
 };
 const labelStyle = {
-  color: 'rgba(255,255,255,.55)', fontSize: 12, fontWeight: 600,
+  color: 'rgba(230,225,250,.85)', fontSize: 12, fontWeight: 700,
   textTransform: 'uppercase', letterSpacing: .6, marginBottom: 6,
 };
 const inputStyle = {
   width: '100%', padding: '10px 12px', borderRadius: 10,
-  background: 'rgba(0,0,0,.25)', border: '1px solid rgba(255,255,255,.1)',
+  background: 'rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)',
   color: 'white', fontSize: 14, outline: 'none',
+  fontFamily: 'inherit',
 };
 const btnStyle = {
   padding: '9px 16px', borderRadius: 10, border: 'none',
-  background: 'rgba(120,90,200,.4)', color: 'white', fontSize: 13,
+  background: 'rgba(140,110,220,.7)', color: 'white', fontSize: 13,
   fontWeight: 600, cursor: 'pointer',
+  fontFamily: 'inherit',
 };
-const btnGhost = { ...btnStyle, background: 'rgba(255,255,255,.07)' };
-const btnDanger = { ...btnStyle, background: 'rgba(220,90,90,.35)' };
+const btnGhost = { ...btnStyle, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.18)' };
+const btnDanger = { ...btnStyle, background: 'rgba(220,90,90,.55)', border: '1px solid rgba(255,160,160,.4)' };
+const mutedText = { color: 'rgba(220,215,240,.78)' };  // вторичный текст с хорошим контрастом
+const hintText  = { color: 'rgba(220,215,240,.6)' };   // подсказки — легче, но читаемо
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -157,7 +164,7 @@ export default function AdminAwo() {
         <div style={{fontWeight:700,marginBottom:6}}>
           Привязать «{userName}» как официальный школьный аккаунт?
         </div>
-        <div style={{color:'rgba(255,255,255,.65)',fontSize:13,lineHeight:1.55}}>
+        <div style={{color:'rgba(225,220,245,.85)',fontSize:13,lineHeight:1.55}}>
           От его имени будут отправляться приветствия в чаты курсов и приглашения
           из АВО. Можно сменить в любой момент.
         </div>
@@ -195,7 +202,7 @@ export default function AdminAwo() {
       <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         🎓 АВО / Школа
       </h1>
-      <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14, marginBottom: 24 }}>
+      <p style={{ color: 'rgba(225,220,245,.75)', fontSize: 14, marginBottom: 24 }}>
         Интеграция с АвтоВебОфис: автоприглашение учеников после оплаты курсов BL School
       </p>
 
@@ -217,7 +224,7 @@ export default function AdminAwo() {
         <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
           🎓 Официальный аккаунт школы
         </h3>
-        <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginBottom: 16, lineHeight:1.55 }}>
+        <p style={{ color: 'rgba(225,220,245,.82)', fontSize: 13, marginBottom: 16, lineHeight:1.55 }}>
           От имени этого аккаунта школа общается с учениками в HEY: появляется в контактах
           у новых учеников после регистрации по /join-ссылке и отправляет приветствия
           «🎓 X присоединился к курсу» в чатах курсов.
@@ -244,7 +251,7 @@ export default function AdminAwo() {
                 overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {settings.school_account.name}
               </div>
-              <div style={{ color:'rgba(255,255,255,.5)', fontSize:12, marginTop:2 }}>
+              <div style={{ color:'rgba(225,220,245,.82)', fontSize:12, marginTop:2 }}>
                 {settings.school_account.is_default
                   ? 'системный дефолтный аккаунт'
                   : (settings.school_account.phone || 'привязанный пользователь')}
@@ -270,7 +277,7 @@ export default function AdminAwo() {
             placeholder="Имя или телефон (минимум 2 символа)"/>
         </div>
         {accountSearching && (
-          <div style={{ color:'rgba(255,255,255,.4)', fontSize:12, marginTop:6 }}>Поиск…</div>
+          <div style={{ color:'rgba(225,220,245,.75)', fontSize:12, marginTop:6 }}>Поиск…</div>
         )}
         {accountResults.length > 0 && (
           <div style={{ marginTop: 8, display:'flex', flexDirection:'column', gap:6,
@@ -300,7 +307,7 @@ export default function AdminAwo() {
                   <div style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                     {u.name} {u.is_super ? '✦' : ''}
                   </div>
-                  <div style={{ color:'rgba(255,255,255,.4)', fontSize:11 }}>{u.phone}</div>
+                  <div style={{ color:'rgba(225,220,245,.75)', fontSize:11 }}>{u.phone}</div>
                 </div>
                 {u.id === settings?.school_account?.id && (
                   <span style={{ color:'rgba(110,235,150,.95)', fontSize:11 }}>текущий</span>
@@ -327,7 +334,7 @@ export default function AdminAwo() {
 
         {testMode && (
           <div style={{ marginBottom: 14 }}>
-            <div style={labelStyle}>Тестовый курс (поле <code>goods</code> из АВО)</div>
+            <div style={labelStyle}>Тестовый курс (поле <code style={{background:'rgba(0,0,0,.45)',padding:'1px 5px',borderRadius:4,color:'rgba(200,220,255,1)',fontSize:11.5}}>goods</code> из АВО)</div>
             <input style={inputStyle} value={testCourse} onChange={e => setTestCourse(e.target.value)}
               placeholder="Например: BL School — Базовый курс"/>
           </div>
@@ -337,8 +344,8 @@ export default function AdminAwo() {
           <div style={labelStyle}>🚫 Стоп-слова для доступа к чату (через запятую)</div>
           <input style={inputStyle} value={chatExcludes} onChange={e => setChatExcludes(e.target.value)}
             placeholder="слушатель, запись"/>
-          <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
-            Если в названии курса (<code>goods</code>) есть хоть одно из этих слов —
+          <div style={{ color: 'rgba(225,220,245,.75)', fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+            Если в названии курса (<code style={{background:'rgba(0,0,0,.45)',padding:'1px 5px',borderRadius:4,color:'rgba(200,220,255,1)',fontSize:11.5}}>goods</code>) есть хоть одно из этих слов —
             ученика <strong>не добавим</strong> в чат курса (инвайт всё равно создастся).
             Регистр не важен.
           </div>
@@ -348,9 +355,16 @@ export default function AdminAwo() {
           {savingSettings ? 'Сохраняю…' : 'Сохранить настройки'}
         </button>
 
-        <div style={{ marginTop: 16, color: 'rgba(255,255,255,.4)', fontSize: 12, lineHeight: 1.5 }}>
-          <strong>Webhook URL:</strong> <code>{location.origin}/api/integrations/awo/webhook?token=&lt;TOKEN&gt;</code><br/>
-          <strong>Токен</strong> задаётся в <code>.env</code> сервера как <code>AWO_WEBHOOK_TOKEN</code>.
+        <div style={{ marginTop: 16, color: 'rgba(225,220,245,.85)', fontSize: 12, lineHeight: 1.6 }}>
+          <strong style={{color:'white'}}>Webhook URL:</strong>{' '}
+          <code style={{background:'rgba(0,0,0,.45)',padding:'2px 6px',borderRadius:4,
+            color:'rgba(200,220,255,1)',fontSize:11.5,wordBreak:'break-all'}}>
+            {location.origin}/api/integrations/awo/webhook?token=&lt;TOKEN&gt;
+          </code><br/>
+          <strong style={{color:'white'}}>Токен</strong> задаётся в{' '}
+          <code style={{background:'rgba(0,0,0,.45)',padding:'2px 5px',borderRadius:4,color:'rgba(200,220,255,1)',fontSize:11.5}}>.env</code>{' '}
+          сервера как{' '}
+          <code style={{background:'rgba(0,0,0,.45)',padding:'2px 5px',borderRadius:4,color:'rgba(200,220,255,1)',fontSize:11.5}}>AWO_WEBHOOK_TOKEN</code>.
         </div>
       </div>
 
@@ -359,7 +373,7 @@ export default function AdminAwo() {
         <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
           🔗 Курс → групповой чат
         </h3>
-        <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
+        <p style={{ color: 'rgba(225,220,245,.75)', fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
           После регистрации ученик автоматически добавится в указанный чат.<br/>
           Название курса можно указывать как <strong>точное</strong>, так и <strong>часть</strong> названия —
           например маппинг «Zoom Участник» подойдёт под курс «BL School — Zoom Участник, поток 5».
@@ -378,7 +392,7 @@ export default function AdminAwo() {
         </div>
 
         {mappings.length === 0 ? (
-          <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Маппингов пока нет.</div>
+          <div style={{ color: 'rgba(220,215,240,.65)', fontSize: 13 }}>Маппингов пока нет.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {mappings.map(m => (
@@ -386,7 +400,7 @@ export default function AdminAwo() {
                 padding: '10px 12px', background: 'rgba(0,0,0,.2)', borderRadius: 10 }}>
                 <div style={{ flex: 1, color: 'white', fontSize: 13 }}>
                   <strong>{m.course}</strong>
-                  <span style={{ color: 'rgba(255,255,255,.4)', marginLeft: 8 }}>
+                  <span style={{ color: 'rgba(225,220,245,.75)', marginLeft: 8 }}>
                     → {m.chat_name || m.chat_id}
                   </span>
                 </div>
@@ -402,7 +416,7 @@ export default function AdminAwo() {
         <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
           🔗 Сгенерировать /join-ссылку
         </h3>
-        <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, marginBottom: 14 }}>
+        <p style={{ color: 'rgba(225,220,245,.75)', fontSize: 12, marginBottom: 14 }}>
           Для ручной отправки или тестирования (обычно ссылку шлёт бизнес-процесс АВО)
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr auto', gap: 10, marginBottom: 12 }}>
@@ -432,12 +446,12 @@ export default function AdminAwo() {
           <button style={btnGhost} onClick={refreshLog}>⟳ Обновить</button>
         </div>
         {log.length === 0 ? (
-          <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 13 }}>Пока ничего не приходило.</div>
+          <div style={{ color: 'rgba(220,215,240,.65)', fontSize: 13 }}>Пока ничего не приходило.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: 'rgba(255,255,255,.85)' }}>
               <thead>
-                <tr style={{ color: 'rgba(255,255,255,.5)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <tr style={{ color: 'rgba(225,220,245,.82)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Когда</th>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Email</th>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Телефон</th>
