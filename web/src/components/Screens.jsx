@@ -3259,7 +3259,7 @@ export function ConversationsScreen() {
           ) : (
             <div style={{color:'rgba(255,255,255,.45)',fontSize:13,
               whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-              {c.last_sender_id===user?.id ? 'Вы: ' : ''}{c.last_text||'…'}
+              {c.last_sender_id===user?.id ? 'Вы: ' : ''}{c.last_text ? renderPreviewWithEmoji(c.last_text) : '…'}
             </div>
           )}
         </div>
@@ -3804,6 +3804,26 @@ const HEY_EMOJI = [
 
 const HEY_EMOJI_SET = new Set(HEY_EMOJI);
 const EMOJI_RE = new RegExp('\\[(' + HEY_EMOJI.map(n => n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')\\]', 'g');
+
+// Лёгкий рендер для коротких превью (список чатов, цитаты): заменяет
+// [emoji-name] на маленькую <img>. Без markdown и URL-парсинга.
+function renderPreviewWithEmoji(text, iconSize = 14) {
+  if (!text) return text;
+  const re = new RegExp(EMOJI_RE.source, 'g');
+  const out = [];
+  let last = 0, m, i = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (!HEY_EMOJI_SET.has(m[1])) continue;
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(
+      <img key={'e'+(i++)} src={`/emoji/${encodeURIComponent(m[1])}.svg`} alt={m[1]}
+        style={{width:iconSize,height:iconSize,verticalAlign:'-2px',display:'inline-block'}}/>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out.length ? out : text;
+}
 
 // Inline markdown:
 //   **bold**          — жирный
@@ -4856,7 +4876,7 @@ const MessageRow = memo(function MessageRow({
                     fontSize:12, color: subtxt,
                     overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>
-                    {preview || '…'}
+                    {preview ? renderPreviewWithEmoji(preview) : '…'}
                   </div>
                 </div>
               </div>
@@ -6163,7 +6183,7 @@ export function ChatScreen() {
                 </div>
                 <div style={{color:'rgba(255,255,255,.85)',fontSize:13,
                   overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:1}}>
-                  {preview.slice(0, 200)}
+                  {renderPreviewWithEmoji(preview.slice(0, 200))}
                 </div>
               </div>
               {canUnpin && (
@@ -6443,7 +6463,7 @@ export function ChatScreen() {
                 </div>
                 <div style={{color:'rgba(255,255,255,.7)',fontSize:13,
                   overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:2}}>
-                  {preview || '…'}
+                  {preview ? renderPreviewWithEmoji(preview) : '…'}
                 </div>
               </div>
               <button onClick={() => setReplyTo(null)}
