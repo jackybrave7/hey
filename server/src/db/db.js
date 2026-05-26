@@ -863,6 +863,21 @@ function getUnreadCounts(userId, convIds) {
   return Object.fromEntries(rows.map(r => [r.conversation_id, r.cnt]));
 }
 
+// Общий счётчик непрочитанных для виджета — суммирует по всем чатам где
+// пользователь активный участник.
+function getTotalUnreadFor(userId) {
+  const convIds = db.prepare(
+    `SELECT conversation_id FROM members WHERE user_id=? AND status='active'`
+  ).all(userId).map(r => r.conversation_id);
+  if (!convIds.length) return 0;
+  const ph = convIds.map(() => '?').join(',');
+  const row = db.prepare(
+    `SELECT COUNT(*) AS cnt FROM messages
+     WHERE conversation_id IN (${ph}) AND sender_id!=? AND status!='read'`
+  ).get(...convIds, userId);
+  return row?.cnt || 0;
+}
+
 function getConversationsForUser(userId) {
   // Включаем и активные, и pending членства — pending покажем как «приглашение»
   const memberRows = db.prepare(
@@ -2322,6 +2337,7 @@ module.exports = {
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes,
   getReferralCount, findUserByInviteCode,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
+  getTotalUnreadFor,
   // AWO integration
   createSchoolInvite, findSchoolInviteByCode, findActiveSchoolInviteByEmail, markSchoolInviteUsed,
   addUserToChat,

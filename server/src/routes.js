@@ -5,7 +5,7 @@ const path = require('path');
 const { v4: uuid } = require('uuid');
 const nodemailer = require('nodemailer');
 const authModule = require('./auth');
-const { signToken, requireAuth, optionalAuth } = authModule;
+const { signToken, requireAuth, optionalAuth, setSessionCookie, clearSessionCookie, getSessionFromCookie } = authModule;
 const db = require('./db/db');
 const { detectTags, detectMoodEmoji } = require('./auto-tags');
 const { parseEmbeddedVideo } = require('./video-embed');
@@ -200,6 +200,7 @@ module.exports = function makeRouter(db, broadcast) {
     }
 
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
+    setSessionCookie(res, token);
     const { password: _, ...safe } = user;
     res.json({ token, user: safe });
   });
@@ -241,8 +242,39 @@ module.exports = function makeRouter(db, broadcast) {
       });
     }
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
+    setSessionCookie(res, token);
     const { password: _, ...safe } = user;
     res.json({ token, user: safe });
+  });
+
+  // Logout — очищает cookie-сессию (JWT в localStorage клиент чистит сам)
+  r.post('/logout', (req, res) => {
+    clearSessionCookie(res);
+    res.json({ ok: true });
+  });
+
+  // ── Widget для виджета HEY в личном кабинете АВО ─────────────────────────
+  // Возвращает счётчик непрочитанных, но ТОЛЬКО если:
+  //   1) у браузера есть валидная cookie-сессия HEY
+  //   2) email сессии совпадает с переданным query-параметром (email из АВО)
+  // Без совпадения — { authenticated: false }, никаких персональных данных.
+  // CORS: app-wide cors уже эхо-возвращает origin с credentials — для виджета
+  // на чужом домене этого достаточно.
+  r.get('/widget/unread', (req, res) => {
+    // Безкэшевый ответ
+    res.set('Cache-Control', 'no-store');
+    const session = getSessionFromCookie(req);
+    if (!session) return res.json({ authenticated: false });
+    const user = db.findUserById(session.id);
+    if (!user || user.is_blocked) return res.json({ authenticated: false });
+    // Email из АВО → нормализуем
+    const askedEmail = String(req.query.email || '').trim().toLowerCase();
+    const userEmail  = (user.email || '').trim().toLowerCase();
+    if (!askedEmail || !userEmail || askedEmail !== userEmail) {
+      return res.json({ authenticated: false });
+    }
+    const unread = db.getTotalUnreadFor(user.id);
+    res.json({ authenticated: true, unread });
   });
 
   // Public invite info endpoint (no auth required)

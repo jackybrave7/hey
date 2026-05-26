@@ -411,6 +411,47 @@ export default function AdminAwo() {
         )}
       </div>
 
+      {/* Виджет HEY для ЛК АВО */}
+      <div style={cardStyle}>
+        <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 10 }}>
+          📦 Виджет HEY в ЛК АВО
+        </h3>
+        <p style={{ color: 'rgba(225,220,245,.85)', fontSize: 13, marginBottom: 12, lineHeight: 1.55 }}>
+          Плавающий фиолетовый пузырь со счётчиком непрочитанных в углу личного
+          кабинета ученика. Если в браузере есть сессия HEY и email совпадает —
+          показывает реальный счётчик; иначе нейтральное «Открыть HEY».
+        </p>
+        <div style={{ ...labelStyle, marginTop: 4 }}>Сниппет для поля «Редактирование скриптов» в АВО</div>
+        <div style={{
+          position: 'relative', background: 'rgba(0,0,0,.45)',
+          border: '1px solid rgba(255,255,255,.12)', borderRadius: 10,
+          padding: '12px 14px', marginBottom: 10,
+        }}>
+          <pre style={{
+            margin: 0, color: 'rgba(200,220,255,1)', fontSize: 12.5,
+            fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.55,
+          }}>{`<script>window.HEY_USER_EMAIL = "{email}";</script>
+<script src="${location.origin}/widget.js"></script>`}</pre>
+          <button onClick={() => {
+            const snippet = `<script>window.HEY_USER_EMAIL = "{email}";</script>\n<script src="${location.origin}/widget.js"></script>`;
+            navigator.clipboard.writeText(snippet);
+            notify('Сниппет скопирован');
+          }} style={{ ...btnGhost, position: 'absolute', top: 8, right: 8, padding: '6px 12px', fontSize: 12 }}>
+            📋 Копировать
+          </button>
+        </div>
+        <div style={{ color: 'rgba(225,220,245,.78)', fontSize: 12, lineHeight: 1.6 }}>
+          <strong style={{ color: 'white' }}>Куда вставлять:</strong> Настройки АВО → «Редактирование
+          скриптов (javascript) для кабинета ученика». Переменную{' '}
+          <code style={{ background: 'rgba(0,0,0,.45)', padding: '1px 5px', borderRadius: 4,
+            color: 'rgba(200,220,255,1)', fontSize: 11.5 }}>{'{email}'}</code>{' '}
+          АВО подставит автоматически. Виджет грузится с твоего домена{' '}
+          <code style={{ background: 'rgba(0,0,0,.45)', padding: '1px 5px', borderRadius: 4,
+            color: 'rgba(200,220,255,1)', fontSize: 11.5 }}>{location.origin}/widget.js</code>.
+        </div>
+      </div>
+
       {/* Генератор join-ссылки */}
       <div style={cardStyle}>
         <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>

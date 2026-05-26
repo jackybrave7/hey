@@ -81,4 +81,38 @@ function optionalAuth(req, res, next) {
   next();
 }
 
-module.exports = { init, signToken, verifyToken, requireAuth, optionalAuth, wsAuth };
+// ── Cookie session (для виджета в АВО ЛК) ────────────────────────────────
+// Параллельно с JWT-в-Authorization-header ставим cookie hey_session, чтобы
+// cross-origin widget мог проверить «залогинен ли этот браузер в HEY» без
+// доступа к localStorage другого домена.
+const SESSION_COOKIE = 'hey_session';
+const SESSION_TTL_DAYS = 30;
+
+function setSessionCookie(res, token) {
+  // SameSite=None+Secure обязательны для cross-site iframe/виджета.
+  // HttpOnly — JS на чужом домене не сможет украсть; читаем только сервером.
+  const maxAge = SESSION_TTL_DAYS * 24 * 3600;
+  res.setHeader('Set-Cookie',
+    `${SESSION_COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=None`);
+}
+
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie',
+    `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None`);
+}
+
+function getSessionFromCookie(req) {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  const m = raw.split(/;\s*/).map(s => s.split('='))
+    .find(([k]) => k === SESSION_COOKIE);
+  if (!m || !m[1]) return null;
+  try {
+    return verifyToken(m[1]);
+  } catch { return null; }
+}
+
+module.exports = {
+  init, signToken, verifyToken, requireAuth, optionalAuth, wsAuth,
+  setSessionCookie, clearSessionCookie, getSessionFromCookie,
+};

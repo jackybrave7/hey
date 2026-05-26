@@ -38,6 +38,9 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    // Чистим cookie-сессию на сервере (для виджета HEY в ЛК АВО).
+    // Игнорируем ошибки — основное обнуление состояния делаем локально.
+    try { api.logout?.().catch(() => {}); } catch {}
     localStorage.removeItem('hey_token');
     socket.disconnect();
     setUser(null);
