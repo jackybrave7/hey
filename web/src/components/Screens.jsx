@@ -1114,6 +1114,8 @@ export function MyProfileScreen() {
   const [name, setName]         = useState('');
   const [phone, setPhone]       = useState('');
   const [birthday, setBirthday] = useState('');
+  const [email,    setEmail]    = useState('');
+  const [emailErr, setEmailErr] = useState('');
   const [avatar, setAvatar]     = useState('');
   const [avatarFile, setAvatarFile] = useState(null); // pending File to upload on save
   const [bio, setBio]           = useState('');
@@ -1200,6 +1202,7 @@ export function MyProfileScreen() {
       setBirthday(user.birthday || '');
       setAvatar(user.avatar || '');
       setBio(user.bio || '');
+      setEmail(user.email || '');
     }
   }, [user]);
 
@@ -1228,6 +1231,7 @@ export function MyProfileScreen() {
   function cancelEdit() {
     setEditing(false);
     setPhoneErr('');
+    setEmailErr('');
     // Reset to saved values
     setName(user.name || '');
     setPhone(user.phone || '');
@@ -1235,12 +1239,19 @@ export function MyProfileScreen() {
     setAvatar(user.avatar || '');
     setAvatarFile(null);
     setBio(user.bio || '');
+    setEmail(user.email || '');
   }
 
   async function saveProfile() {
-    const pv = validatePhone(phone);
-    if (!pv.ok) { setPhoneErr(pv.msg); return; }
     if (!name.trim()) return;
+    // Email — опциональный, но если введён должен быть валидный
+    const trimmedEmail = (email || '').trim();
+    if (trimmedEmail) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmedEmail)) {
+        setEmailErr('Неверный формат email');
+        return;
+      }
+    }
     // Проверяем лимит ссылок ДО запроса (повторно проверится на сервере)
     const urls = (bio || '').match(/https?:\/\/\S+/gi) || [];
     const maxLinks = user?.is_super ? 5 : 1;
@@ -1258,12 +1269,13 @@ export function MyProfileScreen() {
         finalAvatar = await uploadAvatar(avatarFile, { getPresignUrl: api.getPresignUrl });
         setAvatarFile(null);
       }
+      // Телефон НЕ отправляем — он закреплён за аккаунтом и не меняется в профиле
       const updated = await api.updateMe({
         name: name.trim(),
-        phone: pv.normalized,
         birthday: birthday || null,
         avatar: finalAvatar,
         bio: bio.trim() || null,
+        email: trimmedEmail || null,
       });
       setUser(updated);
       setEditing(false);
@@ -1336,16 +1348,38 @@ export function MyProfileScreen() {
             </div>
           ) : <FieldLine value={name || '—'}/>}
 
-          {/* Телефон */}
+          {/* Телефон — нельзя менять после регистрации */}
           {editing ? (
             <div>
-              <div style={{color:'rgba(255,255,255,.6)',fontSize:12,marginBottom:4}}>Телефон</div>
-              <input className="ul-input" value={phone}
-                onChange={e=>{ setPhone(formatPhoneInput(e.target.value)); setPhoneErr(''); }}
-                placeholder="+7 (___) ___-__-__" type="tel"/>
-              {phoneErr && <div style={{color:'#ffaaaa',fontSize:12,marginTop:4}}>{phoneErr}</div>}
+              <div style={{color:'rgba(255,255,255,.6)',fontSize:12,marginBottom:4}}>
+                Телефон <span style={{opacity:.6,fontSize:11}}>(нельзя изменить)</span>
+              </div>
+              <input className="ul-input" value={user?.phone || ''} readOnly disabled
+                type="tel"
+                style={{opacity:.7, cursor:'not-allowed'}}/>
+              <div style={{color:'rgba(255,255,255,.4)',fontSize:11,marginTop:4,lineHeight:1.4}}>
+                Телефон используется для входа и остаётся как при регистрации.
+                Для смены — напиши в Telegram-бот поддержки.
+              </div>
             </div>
-          ) : <FieldLine value={phone || '—'}/>}
+          ) : <FieldLine value={user?.phone || '—'}/>}
+
+          {/* Email — опциональный */}
+          {editing ? (
+            <div>
+              <div style={{color:'rgba(255,255,255,.6)',fontSize:12,marginBottom:4}}>
+                Email <span style={{opacity:.6,fontSize:11}}>(необязательно)</span>
+              </div>
+              <input className="ul-input" value={email}
+                onChange={e=>{ setEmail(e.target.value); setEmailErr(''); }}
+                placeholder="you@example.com" type="email"/>
+              {emailErr && <div style={{color:'#ffaaaa',fontSize:12,marginTop:4}}>{emailErr}</div>}
+              <div style={{color:'rgba(255,255,255,.4)',fontSize:11,marginTop:4,lineHeight:1.4}}>
+                Нужен для интеграции со школьными курсами (BL School и т.п.).
+                Видишь только ты.
+              </div>
+            </div>
+          ) : (user?.email ? <FieldLine value={user.email}/> : null)}
 
           {/* Дата рождения */}
           {editing ? (
@@ -3093,6 +3127,7 @@ export function ConversationsScreen() {
 
   // ── Поиск по чатам ────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false); // показывать ли инпут поиска
   const [searchMsgs, setSearchMsgs] = useState(null); // null | array
   const [searchLoading, setSearchLoading] = useState(false);
 
@@ -3288,38 +3323,50 @@ export function ConversationsScreen() {
           <div style={{color:'white',fontSize:20,fontWeight:800,letterSpacing:-.3}}>
             💬 Чаты
           </div>
-          <button onClick={() => nav('/groups/new')}
-            style={{
-              padding:'8px 16px',borderRadius:50,fontSize:13,fontWeight:700,cursor:'pointer',
-              background:'rgba(120,90,200,.85)',border:'none',color:'white',
-              boxShadow:'0 2px 12px rgba(120,80,200,.4)',transition:'all .18s',
-            }}
-            onMouseEnter={e=>e.currentTarget.style.background='rgba(140,110,220,.9)'}
-            onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.85)'}>
-            + Группа
-          </button>
+          <DotsMenu items={[
+            { label:'Поиск по чатам', icon:'🔍', onClick: () => {
+              setSearchOpen(true);
+              setTimeout(() => document.getElementById('hey-chats-search')?.focus(), 50);
+            } },
+            { label:'Новая группа',   icon:'👥', onClick: () => nav('/groups/new') },
+          ]}/>
         </div>
       </div>
 
       <div style={{maxWidth:680,margin:'0 auto',width:'100%'}}>
 
-        {/* Поиск по чатам и сообщениям */}
+        {/* Поиск по чатам и сообщениям — показывается по клику в три точки */}
+        {searchOpen && (
         <div style={{padding:'12px 20px',position:'relative'}}>
           <input
+            id="hey-chats-search"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Поиск по чатам, сообщениям"
+            onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); setSearchOpen(false); } }}
             style={{
               width:'100%', boxSizing:'border-box',
               background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.14)',
-              borderRadius:50, padding:'11px 40px 11px 18px',
+              borderRadius:50, padding:'11px 70px 11px 18px',
               color:'white', fontSize:14, fontFamily:'inherit', outline:'none',
               transition:'border-color .15s',
             }}
             onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.55)'}
             onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.14)'}
           />
-          {search && (
+          {/* Кнопка закрыть поиск целиком */}
+          <button onClick={() => { setSearch(''); setSearchOpen(false); }}
+            title="Закрыть поиск"
+            style={{
+              position:'absolute',right:30,top:'50%',transform:'translateY(-50%)',
+              background:'rgba(255,255,255,.08)',border:'1px solid rgba(255,255,255,.12)',
+              color:'rgba(255,255,255,.7)',fontSize:13,cursor:'pointer',
+              width:26,height:26,borderRadius:'50%',
+              display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,padding:0,
+            }}>
+            ✕
+          </button>
+          {false && search && (
             <button onClick={() => setSearch('')}
               style={{
                 position:'absolute',right:30,top:'50%',transform:'translateY(-50%)',
@@ -3329,9 +3376,10 @@ export function ConversationsScreen() {
               }}>✕</button>
           )}
         </div>
+        )}
 
         {/* Подзаголовок про поиск по сообщениям */}
-        {search.trim().length >= 2 && (
+        {searchOpen && search.trim().length >= 2 && (
           <>
             {searchLoading && (
               <div style={{color:'rgba(255,255,255,.4)',fontSize:12,padding:'4px 22px'}}>
@@ -7383,6 +7431,7 @@ export function SettingsScreen() {
 
   // Password change
   const [showPwdModal, setShowPwdModal] = useState(false);
+  const [showPwds,     setShowPwds]     = useState(false); // показывать ли пароли в текст-режиме
   const [oldPwd,   setOldPwd]   = useState('');
   const [newPwd,   setNewPwd]   = useState('');
   const [newPwd2,  setNewPwd2]  = useState('');
@@ -7803,9 +7852,27 @@ export function SettingsScreen() {
               ].map(f => (
                 <div key={f.label}>
                   <div style={{color:'rgba(255,255,255,.5)',fontSize:12,marginBottom:5}}>{f.label}</div>
-                  <input type="password" value={f.value} onChange={e=>f.set(e.target.value)}
-                    className="ul-input" placeholder="••••••••"
-                    onKeyDown={e=>e.key==='Enter'&&submitPasswordChange()}/>
+                  <div style={{position:'relative'}}>
+                    <input type={showPwds ? 'text' : 'password'} value={f.value}
+                      onChange={e=>f.set(e.target.value)}
+                      className="ul-input" placeholder="••••••••"
+                      style={{paddingRight:38}}
+                      onKeyDown={e=>e.key==='Enter'&&submitPasswordChange()}/>
+                    {f.label === 'Текущий пароль' && (
+                      <button type="button" onClick={() => setShowPwds(s => !s)}
+                        title={showPwds ? 'Скрыть пароли' : 'Показать пароли'}
+                        style={{
+                          position:'absolute', right:8, top:'50%', transform:'translateY(-50%)',
+                          background:'none', border:'none', cursor:'pointer',
+                          color:'rgba(255,255,255,.55)', fontSize:18, lineHeight:1,
+                          padding:6, borderRadius:6,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color='rgba(255,255,255,.9)'}
+                        onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,.55)'}>
+                        {showPwds ? '🙈' : '👁'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
               {pwdErr && (
