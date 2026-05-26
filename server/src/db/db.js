@@ -173,6 +173,10 @@ try { db.exec('ALTER TABLE members ADD COLUMN invited_by TEXT'); } catch {}
 // Заполняем status для существующих записей (миграция, ОДИН раз — UPDATE no-op если уже 'active')
 try { db.exec("UPDATE members SET status='active' WHERE status IS NULL"); } catch {}
 
+// Флаг что юзер — тестовый (сидинг через админку). Видимы только админу
+// при включённом 'test_users_enabled' в system_settings.
+try { db.exec('ALTER TABLE users ADD COLUMN is_test INTEGER DEFAULT 0'); } catch {}
+
 // Web Push подписки (один юзер — много устройств/браузеров)
 try { db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
   endpoint    TEXT PRIMARY KEY,
@@ -1390,9 +1394,13 @@ function getBlockedByIds(userId) {
 
 function getMomentFeed(userId, limit = 20, before = null) {
   const contactIds = getContactIds(userId);
-  if (!contactIds.length) return { items: [], hasMore: false };
   const blockedIds = getBlockedByIds(userId);
-  const visible = contactIds.filter(id => !blockedIds.includes(id));
+  let visible = contactIds.filter(id => !blockedIds.includes(id));
+  // Test-users mode: админу подсыпаем моменты тестовых юзеров
+  const requester = findUserById(userId);
+  if (requester?.is_admin && isTestUsersEnabled()) {
+    visible = [...visible, ...getTestUserIds()];
+  }
   if (!visible.length) return { items: [], hasMore: false };
   const ph = visible.map(() => '?').join(',');
   const beforeCond = before ? `AND m.created_at < ?` : '';
@@ -1710,8 +1718,12 @@ function editBroadcast(broadcastId, newText) {
 }
 
 // Search users by name or phone (для контактов; case-insensitive в том числе и для кириллицы)
+// Тестовые юзеры (is_test=1) видны только админам когда включён test_users_enabled.
 function searchUsers(query, excludeUserId) {
   const q = `%${(query || '').toLowerCase()}%`;
+  const requester = excludeUserId ? findUserById(excludeUserId) : null;
+  const testVisible = requester?.is_admin && isTestUsersEnabled();
+  const testFilter = testVisible ? '' : 'AND u.is_test = 0';
   const rows = db.prepare(
     `SELECT u.id, u.name, u.avatar, u.phone,
             p.online
@@ -1720,6 +1732,7 @@ function searchUsers(query, excludeUserId) {
      WHERE (LOWER(u.name) LIKE ? OR LOWER(u.phone) LIKE ?)
        AND u.is_blocked = 0
        AND u.id != ?
+       ${testFilter}
      ORDER BY u.name ASC
      LIMIT 20`
   ).all(q, q, excludeUserId || 0);
@@ -2137,6 +2150,72 @@ function setSetting(key, value) {
     ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(key, v);
 }
 
+// ── Test users (admin convenience) ─────────────────────────────────────────
+function isTestUsersEnabled() {
+  return !!getSetting('test_users_enabled', false);
+}
+function setTestUsersEnabled(enabled) {
+  setSetting('test_users_enabled', !!enabled);
+}
+function getTestUserIds() {
+  return db.prepare('SELECT id FROM users WHERE is_test=1').all().map(r => r.id);
+}
+// Создаёт/обновляет 100 тестовых пользователей с моментами.
+// Идемпотентно: повторный вызов перезаписывает имя/аватар, не дублирует.
+function seedTestUsers() {
+  const { generateTestUsers } = require('../testUsersData');
+  const users = generateTestUsers(100);
+  const ts = now();
+  let created = 0, updated = 0;
+  for (const u of users) {
+    const exists = db.prepare('SELECT id FROM users WHERE id=?').get(u.id);
+    if (exists) {
+      db.prepare(`UPDATE users SET name=?, avatar=?, bio=?, headline=?, is_super=?, is_test=1
+        WHERE id=?`).run(u.name, u.avatar, u.bio, u.headline, u.is_super, u.id);
+      updated++;
+    } else {
+      db.prepare(`INSERT INTO users
+        (id, phone, name, password, avatar, bio, headline, is_super, is_test,
+         created_at, invite_code)
+        VALUES (?, ?, ?, '$disabled$', ?, ?, ?, ?, 1, ?, ?)`)
+        .run(u.id,
+          `+0test${String(u.id).slice(-4)}` + String(Math.random()).slice(2,8),
+          u.name, u.avatar, u.bio, u.headline, u.is_super, ts,
+          makeInviteCode(u.id));
+      try {
+        db.prepare(`INSERT INTO presence (user_id, online, last_seen) VALUES (?, 0, ?)`)
+          .run(u.id, ts - Math.floor(Math.random() * 86400 * 30)); // случайный последний онлайн за месяц
+      } catch {}
+      created++;
+    }
+    // Моменты: чистим существующие активные test-моменты юзера и пересоздаём
+    db.prepare(`DELETE FROM moments WHERE user_id=?`).run(u.id);
+    for (const m of u.moments) {
+      const mid = `test-moment-${u.id}-${Math.random().toString(36).slice(2,8)}`;
+      const auto_tags = '[]';
+      db.prepare(`INSERT INTO moments
+        (id, user_id, text, mood_emoji, auto_tags, is_search, status, created_at, updated_at, edited)
+        VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?, 0)`)
+        .run(mid, u.id, m.text, m.mood || null, auto_tags,
+          ts - Math.floor(Math.random() * 86400 * 7), // случайно за последнюю неделю
+          ts);
+    }
+  }
+  return { created, updated, total: users.length };
+}
+function clearTestUsers() {
+  const ids = getTestUserIds();
+  if (!ids.length) return { deleted: 0 };
+  const ph = ids.map(() => '?').join(',');
+  // Чистим моменты, реакции, presence — потом самих юзеров
+  db.prepare(`DELETE FROM moment_reactions WHERE user_id IN (${ph})`).run(...ids);
+  db.prepare(`DELETE FROM moment_views WHERE user_id IN (${ph})`).run(...ids);
+  db.prepare(`DELETE FROM moments WHERE user_id IN (${ph})`).run(...ids);
+  db.prepare(`DELETE FROM presence WHERE user_id IN (${ph})`).run(...ids);
+  db.prepare(`DELETE FROM users WHERE id IN (${ph})`).run(...ids);
+  return { deleted: ids.length };
+}
+
 function getAwoSettings() {
   return {
     test_mode:    !!getSetting('awo_test_mode', false),
@@ -2180,6 +2259,8 @@ module.exports = {
   awoIsProcessed, awoMarkProcessed, awoListProcessed,
   setAwoCourseChat, deleteAwoCourseChat, getChatForCourse, listAwoCourseChats, listAllGroupChats,
   getSetting, setSetting, getAwoSettings, setAwoSettings,
+  isTestUsersEnabled, setTestUsersEnabled, getTestUserIds,
+  seedTestUsers, clearTestUsers,
   extendSuper, processReferral, confirmReferralIfPending, checkAndExpireSuper,
   // Moments
   getMomentFeed, getMyMoments, getMomentById, getActiveMoment, getActiveMoments, getActiveMomentCount,

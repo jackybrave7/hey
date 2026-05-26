@@ -176,6 +176,12 @@ export const api = {
   adminGetGroupChats:      ()              => req('GET',    '/admin/group-chats'),
   adminGetAwoLog:          (limit)         => req('GET',    `/admin/awo/log${limit ? '?limit=' + limit : ''}`),
   adminAwoMakeJoinLink:    (email, course) => req('POST',   '/admin/awo/join-link', { email, course }),
+
+  // Admin: Test users mode
+  adminTestUsersStatus:    ()              => req('GET',    '/admin/test-users/status'),
+  adminTestUsersToggle:    (enabled)       => req('POST',   '/admin/test-users/toggle', { enabled }),
+  adminTestUsersReseed:    ()              => req('POST',   '/admin/test-users/reseed'),
+  adminTestUsersClear:     ()              => req('DELETE', '/admin/test-users'),
 };
 
 // ── WebSocket ────────────────────────────────────────────────────────────────

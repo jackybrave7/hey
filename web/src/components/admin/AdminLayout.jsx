@@ -9,6 +9,7 @@ const NAV = [
   { to: '/admin/reports', label: '🚩 Жалобы' },
   { to: '/admin/system',  label: '📢 HEY-заведующий' },
   { to: '/admin/awo',     label: '🎓 АВО / Школа' },
+  { to: '/admin/test-users', label: '🧪 Тестовые юзеры' },
   { to: '/admin/logs',    label: '📋 Логи' },
 ];
 

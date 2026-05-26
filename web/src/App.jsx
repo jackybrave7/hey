@@ -23,6 +23,7 @@ import AdminLogs from './components/admin/AdminLogs';
 import AdminSystem from './components/admin/AdminSystem';
 import AdminReports from './components/admin/AdminReports';
 import AdminAwo from './components/admin/AdminAwo';
+import AdminTestUsers from './components/admin/AdminTestUsers';
 import JoinScreen from './components/JoinScreen';
 import UserGuide from './components/UserGuide';
 import { ensurePushIfGranted } from './lib/push';
@@ -332,6 +333,11 @@ export default function App() {
           <Route path="/admin/awo" element={
             <RequireAdmin>
               <AdminLayout><AdminAwo/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/test-users" element={
+            <RequireAdmin>
+              <AdminLayout><AdminTestUsers/></AdminLayout>
             </RequireAdmin>
           }/>
 

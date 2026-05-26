@@ -1739,6 +1739,39 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true, sent: subs.length - gone.length, cleaned: gone.length });
   });
 
+  // ── Admin: Test users mode ───────────────────────────────────────────────
+  r.get('/admin/test-users/status', requireAdmin, (req, res) => {
+    res.json({
+      enabled: db.isTestUsersEnabled(),
+      count: db.getTestUserIds().length,
+    });
+  });
+  r.post('/admin/test-users/toggle', requireAdmin, (req, res) => {
+    const { enabled } = req.body || {};
+    db.setTestUsersEnabled(!!enabled);
+    // При включении — автоматически сидим (идемпотентно)
+    if (enabled && db.getTestUserIds().length === 0) {
+      try { db.seedTestUsers(); } catch (e) { console.error('[test-users seed]', e.message); }
+    }
+    res.json({
+      enabled: db.isTestUsersEnabled(),
+      count: db.getTestUserIds().length,
+    });
+  });
+  r.post('/admin/test-users/reseed', requireAdmin, (req, res) => {
+    try {
+      const r2 = db.seedTestUsers();
+      res.json({ ok: true, ...r2 });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  r.delete('/admin/test-users', requireAdmin, (req, res) => {
+    try {
+      const r2 = db.clearTestUsers();
+      db.setTestUsersEnabled(false);
+      res.json({ ok: true, ...r2 });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   r.get('/health', (_, res) => res.json({ ok: true }));
 
   return r;
