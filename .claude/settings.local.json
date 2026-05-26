@@ -181,7 +181,8 @@
       "Bash(grep -n \"type=\\\\\"tel\\\\\"\\\\|Имя\\\\\\\\|setPhone\\(\\\\\\\\|setBirthday\" C:/projects/hey/web/src/components/Screens.jsx)",
       "Bash(grep -n \"reply_to.text\\\\|reply_to\\\\\\\\.text\\\\|preview = \" C:/projects/hey/web/src/components/Screens.jsx)",
       "Bash(node -e \"const db=require\\('./src/db/db'\\); const r=db.seedTestUsers\\(\\); console.log\\(r\\); const ids=db.getTestUserIds\\(\\); console.log\\('total test users:', ids.length, 'sample:', ids.slice\\(0,3\\)\\);\")",
-      "Bash(node -e \"const db=require\\('./src/db/db'\\); const r=db.clearTestUsers\\(\\); console.log\\(r\\);\")"
+      "Bash(node -e \"const db=require\\('./src/db/db'\\); const r=db.clearTestUsers\\(\\); console.log\\(r\\);\")",
+      "Bash(grep -n \"nav\\(\\\\`/profile/\\\\${\" C:/projects/hey/web/src/components/Screens.jsx)"
     ]
   }
 }

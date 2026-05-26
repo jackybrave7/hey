@@ -2156,13 +2156,100 @@ function AvatarDisplay({ avatar, name, size = 52, fontSize = 20, radius = '50%',
   );
 }
 
-function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnblock, onNotesChange }) {
+// Helper: открыть карточку контакта из любого места приложения
+export function openUserCard(userId) {
+  if (!userId) return;
+  window.dispatchEvent(new CustomEvent('hey:open-user-card', { detail: userId }));
+}
+
+// Глобальный mount для ContactCardModal — слушает hey:open-user-card,
+// фетчит контакт-инфо, рендерит модалку. Вставляется один раз на уровне App.
+export function GlobalUserCardMount() {
+  const [userId, setUserId] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [blocked, setBlocked] = useState([]);
+  const nav = useNavigate();
+  const { user: me } = useAuth();
+
+  useEffect(() => {
+    function onOpen(e) {
+      const id = e.detail;
+      if (!id || id === me?.id) return;  // на себя не открываем
+      setUserId(id);
+      api.getContacts().then(setContacts).catch(() => {});
+      api.getBlocked().then(setBlocked).catch(() => {});
+    }
+    window.addEventListener('hey:open-user-card', onOpen);
+    return () => window.removeEventListener('hey:open-user-card', onOpen);
+  }, [me?.id]);
+
+  if (!userId) return null;
+  const fromContacts = contacts.find(c => c.id === userId);
+  const contactObj = fromContacts || { id: userId, name: '…', notes: null, nickname: null };
+  const isContact   = !!fromContacts;
+  const isBlocked   = blocked.some(b => b.id === userId);
+
+  async function refreshLists() {
+    try { setContacts(await api.getContacts()); } catch {}
+    try { setBlocked(await api.getBlocked()); }   catch {}
+  }
+
+  return (
+    <ContactCardModal
+      contact={contactObj}
+      isBlocked={isBlocked}
+      isContact={isContact}
+      onClose={() => setUserId(null)}
+      onChat={async () => {
+        try {
+          const conv = await api.openConversation(userId);
+          setUserId(null);
+          nav(`/chat/${conv.id}`);
+        } catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
+      }}
+      onAddContact={async () => {
+        try {
+          await api.addContact({ userId });
+          await refreshLists();
+          heyToast('✓ Добавлено в контакты', 'success');
+        } catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
+      }}
+      onRemoveContact={async () => {
+        if (!confirm('Удалить из контактов? Чат и переписка останутся.')) return;
+        try {
+          await api.deleteContact(userId);
+          await refreshLists();
+        } catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
+      }}
+      onBlock={async () => {
+        if (!confirm('Заблокировать пользователя?')) return;
+        try {
+          await api.blockUser(userId);
+          await refreshLists();
+          heyToast('Заблокирован', 'info');
+        } catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
+      }}
+      onUnblock={async () => {
+        try {
+          await api.unblockUser(userId);
+          await refreshLists();
+        } catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
+      }}
+      onNotesChange={() => refreshLists()}
+      onOpenMoment={(m) => { setUserId(null); nav(`/moments/${m.id}`); }}
+    />
+  );
+}
+
+function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
+  onAddContact, onRemoveContact, onBlock, onUnblock, onNotesChange, onOpenMoment }) {
   const [notes, setNotes]         = useState(contact.notes || '');
   const [notesSaved, setNotesSaved] = useState(false);
   const [avatarFull, setAvatarFull] = useState(false);
-  // Свежие данные профиля (аватар / bio / headline) — подтягиваем при открытии,
-  // чтобы карточка не показывала устаревшие данные из contacts-кеша.
+  // Свежие данные профиля (аватар / bio / headline / active_moments) —
+  // подтягиваем при открытии чтобы карточка не показывала устаревшие данные.
   const [fresh, setFresh] = useState(null);
+  // is_contact с сервера — если проп isContact не передан, берём из fresh
   const saveTimer = useRef();
 
   useEffect(() => {
@@ -2176,9 +2263,10 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
 
   // Объединяем: свежие данные имеют приоритет над contacts-кешем
   const merged = { ...contact, ...(fresh || {}) };
-  // nickname (личное прозвище) хранится только локально — сохраняем из contact
   merged.nickname = contact.nickname;
   merged.notes    = contact.notes;
+  // Определяем isContact: явный проп > свежий is_contact с сервера
+  const resolvedIsContact = isContact !== undefined ? isContact : !!fresh?.is_contact;
 
   // Determine if avatar is a real image (not emoji/letter)
   const av = merged.avatar;
@@ -2258,7 +2346,52 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
         </div>
 
         {/* Body */}
-        <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{padding:'18px 22px 20px',display:'flex',flexDirection:'column',gap:14}}>
+          {/* Active moments thumbnails */}
+          {Array.isArray(merged.active_moments) && merged.active_moments.length > 0 && (
+            <div>
+              <div style={{color:'rgba(255,255,255,.5)',fontSize:11,fontWeight:700,
+                textTransform:'uppercase',letterSpacing:.6,marginBottom:8}}>
+                ✦ Сейчас в моментах · {merged.active_moments.length}
+              </div>
+              <div style={{display:'flex',gap:8,overflowX:'auto',padding:'2px 0 4px'}}>
+                {merged.active_moments.map(m => {
+                  const hasImg = m.media_url && m.media_type === 'image';
+                  return (
+                    <div key={m.id} onClick={() => onOpenMoment?.(m)}
+                      title={m.text ? m.text.slice(0, 80) : 'Момент'}
+                      style={{
+                        width:72,height:90,flexShrink:0,borderRadius:10,
+                        overflow:'hidden',cursor:'pointer',
+                        background: hasImg ? '#0a0518' : 'linear-gradient(135deg,#2a1858,#4a2898)',
+                        border:'1px solid rgba(255,255,255,.12)',
+                        display:'flex',alignItems:'center',justifyContent:'center',
+                        color:'white',fontSize:11,padding: hasImg ? 0 : 6,
+                        textAlign:'center',lineHeight:1.3,
+                        transition:'transform .15s',
+                      }}
+                      onMouseEnter={e=>e.currentTarget.style.transform='scale(1.04)'}
+                      onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
+                      {hasImg ? (
+                        <img src={m.media_url} alt=""
+                          style={{width:'100%',height:'100%',objectFit:'cover',
+                            objectPosition: m.media_position || '50% 50%'}}/>
+                      ) : (
+                        <div style={{
+                          overflow:'hidden',display:'-webkit-box',
+                          WebkitLineClamp:4,WebkitBoxOrient:'vertical',
+                          opacity:.9,
+                        }}>
+                          {m.text ? m.text.slice(0,40) : '✦'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Notes */}
           <div>
             <div style={{color:'rgba(255,255,255,.5)',fontSize:12,marginBottom:6,
@@ -2280,33 +2413,64 @@ function ContactCardModal({ contact, isBlocked, onClose, onChat, onBlock, onUnbl
               onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.15)'}/>
           </div>
 
-          {/* Actions */}
+          {/* Primary actions: Написать + В контактах/Добавить */}
           <div style={{display:'flex',gap:10}}>
             <button onClick={onChat}
-              style={{flex:1,padding:'12px 0',background:'rgba(100,80,160,.75)',
-                border:'1px solid rgba(180,140,220,.4)',borderRadius:14,
-                color:'white',fontSize:14,fontWeight:600,cursor:'pointer',transition:'background .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.background='rgba(120,95,180,.85)'}
-              onMouseLeave={e=>e.currentTarget.style.background='rgba(100,80,160,.75)'}>
+              style={{flex:1,padding:'12px 0',background:'rgba(120,90,200,.85)',
+                border:'1px solid rgba(180,140,220,.5)',borderRadius:14,
+                color:'white',fontSize:14,fontWeight:700,cursor:'pointer',
+                transition:'background .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(140,110,220,.95)'}
+              onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.85)'}>
               ✉ Написать
             </button>
+            {resolvedIsContact ? (
+              <button onClick={onRemoveContact}
+                title="Убрать из контактов"
+                style={{flex:1,padding:'12px 0',background:'rgba(60,160,90,.32)',
+                  border:'1px solid rgba(100,200,120,.45)',borderRadius:14,
+                  color:'rgba(170,240,190,.95)',fontSize:14,fontWeight:600,cursor:'pointer',
+                  transition:'background .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(60,160,90,.5)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(60,160,90,.32)'}>
+                ✓ В контактах
+              </button>
+            ) : (
+              <button onClick={onAddContact}
+                style={{flex:1,padding:'12px 0',background:'rgba(255,255,255,.08)',
+                  border:'1px solid rgba(255,255,255,.18)',borderRadius:14,
+                  color:'white',fontSize:14,fontWeight:600,cursor:'pointer',
+                  transition:'background .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.14)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}>
+                + Добавить в контакты
+              </button>
+            )}
+          </div>
+
+          {/* Secondary: Block (de-emphasized — icon-button) */}
+          <div style={{display:'flex',justifyContent:'center',marginTop:-4}}>
             {isBlocked ? (
               <button onClick={onUnblock}
-                style={{flex:1,padding:'12px 0',background:'rgba(60,160,80,.4)',
-                  border:'1px solid rgba(100,200,120,.4)',borderRadius:14,
-                  color:'rgba(140,240,160,.9)',fontSize:14,cursor:'pointer',transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(60,160,80,.6)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(60,160,80,.4)'}>
+                style={{
+                  background:'none',border:'none',cursor:'pointer',
+                  color:'rgba(160,220,180,.75)',fontSize:12,fontWeight:500,
+                  padding:'6px 10px',borderRadius:8,fontFamily:'inherit',
+                }}
+                onMouseEnter={e=>e.currentTarget.style.color='rgba(180,240,200,1)'}
+                onMouseLeave={e=>e.currentTarget.style.color='rgba(160,220,180,.75)'}>
                 ✓ Разблокировать
               </button>
             ) : (
               <button onClick={onBlock}
-                style={{flex:1,padding:'12px 0',background:'rgba(180,50,50,.3)',
-                  border:'1px solid rgba(220,80,80,.3)',borderRadius:14,
-                  color:'rgba(255,140,140,.9)',fontSize:14,cursor:'pointer',transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(180,50,50,.5)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(180,50,50,.3)'}>
-                🚫 Заблокировать
+                style={{
+                  background:'none',border:'none',cursor:'pointer',
+                  color:'rgba(255,255,255,.4)',fontSize:12,fontWeight:500,
+                  padding:'6px 10px',borderRadius:8,fontFamily:'inherit',
+                }}
+                onMouseEnter={e=>e.currentTarget.style.color='rgba(255,160,160,.85)'}
+                onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,.4)'}>
+                Заблокировать
               </button>
             )}
           </div>
@@ -3049,11 +3213,19 @@ export function ContactsScreen() {
         <ContactCardModal
           contact={card}
           isBlocked={isBlockedId(card.id)}
+          isContact={true}
           onClose={() => setCard(null)}
           onChat={() => openChat(card.id)}
+          onAddContact={() => {}} /* уже в контактах — кнопка не показывается */
+          onRemoveContact={async () => {
+            if (!confirm('Удалить из контактов? Чат и переписка останутся.')) return;
+            try { await api.deleteContact(card.id); setContacts(prev => prev.filter(c => c.id !== card.id)); setCard(null); }
+            catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
+          }}
           onBlock={() => handleBlock(card)}
           onUnblock={() => handleUnblock(card.id)}
           onNotesChange={handleNotesChange}
+          onOpenMoment={(m) => { setCard(null); nav(`/moments/${m.id}`); }}
         />
       )}
 
@@ -4815,7 +4987,11 @@ const MessageRow = memo(function MessageRow({
             transition:'background .2s'
           }}>
           {isGroup && !isOut && (
-            <div style={{fontSize:11,fontWeight:700,color:'rgba(200,160,240,.8)',marginBottom:4}}>
+            <div
+              onClick={(e) => { e.stopPropagation(); openUserCard(m.sender_id); }}
+              style={{fontSize:11,fontWeight:700,color:'rgba(200,160,240,.85)',marginBottom:4,
+                cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(200,160,240,.3)',
+                textUnderlineOffset:2,display:'inline-block'}}>
               {m.sender_name}
             </div>
           )}
@@ -6131,7 +6307,7 @@ export function ChatScreen() {
               </div>
             );
           })() : (
-            <div onClick={() => partner.id && nav(`/profile/${partner.id}`)}
+            <div onClick={() => partner.id && openUserCard(partner.id)}
               style={{cursor: partner.id ? 'pointer' : 'default',transition:'transform .15s',
                 position:'relative',width:36,height:36,flexShrink:0}}
               onMouseEnter={e=>{ if(partner.id) e.currentTarget.style.transform='scale(1.05)'; }}
@@ -6152,7 +6328,7 @@ export function ChatScreen() {
           )}
           <div onClick={() => {
               if (partner.isGroup) nav(`/groups/${convId}/settings`);
-              else if (partner.id) nav(`/profile/${partner.id}`);
+              else if (partner.id) openUserCard(partner.id);
             }}
             style={{flex:1,marginLeft:8,minWidth:0,
               cursor: (partner.isGroup || partner.id) ? 'pointer' : 'default'}}>
