@@ -182,7 +182,11 @@
       "Bash(grep -n \"reply_to.text\\\\|reply_to\\\\\\\\.text\\\\|preview = \" C:/projects/hey/web/src/components/Screens.jsx)",
       "Bash(node -e \"const db=require\\('./src/db/db'\\); const r=db.seedTestUsers\\(\\); console.log\\(r\\); const ids=db.getTestUserIds\\(\\); console.log\\('total test users:', ids.length, 'sample:', ids.slice\\(0,3\\)\\);\")",
       "Bash(node -e \"const db=require\\('./src/db/db'\\); const r=db.clearTestUsers\\(\\); console.log\\(r\\);\")",
-      "Bash(grep -n \"nav\\(\\\\`/profile/\\\\${\" C:/projects/hey/web/src/components/Screens.jsx)"
+      "Bash(grep -n \"nav\\(\\\\`/profile/\\\\${\" C:/projects/hey/web/src/components/Screens.jsx)",
+      "Bash(npm uninstall *)",
+      "Bash(node -e \"const m=require\\('lucide-react'\\); console.log\\('icons:', Object.keys\\(m\\).slice\\(0,8\\)\\);\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('lucide-react'\\)\\)\")",
+      "Bash(node -e \"const {generateTestUsers}=require\\('./src/testUsersData'\\); const u=generateTestUsers\\(8\\); for\\(const x of u\\){console.log\\(x.name,'|',x.headline,'| moments:'\\); for\\(const m of x.moments\\)console.log\\('  ', m.type||'text', '|', \\(m.text||''\\).slice\\(0,40\\), '| mood:', m.mood, '| audio:', m.audio?'y':'-', '| video:', m.video?'y':'-', '| seed:', m.seed||'-'\\);}\")"
     ]
   }
 }

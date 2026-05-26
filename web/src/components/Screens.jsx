@@ -16,6 +16,7 @@ import MomentDetailPopup, { TextWithLinks } from './moments/MomentDetailPopup';
 import MomentCard from './moments/MomentCard';
 import OnboardingTour from './OnboardingTour';
 import MoodEmoji from './moments/MoodEmoji';
+import Icon from './Icon';
 import SuperStatusCard from './super/SuperStatusCard';
 import AchievementBadges from './super/AchievementBadges';
 
@@ -91,7 +92,7 @@ function DotsMenu({ items }) {
               }}
               onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.08)'}
               onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-              <span style={{fontSize:18}}>{icon}</span>{label}
+              <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,color: danger ? '#ff6b6b' : 'rgba(255,255,255,.85)'}}>{typeof icon === 'string' ? <span style={{fontSize:17}}>{icon}</span> : icon}</span>{label}
             </div>
           ))}
         </div>,
@@ -1564,7 +1565,7 @@ export function MyProfileScreen() {
               background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',
               color:'white',fontSize:14,fontWeight:500,
             }}>
-            <span>⚙️ Настройки</span>
+            <span style={{display:'inline-flex',alignItems:'center',gap:10}}><Icon name="settings" size={18}/> Настройки</span>
             <span style={{opacity:.4}}>›</span>
           </button>
           {user?.is_admin && (
@@ -1577,7 +1578,7 @@ export function MyProfileScreen() {
             }}
               onMouseEnter={e=>e.currentTarget.style.background='rgba(120,90,200,.32)'}
               onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.18)'}>
-              <span>⚙️ Панель администратора</span>
+              <span style={{display:'inline-flex',alignItems:'center',gap:10}}><Icon name="settings" size={18}/> Панель администратора</span>
               <span style={{opacity:.5}}>›</span>
             </button>
           )}
@@ -1769,7 +1770,7 @@ export function MyProfileScreen() {
                             onMouseEnter={e=>e.currentTarget.style.background='rgba(255,80,80,.22)'}
                             onMouseLeave={e=>e.currentTarget.style.background='rgba(255,80,80,.12)'}
                             title="Удалить навсегда">
-                            🗑
+                            <Icon name="trash" size={15}/>
                           </button>
                         </div>
                       </div>
@@ -2311,8 +2312,8 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
             <div className="av-zoom" style={{
               position:'absolute',inset:0,borderRadius:'50%',opacity:0,transition:'opacity .2s',
               background:'rgba(0,0,0,.35)',display:'flex',alignItems:'center',justifyContent:'center',
-              pointerEvents:'none',fontSize:22
-            }}>🔍</div>
+              pointerEvents:'none',color:'white',
+            }}><Icon name="search" size={22}/></div>
           </div>
           <div style={{textAlign:'center', width:'100%'}}>
             <div style={{color:'white',fontSize:20,fontWeight:700}}>
@@ -2422,7 +2423,7 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                 transition:'background .15s'}}
               onMouseEnter={e=>e.currentTarget.style.background='rgba(140,110,220,.95)'}
               onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.85)'}>
-              ✉ Написать
+              <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="chat" size={16}/> Написать</span>
             </button>
             {resolvedIsContact ? (
               <button onClick={onRemoveContact}
@@ -2433,7 +2434,7 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                   transition:'background .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.background='rgba(60,160,90,.5)'}
                 onMouseLeave={e=>e.currentTarget.style.background='rgba(60,160,90,.32)'}>
-                ✓ В контактах
+                <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="check" size={16}/> В контактах</span>
               </button>
             ) : (
               <button onClick={onAddContact}
@@ -2443,7 +2444,7 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                   transition:'background .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.14)'}
                 onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}>
-                + Добавить в контакты
+                <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="user-plus" size={16}/> Добавить в контакты</span>
               </button>
             )}
           </div>
@@ -3064,12 +3065,12 @@ export function ContactsScreen() {
       }}>
         <div style={{maxWidth:680,margin:'0 auto',padding:'16px 20px 12px',
           display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{color:'white',fontSize:20,fontWeight:800,letterSpacing:-.3}}>
-            👥 Контакты
+          <div style={{color:'white',fontSize:20,fontWeight:800,letterSpacing:-.3,display:'flex',alignItems:'center',gap:8}}>
+            <Icon name="users" size={20}/> Контакты
           </div>
           <DotsMenu items={[
-            { label: 'Импорт контактов', icon: '📥', onClick: () => setShowImport(true) },
-            { label: 'Пригласить друга',  icon: '🎉', onClick: () => setShowInvite(true) },
+            { label: 'Импорт контактов', icon: <Icon name="download" size={18}/>, onClick: () => setShowImport(true) },
+            { label: 'Пригласить друга',  icon: <Icon name="share" size={18}/>, onClick: () => setShowInvite(true) },
           ]}/>
         </div>
       </div>
@@ -3413,7 +3414,7 @@ export function ConversationsScreen() {
         <div style={{flex:1,minWidth:0}}>
           <div style={{color:'white',fontSize:15,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
             {c.name||'Диалог'}
-            {c.is_pinned && <span style={{fontSize:11,opacity:.5}}>📌</span>}
+            {c.is_pinned && <span style={{opacity:.6,display:'inline-flex',alignItems:'center'}}><Icon name="pin" size={11}/></span>}
           </div>
           {isRequest ? (
             <div style={{color:'rgba(180,140,220,.8)',fontSize:13}}>хочет написать вам</div>
@@ -3446,7 +3447,8 @@ export function ConversationsScreen() {
               background:'rgba(110,70,200,.85)',border:'1px solid rgba(200,160,240,.6)',
               borderRadius:20,padding:'3px 10px',fontSize:11,color:'white',fontWeight:700,
               boxShadow:'0 2px 8px rgba(80,40,180,.3)',
-            }}>📩 Приглашение</div>
+              display:'inline-flex',alignItems:'center',gap:5,
+            }}><Icon name="mail" size={12}/> Приглашение</div>
           ) : (
             <>
               {/* Pin toggle — visible on hover */}
@@ -3461,7 +3463,7 @@ export function ConversationsScreen() {
                   }}
                   onMouseEnter={e=>e.currentTarget.style.opacity='1'}
                   onMouseLeave={e=>e.currentTarget.style.opacity= c.is_pinned ? '0.9' : '0.45'}
-                >📌</button>
+                ><Icon name="pin" size={14}/></button>
               ) : c.last_at ? (
                 <div style={{color:'rgba(255,255,255,.35)',fontSize:11}}>{fmtTime(c.last_at)}</div>
               ) : null}
@@ -3492,15 +3494,15 @@ export function ConversationsScreen() {
       }}>
         <div style={{maxWidth:680,margin:'0 auto',padding:'16px 20px 12px',
           display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{color:'white',fontSize:20,fontWeight:800,letterSpacing:-.3}}>
-            💬 Чаты
+          <div style={{color:'white',fontSize:20,fontWeight:800,letterSpacing:-.3,display:'flex',alignItems:'center',gap:8}}>
+            <Icon name="chat" size={20} /> Чаты
           </div>
           <DotsMenu items={[
-            { label:'Поиск по чатам', icon:'🔍', onClick: () => {
+            { label:'Поиск по чатам', icon:<Icon name="search" size={18}/>, onClick: () => {
               setSearchOpen(true);
               setTimeout(() => document.getElementById('hey-chats-search')?.focus(), 50);
             } },
-            { label:'Новая группа',   icon:'👥', onClick: () => nav('/groups/new') },
+            { label:'Новая группа',   icon:<Icon name="users" size={18}/>, onClick: () => nav('/groups/new') },
           ]}/>
         </div>
       </div>
@@ -4321,10 +4323,10 @@ function MediaViewerModal({ convId, onClose }) {
     boxShadow:'0 16px 48px rgba(0,0,0,.5)' };
 
   const TABS = [
-    ['images', '🖼', 'Фото',   images.length],
-    ['files',  '📎', 'Файлы',  files.length],
-    ['audios', '🎙', 'Аудио',  audios.length],
-    ['links',  '🔗', 'Ссылки', links.length],
+    ['images', 'image', 'Фото',   images.length],
+    ['files',  'attach','Файлы',  files.length],
+    ['audios', 'mic',   'Аудио',  audios.length],
+    ['links',  'link',  'Ссылки', links.length],
   ];
 
   return (
@@ -4332,7 +4334,7 @@ function MediaViewerModal({ convId, onClose }) {
       <div style={modal} onClick={e=>e.stopPropagation()}>
         <div style={{display:'flex',alignItems:'center',padding:'16px 20px 0'}}>
           <span style={{flex:1,color:'white',fontSize:17,fontWeight:600}}>Медиа и ссылки</span>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',fontSize:22,cursor:'pointer'}}>✕</button>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',cursor:'pointer',display:'inline-flex',alignItems:'center'}}><Icon name="close" size={20}/></button>
         </div>
         <div style={{display:'flex',gap:0,padding:'10px 8px 0',borderBottom:'1px solid rgba(255,255,255,.1)'}}>
           {TABS.map(([id,icon,label,count])=>(
@@ -4346,7 +4348,7 @@ function MediaViewerModal({ convId, onClose }) {
               fontWeight: tab===id ? 600 : 500,
               minWidth:0,
             }}>
-              <span style={{fontSize:18,lineHeight:1}}>{icon}</span>
+              <span style={{lineHeight:1,display:'inline-flex',alignItems:'center',justifyContent:'center',height:20}}><Icon name={icon} size={18}/></span>
               <span style={{fontSize:11,whiteSpace:'nowrap',
                 overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%'}}>
                 {label}{count > 0 ? ` · ${count}` : ''}
@@ -4773,7 +4775,7 @@ export function GroupSettingsScreen() {
             <div style={{color:'rgba(255,255,255,.5)',fontSize:13}}>{members.length} участников</div>
           </div>
           {isAdmin && <button onClick={()=>setEditing(true)}
-            style={{marginLeft:'auto',background:'none',border:'none',color:'rgba(255,255,255,.5)',fontSize:20,cursor:'pointer'}}>✏️</button>}
+            style={{marginLeft:'auto',background:'none',border:'none',color:'rgba(255,255,255,.5)',cursor:'pointer',display:'inline-flex',alignItems:'center'}}><Icon name="pencil" size={18}/></button>}
         </div>
 
         {/* Edit form */}
@@ -6196,25 +6198,25 @@ export function ChatScreen() {
   const canDeleteChat = !partner.isMonolog && (partner.isGroup ? isGroupAdmin : true);
 
   const chatMenuItems = [
-    { label: 'Поиск в чате',            icon: '🔍', danger: false, onClick: () => { setSearchMode(true); setTimeout(()=>searchRef.current?.focus(),50); } },
-    { label: 'Медиа и ссылки',          icon: '🖼️', danger: false, onClick: () => setShowMedia(true) },
+    { label: 'Поиск в чате',            icon: <Icon name="search" size={18}/>, danger: false, onClick: () => { setSearchMode(true); setTimeout(()=>searchRef.current?.focus(),50); } },
+    { label: 'Медиа и ссылки',          icon: <Icon name="image"  size={18}/>, danger: false, onClick: () => setShowMedia(true) },
     ...(partner.isGroup ? [
-      { label: 'Настройки группы',      icon: '⚙️', danger: false, onClick: () => nav(`/groups/${convId}/settings`) },
+      { label: 'Настройки группы',      icon: <Icon name="settings" size={18}/>, danger: false, onClick: () => nav(`/groups/${convId}/settings`) },
     ] : [
       ...(!isContact && partner.id && !partner.isDeleted ? [
-        { label: 'Добавить в контакты', icon: '👤', danger: false, onClick: handleAddContact },
+        { label: 'Добавить в контакты', icon: <Icon name="user-plus" size={18}/>, danger: false, onClick: handleAddContact },
       ] : []),
-      { label: 'Экспортировать чат',    icon: '📥', danger: false, onClick: handleExportChat },
+      { label: 'Экспортировать чат',    icon: <Icon name="download" size={18}/>, danger: false, onClick: handleExportChat },
     ]),
     ...(canClearChat ? [
-      { label: 'Удалить содержимое чата', icon: '🗑️', danger: true,  onClick: handleClearChat },
+      { label: 'Удалить содержимое чата', icon: <Icon name="trash" size={18}/>, danger: true,  onClick: handleClearChat },
     ] : []),
     ...(canLeaveGroup ? [
-      { label: 'Выйти из группы',         icon: '🚪', danger: true,  onClick: handleLeaveGroup },
+      { label: 'Выйти из группы',         icon: <Icon name="logout" size={18}/>, danger: true,  onClick: handleLeaveGroup },
     ] : []),
     ...(canDeleteChat ? [
       { label: partner.isGroup ? 'Удалить группу' : 'Удалить чат',
-        icon: '❌', danger: true, onClick: handleDeleteConversation },
+        icon: <Icon name="close" size={18}/>, danger: true, onClick: handleDeleteConversation },
     ] : []),
   ];
 
@@ -6371,17 +6373,15 @@ export function ChatScreen() {
           }}>
             <div style={{maxWidth:680,margin:'0 auto',
               display:'flex',alignItems:'center',gap:10,padding:'8px 14px'}}>
-              <span style={{fontSize:18,flexShrink:0}}>📌</span>
+              <span style={{flexShrink:0,color:'rgba(230,200,255,.95)',display:'inline-flex'}}>
+                <Icon name="pin" size={16}/>
+              </span>
               <div onClick={() => {
                   window.dispatchEvent(new CustomEvent('hey:scroll-to-msg', { detail: pinnedMessage.id }));
                 }}
                 style={{flex:1,minWidth:0,cursor:'pointer'}}>
-                <div style={{color:'rgba(230,200,255,1)',fontSize:11,fontWeight:700,letterSpacing:.5,
-                  textTransform:'uppercase'}}>
-                  📌 Закреплено
-                </div>
-                <div style={{color:'rgba(255,255,255,.85)',fontSize:13,
-                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:1}}>
+                <div style={{color:'rgba(255,255,255,.92)',fontSize:13,
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                   {renderPreviewWithEmoji(preview.slice(0, 200))}
                 </div>
               </div>
@@ -6678,7 +6678,7 @@ export function ChatScreen() {
         <div style={{background:'rgba(100,78,148,.5)',flexShrink:0}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'6px 14px',
             maxWidth:680,margin:'0 auto'}}>
-            <span style={{fontSize:16}}>✏️</span>
+            <span style={{color:'rgba(255,255,255,.85)',display:'inline-flex'}}><Icon name="pencil" size={15}/></span>
             <span style={{flex:1,color:'rgba(255,255,255,.8)',fontSize:13,
               overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
               {editingMsg.text}
@@ -6745,8 +6745,9 @@ export function ChatScreen() {
               color:'white', fontSize:11, fontWeight:700,
               letterSpacing:.9, textTransform:'uppercase',
               padding:'4px 12px', borderRadius:50, marginBottom:10,
+              display:'inline-flex',alignItems:'center',gap:6,
             }}>
-              📩 Приглашение в группу
+              <Icon name="mail" size={12}/> Приглашение в группу
             </div>
             <div style={{color:'white', fontSize:22, fontWeight:800, marginBottom:8,
               textShadow:'0 2px 8px rgba(0,0,0,.25)'}}>
@@ -6982,7 +6983,7 @@ export function ChatScreen() {
             <button onClick={cancelVoice} title="Удалить"
               style={{width:36,height:36,borderRadius:'50%',flexShrink:0,
                 background:'rgba(255,80,80,.15)',border:'1px solid rgba(255,120,120,.35)',
-                color:'rgba(255,180,180,.9)',fontSize:18,cursor:'pointer',lineHeight:1}}>🗑</button>
+                color:'rgba(255,180,180,.9)',cursor:'pointer',lineHeight:1,display:'inline-flex',alignItems:'center',justifyContent:'center'}}><Icon name="trash" size={16}/></button>
             <div style={{flex:1,background:'rgba(255,255,255,.07)',borderRadius:26,
               padding:'8px 14px',border:'1px solid rgba(255,255,255,.12)'}}>
               <AudioPlayer url={voiceObjUrl} duration={voiceDuration} isOut={true}/>
@@ -7069,7 +7070,7 @@ export function ChatScreen() {
                   transition:'background .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.95)'}
                 onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.85)'}>
-                🎙
+                <Icon name="mic" size={18}/>
               </button>
             )}
           </div>
@@ -7152,20 +7153,20 @@ export function ChatScreen() {
               catch { heyToast('Не удалось скопировать', 'error'); }
             };
             return [
-              { label:'Ответить', icon:'↩', danger:false, action:() => { setReplyTo(msgMenu.msg); setMsgMenu(null); textareaRef.current?.focus(); } },
-              { label:'Переслать', icon:'➦', danger:false, action:() => openForwardModal(msgMenu.msg) },
-              canCopy && { label:'Копировать', icon:'⧉', danger:false, action: copyText },
-              canPin && !isPinned && { label:'Закрепить', icon:'📌', danger:false, action:() => pinMsg(msgMenu.msg) },
-              canPin &&  isPinned && { label:'Открепить', icon:'📌', danger:false, action:() => unpinMsg() },
-              canEdit && { label:'Редактировать', icon:'✏️', danger:false, action:() => startEdit(msgMenu.msg) },
-              isOwn  && { label:'Удалить', icon:'🗑️', danger:true, action:() => deleteMsg(msgMenu.msg) },
+              { label:'Ответить', icon:<Icon name="reply" size={18}/>, danger:false, action:() => { setReplyTo(msgMenu.msg); setMsgMenu(null); textareaRef.current?.focus(); } },
+              { label:'Переслать', icon:<Icon name="forward" size={18}/>, danger:false, action:() => openForwardModal(msgMenu.msg) },
+              canCopy && { label:'Копировать', icon:<Icon name="copy" size={18}/>, danger:false, action: copyText },
+              canPin && !isPinned && { label:'Закрепить', icon:<Icon name="pin" size={18}/>, danger:false, action:() => pinMsg(msgMenu.msg) },
+              canPin &&  isPinned && { label:'Открепить', icon:<Icon name="unpin" size={18}/>, danger:false, action:() => unpinMsg() },
+              canEdit && { label:'Редактировать', icon:<Icon name="pencil" size={18}/>, danger:false, action:() => startEdit(msgMenu.msg) },
+              isOwn  && { label:'Удалить', icon:<Icon name="trash" size={18}/>, danger:true, action:() => deleteMsg(msgMenu.msg) },
             ].filter(Boolean).map(({ label, icon, danger, action }) => (
               <div key={label} onClick={action}
                 style={{padding:'13px 18px',color:danger?'#ff6b6b':'white',fontSize:15,
                   cursor:'pointer',display:'flex',alignItems:'center',gap:10,transition:'background .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}
                 onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                <span style={{fontSize:18}}>{icon}</span>{label}
+                <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,color:danger?'#ff6b6b':'rgba(255,255,255,.85)'}}>{icon}</span>{label}
               </div>
             ));
           })()}
@@ -7763,7 +7764,7 @@ export function SettingsScreen() {
       }}
         onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
         onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-        <span style={{fontSize:20,flexShrink:0,lineHeight:1}}>{icon}</span>
+        <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,flexShrink:0,color:danger?'rgba(255,170,170,1)':'rgba(255,255,255,.85)'}}>{typeof icon === 'string' ? <span style={{fontSize:18}}>{icon}</span> : icon}</span>
         <div style={{flex:1}}>
           <div>{label}</div>
           {sub && <div style={{fontSize:12,color:'rgba(255,255,255,.65)',marginTop:1}}>{sub}</div>}
@@ -7833,7 +7834,7 @@ export function SettingsScreen() {
               }}
                 onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
                 onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                <span style={{fontSize:20,lineHeight:1}}>🔔</span>
+                <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,color:'rgba(255,255,255,.85)'}}><Icon name="bell" size={18}/></span>
                 <div style={{flex:1}}>
                   <div>Оповещения</div>
                   <div style={{fontSize:12, marginTop:1, fontWeight:500,
@@ -7864,7 +7865,7 @@ export function SettingsScreen() {
                     }}
                     onMouseEnter={e => e.currentTarget.style.background='rgba(120,90,200,.32)'}
                     onMouseLeave={e => e.currentTarget.style.background='rgba(120,90,200,.18)'}>
-                    <span>📖</span>
+                    <Icon name="book" size={14}/>
                     <span>Подробная инструкция по браузерам</span>
                     <span style={{opacity:.6}}>→</span>
                   </button>
@@ -7925,13 +7926,13 @@ export function SettingsScreen() {
             </div>
 
             <div style={dividerStyle}>
-              <Row icon="⚫" label="Чёрный список" onClick={() => setShowBlacklist(true)}/>
+              <Row icon={<Icon name="ban" size={18}/>} label="Чёрный список" onClick={() => setShowBlacklist(true)}/>
             </div>
             <div style={dividerStyle}>
-              <Row icon="📖" label="Руководство" sub="Все функции HEY с поиском"
+              <Row icon={<Icon name="book" size={18}/>} label="Руководство" sub="Все функции HEY с поиском"
                 onClick={() => nav('/help')}/>
             </div>
-            <Row icon="💬" label="Написать разработчику" onClick={() => setShowFeedback(true)}/>
+            <Row icon={<Icon name="chat" size={18}/>} label="Написать разработчику" onClick={() => setShowFeedback(true)}/>
           </div>
         </div>
 
@@ -8088,7 +8089,7 @@ export function SettingsScreen() {
                         }}
                         onMouseEnter={e => e.currentTarget.style.color='rgba(255,255,255,.9)'}
                         onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,.55)'}>
-                        {showPwds ? '🙈' : '👁'}
+                        <Icon name={showPwds ? 'eye-off' : 'eye'} size={18}/>
                       </button>
                     )}
                   </div>
@@ -8343,7 +8344,7 @@ export function MomentPage() {
                   style={{ width:'100%', padding:'13px', borderRadius:14,
                     background:'rgba(100,78,148,.75)', border:'none',
                     color:'white', fontSize:15, fontWeight:600, cursor:'pointer', marginTop:4 }}>
-                  ✉ Написать {moment.author_name?.split(' ')[0]}
+                  <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8}}><Icon name="chat" size={16}/> Написать {moment.author_name?.split(' ')[0]}</span>
                 </button>
               </>
             ) : (
@@ -8556,7 +8557,7 @@ export function PublicProfileScreen() {
             }}
               onMouseEnter={e=>e.currentTarget.style.background='rgba(140,110,220,.9)'}
               onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.8)'}>
-              💬 Написать
+              <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="chat" size={16}/> Написать</span>
             </button>
             {!added && (
               <button onClick={handleAddContact} disabled={adding} style={{
@@ -8732,7 +8733,7 @@ export function ForcePasswordModal({ onDone }) {
             position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
             background: 'none', border: 'none', color: 'rgba(255,255,255,.5)',
             cursor: 'pointer', fontSize: 17, fontFamily: 'inherit'
-          }}>{show1 ? '🙈' : '👁'}</button>
+          }}><Icon name={show1 ? 'eye-off' : 'eye'} size={18}/></button>
         </div>
 
         {/* Confirm password */}
@@ -8756,7 +8757,7 @@ export function ForcePasswordModal({ onDone }) {
             position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
             background: 'none', border: 'none', color: 'rgba(255,255,255,.5)',
             cursor: 'pointer', fontSize: 17, fontFamily: 'inherit'
-          }}>{show2 ? '🙈' : '👁'}</button>
+          }}><Icon name={show2 ? 'eye-off' : 'eye'} size={18}/></button>
         </div>
 
         {err && (

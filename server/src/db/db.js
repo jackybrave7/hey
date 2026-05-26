@@ -2193,10 +2193,25 @@ function seedTestUsers() {
     for (const m of u.moments) {
       const mid = `test-moment-${u.id}-${Math.random().toString(36).slice(2,8)}`;
       const auto_tags = '[]';
+      // Определяем тип медиа и URL
+      let mediaType = null, mediaUrl = null, mediaDuration = null;
+      if (m.type === 'image' && m.seed) {
+        mediaType = 'image';
+        mediaUrl  = `https://picsum.photos/seed/${encodeURIComponent(m.seed)}/640/800`;
+      } else if (m.type === 'video' && m.video) {
+        mediaType = 'video';
+        mediaUrl  = m.video;
+      } else if (m.type === 'audio' && m.audio) {
+        mediaType = 'audio';
+        mediaUrl  = m.audio;
+        mediaDuration = 30 + Math.floor(Math.random() * 120); // 30-150 сек
+      }
       db.prepare(`INSERT INTO moments
-        (id, user_id, text, mood_emoji, auto_tags, is_search, status, created_at, updated_at, edited)
-        VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?, 0)`)
-        .run(mid, u.id, m.text, m.mood || null, auto_tags,
+        (id, user_id, text, media_type, media_url, media_duration,
+         mood_emoji, auto_tags, is_search, status, created_at, updated_at, edited)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'active', ?, ?, 0)`)
+        .run(mid, u.id, m.text, mediaType, mediaUrl, mediaDuration,
+          m.mood || null, auto_tags,
           ts - Math.floor(Math.random() * 86400 * 7), // случайно за последнюю неделю
           ts);
     }

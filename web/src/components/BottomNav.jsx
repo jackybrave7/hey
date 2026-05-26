@@ -1,11 +1,12 @@
 // BottomNav.jsx — нижняя навигация 4 пункта
 import { useLocation, useNavigate } from 'react-router-dom';
+import Icon from './Icon';
 
 const ITEMS = [
-  { label: 'Моменты', icon: '✦', paths: ['/main', '/moments'] },
-  { label: 'Чаты',    icon: '💬', paths: ['/chats'], badgeKey: 'unread' },
-  { label: 'Контакты',icon: '👥', paths: ['/contacts'] },
-  { label: 'Я',       icon: null,  paths: ['/me'] },
+  { label: 'Моменты', iconName: 'sparkle',  paths: ['/main', '/moments'] },
+  { label: 'Чаты',    iconName: 'chat',     paths: ['/chats'], badgeKey: 'unread' },
+  { label: 'Контакты',iconName: 'contacts', paths: ['/contacts'] },
+  { label: 'Я',       iconName: null,       paths: ['/me'] },
 ];
 
 export default function BottomNav({ user, unread = 0 }) {
@@ -63,12 +64,11 @@ export default function BottomNav({ user, unread = 0 }) {
             ) : (
               <div style={{
                 position:'relative',
-                fontSize: item.label === 'Моменты' ? 17 : 20,
-                fontWeight: item.label === 'Моменты' ? 800 : 400,
                 color:'white',
                 lineHeight:1,
+                display:'flex',alignItems:'center',justifyContent:'center',
               }}>
-                {item.icon}
+                <Icon name={item.iconName} size={22} stroke={1.75} />
                 {/* Unread badge */}
                 {badge > 0 && (
                   <div style={{
