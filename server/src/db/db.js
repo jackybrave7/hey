@@ -1854,7 +1854,9 @@ function getAdminUsers({ search, filter } = {}) {
             u.blocked_at, u.blocked_by, u.must_change_password,
             p.online, p.last_seen,
             SUM(CASE WHEN m.status='active'   THEN 1 ELSE 0 END) AS active_moments,
-            SUM(CASE WHEN m.status!='deleted' THEN 1 ELSE 0 END) AS total_moments
+            SUM(CASE WHEN m.status!='deleted' THEN 1 ELSE 0 END) AS total_moments,
+            (SELECT COUNT(*) FROM referrals r WHERE r.inviter_id=u.id)                                      AS invited_total,
+            (SELECT COUNT(*) FROM referrals r WHERE r.inviter_id=u.id AND r.confirmed_at IS NOT NULL)       AS invited_confirmed
      FROM users u
      LEFT JOIN presence p  ON p.user_id=u.id
      LEFT JOIN moments  m  ON m.user_id=u.id
@@ -1869,14 +1871,30 @@ function getAdminUserById(id) {
   const u = db.prepare(
     `SELECT u.*, p.online, p.last_seen,
             (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status!='deleted') AS total_moments,
-            (SELECT COUNT(*) FROM moment_reactions mr JOIN moments m ON m.id=mr.moment_id WHERE m.user_id=u.id) AS total_reactions_received
+            (SELECT COUNT(*) FROM moment_reactions mr JOIN moments m ON m.id=mr.moment_id WHERE m.user_id=u.id) AS total_reactions_received,
+            (SELECT COUNT(*) FROM referrals r WHERE r.inviter_id=u.id)                                AS invited_total,
+            (SELECT COUNT(*) FROM referrals r WHERE r.inviter_id=u.id AND r.confirmed_at IS NOT NULL) AS invited_confirmed,
+            (SELECT inv.name FROM users inv WHERE inv.id = u.referral_by)                             AS invited_by_name
      FROM users u
      LEFT JOIN presence p ON p.user_id=u.id
      WHERE u.id=?`
   ).get(id);
   if (!u) return null;
   const { password: _, ...safe } = u;
-  return { ...safe, online: !!safe.online, is_admin: !!safe.is_admin, is_super: !!safe.is_super, is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password };
+  // Список приглашённых юзеров для подробной карточки
+  const invitees = db.prepare(
+    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+            r.created_at AS invited_at, r.confirmed_at
+     FROM referrals r JOIN users inv ON inv.id = r.invitee_id
+     WHERE r.inviter_id = ?
+     ORDER BY r.created_at DESC`
+  ).all(id).map(r => ({ ...r, is_blocked: !!r.is_blocked }));
+  return {
+    ...safe,
+    online: !!safe.online, is_admin: !!safe.is_admin, is_super: !!safe.is_super,
+    is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password,
+    invitees,
+  };
 }
 
 function adminResetPassword(userId, newHashedPassword) {

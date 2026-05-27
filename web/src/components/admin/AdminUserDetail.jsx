@@ -179,6 +179,25 @@ export default function AdminUserDetail() {
         <Row label="Зарегистрирован" value={fmtDate(user.created_at)} />
         <Row label="Всего моментов" value={user.total_moments} />
         <Row label="Получено реакций" value={user.total_reactions_received} />
+        <Row label="Пригласил" value={
+          (user.invited_total || 0) === 0
+            ? <span style={{color:'rgba(255,255,255,.4)'}}>никого</span>
+            : <>
+                <strong style={{color:'rgba(220,200,255,.95)'}}>{user.invited_total}</strong>
+                <span style={{color:'rgba(255,255,255,.55)',fontSize:12,marginLeft:6}}>
+                  всего · {user.invited_confirmed || 0} написали первое сообщение
+                </span>
+              </>
+        }/>
+        {user.referral_by && (
+          <Row label="Кто пригласил" value={
+            user.invited_by_name
+              ? <a href={`/admin/users/${user.referral_by}`} style={{color:'rgba(180,140,255,.95)',textDecoration:'none'}}>
+                  {user.invited_by_name}
+                </a>
+              : <code style={{color:'rgba(255,255,255,.55)',fontSize:12}}>{user.referral_by}</code>
+          }/>
+        )}
         <Row label="Статус" value={
           user.is_blocked
             ? `Заблокирован ${fmtDate(user.blocked_at)}`
@@ -198,6 +217,71 @@ export default function AdminUserDetail() {
                 </span>
         } />
       </div>
+
+      {/* Список приглашённых — показываем только если есть */}
+      {user.invitees && user.invitees.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: .6, marginBottom: 10 }}>
+            Привёл в HEY ({user.invitees.length})
+          </div>
+          <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 14,
+            border: '1px solid rgba(255,255,255,.08)', overflow: 'hidden' }}>
+            {user.invitees.map((inv, i) => (
+              <div key={inv.id}
+                onClick={() => nav(`/admin/users/${inv.id}`)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px', cursor: 'pointer',
+                  borderBottom: i < user.invitees.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none',
+                  transition: 'background .12s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.04)'}
+                onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: 'rgba(120,90,200,.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, color: 'white', fontWeight: 700, flexShrink: 0,
+                  overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)',
+                }}>
+                  {inv.avatar && (inv.avatar.startsWith('http') || inv.avatar.startsWith('/') || inv.avatar.startsWith('data:'))
+                    ? <img src={inv.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+                    : (inv.name?.[0]?.toUpperCase() || '?')}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: 'white', fontSize: 14, fontWeight: 500,
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {inv.name}
+                    {inv.is_blocked && (
+                      <span style={{ marginLeft: 6, fontSize: 10, color: 'rgba(255,100,100,.9)',
+                        background: 'rgba(200,50,50,.18)', borderRadius: 4, padding: '1px 5px' }}>
+                        blocked
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 11, marginTop: 1 }}>
+                    {inv.phone} · {fmtDate(inv.invited_at)}
+                  </div>
+                </div>
+                {inv.confirmed_at ? (
+                  <span title={`Написал первое сообщение ${fmtDate(inv.confirmed_at)}`}
+                    style={{ fontSize: 11, color: 'rgba(110,235,150,.95)', fontWeight: 600,
+                      background: 'rgba(60,180,100,.14)', padding: '3px 8px', borderRadius: 8 }}>
+                    ✓ активен
+                  </span>
+                ) : (
+                  <span title="Зарегистрировался, но ещё не написал первое сообщение"
+                    style={{ fontSize: 11, color: 'rgba(255,200,120,.85)', fontWeight: 500,
+                      background: 'rgba(255,200,120,.1)', padding: '3px 8px', borderRadius: 8 }}>
+                    ожидаем
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>

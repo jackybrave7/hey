@@ -100,13 +100,18 @@ export default function AdminUsers() {
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('name')}>Имя{sortIcon('name')}</th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('phone')}>Телефон{sortIcon('phone')}</th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('total_moments')}>Моменты{sortIcon('total_moments')}</th>
+                <th style={{...hcell, cursor:'pointer', userSelect:'none'}}
+                  onClick={() => toggleSort('invited_total')}
+                  title="Пригласил всего (подтверждённых — написали первое сообщение)">
+                  Привёл{sortIcon('invited_total')}
+                </th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('created_at')}>Зарегистрирован{sortIcon('created_at')}</th>
                 <th style={hcell}>Статус</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 && (
-                <tr><td colSpan={5} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={6} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
                   Пусто
                 </td></tr>
               )}
@@ -163,6 +168,14 @@ export default function AdminUsers() {
                   </td>
                   <td style={cell}>{u.phone}</td>
                   <td style={cell}>{u.active_moments}/{u.total_moments}</td>
+                  <td style={cell}>
+                    {(u.invited_total || 0) > 0 ? (
+                      <span title={`Всего: ${u.invited_total}, написали первое сообщение: ${u.invited_confirmed || 0}`}>
+                        <strong style={{color:'rgba(220,200,255,.95)'}}>{u.invited_total}</strong>
+                        <span style={{color:'rgba(255,255,255,.4)'}}> ({u.invited_confirmed || 0})</span>
+                      </span>
+                    ) : <span style={{color:'rgba(255,255,255,.25)'}}>—</span>}
+                  </td>
                   <td style={cell}>{fmtDate(u.created_at)}</td>
                   <td style={cell}>
                     {u.is_blocked ? (
