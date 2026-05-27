@@ -2457,44 +2457,59 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
               onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.15)'}/>
           </div>
 
-          {/* Primary actions: Написать + В контактах/Добавить */}
-          <div style={{display:'flex',gap:10}}>
-            <button onClick={onChat}
-              style={{flex:1,padding:'12px 0',background:'rgba(120,90,200,.85)',
-                border:'1px solid rgba(180,140,220,.5)',borderRadius:14,
-                color:'white',fontSize:14,fontWeight:700,cursor:'pointer',
-                transition:'background .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.background='rgba(140,110,220,.95)'}
-              onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.85)'}>
-              <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="chat" size={16}/> Написать</span>
-            </button>
-            {resolvedIsContact ? (
-              <button onClick={onRemoveContact}
-                title="Убрать из контактов"
-                style={{flex:1,padding:'12px 0',background:'rgba(60,160,90,.32)',
-                  border:'1px solid rgba(100,200,120,.45)',borderRadius:14,
-                  color:'rgba(170,240,190,.95)',fontSize:14,fontWeight:600,cursor:'pointer',
-                  transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(60,160,90,.5)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(60,160,90,.32)'}>
-                <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="check" size={16}/> В контактах</span>
-              </button>
-            ) : (
-              <button onClick={onAddContact}
-                style={{flex:1,padding:'12px 0',background:'rgba(255,255,255,.08)',
-                  border:'1px solid rgba(255,255,255,.18)',borderRadius:14,
-                  color:'white',fontSize:14,fontWeight:600,cursor:'pointer',
-                  transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.14)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}>
-                <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="user-plus" size={16}/> Добавить в контакты</span>
-              </button>
-            )}
-          </div>
+          {/* Если юзер удалил аккаунт — действий нет, показываем плашку */}
+          {merged.is_deleted ? (
+            <div style={{
+              padding:'14px 16px',borderRadius:14,
+              background:'rgba(180,180,180,.08)',
+              border:'1px solid rgba(255,255,255,.1)',
+              color:'rgba(225,220,245,.75)',fontSize:13,lineHeight:1.5,textAlign:'center',
+            }}>
+              Этот пользователь удалил аккаунт.<br/>
+              Написать и добавить в контакты нельзя.
+            </div>
+          ) : (
+            <>
+              {/* Primary actions: Написать + В контактах/Добавить */}
+              <div style={{display:'flex',gap:10}}>
+                <button onClick={onChat}
+                  style={{flex:1,padding:'12px 0',background:'rgba(120,90,200,.85)',
+                    border:'1px solid rgba(180,140,220,.5)',borderRadius:14,
+                    color:'white',fontSize:14,fontWeight:700,cursor:'pointer',
+                    transition:'background .15s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(140,110,220,.95)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.85)'}>
+                  <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="chat" size={16}/> Написать</span>
+                </button>
+                {resolvedIsContact ? (
+                  <button onClick={onRemoveContact}
+                    title="Убрать из контактов"
+                    style={{flex:1,padding:'12px 0',background:'rgba(60,160,90,.32)',
+                      border:'1px solid rgba(100,200,120,.45)',borderRadius:14,
+                      color:'rgba(170,240,190,.95)',fontSize:14,fontWeight:600,cursor:'pointer',
+                      transition:'background .15s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(60,160,90,.5)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='rgba(60,160,90,.32)'}>
+                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="check" size={16}/> В контактах</span>
+                  </button>
+                ) : (
+                  <button onClick={onAddContact}
+                    style={{flex:1,padding:'12px 0',background:'rgba(255,255,255,.08)',
+                      border:'1px solid rgba(255,255,255,.18)',borderRadius:14,
+                      color:'white',fontSize:14,fontWeight:600,cursor:'pointer',
+                      transition:'background .15s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.14)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}>
+                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="user-plus" size={16}/> Добавить в контакты</span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Secondary: Block (de-emphasized — icon-button) */}
           <div style={{display:'flex',justifyContent:'center',marginTop:-4}}>
-            {isBlocked ? (
+            {merged.is_deleted ? null : isBlocked ? (
               <button onClick={onUnblock}
                 style={{
                   background:'none',border:'none',cursor:'pointer',
@@ -5152,9 +5167,10 @@ const MessageRow = memo(function MessageRow({
           {isGroup && !isOut && (
             <div
               onClick={(e) => { e.stopPropagation(); openUserCard(m.sender_id); }}
-              style={{fontSize:11,fontWeight:700,color:'rgba(200,160,240,.85)',marginBottom:4,
-                cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(200,160,240,.3)',
-                textUnderlineOffset:2,display:'inline-block'}}>
+              style={{fontSize:12,fontWeight:700,color:'rgba(180,130,255,1)',marginBottom:4,
+                cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(180,130,255,.5)',
+                textUnderlineOffset:2,display:'inline-block',
+                textShadow:'0 1px 2px rgba(0,0,0,.25)'}}>
               {m.sender_name}
             </div>
           )}

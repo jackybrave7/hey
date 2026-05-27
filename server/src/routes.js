@@ -442,6 +442,7 @@ module.exports = function makeRouter(db, broadcast) {
     if (!target) return res.status(404).json({ error: 'Пользователь не найден' });
     if (target.id === req.user.id) return res.status(400).json({ error: 'Нельзя добавить себя' });
     if (target.is_blocked) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (target.is_deleted) return res.status(400).json({ error: 'Пользователь удалил аккаунт' });
     try { db.addContact(req.user.id, target.id, nickname); }
     catch(e) { return res.status(409).json({ error: e.message }); }
     const { password, ...safe } = target;
@@ -485,6 +486,7 @@ module.exports = function makeRouter(db, broadcast) {
     if (!userId) return res.status(400).json({ error: 'userId required' });
     const target = db.findUserById(userId);
     if (!target || target.is_blocked) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (target.is_deleted) return res.status(400).json({ error: 'Пользователь удалил аккаунт' });
     if (db.isBlocked(req.user.id, userId) || db.isBlocked(userId, req.user.id))
       return res.status(403).json({ error: 'Переписка недоступна' });
     const conv = db.getOrCreateDirectConversation(req.user.id, userId);
