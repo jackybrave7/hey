@@ -267,6 +267,8 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS school_invites (
 )`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_school_invites_email ON school_invites(bound_email COLLATE NOCASE)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_school_invites_phone ON school_invites(bound_phone)'); } catch {}
+// bound_name — добавляем для предзаполнения формы регистрации из АВО payload
+try { db.exec('ALTER TABLE school_invites ADD COLUMN bound_name TEXT'); } catch {}
 
 // Обработанные счета АВО (идемпотентность)
 try { db.exec(`CREATE TABLE IF NOT EXISTS awo_processed (
@@ -2097,14 +2099,15 @@ function _makeShortCode(len = 16) {
   return s;
 }
 
-function createSchoolInvite({ bound_email, bound_phone, course }) {
+function createSchoolInvite({ bound_email, bound_phone, course, bound_name }) {
   const code = _makeShortCode(16);
   const email = bound_email ? String(bound_email).trim().toLowerCase() : null;
   db.prepare(`INSERT INTO school_invites
-    (code, issued_by, bound_email, bound_phone, course, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(code, SCHOOL_USER_ID, email, bound_phone || null, course || null, now());
-  return { code, issued_by: SCHOOL_USER_ID, bound_email: email, bound_phone, course };
+    (code, issued_by, bound_email, bound_phone, course, bound_name, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(code, SCHOOL_USER_ID, email, bound_phone || null, course || null,
+      bound_name ? String(bound_name).trim().slice(0, 80) : null, now());
+  return { code, issued_by: SCHOOL_USER_ID, bound_email: email, bound_phone, course, bound_name };
 }
 
 function findSchoolInviteByCode(code) {

@@ -1700,6 +1700,9 @@ module.exports = function makeRouter(db, broadcast) {
       course: invite.course || course,
       schoolInviteCode: invite.code,
       schoolName: db.getSchoolAccount()?.name || 'Школа',
+      // Поля для предзаполнения формы регистрации (из payload АВО)
+      prefillName:  invite.bound_name  || null,
+      prefillPhone: invite.bound_phone || null,
     });
   });
 
@@ -1726,6 +1729,13 @@ module.exports = function makeRouter(db, broadcast) {
     const goods             = (goodsFromLines || payload.goods || payload.product || payload.course || '').toString().trim();
     const rawEmail          = (payload.email || '').toString().trim().toLowerCase();
     const rawPhone          = payload.phone_number || payload.phone || null;
+    // Имя из payload: last_name + name (или middle_name) — для предзаполнения
+    // формы регистрации. Если в payload только одно поле — берём его.
+    const rawName = [payload.last_name, payload.name]
+      .map(s => (s || '').toString().trim())
+      .filter(Boolean)
+      .join(' ')
+      .slice(0, 80) || null;
 
     if (!id_account) {
       return res.status(400).json({ error: 'id_account required' });
@@ -1804,8 +1814,11 @@ module.exports = function makeRouter(db, broadcast) {
       return res.json({ ok: true, result: extraResult });
     }
 
-    // Новый пользователь — создаём школьный инвайт
-    const invite = db.createSchoolInvite({ bound_email: rawEmail, bound_phone: phone, course: goods });
+    // Новый пользователь — создаём школьный инвайт с пред-заполненными
+    // полями (name/phone), фронт подставит их на форму регистрации.
+    const invite = db.createSchoolInvite({
+      bound_email: rawEmail, bound_phone: phone, course: goods, bound_name: rawName,
+    });
     db.awoMarkProcessed({ id_account, email: rawEmail, phone, course: goods,
       invite_code: invite.code, result: 'invite_created', raw_payload: payload });
 

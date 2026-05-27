@@ -55,6 +55,9 @@ export default function JoinScreen() {
       email: info.email,
       course: info.course,
       schoolName: info.schoolName,
+      // Предзаполнение из payload АВО — юзер увидит и сможет поправить
+      prefillName:  info.prefillName  || null,
+      prefillPhone: info.prefillPhone || null,
     }));
     nav('/register');
   }

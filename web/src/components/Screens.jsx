@@ -753,14 +753,16 @@ export function RegisterScreen() {
     } catch { return null; }
   });
 
-  const [name, setName]         = useState('');
-  const [phone, setPhone]       = useState('');
+  const [name, setName]         = useState(() => schoolInvite?.prefillName || '');
+  const [phone, setPhone]       = useState(() => schoolInvite?.prefillPhone || '');
   const [password, setPassword] = useState('');
   const [err, setErr]           = useState('');
   const [loading, setLoading]   = useState(false);
   const [inviter, setInviter]   = useState(null);
 
   const hasInvite = !!inviteCode || !!schoolInvite || !!groupInvite;
+  // Пометка для UI: показать ученику, что данные предзаполнены из оплаты
+  const hasPrefill = !!(schoolInvite?.prefillName || schoolInvite?.prefillPhone);
 
   // Load inviter info if invite code present
   useEffect(() => {
@@ -815,6 +817,11 @@ export function RegisterScreen() {
               <div style={{fontWeight:700, color:'white'}}>{schoolInvite.schoolName} приглашает</div>
               {schoolInvite.course && <div style={{opacity:.75, marginTop:2}}>Курс «{schoolInvite.course}»</div>}
               <div style={{opacity:.65, marginTop:2, fontSize:12}}>{schoolInvite.email}</div>
+              {hasPrefill && (
+                <div style={{opacity:.7, marginTop:6, fontSize:12, lineHeight:1.4}}>
+                  Имя и телефон подставлены из оплаты — проверь и при необходимости поправь ниже.
+                </div>
+              )}
             </div>
           </div>
         )}
