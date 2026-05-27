@@ -162,6 +162,8 @@ export const api = {
   adminRevokeAdmin:        (id)            => req('POST',   `/admin/users/${id}/revoke-admin`),
   adminMakeSuper:          (id)            => req('POST',   `/admin/users/${id}/make-super`),
   adminRevokeSuper:        (id)            => req('POST',   `/admin/users/${id}/revoke-super`),
+  // body: { mode: 'set'|'unlimited'|'revoke', expires_at?: unix }
+  adminSetSuperExpiry:     (id, body)      => req('PATCH',  `/admin/users/${id}/super`, body),
   adminGetMoments:         (params = {})   => {
     const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v)).toString();
     return req('GET', `/admin/moments${qs ? '?' + qs : ''}`);

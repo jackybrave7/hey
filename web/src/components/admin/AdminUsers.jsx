@@ -141,7 +141,22 @@ export default function AdminUsers() {
                         <div style={{ color: 'white', fontWeight: 600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.name}</div>
                         <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
                           {u.is_admin && <span style={{ color: 'rgba(180,140,255,.8)', fontSize: 11 }}>admin</span>}
-                          {u.is_super && <span style={{ color: 'rgba(255,200,80,.9)', fontSize: 11 }}>⭐ super</span>}
+                          {u.is_super && (
+                            <span style={{ color: 'rgba(255,200,80,.9)', fontSize: 11 }}
+                              title={u.super_expires_at
+                                ? 'Super до ' + new Date(u.super_expires_at*1000).toLocaleDateString('ru')
+                                : 'Super без ограничения'}>
+                              ✦ super
+                              {u.super_expires_at != null && (
+                                <span style={{opacity:.7,marginLeft:4}}>
+                                  до {new Date(u.super_expires_at*1000).toLocaleDateString('ru',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+                                </span>
+                              )}
+                              {u.super_expires_at == null && (
+                                <span style={{opacity:.7,marginLeft:4}}>∞</span>
+                              )}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

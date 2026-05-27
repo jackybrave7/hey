@@ -31,6 +31,7 @@ export default function AdminUserDetail() {
   const [blockReason, setBlockReason] = useState('');
   const [showBlockForm, setShowBlockForm] = useState(false);
   const [customConfirm, confirmModal] = useConfirm();
+  const [showSuperModal, setShowSuperModal] = useState(false);
 
   function showMsg(msg) {
     setToast(msg);
@@ -93,21 +94,16 @@ export default function AdminUserDetail() {
     } catch (e) { showMsg('Ошибка: ' + e.message); }
   }
 
-  async function handleMakeSuper() {
-    if (!await customConfirm('Назначить статус ✦ Супер?')) return;
+  async function applySuper(mode, expiresAt) {
     try {
-      await api.adminMakeSuper(id);
+      await api.adminSetSuperExpiry(id, { mode, expires_at: expiresAt });
       await reload();
-      showMsg('Статус Супер назначен');
-    } catch (e) { showMsg('Ошибка: ' + e.message); }
-  }
-
-  async function handleRevokeSuper() {
-    if (!await customConfirm('Снять статус ✦ Супер?', { danger: true })) return;
-    try {
-      await api.adminRevokeSuper(id);
-      await reload();
-      showMsg('Статус Супер снят');
+      setShowSuperModal(false);
+      showMsg(
+        mode === 'unlimited' ? 'Super: без ограничения' :
+        mode === 'revoke'    ? 'Super снят' :
+        'Super установлен до ' + new Date(expiresAt * 1000).toLocaleDateString('ru')
+      );
     } catch (e) { showMsg('Ошибка: ' + e.message); }
   }
 
@@ -188,6 +184,19 @@ export default function AdminUserDetail() {
             ? `Заблокирован ${fmtDate(user.blocked_at)}`
             : (user.online ? 'Онлайн' : `Был(а) ${fmtDate(user.last_seen)}`)
         } />
+        <Row label="✦ Super" value={
+          !user.is_super
+            ? <span style={{color:'rgba(255,255,255,.4)'}}>нет</span>
+            : user.super_expires_at == null
+              ? <span style={{color:'rgba(255,220,120,.95)',fontWeight:600}}>без ограничения</span>
+              : <span>
+                  до <strong style={{color:'rgba(255,220,120,.95)'}}>{fmtDate(user.super_expires_at)}</strong>
+                  {' '}
+                  <span style={{color:'rgba(255,255,255,.4)',fontSize:12}}>
+                    ({Math.ceil((user.super_expires_at - Date.now()/1000) / 86400)} дн.)
+                  </span>
+                </span>
+        } />
       </div>
 
       {/* Actions */}
@@ -221,15 +230,9 @@ export default function AdminUserDetail() {
           )
         )}
 
-        {user.is_super ? (
-          <button onClick={handleRevokeSuper} style={btnStyle('rgba(255,180,50,.2)')}>
-            ⭐ Снять Super
-          </button>
-        ) : (
-          <button onClick={handleMakeSuper} style={btnStyle('rgba(80,160,255,.25)')}>
-            ⭐ Назначить Super
-          </button>
-        )}
+        <button onClick={() => setShowSuperModal(true)} style={btnStyle('rgba(255,180,50,.22)')}>
+          ✦ {user.is_super ? 'Изменить срок Super' : 'Назначить Super'}
+        </button>
       </div>
 
       {/* Block reason form */}
@@ -297,6 +300,13 @@ export default function AdminUserDetail() {
         </div>
       )}
       {confirmModal}
+      {showSuperModal && (
+        <SuperManageModal
+          user={user}
+          onClose={() => setShowSuperModal(false)}
+          onApply={applySuper}
+        />
+      )}
     </div>
   );
 }
@@ -307,4 +317,125 @@ function btnStyle(bg) {
     cursor: 'pointer', border: 'none', background: bg,
     color: 'rgba(255,255,255,.85)', transition: 'opacity .15s',
   };
+}
+
+// Модалка управления Super: 3 режима — без ограничения / до даты / снять
+function SuperManageModal({ user, onClose, onApply }) {
+  const initialMode = !user.is_super ? 'set'
+    : user.super_expires_at == null ? 'unlimited'
+    : 'set';
+  const initialDate = user.super_expires_at
+    ? new Date(user.super_expires_at * 1000).toISOString().slice(0, 10)
+    : new Date(Date.now() + 30 * 86400 * 1000).toISOString().slice(0, 10);
+
+  const [mode, setMode] = useState(initialMode);
+  const [dateStr, setDateStr] = useState(initialDate);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    if (mode === 'set') {
+      // Парсим YYYY-MM-DD как локальный конец дня (23:59:59)
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d, 23, 59, 59);
+      await onApply('set', Math.floor(dt.getTime() / 1000));
+    } else {
+      await onApply(mode, null);
+    }
+    setBusy(false);
+  }
+
+  const opt = (key, label, sub) => (
+    <label key={key} style={{
+      display:'flex',alignItems:'flex-start',gap:10,padding:'12px 14px',
+      borderRadius:12,cursor:'pointer',marginBottom:8,
+      background: mode === key ? 'rgba(120,90,200,.22)' : 'rgba(255,255,255,.04)',
+      border: '1px solid ' + (mode === key ? 'rgba(180,140,255,.45)' : 'rgba(255,255,255,.08)'),
+      transition: 'all .12s',
+    }}>
+      <input type="radio" name="super-mode" checked={mode === key}
+        onChange={() => setMode(key)}
+        style={{ marginTop: 3, accentColor: 'rgb(180,140,255)' }}/>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: 'white', fontSize: 14, fontWeight: 600 }}>{label}</div>
+        <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, marginTop: 2, lineHeight: 1.45 }}>
+          {sub}
+        </div>
+      </div>
+    </label>
+  );
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 9000,
+      background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(10px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'rgba(22,15,50,.98)', borderRadius: 18,
+        border: '1px solid rgba(255,255,255,.14)',
+        width: 'min(96vw, 460px)', padding: '22px 24px',
+        boxShadow: '0 20px 60px rgba(0,0,0,.5)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ flex: 1, color: 'white', fontSize: 18, fontWeight: 800 }}>
+            ✦ Управление Super
+          </div>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', color: 'rgba(255,255,255,.5)',
+            fontSize: 22, cursor: 'pointer', lineHeight: 1, padding: 0,
+          }}>✕</button>
+        </div>
+
+        <div style={{ color: 'rgba(225,220,245,.78)', fontSize: 13,
+          marginBottom: 16, lineHeight: 1.5 }}>
+          Пользователь: <strong style={{color:'white'}}>{user.name}</strong>
+        </div>
+
+        {opt('unlimited', 'Без ограничения', 'Статус Super остаётся пока админ его не снимет.')}
+
+        {opt('set', 'До даты', 'Статус автоматически снимется в указанный день.')}
+        {mode === 'set' && (
+          <div style={{ marginTop: -2, marginBottom: 12, paddingLeft: 36 }}>
+            <input type="date" value={dateStr}
+              onChange={e => setDateStr(e.target.value)}
+              min={new Date(Date.now() + 86400 * 1000).toISOString().slice(0, 10)}
+              style={{
+                background: 'rgba(0,0,0,.4)', border: '1px solid rgba(255,255,255,.18)',
+                borderRadius: 8, padding: '8px 12px', color: 'white', fontSize: 14,
+                fontFamily: 'inherit', outline: 'none',
+                colorScheme: 'dark',
+              }}/>
+            <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 11, marginTop: 6 }}>
+              {(() => {
+                const [y, m, d] = dateStr.split('-').map(Number);
+                if (!y) return '';
+                const ms = new Date(y, m - 1, d, 23, 59, 59).getTime() - Date.now();
+                const days = Math.ceil(ms / 86400000);
+                return days > 0 ? `≈ ${days} дн. от сегодня` : 'дата в прошлом';
+              })()}
+            </div>
+          </div>
+        )}
+
+        {opt('revoke', 'Снять Super', 'Полностью убрать статус. Можно вернуть позже.')}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+          <button onClick={onClose} disabled={busy} style={{
+            flex: 1, padding: '11px', borderRadius: 12, border: '1px solid rgba(255,255,255,.18)',
+            background: 'rgba(255,255,255,.06)', color: 'rgba(255,255,255,.85)',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+          }}>Отмена</button>
+          <button onClick={save} disabled={busy} style={{
+            flex: 1, padding: '11px', borderRadius: 12, border: 'none',
+            background: 'rgba(140,110,220,.85)', color: 'white',
+            fontSize: 14, fontWeight: 700, cursor: busy ? 'wait' : 'pointer',
+            fontFamily: 'inherit', boxShadow: '0 4px 14px rgba(120,90,200,.3)',
+          }}>
+            {busy ? '…' : 'Применить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

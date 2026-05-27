@@ -1603,6 +1603,20 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  // Установить срок действия Super: { mode: 'set'|'unlimited'|'revoke',
+  //   expires_at: <unix-ts> (для mode='set') }
+  r.patch('/admin/users/:id/super', requireAdmin, (req, res) => {
+    const user = db.findUserById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    const { mode, expires_at } = req.body || {};
+    try {
+      const result = db.setSuperExpiry(req.params.id, mode, expires_at);
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
   r.get('/admin/moments', requireAdmin, (req, res) => {
     const { status, userId } = req.query;
     res.json(db.getAdminMoments({ status, userId }));

@@ -1850,6 +1850,7 @@ function getAdminUsers({ search, filter } = {}) {
   if (filter === 'admins')   { where += ' AND u.is_admin=1'; }
   const rows = db.prepare(
     `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_super, u.is_blocked,
+            u.super_expires_at,
             u.blocked_at, u.blocked_by, u.must_change_password,
             p.online, p.last_seen,
             SUM(CASE WHEN m.status='active'   THEN 1 ELSE 0 END) AS active_moments,
@@ -1958,6 +1959,33 @@ function getPresence(userId) {
 }
 
 // ── Referral mechanics ─────────────────────────────────────────────────────────
+
+// Админский override: установить произвольную дату окончания Super,
+// «без ограничения» (NULL) или отозвать. Не использует логику extendSuper
+// (та накапливает месяцы относительно текущего expires_at).
+//   mode='set'        → expiresAt — unix timestamp (число)
+//   mode='unlimited'  → super_expires_at = NULL, is_super = 1 (бесконечно)
+//   mode='revoke'     → is_super = 0, super_expires_at = NULL
+function setSuperExpiry(userId, mode, expiresAt) {
+  const u = findUserById(userId);
+  if (!u) throw new Error('Пользователь не найден');
+  if (mode === 'revoke') {
+    db.prepare('UPDATE users SET is_super=0, super_expires_at=NULL WHERE id=?').run(userId);
+    return { is_super: false, super_expires_at: null };
+  }
+  if (mode === 'unlimited') {
+    db.prepare('UPDATE users SET is_super=1, super_expires_at=NULL WHERE id=?').run(userId);
+    return { is_super: true, super_expires_at: null };
+  }
+  if (mode === 'set') {
+    const ts = Number(expiresAt);
+    if (!Number.isFinite(ts) || ts <= 0) throw new Error('Некорректная дата');
+    if (ts < now()) throw new Error('Дата окончания должна быть в будущем');
+    db.prepare('UPDATE users SET is_super=1, super_expires_at=? WHERE id=?').run(ts, userId);
+    return { is_super: true, super_expires_at: ts };
+  }
+  throw new Error('Неизвестный режим: ' + mode);
+}
 
 function extendSuper(userId, months) {
   const user = findUserById(userId);
@@ -2346,7 +2374,7 @@ module.exports = {
   getSetting, setSetting, getAwoSettings, setAwoSettings,
   isTestUsersEnabled, setTestUsersEnabled, getTestUserIds,
   seedTestUsers, clearTestUsers,
-  extendSuper, processReferral, confirmReferralIfPending, checkAndExpireSuper,
+  extendSuper, setSuperExpiry, processReferral, confirmReferralIfPending, checkAndExpireSuper,
   // Moments
   getMomentFeed, getMyMoments, getMomentById, getActiveMoment, getActiveMoments, getActiveMomentCount,
   createMoment, updateMoment, archiveMoment, restoreMoment, deleteMomentForever, reorderMoments,
