@@ -70,7 +70,7 @@ export default function AdminReports() {
       <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         🚩 Жалобы
       </h1>
-      <p style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginTop: 0, marginBottom: 24 }}>
+      <p style={{ color: 'rgba(225,220,245,.85)', fontSize: 14, marginTop: 0, marginBottom: 24 }}>
         Что прислали пользователи через «Пожаловаться» на моменты и юзеров
       </p>
 
@@ -80,9 +80,10 @@ export default function AdminReports() {
           <button key={t.v} onClick={() => setStatus(t.v)}
             style={{
               padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', border: 'none', fontFamily: 'inherit',
-              background: status === t.v ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
-              color: status === t.v ? 'white' : 'rgba(255,255,255,.6)',
+              cursor: 'pointer', fontFamily: 'inherit',
+              background: status === t.v ? 'rgba(140,110,220,.85)' : 'rgba(20,12,40,.5)',
+              border: status === t.v ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.12)',
+              color: status === t.v ? 'white' : 'rgba(225,220,245,.85)',
             }}>
             {t.l}
           </button>
@@ -90,13 +91,13 @@ export default function AdminReports() {
       </div>
 
       {loading ? (
-        <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 14 }}>Загрузка…</div>
+        <div style={{ color: 'rgba(225,220,245,.75)', fontSize: 14 }}>Загрузка…</div>
       ) : reports.length === 0 ? (
         <div style={{
           padding: '40px 20px', textAlign: 'center',
-          background: 'rgba(255,255,255,.03)', borderRadius: 14,
-          border: '1px dashed rgba(255,255,255,.1)',
-          color: 'rgba(255,255,255,.4)', fontSize: 14,
+          background: 'rgba(20,12,40,.5)', borderRadius: 14,
+          border: '1px dashed rgba(255,255,255,.15)',
+          color: 'rgba(225,220,245,.85)', fontSize: 14,
         }}>
           {status === 'open' ? '✓ Открытых жалоб нет' : 'Пусто'}
         </div>
@@ -106,9 +107,11 @@ export default function AdminReports() {
             const st = STATUS_LABELS[r.status] || STATUS_LABELS.open;
             return (
               <div key={r.id} style={{
-                background: 'rgba(255,255,255,.05)',
-                border: '1px solid rgba(255,255,255,.08)',
+                background: 'rgba(20,12,40,.65)',
+                border: '1px solid rgba(255,255,255,.14)',
                 borderRadius: 14, padding: 16,
+                backdropFilter: 'blur(8px)',
+                boxShadow: '0 4px 14px rgba(0,0,0,.15)',
               }}>
                 {/* Meta */}
                 <div style={{
@@ -118,7 +121,7 @@ export default function AdminReports() {
                   <span style={{
                     background: 'rgba(255,255,255,.08)', borderRadius: 6,
                     padding: '3px 9px', fontSize: 11, fontWeight: 700,
-                    color: 'rgba(255,255,255,.85)',
+                    color: 'rgba(240,235,255,.95)',
                   }}>
                     {TARGET_LABELS[r.target_type] || r.target_type}
                   </span>
@@ -129,7 +132,7 @@ export default function AdminReports() {
                   }}>
                     {st.l}
                   </span>
-                  <span style={{ color: 'rgba(255,255,255,.4)', fontSize: 12 }}>
+                  <span style={{ color: 'rgba(225,220,245,.75)', fontSize: 12 }}>
                     {fmtDate(r.created_at)}
                   </span>
                 </div>
@@ -137,15 +140,15 @@ export default function AdminReports() {
                 {/* Reporter */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
-                  color: 'rgba(255,255,255,.55)', fontSize: 13,
+                  color: 'rgba(225,220,245,.85)', fontSize: 13,
                 }}>
-                  <span style={{ color: 'rgba(255,255,255,.4)' }}>от</span>
+                  <span style={{ color: 'rgba(225,220,245,.75)' }}>от</span>
                   <strong style={{ color: 'rgba(220,200,255,.95)', fontWeight: 600 }}>
                     {r.reporter_name || r.reporter_id?.slice(0, 8) || '—'}
                   </strong>
                   {r.target_user_name && (
                     <>
-                      <span style={{ color: 'rgba(255,255,255,.4)' }}>·  на</span>
+                      <span style={{ color: 'rgba(225,220,245,.75)' }}>·  на</span>
                       <strong style={{ color: 'rgba(255,180,180,.95)', fontWeight: 600 }}>
                         {r.target_user_name}
                       </strong>
@@ -155,7 +158,7 @@ export default function AdminReports() {
 
                 {/* Target ID */}
                 <div style={{
-                  color: 'rgba(255,255,255,.35)', fontSize: 11,
+                  color: 'rgba(225,220,245,.7)', fontSize: 11,
                   fontFamily: 'monospace', marginBottom: 12,
                 }}>
                   {r.target_type} → <code>{r.target_id}</code>
@@ -164,7 +167,7 @@ export default function AdminReports() {
                 {/* Reason */}
                 <div style={{
                   background: 'rgba(0,0,0,.25)', borderRadius: 10, padding: '12px 14px',
-                  color: 'rgba(255,255,255,.85)', fontSize: 14, lineHeight: 1.55,
+                  color: 'rgba(240,235,255,.95)', fontSize: 14, lineHeight: 1.55,
                   whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginBottom: 14,
                 }}>
                   {r.reason}
@@ -186,7 +189,7 @@ export default function AdminReports() {
                         style={{
                           padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                           cursor: 'pointer', border: '1px solid rgba(255,255,255,.15)',
-                          background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.7)',
+                          background: 'rgba(255,255,255,.08)', color: 'rgba(240,235,255,.95)',
                           fontFamily: 'inherit',
                         }}>
                         Отклонить
@@ -220,7 +223,7 @@ export default function AdminReports() {
                   )}
                 </div>
                 {r.status !== 'open' && r.resolved_at && (
-                  <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 12,
+                  <div style={{ color: 'rgba(225,220,245,.8)', fontSize: 12, marginTop:10,
                     display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                     <span>
                       {r.status === 'resolved' ? '✓ Приняты меры' : '◇ Отклонена'}
