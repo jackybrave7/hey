@@ -232,19 +232,26 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                     <div
                       onMouseDown={onPosDragStart}
                       onTouchStart={onPosDragStart}
-                      style={{position:'relative',width:'100%',aspectRatio:'1 / 1',
-                        maxWidth:360,margin:'0 auto',
-                        cursor:'grab',userSelect:'none',touchAction:'none'}}>
+                      style={{
+                        position:'relative',
+                        width:'100%',maxHeight:480,
+                        display:'flex',justifyContent:'center',alignItems:'center',
+                        cursor:'grab',userSelect:'none',touchAction:'none',
+                      }}>
                       <img src={mediaPreview} alt="" draggable={false}
-                        style={{width:'100%',height:'100%',objectFit:'cover',
-                          objectPosition: mediaPosition,display:'block',pointerEvents:'none'}}/>
+                        style={{
+                          maxWidth:'100%', maxHeight:480,
+                          objectFit:'contain',
+                          objectPosition: mediaPosition,
+                          display:'block', pointerEvents:'none',
+                        }}/>
                       <div style={{
                         position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
                         background:'rgba(0,0,0,.6)',backdropFilter:'blur(6px)',
                         borderRadius:20,padding:'5px 14px',
                         color:'rgba(255,255,255,.92)',fontSize:11,fontWeight:500,whiteSpace:'nowrap',
                         pointerEvents:'none',
-                      }}>↕ Перетащи — так момент будет в ленте</div>
+                      }}>В ленте крупная карточка будет квадратной</div>
                     </div>
                   )}
                   {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
@@ -267,16 +274,21 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                       onMouseDown={!uploading ? onPosDragStart : undefined}
                       onTouchStart={!uploading ? onPosDragStart : undefined}
                       style={{
-                        position:'relative',width:'100%',aspectRatio:'1 / 1',
-                        maxWidth:360,margin:'0 auto',
+                        position:'relative',
+                        width:'100%',maxHeight:480,
+                        display:'flex',justifyContent:'center',alignItems:'center',
                         cursor: uploading ? 'default' : 'grab',
                         userSelect:'none', touchAction:'none',
                       }}>
+                      {/* Картинка показывается в натуральных пропорциях:
+                          горизонтальная — на всю ширину, вертикальная — на всю
+                          высоту (до 480px). objectFit:contain сохраняет AR. */}
                       <img src={mediaPreview} alt="" draggable={false}
                         style={{
-                          width:'100%',height:'100%',objectFit:'cover',
+                          maxWidth:'100%', maxHeight:480,
+                          objectFit:'contain',
                           objectPosition: mediaPosition,
-                          display:'block',pointerEvents:'none',
+                          display:'block', pointerEvents:'none',
                         }}/>
                       {!uploading && (
                         <div style={{
@@ -285,7 +297,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                           borderRadius:20,padding:'5px 14px',
                           color:'rgba(255,255,255,.92)',fontSize:11,fontWeight:500,whiteSpace:'nowrap',
                           pointerEvents:'none',
-                        }}>↕ Перетащи — так момент будет в ленте</div>
+                        }}>В ленте крупная карточка будет квадратной</div>
                       )}
                     </div>
                   )}

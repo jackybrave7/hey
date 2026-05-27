@@ -143,6 +143,25 @@ function ManagePublished() {
                   <span>{fmtDate(m.created_at)}</span>
                   {m.media_type && <Badge>{m.media_type}</Badge>}
                 </Meta>
+                {m.media_url && m.media_type === 'image' && (
+                  <img src={m.media_url} alt="" style={{
+                    maxWidth: 220, maxHeight: 220, borderRadius: 10,
+                    objectFit: 'cover', display: 'block', marginBottom: 10,
+                    border: '1px solid rgba(255,255,255,.08)',
+                  }}/>
+                )}
+                {m.media_url && m.media_type === 'video' && (
+                  <video src={m.media_url} controls muted style={{
+                    maxWidth: 260, maxHeight: 260, borderRadius: 10,
+                    display: 'block', marginBottom: 10,
+                    background: '#0a0518',
+                  }}/>
+                )}
+                {m.media_url && m.media_type === 'audio' && (
+                  <audio src={m.media_url} controls style={{
+                    width: '100%', maxWidth: 360, marginBottom: 10,
+                  }}/>
+                )}
                 <Text>{m.text}</Text>
                 <Actions>
                   <BtnSecondary onClick={() => { setEditingMomentId(m.id); setEditText(m.text || ''); }}>
