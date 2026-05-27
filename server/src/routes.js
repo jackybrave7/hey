@@ -1744,8 +1744,14 @@ module.exports = function makeRouter(db, broadcast) {
 
     const phone = awo.normalizePhone(rawPhone);
 
-    // Уже в HEY?
-    const existing = db.findUserByEmailOrPhone(rawEmail, phone);
+    // Уже в HEY? Ищем ТОЛЬКО по email — он каноничный ключ ученика в АВО.
+    // Phone может пересекаться у разных людей (например админ тестирует с одним
+    // и тем же номером, но разными email), поэтому matching по phone здесь
+    // приводил к ошибочному «опознанию» чужого аккаунта как ученика курса.
+    // Phone оставляем fallback только если в payload вообще нет email.
+    const existing = rawEmail
+      ? db.findUserByEmail(rawEmail)
+      : (phone ? db.findUserByPhone(phone) : null);
     if (existing) {
       let extraResult = 'user_exists';
       // Если есть маппинг курса → добавить в чат курса
