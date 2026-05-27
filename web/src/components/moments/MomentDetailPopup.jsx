@@ -6,7 +6,7 @@ import { api } from '../../api';
 import MoodEmoji from './MoodEmoji';
 import EmbeddedVideoPreview from './EmbeddedVideoPreview';
 import SuperInfoScreen from '../super/SuperInfoScreen';
-import { AudioPlayer } from '../Screens';
+import { AudioPlayer, openUserCard } from '../Screens';
 import Icon from '../Icon';
 
 function fmtDate(ts) {
@@ -695,7 +695,7 @@ export default function MomentDetailPopup({
               <div onClick={() => {
                   if (!moment.user_id) return;
                   if (moment.user_id === currentUser?.id) { onClose?.(); nav('/me'); }
-                  else { onClose?.(); nav(`/profile/${moment.user_id}`); }
+                  else { onClose?.(); openUserCard(moment.user_id); }
                 }}
                 style={{width:40,height:40,flexShrink:0,position:'relative',cursor:'pointer'}}>
                 <div style={{width:40,height:40,borderRadius:'50%',
@@ -727,7 +727,7 @@ export default function MomentDetailPopup({
                 onClick={() => {
                   if (!moment.user_id) return;
                   if (moment.user_id === currentUser?.id) { onClose?.(); nav('/me'); }
-                  else { onClose?.(); nav(`/profile/${moment.user_id}`); }
+                  else { onClose?.(); openUserCard(moment.user_id); }
                 }}>
                 <div style={{color:'white',fontSize:15,fontWeight:600}}>{moment.author_name}</div>
                 <div style={{color:'rgba(255,255,255,.4)',fontSize:12}}>

@@ -171,49 +171,54 @@ export default function AdminReports() {
                 </div>
 
                 {/* Actions */}
-                {r.status === 'open' && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button onClick={() => resolve(r, 'resolved')}
-                      style={{
-                        padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                        cursor: 'pointer', border: 'none', fontFamily: 'inherit',
-                        background: 'rgba(60,180,100,.25)', color: 'rgba(140,240,180,.95)',
-                      }}>
-                      ✓ Принять меры
-                    </button>
-                    <button onClick={() => resolve(r, 'dismissed')}
-                      style={{
-                        padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                        cursor: 'pointer', border: '1px solid rgba(255,255,255,.15)',
-                        background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.7)',
-                        fontFamily: 'inherit',
-                      }}>
-                      Отклонить
-                    </button>
-                    {r.target_type === 'moment' && (
-                      <a href={`/moments/${r.target_id}`} target="_blank" rel="noopener noreferrer"
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {r.status === 'open' && (
+                    <>
+                      <button onClick={() => resolve(r, 'resolved')}
                         style={{
                           padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                          textDecoration: 'none',
-                          background: 'rgba(120,90,200,.25)', color: 'rgba(220,200,255,.95)',
-                          border: '1px solid rgba(180,140,220,.3)',
+                          cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+                          background: 'rgba(60,180,100,.25)', color: 'rgba(140,240,180,.95)',
                         }}>
-                        → Открыть момент
-                      </a>
-                    )}
-                    {r.target_user_id && (
-                      <a href={`/admin/users/${r.target_user_id}`}
+                        ✓ Принять меры
+                      </button>
+                      <button onClick={() => resolve(r, 'dismissed')}
                         style={{
                           padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                          textDecoration: 'none',
-                          background: 'rgba(120,90,200,.25)', color: 'rgba(220,200,255,.95)',
-                          border: '1px solid rgba(180,140,220,.3)',
+                          cursor: 'pointer', border: '1px solid rgba(255,255,255,.15)',
+                          background: 'rgba(255,255,255,.05)', color: 'rgba(255,255,255,.7)',
+                          fontFamily: 'inherit',
                         }}>
-                        → Карточка юзера
-                      </a>
-                    )}
-                  </div>
-                )}
+                        Отклонить
+                      </button>
+                    </>
+                  )}
+                  {/* «Открыть» доступно всегда — даже для решённых/отклонённых
+                      жалоб, чтобы админ мог посмотреть заблокированный контент
+                      (если он не удалён). */}
+                  {r.target_type === 'moment' && (
+                    <a href={`/moments/${r.target_id}`} target="_blank" rel="noopener noreferrer"
+                      style={{
+                        padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                        textDecoration: 'none',
+                        background: 'rgba(120,90,200,.25)', color: 'rgba(220,200,255,.95)',
+                        border: '1px solid rgba(180,140,220,.3)',
+                      }}>
+                      → Открыть момент
+                    </a>
+                  )}
+                  {r.target_user_id && (
+                    <a href={`/admin/users/${r.target_user_id}`}
+                      style={{
+                        padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                        textDecoration: 'none',
+                        background: 'rgba(120,90,200,.25)', color: 'rgba(220,200,255,.95)',
+                        border: '1px solid rgba(180,140,220,.3)',
+                      }}>
+                      → Карточка юзера
+                    </a>
+                  )}
+                </div>
                 {r.status !== 'open' && r.resolved_at && (
                   <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 12,
                     display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>

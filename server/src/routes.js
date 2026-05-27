@@ -1104,10 +1104,17 @@ module.exports = function makeRouter(db, broadcast) {
   // Если юзер залогинен, дополнительно возвращаем myReaction.
   r.get('/moments/:id', optionalAuth, (req, res) => {
     const m = db.getMomentById(req.params.id);
-    if (!m || m.status === 'deleted') return res.status(404).json({ error: 'Not found' });
-    // Если автор заблокирован — момент тоже не показываем
+    if (!m) return res.status(404).json({ error: 'Not found' });
+    // Удалённое навсегда — не показываем никому
+    if (m.status === 'deleted') return res.status(404).json({ error: 'Not found' });
+    // Проверка прав на просмотр заблокированного контента
+    const requester = req.user ? db.findUserById(req.user.id) : null;
+    const isAdmin = !!requester?.is_admin;
     const author = db.findUserById(m.user_id);
-    if (author?.is_blocked || author?.is_deleted) {
+    // Заблокированный момент / автор-блок: видит только админ (чтобы проверить
+    // жалобу) и сам автор (чтобы видеть свой архив)
+    const blocked = m.status === 'blocked' || author?.is_blocked || author?.is_deleted;
+    if (blocked && !isAdmin && requester?.id !== m.user_id) {
       return res.status(404).json({ error: 'Not found' });
     }
     const myReaction = req.user
@@ -1266,8 +1273,8 @@ module.exports = function makeRouter(db, broadcast) {
     }
     if (!targetId) return res.status(400).json({ error: 'Не указан объект' });
     const trimmed = (reason || '').trim();
-    if (trimmed.length < 20) {
-      return res.status(400).json({ error: 'Опишите ситуацию подробнее (минимум 20 символов)' });
+    if (trimmed.length < 5) {
+      return res.status(400).json({ error: 'Опишите ситуацию подробнее (минимум 5 символов)' });
     }
     if (trimmed.length > 1000) {
       return res.status(400).json({ error: 'Слишком длинное описание (максимум 1000 символов)' });
