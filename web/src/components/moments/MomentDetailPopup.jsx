@@ -562,9 +562,19 @@ export default function MomentDetailPopup({
         await api.reactMoment(moment.id, reaction);
         setMyReaction(reaction);
       }
+      // Синхронизируем И moment, И myReaction по серверной правде,
+      // чтобы не висеть со «своей реакцией» которая на сервере уже снята.
       const fresh = await api.getMoment(moment.id);
       setMoment(fresh);
-    } catch {}
+      setMyReaction(fresh.myReaction || null);
+    } catch {
+      // На случай сетевого/серверного сбоя пересинхронизируем с сервером
+      try {
+        const fresh = await api.getMoment(moment.id);
+        setMoment(fresh);
+        setMyReaction(fresh.myReaction || null);
+      } catch {}
+    }
     setReacting(false);
   }
 
