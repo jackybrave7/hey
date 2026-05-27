@@ -6505,8 +6505,66 @@ export function ChatScreen() {
         </div>
       )}
 
+      {/* Пустой «Монолог» — показываем подсказку про что это за чат */}
+      {!requestLock && !groupInvite && !(searchMode && searchResults !== null) &&
+       partner.isMonolog && messages.length === 0 && !loading && (
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px 24px', overflowY: 'auto',
+        }}>
+          <div style={{
+            maxWidth: 460, width: '100%',
+            background: 'rgba(20,12,40,.55)',
+            border: '1px solid rgba(255,255,255,.12)',
+            borderRadius: 18, padding: '26px 24px',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 12px 36px rgba(0,0,0,.25)',
+          }}>
+            <div style={{
+              display:'flex',alignItems:'center',justifyContent:'center',
+              width:56,height:56,borderRadius:'50%',
+              background:'linear-gradient(135deg,#7c4ddc,#a78bfa)',
+              margin:'0 auto 14px',fontSize:28,
+              boxShadow:'0 6px 18px rgba(124,77,220,.4)',
+            }}>📝</div>
+            <h2 style={{
+              margin:0,color:'white',fontSize:18,fontWeight:800,
+              textAlign:'center',marginBottom:8,
+            }}>Это твой Монолог</h2>
+            <p style={{
+              margin:0,color:'rgba(230,225,250,.85)',fontSize:14,
+              lineHeight:1.55,textAlign:'center',marginBottom:18,
+            }}>
+              Личный чат с самим собой. Видишь только ты — остальные сюда не попадут.
+            </p>
+            <div style={{
+              background:'rgba(255,255,255,.05)',
+              borderRadius:12,padding:'12px 14px',
+              color:'rgba(230,225,250,.85)',fontSize:13,lineHeight:1.7,
+            }}>
+              <div style={{
+                color:'rgba(200,170,255,1)',fontWeight:700,fontSize:11,
+                textTransform:'uppercase',letterSpacing:.6,marginBottom:6,
+              }}>Для чего пригодится</div>
+              <div>💡 Заметки, мысли, цитаты — на лету</div>
+              <div>🔗 Сохранить ссылку, чтобы не потерять</div>
+              <div>📎 Прикрепить файл, фото, голосовое — себе</div>
+              <div>✏️ Черновики сообщений и идей</div>
+              <div>🔍 Всё найдётся через поиск по чату</div>
+            </div>
+            <p style={{
+              margin:'14px 0 0',color:'rgba(230,225,250,.6)',
+              fontSize:12,lineHeight:1.5,textAlign:'center',
+            }}>
+              Начни прямо снизу — напиши что-нибудь себе ↓
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Messages — virtualized list, DOM nodes fixed at ~50 regardless of history size */}
-      {!requestLock && !groupInvite && !(searchMode && searchResults !== null) && (
+      {!requestLock && !groupInvite && !(searchMode && searchResults !== null) &&
+       !(partner.isMonolog && messages.length === 0 && !loading) && (
         <Virtuoso
           ref={virtuosoRef}
           style={{ flex: 1, overscrollBehavior: 'contain' }}
