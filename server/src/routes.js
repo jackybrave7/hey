@@ -1817,8 +1817,12 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getAwoSettings());
   });
   r.put('/admin/awo/settings', requireAdmin, (req, res) => {
-    const { test_mode, test_course } = req.body || {};
-    res.json(db.setAwoSettings({ test_mode, test_course }));
+    const { test_mode, test_course, chat_excludes, school_account_id } = req.body || {};
+    try {
+      res.json(db.setAwoSettings({ test_mode, test_course, chat_excludes, school_account_id }));
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
   });
 
   // Админка: маппинг курс ↔ групповой чат

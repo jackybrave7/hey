@@ -211,7 +211,8 @@
       "Bash(curl -sIL --max-time 5 \"https://hey-messenger.ru/test-images/102.jpg\")",
       "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd server && node -e 'require\\(\\\\\"./src/db/db\\\\\"\\).seedTestUsers\\(\\)' && pm2 restart hey 2>&1 | tail -3\")",
       "Bash(curl -sL --max-time 10 -o /dev/null -w \"HTTP %{http_code}, %{size_download}b, type=%{content_type}\\\\n\" \"https://hey-messenger.ru/api/test-images/102.jpg\")",
-      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"sqlite3 /app/server/data/hey.db \\\\\"SELECT user_id, media_url FROM moments WHERE media_url LIKE '%test-images%' LIMIT 3\\\\\"\")"
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"sqlite3 /app/server/data/hey.db \\\\\"SELECT user_id, media_url FROM moments WHERE media_url LIKE '%test-images%' LIMIT 3\\\\\"\")",
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && pm2 restart hey\")"
     ]
   }
 }
