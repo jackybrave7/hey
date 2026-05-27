@@ -4923,12 +4923,18 @@ export function GroupSettingsScreen() {
 
         {/* Members */}
         <div style={{color:'rgba(255,255,255,.5)',fontSize:13,marginBottom:10}}>Участники</div>
-        {members.map(m => (
+        {members.map(m => {
+          const avatarIsImg = m.avatar && (m.avatar.startsWith('http') || m.avatar.startsWith('/') || m.avatar.startsWith('data:'));
+          return (
           <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',
             borderBottom:'1px solid rgba(255,255,255,.07)'}}>
-            <div style={{width:40,height:40,borderRadius:'50%',background:'rgba(200,160,210,.45)',
-              display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,color:'white'}}>
-              {m.name[0].toUpperCase()}
+            <div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',
+              background:'rgba(200,160,210,.45)',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:18,color:'white',flexShrink:0}}>
+              {avatarIsImg
+                ? <img src={m.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                : (m.name?.[0] || '?').toUpperCase()}
             </div>
             <div style={{flex:1}}>
               <div style={{color:'white',fontSize:14,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
@@ -4948,7 +4954,8 @@ export function GroupSettingsScreen() {
                 style={{background:'none',border:'none',color:'rgba(255,80,80,.7)',fontSize:18,cursor:'pointer'}}>✕</button>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {/* Add members (admin only) */}
         {isAdmin && nonMembers.length > 0 && (

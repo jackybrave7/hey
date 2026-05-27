@@ -203,7 +203,8 @@
       "Bash(curl -sL \"https://hey-messenger.ru/widget.js\")",
       "Bash(curl -s \"https://hey-messenger.ru/api/widget/unread?email=test@nobody.com\")",
       "Bash(curl -sI -H \"Origin: https://lk.bl-school.com\" \"https://hey-messenger.ru/api/widget/unread?email=test@nobody.com\")",
-      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && pm2 restart hey 2>&1 | tail -3\")"
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && pm2 restart hey 2>&1 | tail -3\")",
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd web && npm run build 2>&1 | tail -3 && pm2 restart hey\")"
     ]
   }
 }
