@@ -4406,11 +4406,11 @@ function MediaViewerModal({ convId, onClose }) {
           ))}
         </div>
         <div style={{flex:1,overflowY:'auto',padding:16}}>
-          {loading && <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Загрузка…</div>}
+          {loading && <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40}}>Загрузка…</div>}
 
           {!loading && tab==='images' && (
             images.length === 0
-              ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет фото</div>
+              ? <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40}}>Нет фото</div>
               : (() => {
                   const valid = images.filter(m => m.attachment?.url);
                   const urls   = valid.map(m => m.attachment.url);
@@ -4430,7 +4430,7 @@ function MediaViewerModal({ convId, onClose }) {
 
           {!loading && tab==='files' && (
             files.length === 0
-              ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет файлов</div>
+              ? <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40}}>Нет файлов</div>
               : <div style={{display:'flex',flexDirection:'column',gap:6}}>
                   {files.map(m => {
                     const a = m.attachment;
@@ -4451,18 +4451,18 @@ function MediaViewerModal({ convId, onClose }) {
                             overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                             {a.name || 'Файл'}
                           </div>
-                          <div style={{color:'rgba(255,255,255,.45)',fontSize:11,marginTop:2}}>
+                          <div style={{color:'rgba(225,220,245,.7)',fontSize:11,marginTop:2}}>
                             {fmtSize(a.size)}{m.sender_name ? ` · ${m.sender_name}` : ''} · {fmtTime(m.created_at)}
                           </div>
                         </div>
                         <a href={a.url} target="_blank" rel="noreferrer" download={a.name}
                           onClick={e => e.stopPropagation()}
                           title="Скачать"
-                          style={{color:'rgba(255,255,255,.55)',fontSize:16,padding:'6px 10px',
+                          style={{color:'rgba(225,220,245,.85)',fontSize:16,padding:'6px 10px',
                             borderRadius:8,textDecoration:'none',
-                            background:'rgba(255,255,255,.06)'}}
-                          onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,.14)'; e.currentTarget.style.color='white'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,.06)'; e.currentTarget.style.color='rgba(255,255,255,.55)'; }}>
+                            background:'rgba(255,255,255,.08)'}}
+                          onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,.18)'; e.currentTarget.style.color='white'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,.08)'; e.currentTarget.style.color='rgba(225,220,245,.85)'; }}>
                           ⬇
                         </a>
                       </div>
@@ -4473,14 +4473,14 @@ function MediaViewerModal({ convId, onClose }) {
 
           {!loading && tab==='audios' && (
             audios.length === 0
-              ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет голосовых</div>
+              ? <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40}}>Нет голосовых</div>
               : <div style={{display:'flex',flexDirection:'column',gap:8}}>
                   {audios.map(m => (
-                    <div key={m.id} style={{padding:'10px 12px',borderRadius:10,
-                      background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)'}}>
-                      <AudioPlayer url={m.attachment.url} duration={m.attachment.duration} isOut={false}/>
-                      <div style={{display:'flex',alignItems:'center',marginTop:6,gap:8}}>
-                        <div style={{flex:1,color:'rgba(255,255,255,.45)',fontSize:11}}>
+                    <div key={m.id} style={{padding:'12px 14px',borderRadius:12,
+                      background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)'}}>
+                      <AudioPlayer url={m.attachment.url} duration={m.attachment.duration} isOut={false} wide/>
+                      <div style={{display:'flex',alignItems:'center',marginTop:8,gap:8}}>
+                        <div style={{flex:1,color:'rgba(225,220,245,.7)',fontSize:12}}>
                           {m.sender_name || ''} · {fmtTime(m.created_at)}
                         </div>
                         <button onClick={() => goToMessage(m.message_id || m.id)}
@@ -4499,7 +4499,7 @@ function MediaViewerModal({ convId, onClose }) {
 
           {!loading && tab==='links' && (
             links.length === 0
-              ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет ссылок</div>
+              ? <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40}}>Нет ссылок</div>
               : links.map((l,i)=>(
                   <div key={i} style={{padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
                     <a href={l.url} target="_blank" rel="noreferrer"
@@ -4507,7 +4507,7 @@ function MediaViewerModal({ convId, onClose }) {
                       {l.url}
                     </a>
                     <div style={{display:'flex',alignItems:'center',marginTop:4,gap:8}}>
-                      <div style={{flex:1,color:'rgba(255,255,255,.4)',fontSize:11}}>
+                      <div style={{flex:1,color:'rgba(225,220,245,.7)',fontSize:12}}>
                         {l.sender} · {fmtTime(l.time)}
                       </div>
                       {l.message_id && (
