@@ -204,7 +204,10 @@
       "Bash(curl -s \"https://hey-messenger.ru/api/widget/unread?email=test@nobody.com\")",
       "Bash(curl -sI -H \"Origin: https://lk.bl-school.com\" \"https://hey-messenger.ru/api/widget/unread?email=test@nobody.com\")",
       "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && pm2 restart hey 2>&1 | tail -3\")",
-      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd web && npm run build 2>&1 | tail -3 && pm2 restart hey\")"
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd web && npm run build 2>&1 | tail -3 && pm2 restart hey\")",
+      "Bash(curl -sIL --max-time 10 \"https://picsum.photos/id/102/640/800\")",
+      "Bash(curl -sL --max-time 10 -o /dev/null -w \"GET id/102: %{http_code} %{size_download}b in %{time_total}s\\\\n\" \"https://picsum.photos/id/102/640/800\")",
+      "Bash(curl -sL --max-time 10 -o /dev/null -w \"GET id/250: %{http_code} %{size_download}b in %{time_total}s\\\\n\" \"https://picsum.photos/id/250/640/800\")"
     ]
   }
 }

@@ -22,6 +22,10 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Static uploads
 app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
+// Pre-downloaded test-user images (avoid third-party CDN blocking by browsers)
+app.use('/test-images', express.static(path.join(__dirname, '../data/test-images'), {
+  maxAge: '7d',
+}));
 
 // Health check
 app.get('/health', (_, res) => res.json({ ok: true, time: new Date() }));
