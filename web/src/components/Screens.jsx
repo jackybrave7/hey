@@ -4304,7 +4304,17 @@ function MediaViewerModal({ convId, onClose }) {
   const [audios, setAudios] = useState([]);
   const [links,  setLinks]  = useState([]);
   const [loading,setLoading]= useState(true);
-  const [light,  setLight]  = useState(null); // null | { urls: string[], index: number }
+  const [light,  setLight]  = useState(null); // null | { urls: string[], index: number, msgIds: string[] }
+
+  // Закрыть модалку и проскроллить чат к нужному сообщению
+  function goToMessage(msgId) {
+    if (!msgId) return;
+    onClose();
+    // Дать модалке размонтироваться, потом дёрнуть скролл — ChatScreen ловит событие
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('hey:scroll-to-msg', { detail: msgId }));
+    }, 50);
+  }
 
   useEffect(() => {
     api.getMedia(convId).then(msgs => {
@@ -4313,9 +4323,12 @@ function MediaViewerModal({ convId, onClose }) {
       for (const m of msgs) {
         const a = m.attachment;
         if (!a) continue;
-        if (a.type === 'image' && a.url) imgs.push({ ...m, attachment: a });
+        if (a.type === 'image' && a.url) imgs.push({ ...m, attachment: a, message_id: m.id });
         else if (a.type === 'images' && Array.isArray(a.urls)) {
-          a.urls.forEach((u, i) => imgs.push({ ...m, id: m.id + '_' + i, attachment: { type:'image', url:u } }));
+          a.urls.forEach((u, i) => imgs.push({
+            ...m, id: m.id + '_' + i, message_id: m.id,
+            attachment: { type:'image', url:u },
+          }));
         }
         else if (a.type === 'file') fls.push({ ...m, attachment: a });
         else if (a.type === 'audio') auds.push({ ...m, attachment: a });
@@ -4329,7 +4342,7 @@ function MediaViewerModal({ convId, onClose }) {
       const found = [];
       msgs.forEach(m => {
         const urls = m.text?.match(URL_RE) || [];
-        urls.forEach(url => found.push({ url, sender: m.sender_name, time: m.created_at }));
+        urls.forEach(url => found.push({ url, sender: m.sender_name, time: m.created_at, message_id: m.id }));
       });
       setLinks(found);
     }).catch(console.error);
@@ -4399,11 +4412,14 @@ function MediaViewerModal({ convId, onClose }) {
             images.length === 0
               ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет фото</div>
               : (() => {
-                  const urls = images.map(m => m.attachment.url).filter(Boolean);
+                  const valid = images.filter(m => m.attachment?.url);
+                  const urls   = valid.map(m => m.attachment.url);
+                  const msgIds = valid.map(m => m.message_id || m.id);
                   return (
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:4}}>
-                      {urls.map((src, i) => (
-                        <img key={i} src={src} alt="" onClick={()=>setLight({ urls, index: i })}
+                      {valid.map((m, i) => (
+                        <img key={i} src={m.attachment.url} alt=""
+                          onClick={()=>setLight({ urls, index: i, msgIds })}
                           style={{width:'100%',aspectRatio:'1',objectFit:'cover',
                             borderRadius:8,cursor:'zoom-in'}}/>
                       ))}
@@ -4419,10 +4435,11 @@ function MediaViewerModal({ convId, onClose }) {
                   {files.map(m => {
                     const a = m.attachment;
                     return (
-                      <a key={m.id} href={a.url} target="_blank" rel="noreferrer" download={a.name}
+                      <div key={m.id} onClick={() => goToMessage(m.message_id || m.id)}
+                        title="Перейти к сообщению"
                         style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',
                           borderRadius:10, background:'rgba(255,255,255,.06)',
-                          border:'1px solid rgba(255,255,255,.08)',color:'inherit',textDecoration:'none',
+                          border:'1px solid rgba(255,255,255,.08)',cursor:'pointer',
                           transition:'background .15s'}}
                         onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.12)'}
                         onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,.06)'}>
@@ -4438,8 +4455,17 @@ function MediaViewerModal({ convId, onClose }) {
                             {fmtSize(a.size)}{m.sender_name ? ` · ${m.sender_name}` : ''} · {fmtTime(m.created_at)}
                           </div>
                         </div>
-                        <span style={{color:'rgba(255,255,255,.4)',fontSize:14}}>⬇</span>
-                      </a>
+                        <a href={a.url} target="_blank" rel="noreferrer" download={a.name}
+                          onClick={e => e.stopPropagation()}
+                          title="Скачать"
+                          style={{color:'rgba(255,255,255,.55)',fontSize:16,padding:'6px 10px',
+                            borderRadius:8,textDecoration:'none',
+                            background:'rgba(255,255,255,.06)'}}
+                          onMouseEnter={e => { e.currentTarget.style.background='rgba(255,255,255,.14)'; e.currentTarget.style.color='white'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background='rgba(255,255,255,.06)'; e.currentTarget.style.color='rgba(255,255,255,.55)'; }}>
+                          ⬇
+                        </a>
+                      </div>
                     );
                   })}
                 </div>
@@ -4453,8 +4479,18 @@ function MediaViewerModal({ convId, onClose }) {
                     <div key={m.id} style={{padding:'10px 12px',borderRadius:10,
                       background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)'}}>
                       <AudioPlayer url={m.attachment.url} duration={m.attachment.duration} isOut={false}/>
-                      <div style={{color:'rgba(255,255,255,.45)',fontSize:11,marginTop:6}}>
-                        {m.sender_name || ''} · {fmtTime(m.created_at)}
+                      <div style={{display:'flex',alignItems:'center',marginTop:6,gap:8}}>
+                        <div style={{flex:1,color:'rgba(255,255,255,.45)',fontSize:11}}>
+                          {m.sender_name || ''} · {fmtTime(m.created_at)}
+                        </div>
+                        <button onClick={() => goToMessage(m.message_id || m.id)}
+                          title="Перейти к сообщению"
+                          style={{background:'rgba(140,110,220,.25)',border:'none',
+                            color:'rgba(220,200,255,.95)',fontSize:11,fontWeight:600,
+                            padding:'4px 10px',borderRadius:14,cursor:'pointer',
+                            fontFamily:'inherit'}}>
+                          💬 К сообщению
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -4467,11 +4503,23 @@ function MediaViewerModal({ convId, onClose }) {
               : links.map((l,i)=>(
                   <div key={i} style={{padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
                     <a href={l.url} target="_blank" rel="noreferrer"
-                      style={{color:'rgba(160,130,220,.9)',fontSize:13,wordBreak:'break-all',textDecoration:'none'}}>
+                      style={{color:'rgba(160,130,220,.95)',fontSize:13,wordBreak:'break-all',textDecoration:'none',fontWeight:500}}>
                       {l.url}
                     </a>
-                    <div style={{color:'rgba(255,255,255,.35)',fontSize:11,marginTop:3}}>
-                      {l.sender} · {fmtTime(l.time)}
+                    <div style={{display:'flex',alignItems:'center',marginTop:4,gap:8}}>
+                      <div style={{flex:1,color:'rgba(255,255,255,.4)',fontSize:11}}>
+                        {l.sender} · {fmtTime(l.time)}
+                      </div>
+                      {l.message_id && (
+                        <button onClick={() => goToMessage(l.message_id)}
+                          title="Перейти к сообщению"
+                          style={{background:'rgba(140,110,220,.25)',border:'none',
+                            color:'rgba(220,200,255,.95)',fontSize:11,fontWeight:600,
+                            padding:'4px 10px',borderRadius:14,cursor:'pointer',
+                            fontFamily:'inherit'}}>
+                          💬 К сообщению
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -4528,12 +4576,22 @@ function MediaViewerModal({ convId, onClose }) {
                   width:48,height:48,borderRadius:'50%',cursor:'pointer',
                   fontSize:24,display:'flex',alignItems:'center',justifyContent:'center'}}>›</button>
             )}
-            {/* Download */}
-            <a href={curUrl} download onClick={e=>e.stopPropagation()}
-              style={{marginTop:16,background:'rgba(255,255,255,.15)',borderRadius:10,
-                padding:'8px 20px',color:'white',textDecoration:'none',fontSize:14}}>
-              ⬇ Скачать
-            </a>
+            {/* Actions */}
+            <div style={{marginTop:16,display:'flex',gap:8}}>
+              {light.msgIds?.[index] && (
+                <button onClick={e => { e.stopPropagation(); goToMessage(light.msgIds[index]); }}
+                  style={{background:'rgba(140,110,220,.7)',border:'none',borderRadius:10,
+                    padding:'8px 18px',color:'white',fontSize:14,cursor:'pointer',
+                    fontFamily:'inherit',display:'inline-flex',alignItems:'center',gap:6}}>
+                  💬 К сообщению
+                </button>
+              )}
+              <a href={curUrl} download onClick={e=>e.stopPropagation()}
+                style={{background:'rgba(255,255,255,.15)',borderRadius:10,
+                  padding:'8px 18px',color:'white',textDecoration:'none',fontSize:14}}>
+                ⬇ Скачать
+              </a>
+            </div>
           </div>
         );
       })()}
