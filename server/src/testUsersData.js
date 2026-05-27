@@ -139,7 +139,7 @@ const VIDEO_POOL = [
 // другие приватные браузеры блокируют сторонние CDN. Скачиваем картинки
 // на сервер скриптом server/scripts/download-test-images.js и отдаём как
 // локальную статику /test-images/{id}.jpg — никаких блокировок.
-const PICSUM = (id) => `/test-images/${id}.jpg`;
+const PICSUM = (id) => `/api/test-images/${id}.jpg`;
 
 // Курированные picsum ID — разные пейзажи, объекты, портреты, абстракции.
 // Распределены по темам ради смысла, но любой ID гарантированно рендерится.
