@@ -4304,7 +4304,7 @@ function MediaViewerModal({ convId, onClose }) {
   const [audios, setAudios] = useState([]);
   const [links,  setLinks]  = useState([]);
   const [loading,setLoading]= useState(true);
-  const [light,  setLight]  = useState(null);
+  const [light,  setLight]  = useState(null); // null | { urls: string[], index: number }
 
   useEffect(() => {
     api.getMedia(convId).then(msgs => {
@@ -4398,17 +4398,18 @@ function MediaViewerModal({ convId, onClose }) {
           {!loading && tab==='images' && (
             images.length === 0
               ? <div style={{color:'rgba(255,255,255,.4)',textAlign:'center',padding:40}}>Нет фото</div>
-              : <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:4}}>
-                  {images.map(m => {
-                    const src = m.attachment.url;
-                    if (!src) return null;
-                    return (
-                      <img key={m.id} src={src} alt="" onClick={()=>setLight(src)}
-                        style={{width:'100%',aspectRatio:'1',objectFit:'cover',
-                          borderRadius:8,cursor:'zoom-in'}}/>
-                    );
-                  })}
-                </div>
+              : (() => {
+                  const urls = images.map(m => m.attachment.url).filter(Boolean);
+                  return (
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:4}}>
+                      {urls.map((src, i) => (
+                        <img key={i} src={src} alt="" onClick={()=>setLight({ urls, index: i })}
+                          style={{width:'100%',aspectRatio:'1',objectFit:'cover',
+                            borderRadius:8,cursor:'zoom-in'}}/>
+                      ))}
+                    </div>
+                  );
+                })()
           )}
 
           {!loading && tab==='files' && (
@@ -4477,19 +4478,65 @@ function MediaViewerModal({ convId, onClose }) {
           )}
         </div>
       </div>
-      {light && (
-        <div style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,.92)',
-          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}
-          onClick={()=>setLight(null)}>
-          <img src={light} alt="" onClick={e=>e.stopPropagation()}
-            style={{maxWidth:'90vw',maxHeight:'80vh',borderRadius:12,objectFit:'contain'}}/>
-          <a href={light} download onClick={e=>e.stopPropagation()}
-            style={{marginTop:16,background:'rgba(255,255,255,.15)',borderRadius:10,
-              padding:'8px 20px',color:'white',textDecoration:'none',fontSize:14}}>
-            ⬇ Скачать
-          </a>
-        </div>
-      )}
+      {light && (() => {
+        const { urls, index } = light;
+        const total = urls.length;
+        const curUrl = urls[index];
+        const prev = () => setLight({ urls, index: (index - 1 + total) % total });
+        const next = () => setLight({ urls, index: (index + 1) % total });
+        return (
+          <div style={{position:'fixed',inset:0,zIndex:600,background:'rgba(0,0,0,.94)',
+            display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}
+            onClick={()=>setLight(null)}
+            onKeyDown={e => {
+              if (e.key === 'Escape') setLight(null);
+              if (e.key === 'ArrowLeft')  prev();
+              if (e.key === 'ArrowRight') next();
+            }}
+            tabIndex={0}
+            ref={el => el?.focus()}>
+            {/* Close */}
+            <button onClick={e => { e.stopPropagation(); setLight(null); }}
+              style={{position:'absolute',top:16,right:16,
+                background:'rgba(255,255,255,.12)',border:'none',color:'white',
+                width:40,height:40,borderRadius:'50%',cursor:'pointer',
+                fontSize:20,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+            {/* Counter */}
+            {total > 1 && (
+              <div style={{position:'absolute',top:24,left:'50%',transform:'translateX(-50%)',
+                color:'rgba(255,255,255,.85)',fontSize:14,fontWeight:600,
+                background:'rgba(0,0,0,.4)',padding:'5px 14px',borderRadius:20}}>
+                {index + 1} / {total}
+              </div>
+            )}
+            {/* Prev */}
+            {total > 1 && (
+              <button onClick={e => { e.stopPropagation(); prev(); }}
+                style={{position:'absolute',left:16,top:'50%',transform:'translateY(-50%)',
+                  background:'rgba(255,255,255,.12)',border:'none',color:'white',
+                  width:48,height:48,borderRadius:'50%',cursor:'pointer',
+                  fontSize:24,display:'flex',alignItems:'center',justifyContent:'center'}}>‹</button>
+            )}
+            {/* Image */}
+            <img src={curUrl} alt="" onClick={e=>e.stopPropagation()}
+              style={{maxWidth:'90vw',maxHeight:'78vh',borderRadius:12,objectFit:'contain'}}/>
+            {/* Next */}
+            {total > 1 && (
+              <button onClick={e => { e.stopPropagation(); next(); }}
+                style={{position:'absolute',right:16,top:'50%',transform:'translateY(-50%)',
+                  background:'rgba(255,255,255,.12)',border:'none',color:'white',
+                  width:48,height:48,borderRadius:'50%',cursor:'pointer',
+                  fontSize:24,display:'flex',alignItems:'center',justifyContent:'center'}}>›</button>
+            )}
+            {/* Download */}
+            <a href={curUrl} download onClick={e=>e.stopPropagation()}
+              style={{marginTop:16,background:'rgba(255,255,255,.15)',borderRadius:10,
+                padding:'8px 20px',color:'white',textDecoration:'none',fontSize:14}}>
+              ⬇ Скачать
+            </a>
+          </div>
+        );
+      })()}
     </div>
   );
 }
