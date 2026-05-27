@@ -3160,7 +3160,7 @@ export function ContactsScreen() {
                     </div>
                     <div style={{flex:1,minWidth:0}} onClick={() => openChat(c.id)}>
                       <div style={{color:'white',fontSize:15,fontWeight:600}}>{c.nickname||c.name}</div>
-                      <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>
+                      {!c.is_system && <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>}
                     </div>
                     <span style={{color:'rgba(255,255,255,.25)',fontSize:18,flexShrink:0}}>›</span>
                   </div>
@@ -3225,7 +3225,7 @@ export function ContactsScreen() {
                           </span>
                         )}
                       </div>
-                      {!c.is_deleted && <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>}
+                      {!c.is_deleted && !c.is_system && <div style={{color:'rgba(255,255,255,.45)',fontSize:13}}>{c.phone}</div>}
                       {c.notes && !c.is_deleted && <div style={{color:'rgba(255,255,255,.3)',fontSize:12,marginTop:2,
                         overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.notes}</div>}
                     </div>
