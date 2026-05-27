@@ -37,11 +37,16 @@ export default function JoinScreen() {
     minHeight: '100vh', background: 'var(--grad, linear-gradient(135deg,#1a0d3a,#0e0820))',
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
   };
+  // Тёмная подложка — фон страницы в светлой части градиента иначе «съедает»
+  // полупрозрачно-белую карточку и опускает контраст текста.
   const card = {
-    maxWidth: 440, width: '100%', background: 'rgba(255,255,255,.06)',
-    border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '32px 28px',
+    maxWidth: 440, width: '100%', background: 'rgba(20,12,40,.72)',
+    border: '1px solid rgba(255,255,255,.14)', borderRadius: 18, padding: '32px 28px',
     color: 'white', textAlign: 'center', backdropFilter: 'blur(20px)',
+    boxShadow: '0 20px 60px rgba(0,0,0,.35)',
   };
+  const mutedText = { color: 'rgba(230,225,250,.85)' };
+  const hintText  = { color: 'rgba(230,225,250,.65)' };
 
   function continueToRegister() {
     // Передаём данные через sessionStorage (sig и email — чтобы register знал, какой school invite использовать)
@@ -64,10 +69,10 @@ export default function JoinScreen() {
         <div style={card}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Ссылка недействительна</h1>
-          <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 14, marginBottom: 20 }}>
+          <p style={{ ...mutedText, fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
             {error || 'Похоже, ссылка устарела или была изменена. Свяжись со школой за новой ссылкой.'}
           </p>
-          <Link to="/" style={{ color: 'rgba(180,150,250,.95)', fontSize: 14 }}>← На главную</Link>
+          <Link to="/" style={{ color: 'rgba(200,170,255,1)', fontSize: 14, fontWeight: 600 }}>← На главную</Link>
         </div>
       </div>
     );
@@ -79,8 +84,8 @@ export default function JoinScreen() {
         <div style={card}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Ты уже в HEY</h1>
-          <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 14, marginBottom: 20 }}>
-            Аккаунт с email <strong>{email}</strong> уже зарегистрирован.<br/>
+          <p style={{ ...mutedText, fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
+            Аккаунт с email <strong style={{color:'white'}}>{email}</strong> уже зарегистрирован.<br/>
             Просто войди — школа и курс уже привязаны.
           </p>
           <button onClick={() => nav('/login')} style={{
@@ -102,23 +107,24 @@ export default function JoinScreen() {
           {info.schoolName} приглашает тебя в HEY
         </h1>
         {info.course && (
-          <p style={{ color: 'rgba(180,150,250,.95)', fontSize: 14, marginBottom: 14, fontWeight: 600 }}>
+          <p style={{ color: 'rgba(200,170,255,1)', fontSize: 14, marginBottom: 14, fontWeight: 700 }}>
             Курс «{info.course}»
           </p>
         )}
-        <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 14, marginBottom: 22, lineHeight: 1.5 }}>
+        <p style={{ ...mutedText, fontSize: 14, marginBottom: 22, lineHeight: 1.55 }}>
           HEY — мессенджер где собирается сообщество учеников.<br/>
-          Регистрация займёт минуту — email <strong>{email}</strong> уже подставлен.
+          Регистрация займёт минуту — email <strong style={{color:'white'}}>{email}</strong> уже подставлен.
         </p>
         <button onClick={continueToRegister} style={{
           padding: '14px 28px', borderRadius: 12, border: 'none',
-          background: 'rgba(140,110,220,.7)', color: 'white', fontSize: 15, fontWeight: 700,
+          background: 'rgba(140,110,220,.9)', color: 'white', fontSize: 15, fontWeight: 700,
           cursor: 'pointer', width: '100%',
+          boxShadow: '0 6px 18px rgba(120,90,200,.4)',
         }}>
           Продолжить регистрацию →
         </button>
-        <div style={{ marginTop: 14, color: 'rgba(255,255,255,.4)', fontSize: 12 }}>
-          Уже есть аккаунт? <Link to="/login" style={{ color: 'rgba(180,150,250,.95)' }}>Войти</Link>
+        <div style={{ marginTop: 14, ...hintText, fontSize: 13 }}>
+          Уже есть аккаунт? <Link to="/login" style={{ color: 'rgba(200,170,255,1)', fontWeight: 600 }}>Войти</Link>
         </div>
       </div>
     </div>

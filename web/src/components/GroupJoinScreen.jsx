@@ -42,9 +42,10 @@ export default function GroupJoinScreen() {
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
   };
   const card = {
-    maxWidth: 460, width: '100%', background: 'rgba(255,255,255,.06)',
-    border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, padding: '32px 28px',
+    maxWidth: 460, width: '100%', background: 'rgba(20,12,40,.72)',
+    border: '1px solid rgba(255,255,255,.14)', borderRadius: 18, padding: '32px 28px',
     color: 'white', textAlign: 'center', backdropFilter: 'blur(20px)',
+    boxShadow: '0 20px 60px rgba(0,0,0,.35)',
   };
 
   async function handleAccept() {
@@ -73,7 +74,7 @@ export default function GroupJoinScreen() {
       <div style={wrap}>
         <div style={card}>
           <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Ссылка недействительна</h1>
-          <p style={{ color: 'rgba(255,255,255,.6)', fontSize: 14, marginBottom: 20 }}>
+          <p style={{ color: 'rgba(230,225,250,.85)', fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
             {error || 'Возможно, ссылка устарела или приглашающий больше не админ группы.'}
           </p>
           <Link to="/" style={{ color: 'rgba(180,150,250,.95)', fontSize: 14 }}>← На главную</Link>
@@ -104,7 +105,7 @@ export default function GroupJoinScreen() {
         <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>
           {group.name}
         </h1>
-        <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginBottom: 20 }}>
+        <div style={{ color: 'rgba(230,225,250,.8)', fontSize: 13, marginBottom: 20 }}>
           {group.member_count} участник{group.member_count % 10 === 1 && group.member_count % 100 !== 11 ? '' : 'а/ов'}
         </div>
 
@@ -141,8 +142,8 @@ export default function GroupJoinScreen() {
             }}>
               Зарегистрироваться и войти
             </button>
-            <div style={{ marginTop: 4, color: 'rgba(255,255,255,.4)', fontSize: 12 }}>
-              Уже есть аккаунт? <Link to={`/login?gjoin=${encodeURIComponent(token)}`} style={{ color: 'rgba(180,150,250,.95)' }}>Войти</Link>
+            <div style={{ marginTop: 4, color: 'rgba(230,225,250,.7)', fontSize: 13 }}>
+              Уже есть аккаунт? <Link to={`/login?gjoin=${encodeURIComponent(token)}`} style={{ color: 'rgba(200,170,255,1)', fontWeight: 600 }}>Войти</Link>
             </div>
           </>
         )}
