@@ -4838,7 +4838,7 @@ export function GroupSettingsScreen() {
   const { convId } = useParams();
   const { user } = useAuth();
   const [customConfirm, confirmModal] = useConfirm();
-  const [info,    setInfo]    = useState({ name:'', icon:'👥', admin_id: null });
+  const [info,    setInfo]    = useState({ name:'', icon:'👥', admin_id: null, history_visibility: 'all' });
   const [members, setMembers] = useState([]);
   const [contacts,setContacts]= useState([]);
   const [editing, setEditing] = useState(false);
@@ -4848,17 +4848,44 @@ export function GroupSettingsScreen() {
   const [memberSearch, setMemberSearch] = useState('');    // поиск по контактам для добавления
   const avatarInputRef = useRef();
 
-  const isAdmin = info.admin_id === user?.id;
+  // Любой админ — создатель ИЛИ участник с is_admin=1
+  const myMember = members.find(m => m.id === user?.id);
+  const isAdmin = info.admin_id === user?.id || !!myMember?.is_admin;
   const isUrl = (s) => typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:') || s.startsWith('/'));
 
   useEffect(() => {
-    api.getConversations().then(convs => {
-      const c = convs.find(c => c.id === convId);
+    api.getGroupInfo(convId).then(c => {
       if (c) { setInfo(c); setName(c.name || ''); setIcon(c.icon || '👥'); }
-    });
+    }).catch(console.error);
     api.getGroupMembers(convId).then(setMembers);
     api.getContacts().then(setContacts);
   }, [convId]);
+
+  async function toggleMemberAdmin(m) {
+    const setTo = !m.is_admin;
+    if (!await customConfirm(
+      setTo
+        ? `Назначить «${m.name}» админом группы? Сможет добавлять/удалять участников и менять настройки.`
+        : `Снять админа с «${m.name}»?`
+    )) return;
+    try {
+      await api.setGroupMemberAdmin(convId, m.id, setTo);
+      const fresh = await api.getGroupMembers(convId);
+      setMembers(fresh);
+      heyToast(setTo ? 'Назначен админом' : 'Админ снят', 'success');
+    } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+  }
+
+  async function changeHistoryVisibility(value) {
+    try {
+      await api.setGroupHistoryVisibility(convId, value);
+      setInfo(prev => ({ ...prev, history_visibility: value }));
+      heyToast(value === 'all'
+        ? 'Новые участники увидят всю историю'
+        : 'Новые участники увидят только сообщения после вступления',
+        'success');
+    } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+  }
 
   async function handleAvatarSelect(e) {
     const file = e.target.files?.[0];
@@ -5011,6 +5038,8 @@ export function GroupSettingsScreen() {
         <div style={{color:'rgba(255,255,255,.5)',fontSize:13,marginBottom:10}}>Участники</div>
         {members.map(m => {
           const avatarIsImg = m.avatar && (m.avatar.startsWith('http') || m.avatar.startsWith('/') || m.avatar.startsWith('data:'));
+          const isCreator = m.id === info.admin_id;
+          const isMemberAdmin = isCreator || !!m.is_admin;
           return (
           <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',
             borderBottom:'1px solid rgba(255,255,255,.07)'}}>
@@ -5022,10 +5051,19 @@ export function GroupSettingsScreen() {
                 ? <img src={m.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                 : (m.name?.[0] || '?').toUpperCase()}
             </div>
-            <div style={{flex:1}}>
+            <div style={{flex:1,minWidth:0}}>
               <div style={{color:'white',fontSize:14,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                 {m.name}
-                {m.id === info.admin_id && <span style={{fontSize:11,color:'rgba(180,140,220,.8)'}}>админ</span>}
+                {isCreator && (
+                  <span style={{fontSize:10,fontWeight:700,color:'rgba(255,210,120,1)',
+                    background:'rgba(255,200,80,.15)',border:'1px solid rgba(255,200,80,.35)',
+                    borderRadius:6,padding:'2px 7px'}}>создатель</span>
+                )}
+                {!isCreator && m.is_admin && (
+                  <span style={{fontSize:10,fontWeight:700,color:'rgba(200,170,255,1)',
+                    background:'rgba(140,110,220,.18)',border:'1px solid rgba(180,140,220,.4)',
+                    borderRadius:6,padding:'2px 7px'}}>админ</span>
+                )}
                 {m.status === 'pending' && (
                   <span style={{fontSize:11,color:'rgba(255,200,120,.85)',
                     background:'rgba(255,200,120,.12)',borderRadius:6,padding:'2px 7px',fontWeight:600}}>
@@ -5034,14 +5072,70 @@ export function GroupSettingsScreen() {
                 )}
               </div>
             </div>
-            {isAdmin && m.id !== user.id && (
+            {/* Promote/demote: только создатель может менять админство (и не себе) */}
+            {info.admin_id === user?.id && m.id !== user.id && !isCreator && m.status === 'active' && (
+              <button onClick={() => toggleMemberAdmin(m)}
+                title={m.is_admin ? 'Снять админа' : 'Назначить админом'}
+                style={{
+                  background: m.is_admin ? 'rgba(255,200,80,.18)' : 'rgba(120,90,200,.18)',
+                  border: '1px solid ' + (m.is_admin ? 'rgba(255,200,80,.4)' : 'rgba(180,140,220,.4)'),
+                  color: m.is_admin ? 'rgba(255,210,120,1)' : 'rgba(200,170,255,1)',
+                  borderRadius: 8, padding: '5px 10px', fontSize: 11, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {m.is_admin ? 'Снять админа' : '+ Админ'}
+              </button>
+            )}
+            {isAdmin && m.id !== user.id && !isCreator && (
               <button onClick={()=>removeMember(m.id)}
                 title={m.status === 'pending' ? 'Отозвать приглашение' : 'Удалить участника'}
-                style={{background:'none',border:'none',color:'rgba(255,80,80,.7)',fontSize:18,cursor:'pointer'}}>✕</button>
+                style={{
+                  background:'rgba(200,60,60,.2)',border:'1px solid rgba(255,120,120,.45)',
+                  color:'rgba(255,180,180,1)',
+                  borderRadius:8,padding:'5px 10px',fontSize:14,cursor:'pointer',lineHeight:1,
+                  fontFamily:'inherit',
+                }}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(220,80,80,.3)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(200,60,60,.2)'}>✕</button>
             )}
           </div>
           );
         })}
+
+        {/* Visibility toggle — только для создателя */}
+        {info.admin_id === user?.id && (
+          <div style={{marginTop:20,padding:'14px 16px',borderRadius:14,
+            background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)'}}>
+            <div style={{color:'rgba(225,220,245,.85)',fontSize:12,fontWeight:700,
+              textTransform:'uppercase',letterSpacing:.6,marginBottom:8}}>
+              👁 Что видят новые участники
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {[
+                { v:'all', t:'Всю историю чата', d:'По умолчанию. Видят сообщения, которые были до их вступления.' },
+                { v:'since_joined', t:'Только с момента вступления', d:'Прошлые сообщения скрыты — закрытое сообщество.' },
+              ].map(o => (
+                <label key={o.v} style={{display:'flex',alignItems:'flex-start',gap:10,
+                  padding:'10px 12px',borderRadius:10,cursor:'pointer',
+                  background: info.history_visibility === o.v ? 'rgba(120,90,200,.18)' : 'rgba(255,255,255,.04)',
+                  border:'1px solid ' + (info.history_visibility === o.v ? 'rgba(180,140,220,.4)' : 'rgba(255,255,255,.08)'),
+                  transition:'all .12s',
+                }}>
+                  <input type="radio" name="hist-vis"
+                    checked={info.history_visibility === o.v}
+                    onChange={() => changeHistoryVisibility(o.v)}
+                    style={{marginTop:3,accentColor:'rgb(180,140,255)'}}/>
+                  <div style={{flex:1}}>
+                    <div style={{color:'white',fontSize:13,fontWeight:600}}>{o.t}</div>
+                    <div style={{color:'rgba(225,220,245,.65)',fontSize:11,marginTop:2,lineHeight:1.45}}>
+                      {o.d}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Add members (admin only) */}
         {isAdmin && nonMembers.length > 0 && (

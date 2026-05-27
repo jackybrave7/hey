@@ -653,7 +653,7 @@ module.exports = function makeRouter(db, broadcast) {
     }
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const before = req.query.before ? parseInt(req.query.before) : db.now() + 1;
-    const msgs = db.getMessages(req.params.id, before, limit);
+    const msgs = db.getMessages(req.params.id, before, limit, req.user.id);
     const reactionsMap = db.getReactionsForMessages(msgs.map(m => m.id));
     res.json(msgs.map(m => ({ ...m, reactions: reactionsMap[m.id] || {} })));
   });
@@ -793,6 +793,18 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(group);
   });
 
+  // Полные сведения о группе для экрана настроек (фильтрованные поля)
+  r.get('/groups/:id', requireAuth, (req, res) => {
+    if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Forbidden' });
+    const conv = db.getConversationById(req.params.id);
+    if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Not found' });
+    res.json({
+      id: conv.id, name: conv.name, icon: conv.icon,
+      admin_id: conv.admin_id,
+      history_visibility: conv.history_visibility || 'all',
+    });
+  });
+
   r.patch('/groups/:id', requireAuth, (req, res) => {
     try {
       db.updateGroup(req.params.id, req.user.id, req.body);
@@ -853,6 +865,28 @@ module.exports = function makeRouter(db, broadcast) {
     db.declineGroupInvite(req.params.id, req.user.id);
     broadcast([req.user.id], { type: 'group:invite_declined', conversationId: req.params.id });
     res.json({ ok: true });
+  });
+
+  // Назначить/снять админа группы (только текущий админ группы)
+  r.patch('/groups/:id/members/:userId/admin', requireAuth, (req, res) => {
+    try {
+      const value = !!req.body?.is_admin;
+      db.setMemberAdmin(req.params.id, req.user.id, req.params.userId, value);
+      const members = db.getConversationMembers(req.params.id);
+      broadcast(members, { type: 'group:updated', conversationId: req.params.id, fields: { members_changed: true } });
+      res.json({ ok: true });
+    } catch(e) { res.status(403).json({ error: e.message }); }
+  });
+
+  // Видимость истории для новых участников (только админ): 'all' | 'since_joined'
+  r.patch('/groups/:id/history-visibility', requireAuth, (req, res) => {
+    try {
+      const value = req.body?.value;
+      db.setGroupHistoryVisibility(req.params.id, req.user.id, value);
+      const members = db.getConversationMembers(req.params.id);
+      broadcast(members, { type: 'group:updated', conversationId: req.params.id, fields: { history_visibility: value } });
+      res.json({ ok: true });
+    } catch(e) { res.status(403).json({ error: e.message }); }
   });
 
   // ── Group invite links (admin shares a link, anyone can join) ────────────

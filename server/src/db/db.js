@@ -170,6 +170,12 @@ try { db.exec('ALTER TABLE conversations ADD COLUMN pinned_message_id TEXT'); } 
 // + кто пригласил (чтобы показать ученику «Иван пригласил тебя в …»)
 try { db.exec("ALTER TABLE members ADD COLUMN status TEXT DEFAULT 'active'"); } catch {}
 try { db.exec('ALTER TABLE members ADD COLUMN invited_by TEXT'); } catch {}
+// Multi-admin: любой участник может быть админом. conversations.admin_id
+// остаётся как «создатель/владелец» (не может быть отозван). Дополнительных
+// админов отмечаем тут.
+try { db.exec('ALTER TABLE members ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
+// Видимость истории для добавленных позже: 'all' (по умолчанию) или 'since_joined'
+try { db.exec("ALTER TABLE conversations ADD COLUMN history_visibility TEXT DEFAULT 'all'"); } catch {}
 // Заполняем status для существующих записей (миграция, ОДИН раз — UPDATE no-op если уже 'active')
 try { db.exec("UPDATE members SET status='active' WHERE status IS NULL"); } catch {}
 
@@ -632,8 +638,7 @@ function createGroup({ creatorId, name, icon, memberIds }) {
 }
 
 function updateGroup(convId, adminId, fields) {
-  const conv = db.prepare('SELECT admin_id FROM conversations WHERE id=?').get(convId);
-  if (conv?.admin_id !== adminId) throw new Error('Not authorized');
+  if (!isGroupAdmin(convId, adminId)) throw new Error('Not authorized');
   const keys = Object.keys(fields).filter(k => ['name','icon'].includes(k));
   if (!keys.length) return;
   db.prepare(`UPDATE conversations SET ${keys.map(k=>`${k}=@${k}`).join(',')} WHERE id=@id`)
@@ -644,8 +649,7 @@ function updateGroup(convId, adminId, fields) {
 // приглашение и должен сам его принять. Если такая запись уже есть —
 // ничего не меняем (повторное добавление не сбрасывает статус).
 function addGroupMember(convId, requesterId, userId) {
-  const conv = db.prepare('SELECT admin_id FROM conversations WHERE id=?').get(convId);
-  if (conv?.admin_id !== requesterId) throw new Error('Not authorized');
+  if (!isGroupAdmin(convId, requesterId)) throw new Error('Not authorized');
   const existing = db.prepare('SELECT status FROM members WHERE conversation_id=? AND user_id=?')
     .get(convId, userId);
   if (existing) return { alreadyMember: true, status: existing.status };
@@ -677,9 +681,46 @@ function joinGroupViaInvite(convId, userId, invitedBy) {
 }
 
 function removeGroupMember(convId, requesterId, userId) {
+  if (!isGroupAdmin(convId, requesterId) && requesterId !== userId) throw new Error('Not authorized');
+  // Создателя (conversations.admin_id) убрать нельзя — даже самим собой выйти, нужно сначала передать владельца
   const conv = db.prepare('SELECT admin_id FROM conversations WHERE id=?').get(convId);
-  if (conv?.admin_id !== requesterId && requesterId !== userId) throw new Error('Not authorized');
+  if (conv?.admin_id === userId) throw new Error('Нельзя удалить создателя группы');
   db.prepare('DELETE FROM members WHERE conversation_id=? AND user_id=?').run(convId, userId);
+}
+
+// Проверка прав админа на группе. Админ — либо создатель (admin_id), либо
+// явно назначенный (members.is_admin=1). Используется во всех проверках прав.
+function isGroupAdmin(convId, userId) {
+  if (!convId || !userId) return false;
+  const conv = db.prepare('SELECT admin_id, type FROM conversations WHERE id=?').get(convId);
+  if (!conv || conv.type !== 'group') return false;
+  if (conv.admin_id === userId) return true;
+  const m = db.prepare(
+    "SELECT is_admin FROM members WHERE conversation_id=? AND user_id=? AND status='active'"
+  ).get(convId, userId);
+  return !!(m && m.is_admin);
+}
+
+// Дать/отозвать админство у активного участника. Только админ может это
+// делать. Создателя (admin_id) трогать нельзя — он всегда админ.
+function setMemberAdmin(convId, requesterId, userId, value) {
+  if (!isGroupAdmin(convId, requesterId)) throw new Error('Not authorized');
+  const conv = db.prepare('SELECT admin_id FROM conversations WHERE id=?').get(convId);
+  if (conv?.admin_id === userId) throw new Error('Создатель группы — всегда админ');
+  const m = db.prepare(
+    "SELECT 1 FROM members WHERE conversation_id=? AND user_id=? AND status='active'"
+  ).get(convId, userId);
+  if (!m) throw new Error('Пользователь не активный участник группы');
+  db.prepare('UPDATE members SET is_admin=? WHERE conversation_id=? AND user_id=?')
+    .run(value ? 1 : 0, convId, userId);
+}
+
+// История для добавленных позже: 'all' (по умолчанию) или 'since_joined'.
+// Меняет только админ группы.
+function setGroupHistoryVisibility(convId, requesterId, value) {
+  if (!isGroupAdmin(convId, requesterId)) throw new Error('Not authorized');
+  if (!['all', 'since_joined'].includes(value)) throw new Error('Invalid value');
+  db.prepare('UPDATE conversations SET history_visibility=? WHERE id=?').run(value, convId);
 }
 
 // Принять приглашение в группу — переводит запись из pending в active.
@@ -706,11 +747,11 @@ function getGroupMembers(convId, includePending = false) {
     ? `m.conversation_id=?`
     : `m.conversation_id=? AND m.status='active'`;
   return db.prepare(
-    `SELECT u.id, u.name, u.avatar, u.phone, p.online, m.status
+    `SELECT u.id, u.name, u.avatar, u.phone, p.online, m.status, m.is_admin
      FROM members m JOIN users u ON u.id=m.user_id
      LEFT JOIN presence p ON p.user_id=m.user_id
      WHERE ${where}`
-  ).all(convId).map(r => ({ ...r, online: !!r.online }));
+  ).all(convId).map(r => ({ ...r, online: !!r.online, is_admin: !!r.is_admin }));
 }
 
 function getMediaMessages(convId) {
@@ -1124,13 +1165,26 @@ function _replySnippet(replyToId) {
   };
 }
 
-function getMessages(convId, before, limit = 50) {
+function getMessages(convId, before, limit = 50, requesterId = null) {
   // Не таскаем avatar инлайн — он берётся через /api/avatars/:userId с долгим кешем.
-  // Возвращаем только sender_avatar как ссылку, чтобы UI мог рендерить <img src>.
-  // ВАЖНО: берём САМЫЕ СВЕЖИЕ N сообщений до `before` (DESC), затем разворачиваем
-  // обратно в ASC чтобы UI рендерил старые сверху, новые снизу. Раньше тут было
-  // ORDER BY ASC → возвращались первые 50 сообщений от начала чата, и новые
-  // не попадали в выдачу когда история длиннее 50.
+  // ASC-reverse трюк — см. ниже.
+  // Опционально: если в группе history_visibility='since_joined', берём
+  // только сообщения после joined_at для этого юзера (если он не админ).
+  let minTs = 0;
+  if (requesterId) {
+    const conv = db.prepare(
+      "SELECT type, admin_id, history_visibility FROM conversations WHERE id=?"
+    ).get(convId);
+    if (conv?.type === 'group' && conv.history_visibility === 'since_joined') {
+      const isAdminUser = isGroupAdmin(convId, requesterId);
+      if (!isAdminUser) {
+        const m = db.prepare(
+          "SELECT joined_at FROM members WHERE conversation_id=? AND user_id=?"
+        ).get(convId, requesterId);
+        if (m?.joined_at) minTs = m.joined_at;
+      }
+    }
+  }
   const rows = db.prepare(
     `SELECT m.*, u.name AS sender_name, u.id AS _sender_id_for_avatar,
             CASE
@@ -1139,10 +1193,10 @@ function getMessages(convId, before, limit = 50) {
               ELSE u.avatar
             END AS sender_avatar
      FROM messages m JOIN users u ON u.id=m.sender_id
-     WHERE m.conversation_id=? AND m.created_at<?
+     WHERE m.conversation_id=? AND m.created_at<? AND m.created_at>=?
      ORDER BY m.created_at DESC
      LIMIT ?`
-  ).all(convId, before, limit).reverse();
+  ).all(convId, before, minTs, limit).reverse();
   return rows.map(r => {
     delete r._sender_id_for_avatar;
     const parsed = _parseMsg(r);
@@ -2371,7 +2425,7 @@ module.exports = {
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,
-  joinGroupViaInvite,
+  joinGroupViaInvite, isGroupAdmin, setMemberAdmin, setGroupHistoryVisibility,
   getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
