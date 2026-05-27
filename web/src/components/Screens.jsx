@@ -6634,7 +6634,7 @@ export function ChatScreen() {
 
       {/* Пустой «Монолог» — показываем подсказку про что это за чат */}
       {!requestLock && !groupInvite && !(searchMode && searchResults !== null) &&
-       partner.isMonolog && messages.length === 0 && !loading && (
+       partner.isMonolog && messages.length === 0 && (
         <div style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: '20px 24px', overflowY: 'auto',
@@ -6691,7 +6691,7 @@ export function ChatScreen() {
 
       {/* Messages — virtualized list, DOM nodes fixed at ~50 regardless of history size */}
       {!requestLock && !groupInvite && !(searchMode && searchResults !== null) &&
-       !(partner.isMonolog && messages.length === 0 && !loading) && (
+       !(partner.isMonolog && messages.length === 0) && (
         <Virtuoso
           ref={virtuosoRef}
           style={{ flex: 1, overscrollBehavior: 'contain' }}
