@@ -5757,7 +5757,7 @@ export function ChatScreen() {
     });
     const u5 = socket.on('presence:change', ({ userId, online, lastSeen }) => {
       setPartner(p => p.id === userId
-        ? { ...p, online, lastSeen: lastSeen ?? p.lastSeen ?? Math.floor(Date.now()/1000) }
+        ? { ...p, online: !!online, lastSeen: lastSeen ?? p.lastSeen ?? Math.floor(Date.now()/1000) }
         : p);
     });
     const u6 = socket.on('chat:cleared', ({ conversationId }) => {
@@ -6503,8 +6503,11 @@ export function ChatScreen() {
               cursor: (partner.isGroup || partner.id) ? 'pointer' : 'default'}}>
             <div className="topbar-title" style={{flex:'unset'}}>{partner.name}</div>
             {partner.isGroup && <div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>группа</div>}
-            {/* Super видит когда собеседник был онлайн в чате */}
-            {!partner.isGroup && !partner.isMonolog && partner.id && user?.is_super && (
+            {/* Super видит когда собеседник был онлайн в чате.
+                Не показываем для системных аккаунтов (HEY-заведующий, школа) —
+                у них фиктивная presence + плейсхолдерный телефон, которые могут
+                просочиться как «0». */}
+            {!partner.isGroup && !partner.isMonolog && !partner.isSystem && partner.id && user?.is_super && (
               partner.online ? (
                 <div style={{fontSize:11,color:'rgba(110,235,150,.95)',fontWeight:500}}>
                   онлайн
@@ -6516,7 +6519,7 @@ export function ChatScreen() {
               ) : null
             )}
           </div>
-          {partner.online && !partner.isGroup && !partner.isMonolog && <div className="online-dot"/>}
+          {!!partner.online && !partner.isGroup && !partner.isMonolog && !partner.isSystem && <div className="online-dot"/>}
           <DotsMenu items={chatMenuItems}/>
         </div>
       </div>
