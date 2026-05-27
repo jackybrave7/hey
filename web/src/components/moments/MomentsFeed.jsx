@@ -33,6 +33,14 @@ export default function MomentsFeed({ currentUser }) {
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
 
+  // Scroll-to-top — показываем кнопку когда юзер прокрутил ленту глубоко
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    function onScroll() { setShowScrollTop(window.scrollY > 600); }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   function onDragStart(e, idx) {
     setDragIdx(idx);
     e.dataTransfer.effectAllowed = 'move';
@@ -467,6 +475,33 @@ export default function MomentsFeed({ currentUser }) {
           onClose={() => setShowSuperInfo(false)}
           onInvite={() => setShowSuperInfo(false)}
         />
+      )}
+
+      {/* Floating scroll-to-top — появляется когда лента прокручена далеко вниз */}
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Наверх"
+          style={{
+            position: 'fixed',
+            right: 20,
+            bottom: 80,  // над BottomNav (60px height + breathing room)
+            zIndex: 400,
+            width: 44, height: 44, borderRadius: '50%',
+            background: 'rgba(120,90,200,.92)',
+            border: '1px solid rgba(180,140,220,.5)',
+            color: 'white',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 6px 20px rgba(80,50,150,.45),0 2px 6px rgba(0,0,0,.2)',
+            transition: 'transform .15s, background .15s',
+            fontFamily: 'inherit',
+            fontSize: 20, fontWeight: 700, lineHeight: 1,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background='rgba(140,110,220,1)'; e.currentTarget.style.transform='translateY(-2px)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background='rgba(120,90,200,.92)'; e.currentTarget.style.transform='translateY(0)'; }}>
+          ↑
+        </button>
       )}
     </div>
   );
