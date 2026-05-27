@@ -1,20 +1,47 @@
 // web/src/api.js
 
 const BASE = '/api';
+const REQUEST_TIMEOUT_MS = 15000; // 15с — отсечка «сервер не отвечает»
 
 function getToken() {
   return localStorage.getItem('hey_token');
 }
 
+// Простой сигнал о проблемах со связью — слушает ServerStatusBanner.
+// reason: 'timeout' (запрос > 15с) | 'network' (fetch вообще упал) | '5xx'
+function notifyServerIssue(reason) {
+  try { window.dispatchEvent(new CustomEvent('hey:server-issue', { detail: reason })); } catch {}
+}
+function notifyServerOk() {
+  try { window.dispatchEvent(new CustomEvent('hey:server-ok')); } catch {}
+}
+
 async function req(method, path, body) {
-  const res = await fetch(BASE + path, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort('timeout'), REQUEST_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(BASE + path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    // AbortError при таймауте, TypeError при сетевой ошибке
+    if (e?.name === 'AbortError') {
+      notifyServerIssue('timeout');
+      throw new Error('Сервер не отвечает');
+    }
+    notifyServerIssue('network');
+    throw new Error('Нет связи с сервером');
+  }
+  clearTimeout(timer);
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     // Dispatch special events for specific error codes
@@ -25,8 +52,12 @@ async function req(method, path, body) {
     if (err.code === 'MUST_CHANGE_PASSWORD') {
       window.dispatchEvent(new CustomEvent('hey:must-change-password'));
     }
+    // 5xx — баннер. 4xx — не баннер, это валидная бизнес-ошибка.
+    if (res.status >= 500) notifyServerIssue('5xx');
+    else notifyServerOk(); // 4xx значит сервер живой
     throw new Error(err.error || `HTTP ${res.status}`);
   }
+  notifyServerOk();
   return res.json();
 }
 

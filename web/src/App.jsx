@@ -27,6 +27,7 @@ import AdminTestUsers from './components/admin/AdminTestUsers';
 import JoinScreen from './components/JoinScreen';
 import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
+import ServerStatusBanner from './components/ServerStatusBanner';
 import { ensurePushIfGranted } from './lib/push';
 
 function useNotifications() {
@@ -234,6 +235,7 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <GlobalHandlers />
+        <ServerStatusBanner />
         <ToastContainer />
         <GlobalUserCardMount />
         <Routes>
