@@ -6501,25 +6501,31 @@ export function ChatScreen() {
             }}
             style={{flex:1,marginLeft:8,minWidth:0,
               cursor: (partner.isGroup || partner.id) ? 'pointer' : 'default'}}>
-            <div className="topbar-title" style={{flex:'unset'}}>{partner.name}</div>
+            <div className="topbar-title" style={{flex:'unset',display:'flex',alignItems:'center',gap:8}}>
+              <span>{partner.name}</span>
+              {/* Зелёная точка-индикатор онлайн — справа от имени, без подписи */}
+              {!!partner.online && !partner.isGroup && !partner.isMonolog && !partner.isSystem && (
+                <span style={{
+                  width:9, height:9, borderRadius:'50%',
+                  background:'rgba(110,235,150,1)',
+                  boxShadow:'0 0 0 2px rgba(40,30,80,.5), 0 0 6px rgba(110,235,150,.5)',
+                  flexShrink:0,
+                }}/>
+              )}
+            </div>
             {partner.isGroup && <div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>группа</div>}
-            {/* Super видит когда собеседник был онлайн в чате.
-                Не показываем для системных аккаунтов (HEY-заведующий, школа) —
-                у них фиктивная presence + плейсхолдерный телефон, которые могут
-                просочиться как «0». */}
-            {!partner.isGroup && !partner.isMonolog && !partner.isSystem && partner.id && user?.is_super && (
-              partner.online ? (
-                <div style={{fontSize:11,color:'rgba(110,235,150,.95)',fontWeight:500}}>
-                  онлайн
-                </div>
-              ) : partner.lastSeen ? (
-                <div style={{fontSize:11,color:'rgba(255,255,255,.55)'}}>
-                  был {fmtLastSeenShort(partner.lastSeen)}
-                </div>
-              ) : null
+            {/* Super-юзеру показываем «был X» только для оффлайн собеседника.
+                «онлайн» подписи нет — индикатор-точка справа от имени уже
+                сообщает статус. ВНИМАНИЕ: !! на числовых флагах из БД (0/1),
+                иначе React рендерит «0» как текст (JSX `0 && X = 0`). */}
+            {!partner.isGroup && !partner.isMonolog && !partner.isSystem
+             && !!partner.id && !!user?.is_super
+             && !partner.online && !!partner.lastSeen && (
+              <div style={{fontSize:11,color:'rgba(255,255,255,.55)'}}>
+                был {fmtLastSeenShort(partner.lastSeen)}
+              </div>
             )}
           </div>
-          {!!partner.online && !partner.isGroup && !partner.isMonolog && !partner.isSystem && <div className="online-dot"/>}
           <DotsMenu items={chatMenuItems}/>
         </div>
       </div>
