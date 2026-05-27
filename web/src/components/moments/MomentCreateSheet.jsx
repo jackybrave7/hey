@@ -227,23 +227,24 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               /* Edit mode — media is read-only, cannot be changed */
               mediaPreview ? (
                 <div style={{position:'relative',borderRadius:16,overflow:'hidden',
-                  background:'#0a0518',maxHeight:200}}>
+                  background:'#0a0518'}}>
                   {mediaType==='image' && (
                     <div
                       onMouseDown={onPosDragStart}
                       onTouchStart={onPosDragStart}
-                      style={{position:'relative',width:'100%',height:200,
+                      style={{position:'relative',width:'100%',aspectRatio:'1 / 1',
+                        maxWidth:360,margin:'0 auto',
                         cursor:'grab',userSelect:'none',touchAction:'none'}}>
                       <img src={mediaPreview} alt="" draggable={false}
                         style={{width:'100%',height:'100%',objectFit:'cover',
                           objectPosition: mediaPosition,display:'block',pointerEvents:'none'}}/>
                       <div style={{
                         position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
-                        background:'rgba(0,0,0,.55)',backdropFilter:'blur(6px)',
-                        borderRadius:20,padding:'4px 12px',
-                        color:'rgba(255,255,255,.7)',fontSize:11,whiteSpace:'nowrap',
+                        background:'rgba(0,0,0,.6)',backdropFilter:'blur(6px)',
+                        borderRadius:20,padding:'5px 14px',
+                        color:'rgba(255,255,255,.92)',fontSize:11,fontWeight:500,whiteSpace:'nowrap',
                         pointerEvents:'none',
-                      }}>↕ Перетащи чтобы выбрать кадр</div>
+                      }}>↕ Перетащи — так момент будет в ленте</div>
                     </div>
                   )}
                   {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
@@ -260,13 +261,14 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               /* Create mode — full upload zone */
               mediaPreview ? (
                 <div style={{position:'relative',borderRadius:16,overflow:'hidden',
-                  background:'#0a0518',maxHeight:200}}>
+                  background:'#0a0518'}}>
                   {mediaType==='image' && (
                     <div
                       onMouseDown={!uploading ? onPosDragStart : undefined}
                       onTouchStart={!uploading ? onPosDragStart : undefined}
                       style={{
-                        position:'relative',width:'100%',height:200,
+                        position:'relative',width:'100%',aspectRatio:'1 / 1',
+                        maxWidth:360,margin:'0 auto',
                         cursor: uploading ? 'default' : 'grab',
                         userSelect:'none', touchAction:'none',
                       }}>
@@ -279,11 +281,11 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                       {!uploading && (
                         <div style={{
                           position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
-                          background:'rgba(0,0,0,.55)',backdropFilter:'blur(6px)',
-                          borderRadius:20,padding:'4px 12px',
-                          color:'rgba(255,255,255,.7)',fontSize:11,whiteSpace:'nowrap',
+                          background:'rgba(0,0,0,.6)',backdropFilter:'blur(6px)',
+                          borderRadius:20,padding:'5px 14px',
+                          color:'rgba(255,255,255,.92)',fontSize:11,fontWeight:500,whiteSpace:'nowrap',
                           pointerEvents:'none',
-                        }}>↕ Перетащи чтобы выбрать кадр</div>
+                        }}>↕ Перетащи — так момент будет в ленте</div>
                       )}
                     </div>
                   )}
