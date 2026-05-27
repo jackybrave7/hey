@@ -208,7 +208,8 @@
       "Bash(curl -sIL --max-time 10 \"https://picsum.photos/id/102/640/800\")",
       "Bash(curl -sL --max-time 10 -o /dev/null -w \"GET id/102: %{http_code} %{size_download}b in %{time_total}s\\\\n\" \"https://picsum.photos/id/102/640/800\")",
       "Bash(curl -sL --max-time 10 -o /dev/null -w \"GET id/250: %{http_code} %{size_download}b in %{time_total}s\\\\n\" \"https://picsum.photos/id/250/640/800\")",
-      "Bash(curl -sIL --max-time 5 \"https://hey-messenger.ru/test-images/102.jpg\")"
+      "Bash(curl -sIL --max-time 5 \"https://hey-messenger.ru/test-images/102.jpg\")",
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd server && node -e 'require\\(\\\\\"./src/db/db\\\\\"\\).seedTestUsers\\(\\)' && pm2 restart hey 2>&1 | tail -3\")"
     ]
   }
 }
