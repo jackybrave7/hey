@@ -92,6 +92,7 @@ export const api = {
 
   // Conversations
   getConversations: ()       => req('GET', '/conversations'),
+  getArchivedConversations: () => req('GET', '/conversations?archived=1'),
   openConversation: (userId) => req('POST', '/conversations', { userId }),
   getMessages:      (convId, before) =>
     req('GET', `/conversations/${convId}/messages${before ? `?before=${before}` : ''}`),
@@ -109,6 +110,8 @@ export const api = {
   pushTest:          ()                    => req('POST', '/push/test'),
   pinConversation:   (convId)             => req('POST',   `/conversations/${convId}/pin`),
   unpinConversation: (convId)             => req('DELETE', `/conversations/${convId}/pin`),
+  archiveConversation:   (convId)         => req('POST',   `/conversations/${convId}/archive`),
+  unarchiveConversation: (convId)         => req('DELETE', `/conversations/${convId}/archive`),
   acceptRequest:    (convId)              => req('POST',   `/conversations/${convId}/accept`),
   declineRequest:   (convId)              => req('DELETE', `/conversations/${convId}/request`),
   editMessage:      (convId, msgId, text) => req('PATCH',  `/conversations/${convId}/messages/${msgId}`, { text }),

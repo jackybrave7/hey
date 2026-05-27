@@ -478,7 +478,8 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   r.get('/conversations', requireAuth, (req, res) => {
-    res.json(db.getConversationsForUser(req.user.id));
+    const archived = req.query.archived === '1' || req.query.archived === 'true';
+    res.json(db.getConversationsForUser(req.user.id, { archived }));
   });
 
   r.post('/conversations', requireAuth, (req, res) => {
@@ -507,6 +508,18 @@ module.exports = function makeRouter(db, broadcast) {
 
   r.delete('/conversations/:id/pin', requireAuth, (req, res) => {
     db.unpinConversation(req.user.id, req.params.id);
+    res.json({ ok: true });
+  });
+
+  // Архивировать/восстановить чат (персональное действие)
+  r.post('/conversations/:id/archive', requireAuth, (req, res) => {
+    if (!db.isMember(req.params.id, req.user.id))
+      return res.status(403).json({ error: 'Forbidden' });
+    db.archiveConversation(req.params.id, req.user.id);
+    res.json({ ok: true });
+  });
+  r.delete('/conversations/:id/archive', requireAuth, (req, res) => {
+    db.unarchiveConversation(req.params.id, req.user.id);
     res.json({ ok: true });
   });
 

@@ -174,6 +174,8 @@ try { db.exec('ALTER TABLE members ADD COLUMN invited_by TEXT'); } catch {}
 // остаётся как «создатель/владелец» (не может быть отозван). Дополнительных
 // админов отмечаем тут.
 try { db.exec('ALTER TABLE members ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
+// Архив чата — персональный для каждого юзера. NULL = не в архиве.
+try { db.exec('ALTER TABLE members ADD COLUMN archived_at INTEGER'); } catch {}
 // Видимость истории для добавленных позже: 'all' (по умолчанию) или 'since_joined'
 try { db.exec("ALTER TABLE conversations ADD COLUMN history_visibility TEXT DEFAULT 'all'"); } catch {}
 // Заполняем status для существующих записей (миграция, ОДИН раз — UPDATE no-op если уже 'active')
@@ -715,6 +717,18 @@ function setMemberAdmin(convId, requesterId, userId, value) {
     .run(value ? 1 : 0, convId, userId);
 }
 
+// Архивировать/восстановить чат для конкретного юзера (персональное действие)
+function archiveConversation(convId, userId) {
+  db.prepare(
+    `UPDATE members SET archived_at=? WHERE conversation_id=? AND user_id=? AND archived_at IS NULL`
+  ).run(now(), convId, userId);
+}
+function unarchiveConversation(convId, userId) {
+  db.prepare(
+    `UPDATE members SET archived_at=NULL WHERE conversation_id=? AND user_id=?`
+  ).run(convId, userId);
+}
+
 // История для добавленных позже: 'all' (по умолчанию) или 'since_joined'.
 // Меняет только админ группы.
 function setGroupHistoryVisibility(convId, requesterId, value) {
@@ -921,15 +935,19 @@ function getTotalUnreadFor(userId) {
   return row?.cnt || 0;
 }
 
-function getConversationsForUser(userId) {
+function getConversationsForUser(userId, opts = {}) {
+  const { archived = false } = opts; // false → активные, true → только архивные
   // Включаем и активные, и pending членства — pending покажем как «приглашение»
   const memberRows = db.prepare(
-    'SELECT conversation_id, status, invited_by FROM members WHERE user_id=?'
-  ).all(userId);
+    'SELECT conversation_id, status, invited_by, archived_at FROM members WHERE user_id=?'
+  ).all(userId)
+    .filter(r => archived ? r.archived_at != null : r.archived_at == null);
   if (!memberRows.length) return [];
   const convIds = memberRows.map(r => r.conversation_id);
   const memberMeta = Object.fromEntries(
-    memberRows.map(r => [r.conversation_id, { status: r.status || 'active', invited_by: r.invited_by }])
+    memberRows.map(r => [r.conversation_id, {
+      status: r.status || 'active', invited_by: r.invited_by, archived_at: r.archived_at,
+    }])
   );
 
   const ph = convIds.map(() => '?').join(',');
@@ -2426,6 +2444,7 @@ module.exports = {
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,
   joinGroupViaInvite, isGroupAdmin, setMemberAdmin, setGroupHistoryVisibility,
+  archiveConversation, unarchiveConversation,
   getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,

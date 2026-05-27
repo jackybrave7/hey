@@ -3319,6 +3319,7 @@ export function ConversationsScreen() {
   const [requestCard, setRequestCard] = useState(null); // { conv, profile } | null
   const [requestCardLoading, setRequestCardLoading] = useState(false);
   const [requestCardAction, setRequestCardAction] = useState(null); // 'accept' | 'decline' | null
+  const [showArchive, setShowArchive] = useState(false);
 
   const reload = () => api.getConversations().then(setConvs).catch(console.error);
 
@@ -3392,6 +3393,14 @@ export function ConversationsScreen() {
 
   // Карта convId → conv для быстрого доступа из поисковых результатов
   const convsById = useMemo(() => Object.fromEntries(convs.map(c => [c.id, c])), [convs]);
+
+  async function archive(c) {
+    try {
+      await api.archiveConversation(c.id);
+      setConvs(prev => prev.filter(x => x.id !== c.id));
+      setPinToast('📦 В архиве');
+    } catch (e) { heyToast(e.message || 'Не удалось', 'error'); }
+  }
 
   async function togglePin(c) {
     const wasPinned = c.is_pinned;
@@ -3509,19 +3518,31 @@ export function ConversationsScreen() {
             }}><Icon name="mail" size={12}/> Приглашение</div>
           ) : (
             <>
-              {/* Pin toggle — visible on hover */}
+              {/* Inline actions: pin + archive — visible on hover */}
               {hovered ? (
-                <button
-                  onClick={e => { e.stopPropagation(); togglePin(c); }}
-                  title={c.is_pinned ? 'Открепить' : 'Закрепить'}
-                  style={{
-                    background:'none',border:'none',cursor:'pointer',padding:'2px 4px',
-                    fontSize:14,opacity: c.is_pinned ? 0.9 : 0.45,
-                    transition:'opacity .15s',lineHeight:1,
-                  }}
-                  onMouseEnter={e=>e.currentTarget.style.opacity='1'}
-                  onMouseLeave={e=>e.currentTarget.style.opacity= c.is_pinned ? '0.9' : '0.45'}
-                ><Icon name="pin" size={14}/></button>
+                <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                  <button
+                    onClick={e => { e.stopPropagation(); togglePin(c); }}
+                    title={c.is_pinned ? 'Открепить' : 'Закрепить'}
+                    style={{
+                      background:'none',border:'none',cursor:'pointer',padding:'2px 4px',
+                      color:'white',opacity: c.is_pinned ? 0.9 : 0.5,
+                      transition:'opacity .15s',lineHeight:1,
+                    }}
+                    onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                    onMouseLeave={e=>e.currentTarget.style.opacity= c.is_pinned ? '0.9' : '0.5'}
+                  ><Icon name="pin" size={14}/></button>
+                  <button
+                    onClick={e => { e.stopPropagation(); archive(c); }}
+                    title="В архив"
+                    style={{
+                      background:'none',border:'none',cursor:'pointer',padding:'2px 4px',
+                      color:'white',opacity:0.5,transition:'opacity .15s',lineHeight:1,
+                    }}
+                    onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                    onMouseLeave={e=>e.currentTarget.style.opacity='0.5'}
+                  ><Icon name="archive" size={14}/></button>
+                </div>
               ) : c.last_at ? (
                 <div style={{color:'rgba(255,255,255,.35)',fontSize:11}}>{fmtTime(c.last_at)}</div>
               ) : null}
@@ -3561,6 +3582,7 @@ export function ConversationsScreen() {
               setTimeout(() => document.getElementById('hey-chats-search')?.focus(), 50);
             } },
             { label:'Новая группа',   icon:<Icon name="users" size={18}/>, onClick: () => nav('/groups/new') },
+            { label:'Архив',          icon:<Icon name="archive" size={18}/>, onClick: () => setShowArchive(true) },
           ]}/>
         </div>
       </div>
@@ -3894,6 +3916,130 @@ export function ConversationsScreen() {
           </div>
         </div>
       )}
+
+      {showArchive && (
+        <ArchiveListModal
+          onClose={() => setShowArchive(false)}
+          onUnarchive={(c) => { setConvs(prev => [c, ...prev]); }}/>
+      )}
+    </div>
+  );
+}
+
+// Модалка со списком архивных чатов — восстановить или удалить навсегда
+function ArchiveListModal({ onClose, onUnarchive }) {
+  const [list, setList]   = useState(null);
+  const [busy, setBusy]   = useState(false);
+  const [customConfirm, confirmModal] = useConfirm();
+  const nav = useNavigate();
+
+  useEffect(() => {
+    api.getArchivedConversations().then(setList).catch(() => setList([]));
+  }, []);
+
+  async function restore(c) {
+    setBusy(true);
+    try {
+      await api.unarchiveConversation(c.id);
+      setList(prev => prev.filter(x => x.id !== c.id));
+      onUnarchive?.(c);
+      heyToast('Восстановлено', 'success');
+    } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+    setBusy(false);
+  }
+
+  async function removeForever(c) {
+    const ok = await customConfirm(
+      <>
+        <div style={{fontWeight:700,marginBottom:8}}>Удалить чат «{c.name || 'Диалог'}» навсегда?</div>
+        <div style={{color:'rgba(255,255,255,.65)',fontSize:13,lineHeight:1.6}}>
+          Сообщения, медиа и реакции удалятся безвозвратно.
+        </div>
+      </>,
+      { requireWord: 'УДАЛИТЬ', danger: true }
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.deleteConversation(c.id);
+      setList(prev => prev.filter(x => x.id !== c.id));
+      heyToast('Удалено', 'success');
+    } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+    setBusy(false);
+  }
+
+  return (
+    <div onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{position:'fixed',inset:0,zIndex:1000,
+        background:'rgba(0,0,0,.55)',backdropFilter:'blur(10px)',
+        display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div style={{background:'rgba(22,15,50,.98)',borderRadius:18,
+        width:'min(94vw,520px)',maxHeight:'82vh',display:'flex',flexDirection:'column',
+        border:'1px solid rgba(255,255,255,.14)',
+        boxShadow:'0 20px 60px rgba(0,0,0,.5)'}}>
+        <div style={{padding:'16px 20px 14px',borderBottom:'1px solid rgba(255,255,255,.08)',
+          display:'flex',alignItems:'center',gap:10}}>
+          <Icon name="archive" size={20}/>
+          <div style={{flex:1,color:'white',fontSize:17,fontWeight:700}}>Архивные чаты</div>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',color:'rgba(255,255,255,.5)',
+              cursor:'pointer',padding:0,display:'flex',alignItems:'center'}}>
+            <Icon name="close" size={20}/>
+          </button>
+        </div>
+
+        <div style={{flex:1,overflowY:'auto',padding:'8px 12px 12px'}}>
+          {list === null && <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:30}}>Загрузка…</div>}
+          {list && list.length === 0 && (
+            <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40,fontSize:14,lineHeight:1.5}}>
+              Архив пуст.<br/>
+              <span style={{fontSize:12,color:'rgba(225,220,245,.55)'}}>
+                В чатах наведи на строку и нажми 📦 чтобы убрать в архив.
+              </span>
+            </div>
+          )}
+          {list && list.length > 0 && list.map(c => (
+            <div key={c.id} style={{
+              display:'flex',alignItems:'center',gap:12,padding:'10px 8px',
+              borderRadius:10,
+            }}>
+              <div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',flexShrink:0,
+                background:'rgba(120,90,200,.4)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:16,color:'white',fontWeight:700}}>
+                {c.avatar && (c.avatar.startsWith('http') || c.avatar.startsWith('/') || c.avatar.startsWith('data:'))
+                  ? <img src={c.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : (c.type === 'group' ? (c.icon || '👥') : (c.name?.[0]?.toUpperCase() || '?'))}
+              </div>
+              <div style={{flex:1,minWidth:0,cursor:'pointer'}}
+                onClick={() => { onClose(); nav('/chat/' + c.id); }}>
+                <div style={{color:'white',fontSize:14,fontWeight:600,
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {c.name || 'Диалог'}
+                </div>
+                <div style={{color:'rgba(225,220,245,.6)',fontSize:11,marginTop:2}}>
+                  {c.last_text ? c.last_text.slice(0,60) : 'Нет сообщений'}
+                </div>
+              </div>
+              <button onClick={() => restore(c)} disabled={busy}
+                title="Восстановить"
+                style={{background:'rgba(120,90,200,.25)',border:'1px solid rgba(180,140,220,.4)',
+                  color:'rgba(220,200,255,1)',borderRadius:8,padding:'5px 10px',fontSize:11,
+                  fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                ↺ Вернуть
+              </button>
+              <button onClick={() => removeForever(c)} disabled={busy}
+                title="Удалить навсегда"
+                style={{background:'rgba(200,60,60,.2)',border:'1px solid rgba(255,120,120,.45)',
+                  color:'rgba(255,180,180,1)',borderRadius:8,padding:'5px 10px',fontSize:14,
+                  cursor:'pointer',fontFamily:'inherit',lineHeight:1}}>
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      {confirmModal}
     </div>
   );
 }
@@ -5043,15 +5189,23 @@ export function GroupSettingsScreen() {
           return (
           <div key={m.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',
             borderBottom:'1px solid rgba(255,255,255,.07)'}}>
-            <div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',
-              background:'rgba(200,160,210,.45)',
-              display:'flex',alignItems:'center',justifyContent:'center',
-              fontSize:18,color:'white',flexShrink:0}}>
+            <div
+              onClick={() => m.id !== user?.id && openUserCard(m.id)}
+              style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',
+                background:'rgba(200,160,210,.45)',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:18,color:'white',flexShrink:0,
+                cursor: m.id !== user?.id ? 'pointer' : 'default',
+                transition:'transform .12s'}}
+              onMouseEnter={e => { if (m.id !== user?.id) e.currentTarget.style.transform='scale(1.05)'; }}
+              onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}>
               {avatarIsImg
                 ? <img src={m.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                 : (m.name?.[0] || '?').toUpperCase()}
             </div>
-            <div style={{flex:1,minWidth:0}}>
+            <div
+              onClick={() => m.id !== user?.id && openUserCard(m.id)}
+              style={{flex:1,minWidth:0, cursor: m.id !== user?.id ? 'pointer' : 'default'}}>
               <div style={{color:'white',fontSize:14,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                 {m.name}
                 {isCreator && (
