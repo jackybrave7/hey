@@ -4535,7 +4535,13 @@ function MediaViewerModal({ convId, onClose }) {
         return (
           <div style={{position:'fixed',inset:0,zIndex:600,background:'rgba(0,0,0,.94)',
             display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}
-            onClick={()=>setLight(null)}
+            onClick={(e) => {
+              // Стопим всплытие, чтобы не сработал onClose родительского
+              // overlay'я модалки «Медиа и ссылки» — пользователь должен
+              // вернуться в каталог, а не выйти полностью.
+              e.stopPropagation();
+              setLight(null);
+            }}
             onKeyDown={e => {
               if (e.key === 'Escape') setLight(null);
               if (e.key === 'ArrowLeft')  prev();
