@@ -31,6 +31,28 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
+  // Бизнес-доступ: реагируем на одобрение/отклонение в реальном времени.
+  // Сервер шлёт business:approved/rejected/revoked после действий админа.
+  useEffect(() => {
+    const fire = (msg, type) => {
+      try { window.dispatchEvent(new CustomEvent('hey:toast', { detail: { message: msg, type } })); } catch {}
+    };
+    const u1 = socket.on('business:approved', () => {
+      setUser(u => u ? { ...u, business_status: 'approved' } : u);
+      fire('🎓 Бизнес-доступ одобрен! Раздел «Мои школы» доступен.', 'success');
+    });
+    const u2 = socket.on('business:rejected', () => {
+      // Подтянем причину свежим запросом /me
+      api.getMe().then(setUser).catch(() => {});
+      fire('⚠ Заявка на бизнес-доступ отклонена.', 'error');
+    });
+    const u3 = socket.on('business:revoked', () => {
+      api.getMe().then(setUser).catch(() => {});
+      fire('⚠ Бизнес-доступ отозван админом.', 'error');
+    });
+    return () => { u1(); u2(); u3(); };
+  }, []);
+
   function login(token, userData) {
     localStorage.setItem('hey_token', token);
     setUser(userData);
