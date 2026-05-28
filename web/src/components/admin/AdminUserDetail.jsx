@@ -481,6 +481,32 @@ function SuperManageModal({ user, onClose, onApply }) {
         {opt('set', 'До даты', 'Статус автоматически снимется в указанный день.')}
         {mode === 'set' && (
           <div style={{ marginTop: -2, marginBottom: 12, paddingLeft: 36 }}>
+            {/* Быстрые пресеты — выставляют дату относительно текущей */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {[
+                { d: 30,  l: '+30 дн' },
+                { d: 90,  l: '+3 мес' },
+                { d: 180, l: '+6 мес' },
+                { d: 365, l: '+1 год' },
+              ].map(p => {
+                const dt = new Date();
+                dt.setDate(dt.getDate() + p.d);
+                const iso = dt.toISOString().slice(0, 10);
+                const active = dateStr === iso;
+                return (
+                  <button key={p.d} onClick={() => setDateStr(iso)}
+                    style={{
+                      padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      background: active ? 'rgba(140,110,220,.7)' : 'rgba(255,255,255,.06)',
+                      border: '1px solid ' + (active ? 'rgba(180,140,255,.5)' : 'rgba(255,255,255,.14)'),
+                      color: active ? 'white' : 'rgba(225,220,245,.9)',
+                    }}>
+                    {p.l}
+                  </button>
+                );
+              })}
+            </div>
             <input type="date" value={dateStr}
               onChange={e => setDateStr(e.target.value)}
               min={new Date(Date.now() + 86400 * 1000).toISOString().slice(0, 10)}

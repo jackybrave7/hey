@@ -51,6 +51,8 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
   const [uploading, setUploading] = useState(false);
   const [error,     setError]     = useState('');
   const [detectedVideoUrl, setDetectedVideoUrl] = useState(null);
+  // Натуральные пропорции загруженной картинки (после onLoad)
+  const [imgRatio, setImgRatio] = useState(null); // width / height
   const fileRef = useRef();
   const textRef = useRef();
   // Keep local object URL for preview; revoke on unmount / media removal
@@ -100,6 +102,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
     if (previewObjUrl.current) { URL.revokeObjectURL(previewObjUrl.current); previewObjUrl.current = null; }
     setMediaPreview(null);
     setMediaType(null);
+    setImgRatio(null);
     setMediaPosition('50% 50%');
     setUploading(false);
     if (fileRef.current) fileRef.current.value = '';
@@ -228,32 +231,53 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               mediaPreview ? (
                 <div style={{position:'relative',borderRadius:16,overflow:'hidden',
                   background:'#0a0518'}}>
-                  {mediaType==='image' && (
-                    <div
-                      onMouseDown={onPosDragStart}
-                      onTouchStart={onPosDragStart}
-                      style={{
-                        position:'relative',
-                        width:'100%',maxHeight:480,
-                        display:'flex',justifyContent:'center',alignItems:'center',
-                        cursor:'grab',userSelect:'none',touchAction:'none',
-                      }}>
-                      <img src={mediaPreview} alt="" draggable={false}
+                  {mediaType==='image' && (() => {
+                    const isWide = imgRatio && imgRatio > 1.1;
+                    const isTall = imgRatio && imgRatio < 0.9;
+                    const isSquareish = !isWide && !isTall;
+                    const dragHint = isWide ? '↔ Перетащи — выбери видимую часть'
+                                   : isTall ? '↕ Перетащи — выбери видимую часть'
+                                   : 'В ленте крупная карточка будет квадратной';
+                    return (
+                      <div
+                        onMouseDown={!isSquareish ? onPosDragStart : undefined}
+                        onTouchStart={!isSquareish ? onPosDragStart : undefined}
                         style={{
-                          maxWidth:'100%', maxHeight:480,
-                          objectFit:'contain',
-                          objectPosition: mediaPosition,
-                          display:'block', pointerEvents:'none',
-                        }}/>
-                      <div style={{
-                        position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
-                        background:'rgba(0,0,0,.6)',backdropFilter:'blur(6px)',
-                        borderRadius:20,padding:'5px 14px',
-                        color:'rgba(255,255,255,.92)',fontSize:11,fontWeight:500,whiteSpace:'nowrap',
-                        pointerEvents:'none',
-                      }}>В ленте крупная карточка будет квадратной</div>
-                    </div>
-                  )}
+                          position:'relative',
+                          width:'100%',
+                          aspectRatio: isSquareish ? 'auto' : '1 / 1',
+                          maxHeight: isSquareish ? 480 : undefined,
+                          maxWidth: isSquareish ? '100%' : 480,
+                          margin:'0 auto',
+                          display:'flex',justifyContent:'center',alignItems:'center',
+                          cursor: isSquareish ? 'default' : 'grab',
+                          userSelect:'none',touchAction:'none',
+                          overflow:'hidden',
+                        }}>
+                        <img src={mediaPreview} alt="" draggable={false}
+                          onLoad={e => {
+                            const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                            if (w && h) setImgRatio(w / h);
+                          }}
+                          style={{
+                            width: isSquareish ? 'auto' : '100%',
+                            height: isSquareish ? 'auto' : '100%',
+                            maxWidth: isSquareish ? '100%' : undefined,
+                            maxHeight: isSquareish ? 480 : undefined,
+                            objectFit: isSquareish ? 'contain' : 'cover',
+                            objectPosition: mediaPosition,
+                            display:'block', pointerEvents:'none',
+                          }}/>
+                        <div style={{
+                          position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+                          background:'rgba(0,0,0,.65)',backdropFilter:'blur(6px)',
+                          borderRadius:20,padding:'5px 14px',
+                          color:'rgba(255,255,255,.95)',fontSize:11,fontWeight:600,whiteSpace:'nowrap',
+                          pointerEvents:'none',
+                        }}>{dragHint}</div>
+                      </div>
+                    );
+                  })()}
                   {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
                   {mediaType==='audio' && (
                     <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:8,
@@ -269,38 +293,58 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               mediaPreview ? (
                 <div style={{position:'relative',borderRadius:16,overflow:'hidden',
                   background:'#0a0518'}}>
-                  {mediaType==='image' && (
-                    <div
-                      onMouseDown={!uploading ? onPosDragStart : undefined}
-                      onTouchStart={!uploading ? onPosDragStart : undefined}
-                      style={{
-                        position:'relative',
-                        width:'100%',maxHeight:480,
-                        display:'flex',justifyContent:'center',alignItems:'center',
-                        cursor: uploading ? 'default' : 'grab',
-                        userSelect:'none', touchAction:'none',
-                      }}>
-                      {/* Картинка показывается в натуральных пропорциях:
-                          горизонтальная — на всю ширину, вертикальная — на всю
-                          высоту (до 480px). objectFit:contain сохраняет AR. */}
-                      <img src={mediaPreview} alt="" draggable={false}
+                  {mediaType==='image' && (() => {
+                    const isWide = imgRatio && imgRatio > 1.1;   // горизонтальная
+                    const isTall = imgRatio && imgRatio < 0.9;   // вертикальная
+                    const isSquareish = !isWide && !isTall;
+                    const dragHint = isWide ? '↔ Перетащи — выбери видимую часть'
+                                   : isTall ? '↕ Перетащи — выбери видимую часть'
+                                   : 'В ленте крупная карточка будет квадратной';
+                    return (
+                      <div
+                        onMouseDown={!uploading && !isSquareish ? onPosDragStart : undefined}
+                        onTouchStart={!uploading && !isSquareish ? onPosDragStart : undefined}
                         style={{
-                          maxWidth:'100%', maxHeight:480,
-                          objectFit:'contain',
-                          objectPosition: mediaPosition,
-                          display:'block', pointerEvents:'none',
-                        }}/>
-                      {!uploading && (
-                        <div style={{
-                          position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
-                          background:'rgba(0,0,0,.6)',backdropFilter:'blur(6px)',
-                          borderRadius:20,padding:'5px 14px',
-                          color:'rgba(255,255,255,.92)',fontSize:11,fontWeight:500,whiteSpace:'nowrap',
-                          pointerEvents:'none',
-                        }}>В ленте крупная карточка будет квадратной</div>
-                      )}
-                    </div>
-                  )}
+                          position:'relative',
+                          // Для не-квадратных картинок принудительно показываем 1:1
+                          // кроп с object-fit:cover, чтобы юзер сразу видел КАДР как
+                          // в ленте и мог его подвинуть. Для квадратных — natural fit.
+                          width: isSquareish ? '100%' : '100%',
+                          aspectRatio: isSquareish ? 'auto' : '1 / 1',
+                          maxHeight: isSquareish ? 480 : undefined,
+                          maxWidth: isSquareish ? '100%' : 480,
+                          margin: '0 auto',
+                          display:'flex',justifyContent:'center',alignItems:'center',
+                          cursor: uploading ? 'default' : (isSquareish ? 'default' : 'grab'),
+                          userSelect:'none', touchAction:'none',
+                          overflow:'hidden',
+                        }}>
+                        <img src={mediaPreview} alt="" draggable={false}
+                          onLoad={e => {
+                            const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                            if (w && h) setImgRatio(w / h);
+                          }}
+                          style={{
+                            width: isSquareish ? 'auto' : '100%',
+                            height: isSquareish ? 'auto' : '100%',
+                            maxWidth: isSquareish ? '100%' : undefined,
+                            maxHeight: isSquareish ? 480 : undefined,
+                            objectFit: isSquareish ? 'contain' : 'cover',
+                            objectPosition: mediaPosition,
+                            display: 'block', pointerEvents: 'none',
+                          }}/>
+                        {!uploading && (
+                          <div style={{
+                            position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+                            background:'rgba(0,0,0,.65)',backdropFilter:'blur(6px)',
+                            borderRadius:20,padding:'5px 14px',
+                            color:'rgba(255,255,255,.95)',fontSize:11,fontWeight:600,whiteSpace:'nowrap',
+                            pointerEvents:'none',
+                          }}>{dragHint}</div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {mediaType==='video' && <video src={mediaPreview} controls style={{width:'100%',maxHeight:200}}/>}
                   {mediaType==='audio' && (
                     <div style={{padding:'20px',display:'flex',flexDirection:'column',gap:8,
