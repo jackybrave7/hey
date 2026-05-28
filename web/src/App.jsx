@@ -26,6 +26,7 @@ import AdminAwo from './components/admin/AdminAwo';
 import AdminAwoTenants from './components/admin/AdminAwoTenants';
 import AdminBusinessRequests from './components/admin/AdminBusinessRequests';
 import IntegrationsLayout from './components/IntegrationsLayout';
+import BusinessLanding from './components/BusinessLanding';
 import AdminTestUsers from './components/admin/AdminTestUsers';
 import JoinScreen from './components/JoinScreen';
 import GroupJoinScreen from './components/GroupJoinScreen';
@@ -373,6 +374,10 @@ export default function App() {
             <RequireAdmin>
               <AdminLayout><AdminBusinessRequests/></AdminLayout>
             </RequireAdmin>
+          }/>
+          {/* Презентация бизнес-возможностей — доступна всем залогиненным */}
+          <Route path="/business" element={
+            <Protected><BusinessLanding/></Protected>
           }/>
           {/* Бизнес-пользователи (НЕ admin) — свой layout */}
           <Route path="/integrations/awo" element={

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
+import AwoGuide from './AwoGuide';
 
 const cardStyle = {
   background: 'rgba(20,12,40,.65)',
@@ -41,6 +42,7 @@ export default function AdminAwoTenants() {
   const [error, setError]     = useState('');
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const [showGuide, setShowGuide] = useState(false);
   const [customConfirm, confirmModal] = useConfirm();
 
   async function load() {
@@ -79,9 +81,20 @@ export default function AdminAwoTenants() {
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 760 }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
-        🎓 АВО / Школы
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
+        <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, margin: 0, flex: 1 }}>
+          🎓 АВО / Школы
+        </h1>
+        <button onClick={() => setShowGuide(true)}
+          style={{
+            padding: '7px 14px', borderRadius: 10,
+            background: 'rgba(120,90,200,.25)',
+            border: '1px solid rgba(180,140,220,.4)',
+            color: 'rgba(220,200,255,.95)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            fontFamily: 'inherit', flexShrink: 0,
+          }}>📖 Руководство</button>
+      </div>
       <p style={{ color: 'rgba(225,220,245,.85)', fontSize: 14, marginBottom: 22, lineHeight: 1.55 }}>
         Каждая школа — отдельная интеграция с АвтоВебОфисом со своим webhook-токеном,
         набором курсов и официальным аккаунтом.
@@ -165,6 +178,7 @@ export default function AdminAwoTenants() {
         </div>
       ))}
       {confirmModal}
+      {showGuide && <AwoGuide onClose={() => setShowGuide(false)}/>}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
+import AwoGuide from './AwoGuide';
 
 // Тёмные карточки + высоко-контрастный текст — фон админки имеет светлые
 // области градиента, поэтому используем не прозрачно-белые, а тёмные подложки.
@@ -77,6 +78,7 @@ export default function AdminAwo() {
 
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [showGuide, setShowGuide] = useState(false);
   const [customConfirm, confirmModal] = useConfirm();
 
   function notify(msg) {
@@ -249,6 +251,16 @@ export default function AdminAwo() {
             ))}
           </select>
         )}
+        <button onClick={() => setShowGuide(true)}
+          style={{
+            marginLeft: 'auto',
+            padding: '7px 14px', borderRadius: 10,
+            background: 'rgba(120,90,200,.25)',
+            border: '1px solid rgba(180,140,220,.4)',
+            color: 'rgba(220,200,255,.95)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}>📖 Руководство</button>
       </div>
       <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         🎓 {currentTenant?.name || 'Школа'}
@@ -593,6 +605,7 @@ export default function AdminAwo() {
         )}
       </div>
       {confirmModal}
+      {showGuide && <AwoGuide onClose={() => setShowGuide(false)}/>}
     </div>
   );
 }
