@@ -68,6 +68,9 @@ export default function AdminAwo() {
   const [accountResults, setAccountResults] = useState([]);
   const [accountSearching, setAccountSearching] = useState(false);
   const [bindingAccount, setBindingAccount] = useState(false);
+  // Для не-админа: контакты юзера — можно привязать кого-то из них как
+  // школьный аккаунт. Загружаются один раз при открытии страницы.
+  const [contacts, setContacts] = useState([]);
 
   const [mappings, setMappings] = useState([]);
   const [groupChats, setGroupChats] = useState([]);
@@ -106,6 +109,8 @@ export default function AdminAwo() {
       setLog(l);
       setTenants(ts || []);
     }).catch(e => setError(e.message));
+    // Контакты юзера — для не-админа, чтобы можно было привязать одного из них
+    api.getContacts().then(setContacts).catch(() => {});
   }, [tenantId]);
 
   async function saveSettings() {
@@ -336,26 +341,36 @@ export default function AdminAwo() {
           </div>
         )}
 
-        {/* Для не-админа разрешено привязать только себя — кнопка вместо поиска */}
+        {/* Для не-админа: своя кнопка + фильтр контактов */}
         {!isAdmin ? (
-          <button onClick={() => bindSchoolAccount(me.id, me.name)}
-            disabled={bindingAccount || settings?.school_account?.id === me.id}
-            style={{
-              padding: '10px 16px', borderRadius: 10, border: 'none',
-              background: settings?.school_account?.id === me.id
-                ? 'rgba(120,200,140,.18)'
-                : 'rgba(140,110,220,.85)',
-              color: settings?.school_account?.id === me.id
-                ? 'rgba(140,240,180,.95)'
-                : 'white',
-              fontSize: 13, fontWeight: 600,
-              cursor: bindingAccount || settings?.school_account?.id === me.id ? 'default' : 'pointer',
-              fontFamily: 'inherit', marginBottom: 4,
-            }}>
-            {settings?.school_account?.id === me.id
-              ? '✓ Привязан ваш аккаунт'
-              : '🎓 Привязать ваш аккаунт как школьный'}
-          </button>
+          <>
+            <button onClick={() => bindSchoolAccount(me.id, me.name)}
+              disabled={bindingAccount || settings?.school_account?.id === me.id}
+              style={{
+                padding: '10px 16px', borderRadius: 10, border: 'none',
+                background: settings?.school_account?.id === me.id
+                  ? 'rgba(120,200,140,.18)'
+                  : 'rgba(140,110,220,.85)',
+                color: settings?.school_account?.id === me.id
+                  ? 'rgba(140,240,180,.95)'
+                  : 'white',
+                fontSize: 13, fontWeight: 600,
+                cursor: bindingAccount || settings?.school_account?.id === me.id ? 'default' : 'pointer',
+                fontFamily: 'inherit', marginBottom: 12,
+              }}>
+              {settings?.school_account?.id === me.id
+                ? '✓ Привязан ваш аккаунт'
+                : '🎓 Привязать ваш аккаунт как школьный'}
+            </button>
+            {contacts.length > 0 && (
+              <div style={{ marginBottom: 6 }}>
+                <div style={labelStyle}>Или кто-то из ваших контактов</div>
+                <input style={inputStyle} value={accountSearch}
+                  onChange={e => setAccountSearch(e.target.value)}
+                  placeholder="Имя или телефон контакта"/>
+              </div>
+            )}
+          </>
         ) : (
           <>
             {/* Search & pick — только для админа */}
@@ -370,6 +385,56 @@ export default function AdminAwo() {
             )}
           </>
         )}
+        {/* Список контактов с подходящим именем/телефоном — для не-админа */}
+        {!isAdmin && (() => {
+          const q = accountSearch.trim().toLowerCase();
+          const filtered = contacts.filter(c => {
+            if (c.is_blocked || c.is_deleted || c.is_system) return false;
+            if (c.id === me?.id) return false;
+            if (!q) return true;
+            return (c.name || '').toLowerCase().includes(q)
+                || (c.phone || '').includes(q)
+                || (c.nickname || '').toLowerCase().includes(q);
+          }).slice(0, 8);
+          if (!filtered.length) return null;
+          return (
+            <div style={{ marginTop: 8, display:'flex', flexDirection:'column', gap:6,
+              maxHeight: 240, overflowY:'auto',
+              background:'rgba(0,0,0,.18)', borderRadius:10, padding:6 }}>
+              {filtered.map(u => (
+                <button key={u.id} onClick={() => bindSchoolAccount(u.id, u.nickname || u.name)}
+                  disabled={bindingAccount || u.id === settings?.school_account?.id}
+                  style={{
+                    display:'flex', alignItems:'center', gap:10, padding:'8px 10px',
+                    background: u.id === settings?.school_account?.id ? 'rgba(120,200,140,.15)' : 'rgba(255,255,255,.04)',
+                    border:'1px solid rgba(255,255,255,.08)', borderRadius:8,
+                    color:'white', fontSize:13, cursor: bindingAccount ? 'wait' : 'pointer',
+                    textAlign:'left', fontFamily:'inherit', width:'100%',
+                    opacity: u.id === settings?.school_account?.id ? 0.65 : 1,
+                  }}>
+                  {u.avatar && /^https?:|^\//.test(u.avatar) ? (
+                    <img src={u.avatar} alt="" style={{ width:28, height:28, borderRadius:'50%', objectFit:'cover' }}/>
+                  ) : (
+                    <div style={{ width:28, height:28, borderRadius:'50%',
+                      background:'rgba(120,90,200,.5)', display:'flex',
+                      alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}>
+                      {(u.nickname||u.name||'?')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {u.nickname || u.name}
+                    </div>
+                    <div style={{ color:'rgba(225,220,245,.55)', fontSize:11 }}>{u.phone}</div>
+                  </div>
+                  {u.id === settings?.school_account?.id && (
+                    <span style={{ color:'rgba(110,235,150,.95)', fontSize:11 }}>текущий</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
         {isAdmin && accountResults.length > 0 && (
           <div style={{ marginTop: 8, display:'flex', flexDirection:'column', gap:6,
             maxHeight: 240, overflowY:'auto',

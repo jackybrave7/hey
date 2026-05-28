@@ -2048,10 +2048,15 @@ module.exports = function makeRouter(db, broadcast) {
     const { test_mode, test_course, chat_excludes, school_account_id } = req.body || {};
     try {
       // school_account_id: не-админу разрешаем привязывать ТОЛЬКО себя
-      // (защита от «угона» чужого профиля для школьных уведомлений).
+      // или кого-то из своих контактов (контакты — двустороннее согласие на
+      // взаимодействие, так что «угона» чужого профиля не происходит).
       if (school_account_id !== undefined && school_account_id) {
         if (!req.tenantUser.is_admin && school_account_id !== req.tenantUser.id) {
-          return res.status(403).json({ error: 'Привязывать можно только свой аккаунт' });
+          // Проверяем что target есть в контактах у владельца tenant'а
+          const contactIds = db.getContactIds(req.tenantUser.id) || [];
+          if (!contactIds.includes(school_account_id)) {
+            return res.status(403).json({ error: 'Привязать можно себя или кого-то из своих контактов' });
+          }
         }
         const u = db.findUserById(school_account_id);
         if (!u) throw new Error('Пользователь не найден');
