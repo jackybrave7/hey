@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../../api';
+import { useAuth } from '../../AuthContext';
 import { useConfirm } from '../Screens';
 import AwoGuide from './AwoGuide';
 
@@ -50,6 +51,8 @@ export default function AdminAwo() {
   const params = useParams();
   const nav = useNavigate();
   const location = useLocation();
+  const { user: me } = useAuth();
+  const isAdmin = !!me?.is_admin;
   const tenantId = params.tenantId || 'tnt_default';
   const basePath = location.pathname.startsWith('/integrations') ? '/integrations/awo' : '/admin/awo';
 
@@ -178,6 +181,7 @@ export default function AdminAwo() {
   }
 
   async function searchUsers(q) {
+    if (!isAdmin) return; // не-админ не использует search, защита от случайных вызовов
     setAccountSearch(q);
     if (q.trim().length < 2) { setAccountResults([]); return; }
     setAccountSearching(true);
@@ -332,17 +336,41 @@ export default function AdminAwo() {
           </div>
         )}
 
-        {/* Search & pick */}
-        <div style={{ marginBottom: 6 }}>
-          <div style={labelStyle}>Привязать другого пользователя</div>
-          <input style={inputStyle} value={accountSearch}
-            onChange={e => searchUsers(e.target.value)}
-            placeholder="Имя или телефон (минимум 2 символа)"/>
-        </div>
-        {accountSearching && (
-          <div style={{ color:'rgba(225,220,245,.75)', fontSize:12, marginTop:6 }}>Поиск…</div>
+        {/* Для не-админа разрешено привязать только себя — кнопка вместо поиска */}
+        {!isAdmin ? (
+          <button onClick={() => bindSchoolAccount(me.id, me.name)}
+            disabled={bindingAccount || settings?.school_account?.id === me.id}
+            style={{
+              padding: '10px 16px', borderRadius: 10, border: 'none',
+              background: settings?.school_account?.id === me.id
+                ? 'rgba(120,200,140,.18)'
+                : 'rgba(140,110,220,.85)',
+              color: settings?.school_account?.id === me.id
+                ? 'rgba(140,240,180,.95)'
+                : 'white',
+              fontSize: 13, fontWeight: 600,
+              cursor: bindingAccount || settings?.school_account?.id === me.id ? 'default' : 'pointer',
+              fontFamily: 'inherit', marginBottom: 4,
+            }}>
+            {settings?.school_account?.id === me.id
+              ? '✓ Привязан ваш аккаунт'
+              : '🎓 Привязать ваш аккаунт как школьный'}
+          </button>
+        ) : (
+          <>
+            {/* Search & pick — только для админа */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={labelStyle}>Привязать другого пользователя</div>
+              <input style={inputStyle} value={accountSearch}
+                onChange={e => searchUsers(e.target.value)}
+                placeholder="Имя или телефон (минимум 2 символа)"/>
+            </div>
+            {accountSearching && (
+              <div style={{ color:'rgba(225,220,245,.75)', fontSize:12, marginTop:6 }}>Поиск…</div>
+            )}
+          </>
         )}
-        {accountResults.length > 0 && (
+        {isAdmin && accountResults.length > 0 && (
           <div style={{ marginTop: 8, display:'flex', flexDirection:'column', gap:6,
             maxHeight: 240, overflowY:'auto',
             background:'rgba(0,0,0,.18)', borderRadius:10, padding:6 }}>
