@@ -255,6 +255,15 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS waitlist (
 try { db.exec('ALTER TABLE users ADD COLUMN invited_count INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN super_bonus_claimed INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN super_expires_at INTEGER'); } catch {}
+// Бизнес-доступ: можно запросить статус «бизнес-пользователь», админ
+// одобряет → открывается раздел «Мои школы» (AWO multi-tenant).
+//   business_status: 'none' (по умолчанию) | 'pending' | 'approved' | 'rejected'
+try { db.exec("ALTER TABLE users ADD COLUMN business_status TEXT DEFAULT 'none'"); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN business_requested_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN business_request_note TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN business_approved_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN business_approved_by TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN business_reject_reason TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN achievements TEXT DEFAULT \'[]\''); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_system INTEGER DEFAULT 0'); } catch {} // системные аккаунты (нельзя писать им)
 
@@ -2539,6 +2548,48 @@ function clearTestUsers() {
   return { deleted: ids.length };
 }
 
+// ── Business access (бизнес-пользователи) ──────────────────────────────
+function requestBusinessAccess(userId, note) {
+  const u = findUserById(userId);
+  if (!u) throw new Error('Пользователь не найден');
+  if (u.business_status === 'approved') throw new Error('Уже одобрено');
+  if (u.business_status === 'pending')  throw new Error('Заявка уже на рассмотрении');
+  db.prepare(`UPDATE users SET business_status='pending', business_requested_at=?,
+                business_request_note=?, business_reject_reason=NULL WHERE id=?`)
+    .run(now(), note ? String(note).slice(0, 500) : null, userId);
+}
+function cancelBusinessRequest(userId) {
+  db.prepare("UPDATE users SET business_status='none', business_requested_at=NULL, business_request_note=NULL WHERE id=? AND business_status='pending'")
+    .run(userId);
+}
+function listBusinessRequests(status = 'pending') {
+  return db.prepare(
+    `SELECT id, name, phone, avatar, business_status,
+            business_requested_at, business_request_note,
+            business_approved_at, business_approved_by, business_reject_reason
+     FROM users
+     WHERE business_status = ?
+     ORDER BY business_requested_at DESC`
+  ).all(status);
+}
+function approveBusinessRequest(userId, byAdminId) {
+  const u = findUserById(userId);
+  if (!u) throw new Error('Пользователь не найден');
+  db.prepare(`UPDATE users SET business_status='approved', business_approved_at=?,
+                business_approved_by=?, business_reject_reason=NULL WHERE id=?`)
+    .run(now(), byAdminId, userId);
+}
+function rejectBusinessRequest(userId, byAdminId, reason) {
+  db.prepare(`UPDATE users SET business_status='rejected', business_approved_at=?,
+                business_approved_by=?, business_reject_reason=? WHERE id=?`)
+    .run(now(), byAdminId, String(reason || '').slice(0, 500), userId);
+}
+function revokeBusinessAccess(userId, byAdminId, reason) {
+  db.prepare(`UPDATE users SET business_status='rejected', business_approved_at=?,
+                business_approved_by=?, business_reject_reason=? WHERE id=?`)
+    .run(now(), byAdminId, String(reason || 'отозван').slice(0, 500), userId);
+}
+
 // ── Multi-tenant AWO helpers (Шаг 1) ────────────────────────────────────
 function _rowToTenant(r) {
   if (!r) return null;
@@ -2667,6 +2718,9 @@ module.exports = {
   DEFAULT_TENANT_ID,
   listTenants, listTenantsForOwner, getTenantById, getTenantByToken,
   createTenant, updateTenant, deleteTenant, rotateTenantToken,
+  // Business access (Шаг 4.2)
+  requestBusinessAccess, cancelBusinessRequest, listBusinessRequests,
+  approveBusinessRequest, rejectBusinessRequest, revokeBusinessAccess,
   isTestUsersEnabled, setTestUsersEnabled, getTestUserIds,
   seedTestUsers, clearTestUsers,
   extendSuper, setSuperExpiry, processReferral, confirmReferralIfPending, checkAndExpireSuper,

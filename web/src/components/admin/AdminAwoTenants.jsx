@@ -1,6 +1,6 @@
 // AdminAwoTenants.jsx — список школ (tenant'ов) AWO-интеграции
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
 
@@ -34,6 +34,9 @@ function fmtDate(ts) {
 
 export default function AdminAwoTenants() {
   const nav = useNavigate();
+  const location = useLocation();
+  // Базовый путь: /admin/awo для админов, /integrations/awo для бизнес-юзеров
+  const basePath = location.pathname.startsWith('/integrations') ? '/integrations/awo' : '/admin/awo';
   const [tenants, setTenants] = useState(null);
   const [error, setError]     = useState('');
   const [creating, setCreating] = useState(false);
@@ -52,7 +55,7 @@ export default function AdminAwoTenants() {
     try {
       const t = await api.adminCreateAwoTenant(newName.trim());
       setNewName('');
-      nav('/admin/awo/' + t.id);
+      nav(basePath + '/' + t.id);
     } catch (e) { setError(e.message); }
     setCreating(false);
   }
@@ -120,7 +123,7 @@ export default function AdminAwoTenants() {
       )}
       {tenants && tenants.map(t => (
         <div key={t.id} style={cardStyle}
-          onClick={() => nav('/admin/awo/' + t.id)}
+          onClick={() => nav(basePath + '/' + t.id)}
           onMouseEnter={e => e.currentTarget.style.background='rgba(30,18,55,.78)'}
           onMouseLeave={e => e.currentTarget.style.background='rgba(20,12,40,.65)'}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

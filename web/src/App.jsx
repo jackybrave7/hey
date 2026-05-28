@@ -24,6 +24,8 @@ import AdminSystem from './components/admin/AdminSystem';
 import AdminReports from './components/admin/AdminReports';
 import AdminAwo from './components/admin/AdminAwo';
 import AdminAwoTenants from './components/admin/AdminAwoTenants';
+import AdminBusinessRequests from './components/admin/AdminBusinessRequests';
+import IntegrationsLayout from './components/IntegrationsLayout';
 import AdminTestUsers from './components/admin/AdminTestUsers';
 import JoinScreen from './components/JoinScreen';
 import GroupJoinScreen from './components/GroupJoinScreen';
@@ -70,6 +72,22 @@ function RequireAdmin({ children }) {
   );
   if (!user) return <Navigate to="/login" replace/>;
   if (!user.is_admin) return <Navigate to="/main" replace/>;
+  return children;
+}
+
+// Бизнес-юзер ИЛИ админ. Используется для /integrations/*
+function RequireBusinessOrAdmin({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: 'var(--grad)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 16 }}>Загрузка…</div>
+    </div>
+  );
+  if (!user) return <Navigate to="/login" replace/>;
+  if (!user.is_admin && user.business_status !== 'approved') {
+    return <Navigate to="/me" replace/>;
+  }
   return children;
 }
 
@@ -350,6 +368,26 @@ export default function App() {
             <RequireAdmin>
               <AdminLayout><AdminAwo/></AdminLayout>
             </RequireAdmin>
+          }/>
+          <Route path="/admin/business-requests" element={
+            <RequireAdmin>
+              <AdminLayout><AdminBusinessRequests/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          {/* Бизнес-пользователи (НЕ admin) — свой layout */}
+          <Route path="/integrations/awo" element={
+            <RequireBusinessOrAdmin>
+              <IntegrationsLayout title="🎓 Мои школы (АВО)">
+                <AdminAwoTenants/>
+              </IntegrationsLayout>
+            </RequireBusinessOrAdmin>
+          }/>
+          <Route path="/integrations/awo/:tenantId" element={
+            <RequireBusinessOrAdmin>
+              <IntegrationsLayout title="🎓 Настройки школы">
+                <AdminAwo/>
+              </IntegrationsLayout>
+            </RequireBusinessOrAdmin>
           }/>
           <Route path="/admin/test-users" element={
             <RequireAdmin>

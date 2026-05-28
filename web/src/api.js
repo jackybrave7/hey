@@ -231,6 +231,14 @@ export const api = {
   adminDeleteAwoTenant:    (id)            => req('DELETE', `/admin/awo/tenants/${encodeURIComponent(id)}`),
   adminRotateAwoToken:     (id)            => req('POST',   `/admin/awo/tenants/${encodeURIComponent(id)}/rotate-token`),
 
+  // Business access (заявка на бизнес-доступ)
+  requestBusinessAccess:   (note)          => req('POST',   '/me/business/request', { note }),
+  cancelBusinessRequest:   ()              => req('POST',   '/me/business/cancel'),
+  adminListBusinessRequests: (status)      => req('GET',    `/admin/business-requests${status?'?status='+status:''}`),
+  adminApproveBusiness:    (userId)        => req('POST',   `/admin/business-requests/${userId}/approve`),
+  adminRejectBusiness:     (userId, reason)=> req('POST',   `/admin/business-requests/${userId}/reject`, { reason }),
+  adminRevokeBusiness:     (userId, reason)=> req('POST',   `/admin/business-requests/${userId}/revoke`, { reason }),
+
   // Admin: Test users mode
   adminTestUsersStatus:    ()              => req('GET',    '/admin/test-users/status'),
   adminTestUsersToggle:    (enabled)       => req('POST',   '/admin/test-users/toggle', { enabled }),

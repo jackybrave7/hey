@@ -24,6 +24,24 @@ function requireAdmin(req, res, next) {
   });
 }
 
+// Middleware: проверяет что юзер — бизнес-аккаунт (approved) или админ.
+// Используется для входа в AWO-функционал (управление школами).
+function requireBusinessOrAdmin(req, res, next) {
+  requireAuth(req, res, () => {
+    const user = db.findUserById(req.user.id);
+    if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
+    if (!user.is_admin && user.business_status !== 'approved') {
+      return res.status(403).json({
+        error: 'Доступ только для бизнес-аккаунтов',
+        code: 'BUSINESS_REQUIRED',
+        business_status: user.business_status || 'none',
+      });
+    }
+    req.businessUser = user;
+    next();
+  });
+}
+
 // Middleware для tenant-scoped ручек: пускает либо системного админа,
 // либо владельца tenant'а (tenant.owner_id === req.user.id). Кладёт в req:
 //   req.tenant     — объект tenant'а
@@ -444,6 +462,47 @@ module.exports = function makeRouter(db, broadcast) {
     db.deleteUserAccount(req.user.id);
     // Notify the deleted user's own WS connections so the client logs out
     broadcast([req.user.id], { type: 'account:deleted' });
+    res.json({ ok: true });
+  });
+
+  // ── Заявка на бизнес-доступ ────────────────────────────────────────────
+  r.post('/me/business/request', requireAuth, (req, res) => {
+    const { note } = req.body || {};
+    try {
+      db.requestBusinessAccess(req.user.id, note);
+      // Сообщение в HEY-заведующий админам не делаем (пока) — просто
+      // увидят в /admin/business-requests
+      res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+  r.post('/me/business/cancel', requireAuth, (req, res) => {
+    db.cancelBusinessRequest(req.user.id);
+    res.json({ ok: true });
+  });
+
+  // Админка: список заявок
+  r.get('/admin/business-requests', requireAdmin, (req, res) => {
+    const status = (req.query.status || 'pending').toString();
+    res.json(db.listBusinessRequests(status));
+  });
+  r.post('/admin/business-requests/:userId/approve', requireAdmin, (req, res) => {
+    try {
+      db.approveBusinessRequest(req.params.userId, req.user.id);
+      // Уведомление пользователю через WS — обновим в шаге UI ниже
+      broadcast([req.params.userId], { type: 'business:approved' });
+      res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+  r.post('/admin/business-requests/:userId/reject', requireAdmin, (req, res) => {
+    const { reason } = req.body || {};
+    db.rejectBusinessRequest(req.params.userId, req.user.id, reason);
+    broadcast([req.params.userId], { type: 'business:rejected' });
+    res.json({ ok: true });
+  });
+  r.post('/admin/business-requests/:userId/revoke', requireAdmin, (req, res) => {
+    const { reason } = req.body || {};
+    db.revokeBusinessAccess(req.params.userId, req.user.id, reason);
+    broadcast([req.params.userId], { type: 'business:revoked' });
     res.json({ ok: true });
   });
 
@@ -2022,20 +2081,18 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   // ── Multi-tenant CRUD ───────────────────────────────────────────────────
-  // Список школ: админу — все, обычному юзеру — только свои
-  r.get('/admin/awo/tenants', requireAuth, (req, res) => {
-    const user = db.findUserById(req.user.id);
-    if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
+  // Список школ: админу — все, бизнес-юзеру — только свои
+  r.get('/admin/awo/tenants', requireBusinessOrAdmin, (req, res) => {
+    const user = req.businessUser;
     if (user.is_admin) return res.json(db.listTenants());
     res.json(db.listTenantsForOwner(user.id));
   });
-  // Создание школы: любой залогиненный, но non-admin ограничены лимитом
+  // Создание школы: бизнес-юзер или админ, non-admin лимит 3 школы
   const MAX_TENANTS_PER_USER = 3;
-  r.post('/admin/awo/tenants', requireAuth, (req, res) => {
+  r.post('/admin/awo/tenants', requireBusinessOrAdmin, (req, res) => {
     const { name } = req.body || {};
     if (!name?.trim()) return res.status(400).json({ error: 'name required' });
-    const user = db.findUserById(req.user.id);
-    if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
+    const user = req.businessUser;
     if (!user.is_admin) {
       const own = db.listTenantsForOwner(user.id);
       if (own.length >= MAX_TENANTS_PER_USER) {

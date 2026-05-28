@@ -8149,6 +8149,9 @@ export function SettingsScreen() {
   const [customConfirm, confirmModal] = useConfirm();
   const [showBlacklist, setShowBlacklist] = useState(false);
   const [showFeedback,  setShowFeedback]  = useState(false);
+  const [showBusinessRequest, setShowBusinessRequest] = useState(false);
+  const [businessNote, setBusinessNote] = useState('');
+  const [businessSubmitting, setBusinessSubmitting] = useState(false);
   const [showNotif,     setShowNotif]     = useState(false);
   const [notifPerm, setNotifPerm] = useState(() =>
     'Notification' in window ? Notification.permission : 'unsupported'
@@ -8437,7 +8440,46 @@ export function SettingsScreen() {
               <Row icon={<Icon name="book" size={18}/>} label="Руководство" sub="Все функции HEY с поиском"
                 onClick={() => nav('/help')}/>
             </div>
-            <Row icon={<Icon name="chat" size={18}/>} label="Написать разработчику" onClick={() => setShowFeedback(true)}/>
+            <div style={dividerStyle}>
+              <Row icon={<Icon name="chat" size={18}/>} label="Написать разработчику" onClick={() => setShowFeedback(true)}/>
+            </div>
+            {/* Бизнес-аккаунт: только если у юзера ещё нет approved + он не админ */}
+            {!user?.is_admin && user?.business_status === 'approved' && (
+              <Row icon={<Icon name="users" size={18}/>} label="Мои школы (АВО)"
+                sub="Интеграции с АвтоВебОфис" onClick={() => nav('/integrations/awo')}/>
+            )}
+            {!user?.is_admin && (user?.business_status === 'none' || !user?.business_status) && (
+              <Row icon={<Icon name="users" size={18}/>}
+                label="Стать бизнес-пользователем"
+                sub="Подключение АВО, свои школы и курсы"
+                onClick={() => setShowBusinessRequest(true)}/>
+            )}
+            {!user?.is_admin && user?.business_status === 'pending' && (
+              <div style={{padding:'14px 16px',color:'rgba(255,200,120,.9)',fontSize:13,
+                display:'flex',alignItems:'center',gap:10}}>
+                🕓 Заявка на бизнес-доступ отправлена. Админ рассмотрит её и откроет «Мои школы».
+                <button onClick={async () => {
+                  if (!await customConfirm('Отозвать заявку?')) return;
+                  try { await api.cancelBusinessRequest(); setUser(u => ({ ...u, business_status: 'none' })); }
+                  catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+                }} style={{
+                  background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.18)',
+                  color:'rgba(225,220,245,.9)',padding:'4px 10px',borderRadius:8,
+                  fontSize:11,cursor:'pointer',fontFamily:'inherit',
+                }}>Отозвать</button>
+              </div>
+            )}
+            {!user?.is_admin && user?.business_status === 'rejected' && (
+              <div style={{padding:'14px 16px',color:'rgba(255,160,160,.85)',fontSize:13,lineHeight:1.5}}>
+                ⚠ Заявка отклонена{user?.business_reject_reason ? `: ${user.business_reject_reason}` : ''}.
+                {' '}
+                <button onClick={() => setShowBusinessRequest(true)} style={{
+                  background:'none',border:'none',color:'rgba(180,140,255,1)',
+                  fontSize:13,cursor:'pointer',padding:0,fontFamily:'inherit',
+                  textDecoration:'underline',
+                }}>Отправить новую заявку</button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -8486,6 +8528,74 @@ export function SettingsScreen() {
 
       {showBlacklist && <BlacklistModal onClose={() => setShowBlacklist(false)} />}
       {showFeedback  && <FeedbackModal  onClose={() => setShowFeedback(false)}  />}
+
+      {showBusinessRequest && (
+        <div style={{position:'fixed',inset:0,zIndex:900,background:'rgba(0,0,0,.72)',
+          backdropFilter:'blur(16px)',display:'flex',alignItems:'center',
+          justifyContent:'center',padding:'20px'}}
+          onMouseDown={e=>{ if(e.target===e.currentTarget) setShowBusinessRequest(false); }}>
+          <div style={{background:'rgba(22,15,50,.98)',borderRadius:18,
+            border:'1px solid rgba(255,255,255,.14)',
+            width:'min(94vw, 460px)',padding:'24px 26px',
+            boxShadow:'0 20px 60px rgba(0,0,0,.55)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+              <span style={{fontSize:26}}>🎓</span>
+              <h2 style={{margin:0,color:'white',fontSize:18,fontWeight:800}}>
+                Заявка на бизнес-доступ
+              </h2>
+            </div>
+            <p style={{color:'rgba(225,220,245,.85)',fontSize:13,lineHeight:1.55,marginTop:0,marginBottom:14}}>
+              После одобрения админом ты сможешь создавать школы, привязывать
+              интеграции с АвтоВебОфис, маппить курсы на групповые чаты —
+              своих, где ты админ.
+            </p>
+            <div style={{color:'rgba(225,220,245,.75)',fontSize:12,fontWeight:700,
+              textTransform:'uppercase',letterSpacing:.6,marginBottom:6}}>
+              Расскажи о себе (необязательно)
+            </div>
+            <textarea value={businessNote} onChange={e => setBusinessNote(e.target.value.slice(0, 500))}
+              placeholder="Например: онлайн-школа театра, 200 учеников, продажи через АвтоВебОфис"
+              rows={4}
+              style={{
+                width:'100%',boxSizing:'border-box',
+                background:'rgba(0,0,0,.4)',border:'1px solid rgba(255,255,255,.18)',
+                borderRadius:10,padding:'10px 12px',color:'white',fontSize:13,
+                fontFamily:'inherit',outline:'none',resize:'vertical',lineHeight:1.5,
+              }}/>
+            <div style={{color:'rgba(225,220,245,.55)',fontSize:11,marginTop:4,textAlign:'right'}}>
+              {businessNote.length}/500
+            </div>
+            <div style={{display:'flex',gap:10,marginTop:18}}>
+              <button onClick={() => setShowBusinessRequest(false)} disabled={businessSubmitting}
+                style={{flex:1,padding:'11px',borderRadius:12,
+                  border:'1px solid rgba(255,255,255,.18)',
+                  background:'rgba(255,255,255,.06)',color:'rgba(225,220,245,.9)',
+                  fontSize:14,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                Отмена
+              </button>
+              <button disabled={businessSubmitting}
+                onClick={async () => {
+                  setBusinessSubmitting(true);
+                  try {
+                    await api.requestBusinessAccess(businessNote || null);
+                    setUser(u => ({ ...u, business_status: 'pending' }));
+                    setShowBusinessRequest(false);
+                    setBusinessNote('');
+                    heyToast('Заявка отправлена. Админ её рассмотрит.', 'success');
+                  } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+                  setBusinessSubmitting(false);
+                }}
+                style={{flex:1,padding:'11px',borderRadius:12,border:'none',
+                  background:'rgba(140,110,220,.9)',color:'white',
+                  fontSize:14,fontWeight:700,cursor:businessSubmitting?'wait':'pointer',
+                  fontFamily:'inherit',boxShadow:'0 4px 14px rgba(120,90,200,.35)'}}>
+                {businessSubmitting ? '…' : 'Отправить заявку'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmModal}
 
       {/* Delete account modal */}

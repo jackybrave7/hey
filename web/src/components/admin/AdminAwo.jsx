@@ -2,7 +2,7 @@
 // URL: /admin/awo                 → дефолтный tnt_default (back-compat)
 //      /admin/awo/:tenantId       → конкретный tenant
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
 
@@ -48,7 +48,9 @@ function fmtDate(ts) {
 export default function AdminAwo() {
   const params = useParams();
   const nav = useNavigate();
+  const location = useLocation();
   const tenantId = params.tenantId || 'tnt_default';
+  const basePath = location.pathname.startsWith('/integrations') ? '/integrations/awo' : '/admin/awo';
 
   const [tenants, setTenants] = useState([]); // для переключателя
   const [settings, setSettings] = useState(null);
@@ -230,14 +232,14 @@ export default function AdminAwo() {
     <div style={{ padding: '28px 32px', maxWidth: 920 }}>
       {/* Header with tenant switcher + back to list */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-        <Link to="/admin/awo/tenants"
+        <Link to={basePath}
           style={{ color: 'rgba(180,140,255,.95)', fontSize: 13, textDecoration: 'none',
             display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           ← Все школы
         </Link>
         {tenants.length > 1 && (
           <select value={tenantId}
-            onChange={e => nav('/admin/awo/' + e.target.value)}
+            onChange={e => nav(basePath + '/' + e.target.value)}
             style={{
               ...inputStyle, width: 'auto', padding: '6px 12px', fontSize: 13,
               cursor: 'pointer',
