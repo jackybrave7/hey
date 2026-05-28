@@ -513,7 +513,7 @@ export default function AdminAwo() {
 
         {/* Webhook URL: реальный, с встроенными токеном и tenant_id */}
         {settings?.webhook_token && (() => {
-          const webhookUrl = `${location.origin}/api/integrations/awo/webhook/${tenantId}?token=${settings.webhook_token}`;
+          const webhookUrl = `${window.location.origin}/api/integrations/awo/webhook/${tenantId}?token=${settings.webhook_token}`;
           return (
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
               <div style={{ ...labelStyle, marginBottom: 8 }}>📨 Webhook URL для АВО</div>
@@ -610,9 +610,9 @@ export default function AdminAwo() {
             fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
             whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.55,
           }}>{`<script>window.HEY_USER_EMAIL = "{email}";</script>
-<script src="${location.origin}/widget.js"></script>`}</pre>
+<script src="${window.location.origin}/widget.js"></script>`}</pre>
           <button onClick={() => {
-            const snippet = `<script>window.HEY_USER_EMAIL = "{email}";</script>\n<script src="${location.origin}/widget.js"></script>`;
+            const snippet = `<script>window.HEY_USER_EMAIL = "{email}";</script>\n<script src="${window.location.origin}/widget.js"></script>`;
             navigator.clipboard.writeText(snippet);
             notify('Сниппет скопирован');
           }} style={{ ...btnGhost, position: 'absolute', top: 8, right: 8, padding: '6px 12px', fontSize: 12 }}>
@@ -626,7 +626,7 @@ export default function AdminAwo() {
             color: 'rgba(200,220,255,1)', fontSize: 11.5 }}>{'{email}'}</code>{' '}
           АВО подставит автоматически. Виджет грузится с твоего домена{' '}
           <code style={{ background: 'rgba(0,0,0,.45)', padding: '1px 5px', borderRadius: 4,
-            color: 'rgba(200,220,255,1)', fontSize: 11.5 }}>{location.origin}/widget.js</code>.
+            color: 'rgba(200,220,255,1)', fontSize: 11.5 }}>{window.location.origin}/widget.js</code>.
         </div>
       </div>
 

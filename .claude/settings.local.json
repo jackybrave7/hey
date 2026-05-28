@@ -214,7 +214,8 @@
       "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"sqlite3 /app/server/data/hey.db \\\\\"SELECT user_id, media_url FROM moments WHERE media_url LIKE '%test-images%' LIMIT 3\\\\\"\")",
       "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && pm2 restart hey\")",
       "Bash(awk '/function getConversationsForUser/,/^function [a-z]/' /c/projects/hey/server/src/db/db.js)",
-      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd web && npm run build 2>&1 | tail -3 && pm2 restart hey\")"
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd web && npm run build 2>&1 | tail -3 && pm2 restart hey\")",
+      "Bash(cd /c/projects/hey/web && sed -i \"s|location\\\\.origin|window.location.origin|g\" src/components/admin/AdminAwo.jsx && grep -n \"location\\\\.origin\" src/components/admin/AdminAwo.jsx | head -5)"
     ]
   }
 }
