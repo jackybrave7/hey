@@ -213,12 +213,17 @@ module.exports = function makeRouter(db, broadcast) {
             const result = db.addUserToChat(chatId, user.id);
             if (result.added) {
               try {
-                db.createMessage({
+                const senderId = db.getSchoolUserId(inviteTenantId);
+                const msg = db.createMessage({
                   conversationId: chatId,
-                  senderId: db.getSchoolUserId(inviteTenantId),
+                  senderId,
                   text: `🎓 ${user.name} присоединился к курсу «${schoolInvite.course}»`,
                 });
-              } catch {}
+                const senderUser = db.findUserById(senderId);
+                const members = db.getConversationMembers(chatId);
+                broadcast(members, { type: 'message:new',
+                  message: { ...msg, sender_name: senderUser?.name || 'Школа', conversationId: chatId } });
+              } catch (e) { console.error('[awo-course-msg]', e.message); }
               try { broadcast([user.id], { type: 'conversation:added', chat_id: chatId }); } catch {}
             }
           } catch (e) { console.error('[awo-course-chat]', e.message); }
@@ -954,6 +959,20 @@ module.exports = function makeRouter(db, broadcast) {
       broadcast(members, { type: 'group:member_added', conversationId: req.params.id, userId: req.user.id });
       // Себя тоже — фронт должен перезагрузить список чатов
       broadcast([req.user.id], { type: 'group:invite_accepted', conversationId: req.params.id });
+      // Системное сообщение в чат — чтобы все увидели нового участника
+      if (!r2?.alreadyActive) {
+        try {
+          const msg = db.createMessage({
+            conversationId: req.params.id,
+            senderId: db.SYSTEM_USER_ID,
+            text: `👋 ${req.user.name} присоединился к группе`,
+          });
+          // Раздаём системное сообщение всем участникам по WS
+          broadcast(members, { type: 'message:new',
+            message: { ...msg, sender_name: 'HEY-заведующий',
+              conversationId: req.params.id } });
+        } catch (e) { console.error('[group-accept-msg]', e.message); }
+      }
       res.json({ ok: true, alreadyActive: !!r2?.alreadyActive });
     } catch (e) {
       res.status(404).json({ error: e.message });
@@ -1037,15 +1056,18 @@ module.exports = function makeRouter(db, broadcast) {
         broadcast(members, { type: 'group:member_joined', conversationId: conv.id, userId: req.user.id });
         broadcast([req.user.id], { type: 'conversation:added', chat_id: conv.id });
       } catch {}
-      // Системное сообщение в чат
+      // Системное сообщение в чат + WS-доставка всем участникам
       if (!result.alreadyActive) {
         try {
-          db.createMessage({
+          const msg = db.createMessage({
             conversationId: conv.id,
             senderId: db.SYSTEM_USER_ID,
             text: `👋 ${req.user.name} присоединился по приглашению`,
           });
-        } catch {}
+          const members = db.getConversationMembers(conv.id);
+          broadcast(members, { type: 'message:new',
+            message: { ...msg, sender_name: 'HEY-заведующий', conversationId: conv.id } });
+        } catch (e) { console.error('[invite-link-msg]', e.message); }
       }
       res.json({ ok: true, conversationId: conv.id, alreadyActive: !!result.alreadyActive });
     } catch (e) {
@@ -1951,12 +1973,17 @@ module.exports = function makeRouter(db, broadcast) {
             const r = db.addUserToChat(chatId, existing.id);
             if (r.added) {
               try {
-                db.createMessage({
+                const senderId = db.getSchoolUserId(tenantId);
+                const msg = db.createMessage({
                   conversationId: chatId,
-                  senderId: db.getSchoolUserId(tenantId),
+                  senderId,
                   text: `🎓 ${existing.name} присоединился к курсу «${goods}»`,
                 });
-              } catch {}
+                const senderUser = db.findUserById(senderId);
+                const members = db.getConversationMembers(chatId);
+                broadcast(members, { type: 'message:new',
+                  message: { ...msg, sender_name: senderUser?.name || 'Школа', conversationId: chatId } });
+              } catch (e) { console.error('[awo-existing-msg]', e.message); }
               try { broadcast([existing.id], { type: 'conversation:added', chat_id: chatId }); } catch {}
               extraResult = 'user_exists_added_to_chat';
             } else {
