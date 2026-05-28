@@ -3,6 +3,7 @@ const bcrypt   = require('bcryptjs');
 const { v4: uuid } = require('uuid');
 const path = require('path');
 const fs   = require('fs');
+const crypto = require('crypto');
 
 const DATA_DIR = path.join(__dirname, '../../data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -278,7 +279,8 @@ try { db.exec('CREATE INDEX IF NOT EXISTS idx_school_invites_phone ON school_inv
 // bound_name — добавляем для предзаполнения формы регистрации из АВО payload
 try { db.exec('ALTER TABLE school_invites ADD COLUMN bound_name TEXT'); } catch {}
 
-// Обработанные счета АВО (идемпотентность)
+// Обработанные счета АВО (идемпотентность). tenant_id добавлен миграцией
+// ниже, чтобы id_account был уникален в рамках одного tenant'а.
 try { db.exec(`CREATE TABLE IF NOT EXISTS awo_processed (
   id_account    TEXT PRIMARY KEY,
   processed_at  INTEGER NOT NULL,
@@ -297,6 +299,35 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS awo_course_chats (
   chat_id     TEXT NOT NULL,
   created_at  INTEGER NOT NULL
 )`); } catch {}
+
+// ── Multi-tenant AWO (Шаг 1) ─────────────────────────────────────────────
+// Любой бизнес-юзер может создать свой tenant (школу) и привязать к нему
+// собственную интеграцию с АвтоВебОфисом. Текущий single-school setup
+// мигрируется в дефолтный tenant 'tnt_default' ниже.
+try { db.exec(`CREATE TABLE IF NOT EXISTS tenants (
+  id              TEXT PRIMARY KEY,           -- 'tnt_default', 'tnt_abc123'
+  name            TEXT NOT NULL,
+  owner_id        TEXT NOT NULL,              -- user.id управляющего
+  awo_webhook_token TEXT UNIQUE NOT NULL,     -- свой токен webhook'а
+  awo_join_secret   TEXT NOT NULL,            -- свой HMAC-секрет для /join
+  account_id      TEXT,                       -- user.id «бот-аккаунта» школы
+  test_mode       INTEGER DEFAULT 0,
+  test_course     TEXT,
+  chat_excludes   TEXT DEFAULT 'слушатель,запись',
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_tenants_owner ON tenants(owner_id)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_tenants_token ON tenants(awo_webhook_token)'); } catch {}
+
+// tenant_id — на все ключевые таблицы интеграции. NULL = дефолтный tenant
+// (для существующих записей). После миграции мы их перекодируем.
+try { db.exec('ALTER TABLE awo_course_chats ADD COLUMN tenant_id TEXT'); } catch {}
+try { db.exec('ALTER TABLE awo_processed   ADD COLUMN tenant_id TEXT'); } catch {}
+try { db.exec('ALTER TABLE school_invites  ADD COLUMN tenant_id TEXT'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_awo_course_chats_tenant ON awo_course_chats(tenant_id)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_awo_processed_tenant   ON awo_processed(tenant_id)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_school_invites_tenant  ON school_invites(tenant_id)'); } catch {}
 
 // Системные настройки key-value (тестовый режим AWO, тестовый курс и т.п.)
 try { db.exec(`CREATE TABLE IF NOT EXISTS system_settings (
@@ -381,6 +412,51 @@ const SCHOOL_NAME    = process.env.AWO_SCHOOL_NAME || 'BL School';
     );
   } catch (e) {
     console.warn('[school-account] не удалось создать:', e.message);
+  }
+})();
+
+// ── Multi-tenant миграция: создаём дефолтный tenant из существующих
+//    settings (.env AWO_* + system_settings.awo_*) и проставляем tenant_id
+//    на все «бесхозные» строки. Идемпотентно. ───────────────────────────
+const DEFAULT_TENANT_ID = 'tnt_default';
+(function ensureDefaultTenant() {
+  try {
+    const existing = db.prepare('SELECT id FROM tenants WHERE id=?').get(DEFAULT_TENANT_ID);
+    if (existing) return;
+    // Берём токен/секрет из .env (как было), либо генерим
+    const envToken  = process.env.AWO_WEBHOOK_TOKEN || crypto.randomBytes(24).toString('hex');
+    const envSecret = process.env.AWO_JOIN_SECRET   || crypto.randomBytes(32).toString('hex');
+    const t = Math.floor(Date.now() / 1000);
+    // Owner — первый найденный админ; если ещё никого нет — system_hey_official
+    const adminRow = db.prepare("SELECT id FROM users WHERE is_admin=1 LIMIT 1").get();
+    const ownerId = adminRow?.id || 'system_hey_official';
+    // Перенос текущих system_settings.awo_*
+    const getS = (k, d=null) => {
+      const r = db.prepare('SELECT value FROM system_settings WHERE key=?').get(k);
+      if (!r) return d;
+      try { return JSON.parse(r.value); } catch { return r.value; }
+    };
+    const testMode    = getS('awo_test_mode', false);
+    const testCourse  = getS('awo_test_course', '') || '';
+    const chatExcl    = getS('awo_chat_excludes', 'слушатель,запись');
+    const accountId   = getS('awo_school_account_id', null);
+    db.prepare(`INSERT INTO tenants
+      (id, name, owner_id, awo_webhook_token, awo_join_secret, account_id,
+       test_mode, test_course, chat_excludes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(DEFAULT_TENANT_ID, 'Школа по умолчанию', ownerId,
+        envToken, envSecret, accountId,
+        testMode ? 1 : 0, testCourse, chatExcl, t, t);
+    // Backfill: все осиротевшие записи перекодируем на дефолтный tenant
+    db.prepare("UPDATE awo_course_chats SET tenant_id=? WHERE tenant_id IS NULL")
+      .run(DEFAULT_TENANT_ID);
+    db.prepare("UPDATE awo_processed   SET tenant_id=? WHERE tenant_id IS NULL")
+      .run(DEFAULT_TENANT_ID);
+    db.prepare("UPDATE school_invites  SET tenant_id=? WHERE tenant_id IS NULL")
+      .run(DEFAULT_TENANT_ID);
+    console.log('[multi-tenant] migrated existing AWO setup → tnt_default');
+  } catch (e) {
+    console.warn('[multi-tenant] не удалось создать default tenant:', e.message);
   }
 })();
 
@@ -2401,6 +2477,65 @@ function clearTestUsers() {
   return { deleted: ids.length };
 }
 
+// ── Multi-tenant AWO helpers (Шаг 1) ────────────────────────────────────
+function _rowToTenant(r) {
+  if (!r) return null;
+  return { ...r, test_mode: !!r.test_mode };
+}
+function listTenants() {
+  return db.prepare('SELECT * FROM tenants ORDER BY created_at ASC').all().map(_rowToTenant);
+}
+function listTenantsForOwner(ownerId) {
+  return db.prepare('SELECT * FROM tenants WHERE owner_id=? ORDER BY created_at ASC')
+    .all(ownerId).map(_rowToTenant);
+}
+function getTenantById(id) {
+  return _rowToTenant(db.prepare('SELECT * FROM tenants WHERE id=?').get(id));
+}
+function getTenantByToken(token) {
+  if (!token) return null;
+  return _rowToTenant(db.prepare('SELECT * FROM tenants WHERE awo_webhook_token=?').get(token));
+}
+function createTenant({ name, ownerId }) {
+  const id = 'tnt_' + crypto.randomBytes(6).toString('hex');
+  const token  = crypto.randomBytes(24).toString('hex');
+  const secret = crypto.randomBytes(32).toString('hex');
+  const t = now();
+  db.prepare(`INSERT INTO tenants
+    (id, name, owner_id, awo_webhook_token, awo_join_secret,
+     chat_excludes, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'слушатель,запись', ?, ?)`)
+    .run(id, name, ownerId, token, secret, t, t);
+  return getTenantById(id);
+}
+function updateTenant(id, fields) {
+  const allowed = ['name','account_id','test_mode','test_course','chat_excludes'];
+  const keys = Object.keys(fields).filter(k => allowed.includes(k));
+  if (!keys.length) return getTenantById(id);
+  const vals = {};
+  for (const k of keys) {
+    vals[k] = k === 'test_mode' ? (fields[k] ? 1 : 0) : (fields[k] ?? null);
+  }
+  vals.id = id;
+  vals.updated_at = now();
+  db.prepare(`UPDATE tenants SET ${keys.map(k=>`${k}=@${k}`).join(',')}, updated_at=@updated_at WHERE id=@id`)
+    .run(vals);
+  return getTenantById(id);
+}
+function deleteTenant(id) {
+  db.transaction(() => {
+    db.prepare('DELETE FROM tenants WHERE id=?').run(id);
+    // Связанные данные оставляем — лог истории; новый tenant с тем же id
+    // не появится (id уникальные). Если хочется очистить — отдельная ручка.
+  })();
+}
+function rotateTenantToken(id) {
+  const token = crypto.randomBytes(24).toString('hex');
+  db.prepare('UPDATE tenants SET awo_webhook_token=?, updated_at=? WHERE id=?')
+    .run(token, now(), id);
+  return getTenantById(id);
+}
+
 function getAwoSettings() {
   const accountId = getSchoolUserId();
   const account   = findUserById(accountId);
@@ -2466,6 +2601,10 @@ module.exports = {
   awoIsProcessed, awoMarkProcessed, awoListProcessed,
   setAwoCourseChat, deleteAwoCourseChat, getChatForCourse, listAwoCourseChats, listAllGroupChats,
   getSetting, setSetting, getAwoSettings, setAwoSettings,
+  // Multi-tenant AWO (Шаг 1)
+  DEFAULT_TENANT_ID,
+  listTenants, listTenantsForOwner, getTenantById, getTenantByToken,
+  createTenant, updateTenant, deleteTenant, rotateTenantToken,
   isTestUsersEnabled, setTestUsersEnabled, getTestUserIds,
   seedTestUsers, clearTestUsers,
   extendSuper, setSuperExpiry, processReferral, confirmReferralIfPending, checkAndExpireSuper,
