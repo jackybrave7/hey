@@ -5891,16 +5891,27 @@ export function ChatScreen() {
     // Закреплённое сообщение (если есть)
     api.getPinnedMessage(convId).then(pm => setPinnedMessage(pm)).catch(() => {});
     setIsContact(false);
-    Promise.all([api.getConversations(), api.getContacts()]).then(([convs, contacts]) => {
-      const c = convs.find(c => c.id === convId);
+    Promise.all([
+      api.getConversations(),
+      api.getArchivedConversations().catch(() => []), // архив тоже — чтобы показывать партнёра при открытии архивного чата
+      api.getContacts(),
+    ]).then(([convs, archived, contacts]) => {
+      // Ищем в обоих списках; флаг isArchived используется в UI
+      let c = convs.find(c => c.id === convId);
+      let isArchived = false;
+      if (!c) {
+        c = archived.find(c => c.id === convId);
+        isArchived = !!c;
+      }
       if (!c) return;
       if (c.type === 'group') {
         setPartner({ name: c.name||'Группа', online:false, id:null,
-          isGroup:true, icon:c.icon||'👥', admin_id:c.admin_id, isDeleted:false });
+          isGroup:true, icon:c.icon||'👥', admin_id:c.admin_id, isDeleted:false,
+          isArchived });
       } else if (c.type === 'monolog') {
         setPartner({ name:'Монолог', online:false, id:null,
           isGroup:false, isMonolog:true, icon:'📝', avatar:null,
-          isDeleted:false, isSuper:false, isSystem:false });
+          isDeleted:false, isSuper:false, isSystem:false, isArchived });
       } else {
         setPartner(p => ({ ...p, name: c.name||'Диалог', id: c.partner_id||null,
           isGroup:false, avatar: c.avatar||null,
@@ -5909,7 +5920,8 @@ export function ChatScreen() {
           isSuper:   !!c.partner_is_super,
           isSystem:  !!c.partner_is_system,
           online:    !!c.partner_online,
-          lastSeen:  c.partner_last_seen || null }));
+          lastSeen:  c.partner_last_seen || null,
+          isArchived }));
         if (c.partner_id) {
           setIsContact(contacts.some(ct => ct.id === c.partner_id));
         }
@@ -6625,6 +6637,23 @@ export function ChatScreen() {
   const chatMenuItems = [
     { label: 'Поиск в чате',            icon: <Icon name="search" size={18}/>, danger: false, onClick: () => { setSearchMode(true); setTimeout(()=>searchRef.current?.focus(),50); } },
     { label: 'Медиа и ссылки',          icon: <Icon name="image"  size={18}/>, danger: false, onClick: () => setShowMedia(true) },
+    ...(partner.isArchived ? [
+      { label: 'Вернуть из архива',      icon: <Icon name="archive" size={18}/>, danger: false, onClick: async () => {
+        try {
+          await api.unarchiveConversation(convId);
+          heyToast('Чат восстановлен', 'success');
+          setPartner(p => ({ ...p, isArchived: false }));
+        } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+      } },
+    ] : [
+      { label: 'В архив',                icon: <Icon name="archive" size={18}/>, danger: false, onClick: async () => {
+        try {
+          await api.archiveConversation(convId);
+          heyToast('В архиве', 'success');
+          nav('/chats');
+        } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+      } },
+    ]),
     ...(partner.isGroup ? [
       { label: 'Настройки группы',      icon: <Icon name="settings" size={18}/>, danger: false, onClick: () => nav(`/groups/${convId}/settings`) },
       ...(isGroupAdmin ? [
