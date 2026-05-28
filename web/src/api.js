@@ -211,14 +211,25 @@ export const api = {
   // AWO / Школьная интеграция
   joinValidate:            (email, course, sig) =>
     req('GET', `/join/validate?email=${encodeURIComponent(email)}&course=${encodeURIComponent(course||'')}&sig=${encodeURIComponent(sig)}`),
-  adminGetAwoSettings:     ()              => req('GET',    '/admin/awo/settings'),
-  adminSetAwoSettings:     (data)          => req('PUT',    '/admin/awo/settings', data),
-  adminGetAwoCourseChats:  ()              => req('GET',    '/admin/awo/course-chats'),
-  adminSetAwoCourseChat:   (course, chatId) => req('POST',  '/admin/awo/course-chats', { course, chat_id: chatId }),
-  adminDeleteAwoCourseChat:(course)        => req('DELETE', `/admin/awo/course-chats/${encodeURIComponent(course)}`),
+  // Все awo-ручки принимают опциональный tenantId (если не передан → дефолтный)
+  adminGetAwoSettings:     (tenantId)       => req('GET',    `/admin/awo/settings${tenantId?'?tenantId='+encodeURIComponent(tenantId):''}`),
+  adminSetAwoSettings:     (data, tenantId) => req('PUT',    `/admin/awo/settings${tenantId?'?tenantId='+encodeURIComponent(tenantId):''}`, data),
+  adminGetAwoCourseChats:  (tenantId)       => req('GET',    `/admin/awo/course-chats${tenantId?'?tenantId='+encodeURIComponent(tenantId):''}`),
+  adminSetAwoCourseChat:   (course, chatId, tenantId) => req('POST',  `/admin/awo/course-chats${tenantId?'?tenantId='+encodeURIComponent(tenantId):''}`, { course, chat_id: chatId }),
+  adminDeleteAwoCourseChat:(course, tenantId) => req('DELETE', `/admin/awo/course-chats/${encodeURIComponent(course)}${tenantId?'?tenantId='+encodeURIComponent(tenantId):''}`),
   adminGetGroupChats:      ()              => req('GET',    '/admin/group-chats'),
-  adminGetAwoLog:          (limit)         => req('GET',    `/admin/awo/log${limit ? '?limit=' + limit : ''}`),
-  adminAwoMakeJoinLink:    (email, course) => req('POST',   '/admin/awo/join-link', { email, course }),
+  adminGetAwoLog:          (limit, tenantId) => {
+    const qs = [];
+    if (limit)    qs.push('limit=' + limit);
+    if (tenantId) qs.push('tenantId=' + encodeURIComponent(tenantId));
+    return req('GET', '/admin/awo/log' + (qs.length ? '?' + qs.join('&') : ''));
+  },
+  adminAwoMakeJoinLink:    (email, course, tenantId) => req('POST',   '/admin/awo/join-link', { email, course, tenantId }),
+  // Tenants CRUD
+  adminListAwoTenants:     ()              => req('GET',    '/admin/awo/tenants'),
+  adminCreateAwoTenant:    (name)          => req('POST',   '/admin/awo/tenants', { name }),
+  adminDeleteAwoTenant:    (id)            => req('DELETE', `/admin/awo/tenants/${encodeURIComponent(id)}`),
+  adminRotateAwoToken:     (id)            => req('POST',   `/admin/awo/tenants/${encodeURIComponent(id)}/rotate-token`),
 
   // Admin: Test users mode
   adminTestUsersStatus:    ()              => req('GET',    '/admin/test-users/status'),

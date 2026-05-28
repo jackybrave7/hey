@@ -23,6 +23,7 @@ import AdminLogs from './components/admin/AdminLogs';
 import AdminSystem from './components/admin/AdminSystem';
 import AdminReports from './components/admin/AdminReports';
 import AdminAwo from './components/admin/AdminAwo';
+import AdminAwoTenants from './components/admin/AdminAwoTenants';
 import AdminTestUsers from './components/admin/AdminTestUsers';
 import JoinScreen from './components/JoinScreen';
 import GroupJoinScreen from './components/GroupJoinScreen';
@@ -336,6 +337,16 @@ export default function App() {
             </RequireAdmin>
           }/>
           <Route path="/admin/awo" element={
+            <RequireAdmin>
+              <AdminLayout><AdminAwoTenants/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/awo/tenants" element={
+            <RequireAdmin>
+              <AdminLayout><AdminAwoTenants/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/awo/:tenantId" element={
             <RequireAdmin>
               <AdminLayout><AdminAwo/></AdminLayout>
             </RequireAdmin>

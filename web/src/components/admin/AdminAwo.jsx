@@ -1,5 +1,8 @@
-// AdminAwo.jsx — управление интеграцией с АвтоВебОфис (АВО)
+// AdminAwo.jsx — настройки одной школы (tenant'а) АВО-интеграции.
+// URL: /admin/awo                 → дефолтный tnt_default (back-compat)
+//      /admin/awo/:tenantId       → конкретный tenant
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
 
@@ -43,6 +46,11 @@ function fmtDate(ts) {
 }
 
 export default function AdminAwo() {
+  const params = useParams();
+  const nav = useNavigate();
+  const tenantId = params.tenantId || 'tnt_default';
+
+  const [tenants, setTenants] = useState([]); // для переключателя
   const [settings, setSettings] = useState(null);
   const [testCourse, setTestCourse] = useState('');
   const [testMode, setTestMode] = useState(false);
@@ -76,11 +84,12 @@ export default function AdminAwo() {
 
   useEffect(() => {
     Promise.all([
-      api.adminGetAwoSettings(),
-      api.adminGetAwoCourseChats(),
+      api.adminGetAwoSettings(tenantId),
+      api.adminGetAwoCourseChats(tenantId),
       api.adminGetGroupChats(),
-      api.adminGetAwoLog(50),
-    ]).then(([s, m, g, l]) => {
+      api.adminGetAwoLog(50, tenantId),
+      api.adminListAwoTenants(),
+    ]).then(([s, m, g, l, ts]) => {
       setSettings(s);
       setTestMode(!!s.test_mode);
       setTestCourse(s.test_course || '');
@@ -88,8 +97,9 @@ export default function AdminAwo() {
       setMappings(m);
       setGroupChats(g);
       setLog(l);
+      setTenants(ts || []);
     }).catch(e => setError(e.message));
-  }, []);
+  }, [tenantId]);
 
   async function saveSettings() {
     setSavingSettings(true);
@@ -98,7 +108,7 @@ export default function AdminAwo() {
         test_mode: testMode,
         test_course: testCourse,
         chat_excludes: chatExcludes,
-      });
+      }, tenantId);
       setSettings(s);
       notify('Сохранено');
     } catch (e) { setError(e.message); }
@@ -108,8 +118,8 @@ export default function AdminAwo() {
   async function addMapping() {
     if (!newCourse.trim() || !newChatId) return setError('Заполни курс и выбери чат');
     try {
-      await api.adminSetAwoCourseChat(newCourse.trim(), newChatId);
-      const m = await api.adminGetAwoCourseChats();
+      await api.adminSetAwoCourseChat(newCourse.trim(), newChatId, tenantId);
+      const m = await api.adminGetAwoCourseChats(tenantId);
       setMappings(m);
       setNewCourse(''); setNewChatId('');
       notify('Маппинг добавлен');
@@ -119,8 +129,8 @@ export default function AdminAwo() {
   async function removeMapping(course) {
     if (!await customConfirm(`Удалить маппинг курса «${course}»?`, { danger: true })) return;
     try {
-      await api.adminDeleteAwoCourseChat(course);
-      const m = await api.adminGetAwoCourseChats();
+      await api.adminDeleteAwoCourseChat(course, tenantId);
+      const m = await api.adminGetAwoCourseChats(tenantId);
       setMappings(m);
       notify('Удалено');
     } catch (e) { setError(e.message); }
@@ -129,8 +139,25 @@ export default function AdminAwo() {
   async function makeLink() {
     setGeneratedLink('');
     try {
-      const r = await api.adminAwoMakeJoinLink(linkEmail, linkCourse);
+      const r = await api.adminAwoMakeJoinLink(linkEmail, linkCourse, tenantId);
       setGeneratedLink(r.url);
+    } catch (e) { setError(e.message); }
+  }
+
+  async function rotateToken() {
+    if (!await customConfirm(
+      <>
+        <div style={{fontWeight:700,marginBottom:6}}>Пересоздать webhook-токен?</div>
+        <div style={{color:'rgba(225,220,245,.7)',fontSize:13,lineHeight:1.55}}>
+          Старый токен сразу перестанет работать. Не забудь обновить webhook URL в АВО.
+        </div>
+      </>,
+      { confirmLabel: 'Пересоздать', danger: true }
+    )) return;
+    try {
+      const t = await api.adminRotateAwoToken(tenantId);
+      setSettings(prev => ({ ...prev, webhook_token: t.awo_webhook_token }));
+      notify('Токен обновлён');
     } catch (e) { setError(e.message); }
   }
 
@@ -174,7 +201,7 @@ export default function AdminAwo() {
     if (!ok) return;
     setBindingAccount(true);
     try {
-      const s = await api.adminSetAwoSettings({ school_account_id: userId });
+      const s = await api.adminSetAwoSettings({ school_account_id: userId }, tenantId);
       setSettings(s);
       setAccountSearch(''); setAccountResults([]);
       notify('Школьный аккаунт обновлён');
@@ -190,20 +217,42 @@ export default function AdminAwo() {
     setBindingAccount(true);
     try {
       // Передаём пустую строку — сервер сбросит на дефолт
-      const s = await api.adminSetAwoSettings({ school_account_id: '' });
+      const s = await api.adminSetAwoSettings({ school_account_id: '' }, tenantId);
       setSettings(s);
       notify('Сброшено на системный аккаунт');
     } catch (e) { setError(e.message); }
     setBindingAccount(false);
   }
 
+  const currentTenant = tenants.find(t => t.id === tenantId);
+
   return (
     <div style={{ padding: '28px 32px', maxWidth: 920 }}>
+      {/* Header with tenant switcher + back to list */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+        <Link to="/admin/awo/tenants"
+          style={{ color: 'rgba(180,140,255,.95)', fontSize: 13, textDecoration: 'none',
+            display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          ← Все школы
+        </Link>
+        {tenants.length > 1 && (
+          <select value={tenantId}
+            onChange={e => nav('/admin/awo/' + e.target.value)}
+            style={{
+              ...inputStyle, width: 'auto', padding: '6px 12px', fontSize: 13,
+              cursor: 'pointer',
+            }}>
+            {tenants.map(t => (
+              <option key={t.id} value={t.id}>{t.name}{t.id === 'tnt_default' ? ' (основная)' : ''}</option>
+            ))}
+          </select>
+        )}
+      </div>
       <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
-        🎓 АВО / Школа
+        🎓 {currentTenant?.name || 'Школа'}
       </h1>
-      <p style={{ color: 'rgba(225,220,245,.75)', fontSize: 14, marginBottom: 24 }}>
-        Интеграция с АвтоВебОфис: автоприглашение учеников после оплаты курсов BL School
+      <p style={{ color: 'rgba(225,220,245,.85)', fontSize: 14, marginBottom: 24 }}>
+        Интеграция с АвтоВебОфис: автоприглашение учеников после оплаты курсов.
       </p>
 
       {error && (
@@ -355,17 +404,39 @@ export default function AdminAwo() {
           {savingSettings ? 'Сохраняю…' : 'Сохранить настройки'}
         </button>
 
-        <div style={{ marginTop: 16, color: 'rgba(225,220,245,.85)', fontSize: 12, lineHeight: 1.6 }}>
-          <strong style={{color:'white'}}>Webhook URL:</strong>{' '}
-          <code style={{background:'rgba(0,0,0,.45)',padding:'2px 6px',borderRadius:4,
-            color:'rgba(200,220,255,1)',fontSize:11.5,wordBreak:'break-all'}}>
-            {location.origin}/api/integrations/awo/webhook?token=&lt;TOKEN&gt;
-          </code><br/>
-          <strong style={{color:'white'}}>Токен</strong> задаётся в{' '}
-          <code style={{background:'rgba(0,0,0,.45)',padding:'2px 5px',borderRadius:4,color:'rgba(200,220,255,1)',fontSize:11.5}}>.env</code>{' '}
-          сервера как{' '}
-          <code style={{background:'rgba(0,0,0,.45)',padding:'2px 5px',borderRadius:4,color:'rgba(200,220,255,1)',fontSize:11.5}}>AWO_WEBHOOK_TOKEN</code>.
-        </div>
+        {/* Webhook URL: реальный, с встроенными токеном и tenant_id */}
+        {settings?.webhook_token && (() => {
+          const webhookUrl = `${location.origin}/api/integrations/awo/webhook/${tenantId}?token=${settings.webhook_token}`;
+          return (
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+              <div style={{ ...labelStyle, marginBottom: 8 }}>📨 Webhook URL для АВО</div>
+              <div style={{
+                background: 'rgba(0,0,0,.45)', borderRadius: 10,
+                border: '1px solid rgba(255,255,255,.12)',
+                padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center',
+              }}>
+                <code style={{ flex: 1, color: 'rgba(200,220,255,1)', fontSize: 11.5,
+                  wordBreak: 'break-all',
+                  fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace' }}>
+                  {webhookUrl}
+                </code>
+                <button onClick={() => { navigator.clipboard.writeText(webhookUrl); notify('URL скопирован'); }}
+                  style={{ ...btnGhost, padding: '6px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                  📋 Копировать
+                </button>
+              </div>
+              <div style={{ marginTop: 8, color: 'rgba(225,220,245,.7)', fontSize: 12, lineHeight: 1.5 }}>
+                Вставь этот URL в настройки бизнес-процесса АВО («Отправить запрос на URL»).{' '}
+                <button onClick={rotateToken}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,180,180,.85)',
+                    fontSize: 12, cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+                    textDecoration: 'underline' }}>
+                  Пересоздать токен
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Маппинг курс → чат */}
