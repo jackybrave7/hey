@@ -2207,6 +2207,8 @@ export function GlobalUserCardMount() {
   const [userId, setUserId] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [blocked, setBlocked] = useState([]);
+  // Открытие момента поверх карточки — закрытие возвращает в карточку
+  const [openedMoments, setOpenedMoments] = useState(null); // { moments, index } | null
   const nav = useNavigate();
   const { user: me } = useAuth();
   const [customConfirm, confirmModal] = useConfirm();
@@ -2280,8 +2282,25 @@ export function GlobalUserCardMount() {
         } catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
       }}
       onNotesChange={() => refreshLists()}
-      onOpenMoment={(m) => { setUserId(null); nav(`/moments/${m.id}`); }}
+      onOpenMoment={(m) => {
+        // Открываем поверх карточки, не закрывая её. Передаём все active
+        // moments юзера в попап чтобы юзер мог свайпать между ними.
+        const fresh = contacts.find(c => c.id === userId);
+        const all = (fresh?.active_moments || []).filter(x => x && x.id);
+        const list = all.length ? all : [m];
+        const idx = Math.max(0, list.findIndex(x => x.id === m.id));
+        setOpenedMoments({ moments: list, index: idx });
+      }}
     />
+    {/* Moment popup поверх карточки — закрытие НЕ скрывает карточку */}
+    {openedMoments && (
+      <MomentDetailPopup
+        moments={openedMoments.moments}
+        initialIndex={openedMoments.index}
+        currentUser={me}
+        onClose={() => setOpenedMoments(null)}
+      />
+    )}
   </>);
 }
 
@@ -2405,7 +2424,7 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                     <div key={m.id} onClick={() => onOpenMoment?.(m)}
                       title={m.text ? m.text.slice(0, 80) : 'Момент'}
                       style={{
-                        width:72,height:90,flexShrink:0,borderRadius:10,
+                        width:84,height:84,flexShrink:0,borderRadius:10,
                         overflow:'hidden',cursor:'pointer',
                         background: hasImg ? '#0a0518' : 'linear-gradient(135deg,#2a1858,#4a2898)',
                         border:'1px solid rgba(255,255,255,.12)',
