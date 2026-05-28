@@ -811,7 +811,10 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(pinned || null);
   });
 
-  r.post('/conversations/:id/pin', requireAuth, (req, res) => {
+  // Закрепить сообщение в чате. URL отличается от sticky-chat pin
+  // (/conversations/:id/pin), который мы регистрируем выше — поэтому здесь
+  // отдельный путь /pinned-message, иначе Express матчит первый зарегистрированный.
+  r.post('/conversations/:id/pinned-message', requireAuth, (req, res) => {
     const { messageId } = req.body || {};
     if (!messageId) return res.status(400).json({ error: 'messageId required' });
     try {
@@ -829,7 +832,7 @@ module.exports = function makeRouter(db, broadcast) {
     }
   });
 
-  r.delete('/conversations/:id/pin', requireAuth, (req, res) => {
+  r.delete('/conversations/:id/pinned-message', requireAuth, (req, res) => {
     try {
       db.unpinMessage(req.params.id, req.user.id);
       const members = db.getConversationMembers(req.params.id);

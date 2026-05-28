@@ -99,8 +99,8 @@ export const api = {
   clearMessages:    (convId)              => req('DELETE', `/conversations/${convId}/messages`),
   deleteConversation:(convId)             => req('DELETE', `/conversations/${convId}`),
   getPinnedMessage:  (convId)             => req('GET',    `/conversations/${convId}/pinned`),
-  pinMessage:        (convId, messageId)  => req('POST',   `/conversations/${convId}/pin`, { messageId }),
-  unpinMessage:      (convId)             => req('DELETE', `/conversations/${convId}/pin`),
+  pinMessage:        (convId, messageId)  => req('POST',   `/conversations/${convId}/pinned-message`, { messageId }),
+  unpinMessage:      (convId)             => req('DELETE', `/conversations/${convId}/pinned-message`),
   forwardMessage:    (messageId, toConvIds) => req('POST', `/messages/${messageId}/forward`, { toConvIds }),
 
   // Web Push
