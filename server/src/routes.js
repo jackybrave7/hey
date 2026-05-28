@@ -24,6 +24,31 @@ function requireAdmin(req, res, next) {
   });
 }
 
+// Middleware для tenant-scoped ручек: пускает либо системного админа,
+// либо владельца tenant'а (tenant.owner_id === req.user.id). Кладёт в req:
+//   req.tenant     — объект tenant'а
+//   req.tenantUser — db-объект юзера-владельца
+// Защищает per-tenant route'ы от self-service UI (шаг 4.2) — но UI пока
+// admin-only, так что эта проверка — фундамент для будущего.
+function requireTenantAccess(getTenantIdFromReq) {
+  return (req, res, next) => requireAuth(req, res, () => {
+    const tid = (typeof getTenantIdFromReq === 'function')
+      ? getTenantIdFromReq(req)
+      : (req.params.tenantId || req.query.tenantId || req.body?.tenantId);
+    if (!tid) return res.status(400).json({ error: 'tenantId required' });
+    const tenant = db.getTenantById(tid);
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+    const user = db.findUserById(req.user.id);
+    if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
+    if (!user.is_admin && tenant.owner_id !== user.id) {
+      return res.status(403).json({ error: 'Нет доступа к этой школе' });
+    }
+    req.tenant = tenant;
+    req.tenantUser = user;
+    next();
+  });
+}
+
 const MOMENTS_DIR = path.join(__dirname, '../data/uploads/moments');
 fs.mkdirSync(MOMENTS_DIR, { recursive: true });
 
@@ -1913,12 +1938,10 @@ module.exports = function makeRouter(db, broadcast) {
     return (req.query.tenantId || req.body?.tenantId || db.DEFAULT_TENANT_ID);
   }
 
-  r.get('/admin/awo/settings', requireAdmin, (req, res) => {
-    const tid = tenantFromReq(req);
-    const t = db.getTenantById(tid);
-    if (!t) return res.status(404).json({ error: 'Tenant not found' });
+  // Helper: формирует объект ответа settings из tenant'а (без секретов лишних)
+  function tenantToSettings(t) {
     const account = t.account_id ? db.findUserById(t.account_id) : null;
-    res.json({
+    return {
       tenant_id:    t.id,
       test_mode:    !!t.test_mode,
       test_course:  t.test_course || '',
@@ -1928,100 +1951,128 @@ module.exports = function makeRouter(db, broadcast) {
         id: account.id, name: account.name, avatar: account.avatar, phone: account.phone,
         is_default: false,
       } : null,
-    });
+    };
+  }
+
+  r.get('/admin/awo/settings', requireTenantAccess(tenantFromReq), (req, res) => {
+    res.json(tenantToSettings(req.tenant));
   });
-  r.put('/admin/awo/settings', requireAdmin, (req, res) => {
-    const tid = tenantFromReq(req);
+  r.put('/admin/awo/settings', requireTenantAccess(tenantFromReq), (req, res) => {
+    const tid = req.tenant.id;
     const { test_mode, test_course, chat_excludes, school_account_id } = req.body || {};
     try {
-      // Валидация привязанного юзера
+      // school_account_id: не-админу разрешаем привязывать ТОЛЬКО себя
+      // (защита от «угона» чужого профиля для школьных уведомлений).
       if (school_account_id !== undefined && school_account_id) {
+        if (!req.tenantUser.is_admin && school_account_id !== req.tenantUser.id) {
+          return res.status(403).json({ error: 'Привязывать можно только свой аккаунт' });
+        }
         const u = db.findUserById(school_account_id);
         if (!u) throw new Error('Пользователь не найден');
         if (u.is_blocked) throw new Error('Пользователь заблокирован');
+        if (u.is_deleted) throw new Error('Пользователь удалил аккаунт');
       }
       const t = db.updateTenant(tid, {
         test_mode, test_course, chat_excludes,
         ...(school_account_id !== undefined ? { account_id: school_account_id || null } : {}),
       });
-      const account = t.account_id ? db.findUserById(t.account_id) : null;
-      res.json({
-        tenant_id:    t.id,
-        test_mode:    !!t.test_mode,
-        test_course:  t.test_course || '',
-        chat_excludes: t.chat_excludes || 'слушатель,запись',
-        webhook_token: t.awo_webhook_token,
-        school_account: account ? {
-          id: account.id, name: account.name, avatar: account.avatar, phone: account.phone,
-          is_default: false,
-        } : null,
-      });
+      res.json(tenantToSettings(t));
     } catch (e) {
       res.status(400).json({ error: e.message });
     }
   });
 
   // Маппинг курс ↔ чат — per-tenant
-  r.get('/admin/awo/course-chats', requireAdmin, (req, res) => {
-    res.json(db.listAwoCourseChats(tenantFromReq(req)));
+  r.get('/admin/awo/course-chats', requireTenantAccess(tenantFromReq), (req, res) => {
+    res.json(db.listAwoCourseChats(req.tenant.id));
   });
-  r.post('/admin/awo/course-chats', requireAdmin, (req, res) => {
+  r.post('/admin/awo/course-chats', requireTenantAccess(tenantFromReq), (req, res) => {
     const { course, chat_id } = req.body || {};
     if (!course || !chat_id) return res.status(400).json({ error: 'course и chat_id обязательны' });
+    // Для не-админа: можно мапить только чаты, где он сам админ группы
+    if (!req.tenantUser.is_admin) {
+      if (!db.isGroupAdmin(chat_id, req.tenantUser.id)) {
+        return res.status(403).json({ error: 'Можно привязывать только чаты, где вы админ' });
+      }
+    }
     try {
-      db.setAwoCourseChat(course, chat_id, tenantFromReq(req));
+      db.setAwoCourseChat(course, chat_id, req.tenant.id);
       res.json({ ok: true });
     } catch (e) { res.status(400).json({ error: e.message }); }
   });
-  r.delete('/admin/awo/course-chats/:course', requireAdmin, (req, res) => {
-    db.deleteAwoCourseChat(req.params.course, tenantFromReq(req));
+  r.delete('/admin/awo/course-chats/:course', requireTenantAccess(tenantFromReq), (req, res) => {
+    db.deleteAwoCourseChat(req.params.course, req.tenant.id);
     res.json({ ok: true });
   });
 
-  // Список всех групповых чатов (для выбора при маппинге)
-  r.get('/admin/group-chats', requireAdmin, (req, res) => {
-    res.json(db.listAllGroupChats());
+  // Список доступных групповых чатов для маппинга. Админу — все группы,
+  // обычному юзеру — только где он сам админ.
+  r.get('/admin/group-chats', requireAuth, (req, res) => {
+    const user = db.findUserById(req.user.id);
+    if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
+    const all = db.listAllGroupChats();
+    if (user.is_admin) return res.json(all);
+    res.json(all.filter(c => db.isGroupAdmin(c.id, user.id)));
   });
 
   // Лог webhook'ов AWO — per-tenant
-  r.get('/admin/awo/log', requireAdmin, (req, res) => {
+  r.get('/admin/awo/log', requireTenantAccess(tenantFromReq), (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 500);
-    res.json(db.awoListProcessed(limit, tenantFromReq(req)));
+    res.json(db.awoListProcessed(limit, req.tenant.id));
   });
 
   // ── Multi-tenant CRUD ───────────────────────────────────────────────────
-  r.get('/admin/awo/tenants', requireAdmin, (req, res) => {
-    res.json(db.listTenants());
+  // Список школ: админу — все, обычному юзеру — только свои
+  r.get('/admin/awo/tenants', requireAuth, (req, res) => {
+    const user = db.findUserById(req.user.id);
+    if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
+    if (user.is_admin) return res.json(db.listTenants());
+    res.json(db.listTenantsForOwner(user.id));
   });
-  r.post('/admin/awo/tenants', requireAdmin, (req, res) => {
+  // Создание школы: любой залогиненный, но non-admin ограничены лимитом
+  const MAX_TENANTS_PER_USER = 3;
+  r.post('/admin/awo/tenants', requireAuth, (req, res) => {
     const { name } = req.body || {};
     if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    const user = db.findUserById(req.user.id);
+    if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
+    if (!user.is_admin) {
+      const own = db.listTenantsForOwner(user.id);
+      if (own.length >= MAX_TENANTS_PER_USER) {
+        return res.status(403).json({ error: `Лимит школ — ${MAX_TENANTS_PER_USER}` });
+      }
+    }
     try {
-      const t = db.createTenant({ name: name.trim(), ownerId: req.user.id });
+      const t = db.createTenant({ name: name.trim(), ownerId: user.id });
       res.json(t);
     } catch (e) { res.status(400).json({ error: e.message }); }
   });
-  r.delete('/admin/awo/tenants/:id', requireAdmin, (req, res) => {
-    if (req.params.id === db.DEFAULT_TENANT_ID) {
-      return res.status(400).json({ error: 'Нельзя удалить tenant по умолчанию' });
-    }
-    db.deleteTenant(req.params.id);
-    res.json({ ok: true });
-  });
-  r.post('/admin/awo/tenants/:id/rotate-token', requireAdmin, (req, res) => {
-    const t = db.rotateTenantToken(req.params.id);
-    if (!t) return res.status(404).json({ error: 'Tenant not found' });
-    res.json(t);
-  });
+  r.delete('/admin/awo/tenants/:id',
+    requireTenantAccess(req => req.params.id),
+    (req, res) => {
+      if (req.params.id === db.DEFAULT_TENANT_ID) {
+        return res.status(400).json({ error: 'Нельзя удалить tenant по умолчанию' });
+      }
+      db.deleteTenant(req.params.id);
+      res.json({ ok: true });
+    });
+  r.post('/admin/awo/tenants/:id/rotate-token',
+    requireTenantAccess(req => req.params.id),
+    (req, res) => {
+      const t = db.rotateTenantToken(req.params.id);
+      if (!t) return res.status(404).json({ error: 'Tenant not found' });
+      res.json(t);
+    });
 
-  // Админка: сгенерировать /join-ссылку для конкретного tenant'а
-  r.post('/admin/awo/join-link', requireAdmin, (req, res) => {
+  // Сгенерировать /join-ссылку для конкретного tenant'а
+  r.post('/admin/awo/join-link',
+    requireTenantAccess(req => req.body?.tenantId || db.DEFAULT_TENANT_ID),
+    (req, res) => {
     const email  = (req.body?.email  || '').trim().toLowerCase();
     const course = (req.body?.course || '').trim();
-    const tenantId = (req.body?.tenantId || db.DEFAULT_TENANT_ID);
+    const tenant = req.tenant;
+    const tenantId = tenant.id;
     if (!awo.isValidEmail(email)) return res.status(400).json({ error: 'Неверный email' });
-    const tenant = db.getTenantById(tenantId);
-    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
     const sig = awo.signJoin(email, course, tenant.awo_join_secret);
     const base = process.env.PUBLIC_URL || (req.protocol + '://' + req.get('host'));
     const tenantParam = tenantId !== db.DEFAULT_TENANT_ID ? `&tenant=${encodeURIComponent(tenantId)}` : '';
