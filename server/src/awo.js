@@ -2,18 +2,23 @@
 // HMAC signing for /join links, phone normalization, payload validation.
 const crypto = require('crypto');
 
+// JOIN_SECRET остаётся только как fallback для signGroupInvite (HEY-внутренние
+// invite-ссылки в группы — не tenant-scoped). Для школьных /join-ссылок
+// используется tenant.awo_join_secret (multi-tenant), который пробрасывается
+// через параметр secret.
 const JOIN_SECRET    = process.env.AWO_JOIN_SECRET    || 'dev-awo-join-secret-change-me';
-const WEBHOOK_TOKEN  = process.env.AWO_WEBHOOK_TOKEN  || '';
 
-// HMAC(email|course) для защиты /join-ссылок от подделки
-function signJoin(email, course) {
+// HMAC(email|course) для защиты /join-ссылок от подделки.
+// secret — tenant.awo_join_secret. Если не передан, fallback на env (для
+// обратной совместимости со старыми ссылками, выпущенными до multi-tenant).
+function signJoin(email, course, secret = JOIN_SECRET) {
   const payload = `${(email || '').trim().toLowerCase()}|${(course || '').trim()}`;
-  return crypto.createHmac('sha256', JOIN_SECRET).update(payload).digest('hex').slice(0, 32);
+  return crypto.createHmac('sha256', secret).update(payload).digest('hex').slice(0, 32);
 }
 
-function verifyJoin(email, course, sig) {
+function verifyJoin(email, course, sig, secret = JOIN_SECRET) {
   if (!sig) return false;
-  const expected = signJoin(email, course);
+  const expected = signJoin(email, course, secret);
   // timing-safe сравнение
   if (expected.length !== sig.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
@@ -36,14 +41,13 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email).trim());
 }
 
-// Проверка токена webhook — поддерживает заголовок X-AWO-Token и query ?token=
-function checkWebhookToken(req) {
-  if (!WEBHOOK_TOKEN) return true; // если токен не задан — пропускаем (dev/тест)
-  const provided = req.query?.token
+// Достаёт webhook token из request (?token=… или X-AWO-Token header).
+// Сам token-→tenant lookup — в маршруте.
+function extractWebhookToken(req) {
+  return req.query?.token
     || req.get('X-AWO-Token')
     || req.get('x-awo-token')
     || null;
-  return provided === WEBHOOK_TOKEN;
 }
 
 // id_account_status === 5 значит «оплачен» (по документации АВО)
@@ -92,7 +96,7 @@ module.exports = {
   verifyJoin,
   normalizePhone,
   isValidEmail,
-  checkWebhookToken,
+  extractWebhookToken,
   AWO_STATUS_PAID,
   signGroupInvite,
   verifyGroupInvite,

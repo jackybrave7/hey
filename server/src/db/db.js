@@ -577,17 +577,25 @@ function findUserByEmailOrPhone(email, phone) {
 // Возвращает id официального школьного аккаунта.
 // По умолчанию это системный SCHOOL_USER_ID, но админ может привязать
 // в /admin/awo обычного пользователя — тогда возвращается его id.
-function getSchoolUserId() {
-  const configured = getSetting('awo_school_account_id', null);
+// Multi-tenant: возвращает user.id «школьного аккаунта» tenant'а.
+// Если tenant передан и у него есть account_id — он. Иначе legacy
+// system_settings.awo_school_account_id (для совместимости). Если ничего
+// нет / привязанный юзер удалён / заблокирован — fallback SCHOOL_USER_ID.
+function getSchoolUserId(tenantId) {
+  let configured = null;
+  if (tenantId) {
+    const t = getTenantById(tenantId);
+    configured = t?.account_id || null;
+  }
+  if (!configured) configured = getSetting('awo_school_account_id', null);
   if (!configured) return SCHOOL_USER_ID;
-  // Защита: если привязанный юзер удалён/заблокирован — откатываемся на дефолт
   const u = db.prepare('SELECT id, is_blocked FROM users WHERE id=?').get(configured);
   if (!u || u.is_blocked) return SCHOOL_USER_ID;
   return configured;
 }
 
-function getSchoolAccount() {
-  return findUserById(getSchoolUserId());
+function getSchoolAccount(tenantId) {
+  return findUserById(getSchoolUserId(tenantId));
 }
 
 // ── Contacts ───────────────────────────────────────────────────────────────
@@ -2247,15 +2255,20 @@ function _makeShortCode(len = 16) {
   return s;
 }
 
-function createSchoolInvite({ bound_email, bound_phone, course, bound_name }) {
+function createSchoolInvite({ bound_email, bound_phone, course, bound_name, tenantId }) {
   const code = _makeShortCode(16);
   const email = bound_email ? String(bound_email).trim().toLowerCase() : null;
+  const tid = tenantId || DEFAULT_TENANT_ID;
+  // issued_by — это user.id «бот-аккаунта» tenant'а (если есть), иначе legacy
+  // SCHOOL_USER_ID. Через него сохраняется trail кто выпустил.
+  const tenant = getTenantById(tid);
+  const issuedBy = (tenant && tenant.account_id) || SCHOOL_USER_ID;
   db.prepare(`INSERT INTO school_invites
-    (code, issued_by, bound_email, bound_phone, course, bound_name, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .run(code, SCHOOL_USER_ID, email, bound_phone || null, course || null,
-      bound_name ? String(bound_name).trim().slice(0, 80) : null, now());
-  return { code, issued_by: SCHOOL_USER_ID, bound_email: email, bound_phone, course, bound_name };
+    (code, issued_by, bound_email, bound_phone, course, bound_name, tenant_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(code, issuedBy, email, bound_phone || null, course || null,
+      bound_name ? String(bound_name).trim().slice(0, 80) : null, tid, now());
+  return { code, issued_by: issuedBy, bound_email: email, bound_phone, course, bound_name, tenant_id: tid };
 }
 
 function findSchoolInviteByCode(code) {
@@ -2263,8 +2276,17 @@ function findSchoolInviteByCode(code) {
   return db.prepare('SELECT * FROM school_invites WHERE code=?').get(code) || null;
 }
 
-function findActiveSchoolInviteByEmail(email) {
+// tenantId фильтрует поиск — два tenant'а могут принять оплату с одинаковым
+// email независимо. Без явного tenantId возвращаем самый свежий (legacy).
+function findActiveSchoolInviteByEmail(email, tenantId) {
   if (!email) return null;
+  if (tenantId) {
+    return db.prepare(
+      `SELECT * FROM school_invites
+       WHERE bound_email = ? COLLATE NOCASE AND used_at IS NULL AND tenant_id = ?
+       ORDER BY created_at DESC LIMIT 1`
+    ).get(String(email).trim().toLowerCase(), tenantId) || null;
+  }
   return db.prepare(
     `SELECT * FROM school_invites
      WHERE bound_email = ? COLLATE NOCASE AND used_at IS NULL
@@ -2279,27 +2301,43 @@ function markSchoolInviteUsed(code, userId) {
 
 // ── AWO processed (idempotency) ─────────────────────────────────────────────────
 
-function awoIsProcessed(id_account) {
+// id_account уникален глобально (PRIMARY KEY), но мы дополнительно фильтруем
+// по tenant'у — два tenant'а в теории могут получать webhook от одного и того
+// же АВО-аккаунта (если переиспользуют его), и идемпотентность должна быть
+// per-tenant. Без tenantId возвращаем true если запись есть в любом tenant'е.
+function awoIsProcessed(id_account, tenantId) {
   if (!id_account) return false;
+  if (tenantId) {
+    return !!db.prepare('SELECT 1 FROM awo_processed WHERE id_account=? AND tenant_id=?')
+      .get(String(id_account), tenantId);
+  }
   return !!db.prepare('SELECT 1 FROM awo_processed WHERE id_account=?').get(String(id_account));
 }
 
-function awoMarkProcessed({ id_account, email, phone, course, invite_code, result, raw_payload }) {
+function awoMarkProcessed({ id_account, email, phone, course, invite_code, result, raw_payload, tenantId }) {
+  const tid = tenantId || DEFAULT_TENANT_ID;
   try {
     db.prepare(`INSERT INTO awo_processed
-      (id_account, processed_at, email, phone, course, invite_code, result, raw_payload)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      (id_account, processed_at, email, phone, course, invite_code, result, raw_payload, tenant_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(String(id_account), now(),
            email ? String(email).toLowerCase() : null,
            phone || null, course || null, invite_code || null,
-           result || null, raw_payload ? JSON.stringify(raw_payload).slice(0, 8000) : null);
+           result || null, raw_payload ? JSON.stringify(raw_payload).slice(0, 8000) : null,
+           tid);
   } catch (e) {
     // Уже есть — игнорируем (race condition)
     if (e.code !== 'SQLITE_CONSTRAINT_PRIMARYKEY') throw e;
   }
 }
 
-function awoListProcessed(limit = 100) {
+function awoListProcessed(limit = 100, tenantId) {
+  if (tenantId) {
+    return db.prepare(
+      `SELECT id_account, processed_at, email, phone, course, invite_code, result
+       FROM awo_processed WHERE tenant_id=? ORDER BY processed_at DESC LIMIT ?`
+    ).all(tenantId, limit);
+  }
   return db.prepare(
     `SELECT id_account, processed_at, email, phone, course, invite_code, result
      FROM awo_processed ORDER BY processed_at DESC LIMIT ?`
@@ -2308,16 +2346,26 @@ function awoListProcessed(limit = 100) {
 
 // ── AWO course ↔ group chat mapping ─────────────────────────────────────────────
 
-function setAwoCourseChat(course, chatId) {
+// Per-tenant маппинг: один и тот же course может быть у двух tenant'ов
+// независимо (разные школы — разные курсы с похожими названиями). Идём по
+// (tenant_id, course). Уникальность сохраняем на уровне приложения: при
+// upsert делаем DELETE + INSERT, чтобы не зависеть от старого PK course-only.
+function setAwoCourseChat(course, chatId, tenantId) {
   if (!course || !chatId) throw new Error('course and chatId required');
-  db.prepare(`INSERT INTO awo_course_chats (course, chat_id, created_at)
-    VALUES (?, ?, ?)
-    ON CONFLICT(course) DO UPDATE SET chat_id=excluded.chat_id`)
-    .run(String(course).trim(), chatId, now());
+  const tid = tenantId || DEFAULT_TENANT_ID;
+  db.transaction(() => {
+    db.prepare('DELETE FROM awo_course_chats WHERE tenant_id=? AND course=? COLLATE NOCASE')
+      .run(tid, String(course).trim());
+    db.prepare(`INSERT INTO awo_course_chats (course, chat_id, tenant_id, created_at)
+      VALUES (?, ?, ?, ?)`)
+      .run(String(course).trim(), chatId, tid, now());
+  })();
 }
 
-function deleteAwoCourseChat(course) {
-  db.prepare('DELETE FROM awo_course_chats WHERE course=? COLLATE NOCASE').run(course);
+function deleteAwoCourseChat(course, tenantId) {
+  const tid = tenantId || DEFAULT_TENANT_ID;
+  db.prepare('DELETE FROM awo_course_chats WHERE tenant_id=? AND course=? COLLATE NOCASE')
+    .run(tid, course);
 }
 
 // Подбор чата под название курса из АВО.
@@ -2328,28 +2376,32 @@ function deleteAwoCourseChat(course) {
 //   3. Ищем маппинг где сохранённый `course` входит подстрокой в `goods`
 //      (case-insensitive). Например маппинг "Zoom Участник" сматчит
 //      "BL School — Zoom Участник, поток 5"
-function getChatForCourse(goods) {
+function getChatForCourse(goods, tenantId) {
   if (!goods) return null;
   const goodsLower = String(goods).trim().toLowerCase();
   if (!goodsLower) return null;
+  const tid = tenantId || DEFAULT_TENANT_ID;
 
-  // Глобальные стоп-слова
-  const excludeRaw = getSetting('awo_chat_excludes', 'слушатель,запись') || '';
+  // Стоп-слова берём из tenant'а (старые system_settings.awo_chat_excludes
+  // мигрированы в tenant.chat_excludes)
+  const tenant = getTenantById(tid);
+  const excludeRaw = (tenant?.chat_excludes ?? getSetting('awo_chat_excludes', 'слушатель,запись')) || '';
   const excludes = String(excludeRaw).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   for (const ex of excludes) {
     if (goodsLower.includes(ex)) {
-      console.log(`[AWO] курс "${goods}" содержит стоп-слово "${ex}" — чат не назначаем`);
+      console.log(`[AWO][${tid}] курс "${goods}" содержит стоп-слово "${ex}" — чат не назначаем`);
       return null;
     }
   }
 
-  // Сначала пробуем точный матч (быстрый путь, обратная совместимость)
-  const exact = db.prepare('SELECT chat_id FROM awo_course_chats WHERE course=? COLLATE NOCASE')
-    .get(String(goods).trim());
+  // Точный матч в рамках tenant'а
+  const exact = db.prepare(
+    'SELECT chat_id FROM awo_course_chats WHERE tenant_id=? AND course=? COLLATE NOCASE'
+  ).get(tid, String(goods).trim());
   if (exact) return exact.chat_id;
 
-  // Затем — подстрочный матч: маппинг с самым длинным совпавшим паттерном выигрывает
-  const all = db.prepare('SELECT course, chat_id FROM awo_course_chats').all();
+  // Подстрочный матч — только маппинги текущего tenant'а
+  const all = db.prepare('SELECT course, chat_id FROM awo_course_chats WHERE tenant_id=?').all(tid);
   let best = null;
   for (const row of all) {
     const pattern = String(row.course || '').trim().toLowerCase();
@@ -2371,7 +2423,17 @@ function listAllGroupChats() {
   ).all();
 }
 
-function listAwoCourseChats() {
+function listAwoCourseChats(tenantId) {
+  if (tenantId) {
+    return db.prepare(
+      `SELECT ac.course, ac.chat_id, ac.created_at,
+              c.name AS chat_name, c.type AS chat_type
+       FROM awo_course_chats ac
+       LEFT JOIN conversations c ON c.id = ac.chat_id
+       WHERE ac.tenant_id = ?
+       ORDER BY ac.created_at DESC`
+    ).all(tenantId);
+  }
   return db.prepare(
     `SELECT ac.course, ac.chat_id, ac.created_at,
             c.name AS chat_name, c.type AS chat_type

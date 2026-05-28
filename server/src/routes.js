@@ -152,16 +152,19 @@ module.exports = function makeRouter(db, broadcast) {
     // Активация школьного инвайта (от АВО): отметить как использованный + добавить
     // школьный аккаунт в контакты + автодобавление в групповой чат курса
     if (schoolInvite) {
+      // tenant_id берём из инвайта — webhook сохранил его туда. Все
+      // последующие действия (школьный аккаунт, чат курса, приветствие)
+      // выполняются от лица этого tenant'а.
+      const inviteTenantId = schoolInvite.tenant_id || db.DEFAULT_TENANT_ID;
       try { db.markSchoolInviteUsed(schoolInvite.code, user.id); } catch (e) { console.error('[school-invite]', e.message); }
       try {
-        const school = db.getSchoolAccount();
+        const school = db.getSchoolAccount(inviteTenantId);
         if (school) {
           try { db.addContact(user.id, school.id, null); } catch {}
         }
       } catch {}
-      // Автодобавление в групповой чат курса
       if (schoolInvite.course) {
-        const chatId = db.getChatForCourse(schoolInvite.course);
+        const chatId = db.getChatForCourse(schoolInvite.course, inviteTenantId);
         if (chatId) {
           try {
             const result = db.addUserToChat(chatId, user.id);
@@ -169,7 +172,7 @@ module.exports = function makeRouter(db, broadcast) {
               try {
                 db.createMessage({
                   conversationId: chatId,
-                  senderId: db.getSchoolUserId(),
+                  senderId: db.getSchoolUserId(inviteTenantId),
                   text: `🎓 ${user.name} присоединился к курсу «${schoolInvite.course}»`,
                 });
               } catch {}
@@ -177,7 +180,7 @@ module.exports = function makeRouter(db, broadcast) {
             }
           } catch (e) { console.error('[awo-course-chat]', e.message); }
         } else {
-          console.warn(`[awo] нет маппинга курса "${schoolInvite.course}" → чат`);
+          console.warn(`[awo][${inviteTenantId}] нет маппинга курса "${schoolInvite.course}" → чат`);
         }
       }
     }
@@ -1709,25 +1712,25 @@ module.exports = function makeRouter(db, broadcast) {
     const email  = (req.query.email  || '').trim().toLowerCase();
     const course = (req.query.course || '').trim();
     const sig    = (req.query.sig    || '').trim();
+    const explicitTenantId = (req.query.tenant || '').trim() || null;
 
     if (!email) return res.status(400).json({ ok: false, error: 'email обязателен' });
     if (!awo.isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Неверный формат email' });
 
-    const validSig = sig && awo.verifyJoin(email, course, sig);
-
     // Уже есть аккаунт с таким email — фронт покажет «войди»
     const existing = db.findUserByEmail(email);
     if (existing) {
-      // Для существующего пользователя — пускаем только если есть валидная подпись
-      // ИЛИ есть запись об оплате в awo_processed (защита от перебора)
-      if (!validSig) {
-        return res.json({ ok: true, alreadyRegistered: true, email, course });
-      }
       return res.json({ ok: true, alreadyRegistered: true, email, course });
     }
 
-    // Ищем подготовленный webhook'ом инвайт
-    let invite = db.findActiveSchoolInviteByEmail(email);
+    // Ищем подготовленный webhook'ом инвайт. Если в query явно указан tenant
+    // — фильтруем по нему; иначе берём свежайший в любом tenant'е.
+    let invite = db.findActiveSchoolInviteByEmail(email, explicitTenantId);
+    // Tenant для проверки sig + связанных операций
+    let tenantId = invite?.tenant_id || explicitTenantId || db.DEFAULT_TENANT_ID;
+    const tenant = db.getTenantById(tenantId);
+    // verifyJoin теперь с tenant-секретом
+    const validSig = sig && tenant && awo.verifyJoin(email, course, sig, tenant.awo_join_secret);
 
     // Если подписи нет и инвайта нет — отказ. Возможно оплата ещё не дошла.
     if (!validSig && !invite) {
@@ -1739,7 +1742,7 @@ module.exports = function makeRouter(db, broadcast) {
 
     // Если подпись валидна, но инвайта нет (webhook ещё не пришёл) — создаём на лету
     if (validSig && !invite) {
-      invite = db.createSchoolInvite({ bound_email: email, course });
+      invite = db.createSchoolInvite({ bound_email: email, course, tenantId });
     }
 
     res.json({
@@ -1748,7 +1751,8 @@ module.exports = function makeRouter(db, broadcast) {
       email,
       course: invite.course || course,
       schoolInviteCode: invite.code,
-      schoolName: db.getSchoolAccount()?.name || 'Школа',
+      schoolName: db.getSchoolAccount(invite.tenant_id)?.name || 'Школа',
+      tenantId: invite.tenant_id || null,
       // Поля для предзаполнения формы регистрации (из payload АВО)
       prefillName:  invite.bound_name  || null,
       prefillPhone: invite.bound_phone || null,
@@ -1756,14 +1760,37 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   // Webhook от АВО — публичный endpoint, защищён токеном из .env (AWO_WEBHOOK_TOKEN)
-  r.post('/integrations/awo/webhook', rateLimit(120, 60 * 1000), (req, res) => {
-    // Логируем raw payload до любых проверок (для отладки)
+  // Multi-tenant AWO webhook. Два URL'а:
+  //   POST /api/integrations/awo/webhook?token=…              (legacy → tnt_default)
+  //   POST /api/integrations/awo/webhook/:tenantId?token=…    (явный tenant)
+  // В обоих случаях token должен совпадать с tenant.awo_webhook_token.
+  function handleAwoWebhook(req, res, explicitTenantId) {
     const payload = req.body || {};
     console.log('[AWO webhook]', JSON.stringify(payload).slice(0, 500));
 
-    if (!awo.checkWebhookToken(req)) {
-      return res.status(401).json({ error: 'Invalid token' });
+    const provided = awo.extractWebhookToken(req);
+    let tenant = null;
+    if (explicitTenantId) {
+      tenant = db.getTenantById(explicitTenantId);
+      if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+      if (tenant.awo_webhook_token !== provided) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    } else {
+      // Legacy URL — ищем tenant'а по токену. Если токен пустой и default
+      // tenant тоже без токена (dev) — пропускаем.
+      if (provided) {
+        tenant = db.getTenantByToken(provided);
+        if (!tenant) return res.status(401).json({ error: 'Invalid token' });
+      } else {
+        tenant = db.getTenantById(db.DEFAULT_TENANT_ID);
+        if (tenant?.awo_webhook_token) {
+          // У дефолта есть токен, а в запросе нет → отказ
+          return res.status(401).json({ error: 'Invalid token' });
+        }
+      }
     }
+    const tenantId = tenant.id;
 
     const id_account        = payload.id_account || payload.invoice_id || payload.id;
     const id_account_status = Number(payload.id_account_status ?? payload.status ?? 0);
@@ -1798,19 +1825,18 @@ module.exports = function makeRouter(db, broadcast) {
       return res.json({ ok: true, ignored: 'status_' + id_account_status });
     }
 
-    // Идемпотентность — срабатывает только для уже финально обработанных оплат
-    if (db.awoIsProcessed(id_account)) {
+    // Идемпотентность — per-tenant
+    if (db.awoIsProcessed(id_account, tenantId)) {
       return res.json({ ok: true, ignored: 'already_processed' });
     }
 
-    // Тестовый режим: фильтруем по курсу
-    const settings = db.getAwoSettings();
-    if (settings.test_mode) {
-      const testCourse = (settings.test_course || '').trim().toLowerCase();
+    // Тестовый режим из настроек tenant'а
+    if (tenant.test_mode) {
+      const testCourse = (tenant.test_course || '').trim().toLowerCase();
       if (testCourse && goods.toLowerCase() !== testCourse) {
         db.awoMarkProcessed({ id_account, email: rawEmail, phone: rawPhone, course: goods,
-          result: 'ignored_test_mode', raw_payload: payload });
-        console.log(`[AWO] тестовый режим: курс "${goods}" не совпадает с "${testCourse}" — игнор`);
+          result: 'ignored_test_mode', raw_payload: payload, tenantId });
+        console.log(`[AWO][${tenantId}] тестовый режим: курс "${goods}" не совпадает с "${testCourse}" — игнор`);
         return res.json({ ok: true, ignored: 'test_mode' });
       }
     }
@@ -1818,7 +1844,7 @@ module.exports = function makeRouter(db, broadcast) {
     // Валидация — email обязателен (основной ключ)
     if (!awo.isValidEmail(rawEmail)) {
       db.awoMarkProcessed({ id_account, email: rawEmail, phone: rawPhone, course: goods,
-        result: 'invalid_email', raw_payload: payload });
+        result: 'invalid_email', raw_payload: payload, tenantId });
       return res.status(400).json({ error: 'Invalid email' });
     }
 
@@ -1834,9 +1860,8 @@ module.exports = function makeRouter(db, broadcast) {
       : (phone ? db.findUserByPhone(phone) : null);
     if (existing) {
       let extraResult = 'user_exists';
-      // Если есть маппинг курса → добавить в чат курса
       if (goods) {
-        const chatId = db.getChatForCourse(goods);
+        const chatId = db.getChatForCourse(goods, tenantId);
         if (chatId) {
           try {
             const r = db.addUserToChat(chatId, existing.id);
@@ -1844,7 +1869,7 @@ module.exports = function makeRouter(db, broadcast) {
               try {
                 db.createMessage({
                   conversationId: chatId,
-                  senderId: db.getSchoolUserId(),
+                  senderId: db.getSchoolUserId(tenantId),
                   text: `🎓 ${existing.name} присоединился к курсу «${goods}»`,
                 });
               } catch {}
@@ -1859,7 +1884,7 @@ module.exports = function makeRouter(db, broadcast) {
         }
       }
       db.awoMarkProcessed({ id_account, email: rawEmail, phone, course: goods,
-        result: extraResult, raw_payload: payload });
+        result: extraResult, raw_payload: payload, tenantId });
       return res.json({ ok: true, result: extraResult });
     }
 
@@ -1867,62 +1892,140 @@ module.exports = function makeRouter(db, broadcast) {
     // полями (name/phone), фронт подставит их на форму регистрации.
     const invite = db.createSchoolInvite({
       bound_email: rawEmail, bound_phone: phone, course: goods, bound_name: rawName,
+      tenantId,
     });
     db.awoMarkProcessed({ id_account, email: rawEmail, phone, course: goods,
-      invite_code: invite.code, result: 'invite_created', raw_payload: payload });
+      invite_code: invite.code, result: 'invite_created', raw_payload: payload, tenantId });
 
     res.json({ ok: true, result: 'invite_created', invite_code: invite.code });
-  });
+  }
+
+  // Legacy URL → дефолтный tenant (через token lookup)
+  r.post('/integrations/awo/webhook', rateLimit(120, 60 * 1000),
+    (req, res) => handleAwoWebhook(req, res, null));
+  // Multi-tenant URL — явный tenant id
+  r.post('/integrations/awo/webhook/:tenantId', rateLimit(120, 60 * 1000),
+    (req, res) => handleAwoWebhook(req, res, req.params.tenantId));
 
   // Админка: настройки AWO
+  // Helper: tenantId из query или дефолт. Все админ-AWO ручки умеют его принять.
+  function tenantFromReq(req) {
+    return (req.query.tenantId || req.body?.tenantId || db.DEFAULT_TENANT_ID);
+  }
+
   r.get('/admin/awo/settings', requireAdmin, (req, res) => {
-    res.json(db.getAwoSettings());
+    const tid = tenantFromReq(req);
+    const t = db.getTenantById(tid);
+    if (!t) return res.status(404).json({ error: 'Tenant not found' });
+    const account = t.account_id ? db.findUserById(t.account_id) : null;
+    res.json({
+      tenant_id:    t.id,
+      test_mode:    !!t.test_mode,
+      test_course:  t.test_course || '',
+      chat_excludes: t.chat_excludes || 'слушатель,запись',
+      webhook_token: t.awo_webhook_token,
+      school_account: account ? {
+        id: account.id, name: account.name, avatar: account.avatar, phone: account.phone,
+        is_default: false,
+      } : null,
+    });
   });
   r.put('/admin/awo/settings', requireAdmin, (req, res) => {
+    const tid = tenantFromReq(req);
     const { test_mode, test_course, chat_excludes, school_account_id } = req.body || {};
     try {
-      res.json(db.setAwoSettings({ test_mode, test_course, chat_excludes, school_account_id }));
+      // Валидация привязанного юзера
+      if (school_account_id !== undefined && school_account_id) {
+        const u = db.findUserById(school_account_id);
+        if (!u) throw new Error('Пользователь не найден');
+        if (u.is_blocked) throw new Error('Пользователь заблокирован');
+      }
+      const t = db.updateTenant(tid, {
+        test_mode, test_course, chat_excludes,
+        ...(school_account_id !== undefined ? { account_id: school_account_id || null } : {}),
+      });
+      const account = t.account_id ? db.findUserById(t.account_id) : null;
+      res.json({
+        tenant_id:    t.id,
+        test_mode:    !!t.test_mode,
+        test_course:  t.test_course || '',
+        chat_excludes: t.chat_excludes || 'слушатель,запись',
+        webhook_token: t.awo_webhook_token,
+        school_account: account ? {
+          id: account.id, name: account.name, avatar: account.avatar, phone: account.phone,
+          is_default: false,
+        } : null,
+      });
     } catch (e) {
       res.status(400).json({ error: e.message });
     }
   });
 
-  // Админка: маппинг курс ↔ групповой чат
+  // Маппинг курс ↔ чат — per-tenant
   r.get('/admin/awo/course-chats', requireAdmin, (req, res) => {
-    res.json(db.listAwoCourseChats());
+    res.json(db.listAwoCourseChats(tenantFromReq(req)));
   });
   r.post('/admin/awo/course-chats', requireAdmin, (req, res) => {
     const { course, chat_id } = req.body || {};
     if (!course || !chat_id) return res.status(400).json({ error: 'course и chat_id обязательны' });
     try {
-      db.setAwoCourseChat(course, chat_id);
+      db.setAwoCourseChat(course, chat_id, tenantFromReq(req));
       res.json({ ok: true });
     } catch (e) { res.status(400).json({ error: e.message }); }
   });
   r.delete('/admin/awo/course-chats/:course', requireAdmin, (req, res) => {
-    db.deleteAwoCourseChat(req.params.course);
+    db.deleteAwoCourseChat(req.params.course, tenantFromReq(req));
     res.json({ ok: true });
   });
 
-  // Админка: список всех групповых чатов (для выбора при маппинге)
+  // Список всех групповых чатов (для выбора при маппинге)
   r.get('/admin/group-chats', requireAdmin, (req, res) => {
     res.json(db.listAllGroupChats());
   });
 
-  // Админка: лог webhook'ов AWO
+  // Лог webhook'ов AWO — per-tenant
   r.get('/admin/awo/log', requireAdmin, (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 500);
-    res.json(db.awoListProcessed(limit));
+    res.json(db.awoListProcessed(limit, tenantFromReq(req)));
   });
 
-  // Админка: сгенерировать /join-ссылку (для ручной отправки/тестирования)
+  // ── Multi-tenant CRUD ───────────────────────────────────────────────────
+  r.get('/admin/awo/tenants', requireAdmin, (req, res) => {
+    res.json(db.listTenants());
+  });
+  r.post('/admin/awo/tenants', requireAdmin, (req, res) => {
+    const { name } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    try {
+      const t = db.createTenant({ name: name.trim(), ownerId: req.user.id });
+      res.json(t);
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+  r.delete('/admin/awo/tenants/:id', requireAdmin, (req, res) => {
+    if (req.params.id === db.DEFAULT_TENANT_ID) {
+      return res.status(400).json({ error: 'Нельзя удалить tenant по умолчанию' });
+    }
+    db.deleteTenant(req.params.id);
+    res.json({ ok: true });
+  });
+  r.post('/admin/awo/tenants/:id/rotate-token', requireAdmin, (req, res) => {
+    const t = db.rotateTenantToken(req.params.id);
+    if (!t) return res.status(404).json({ error: 'Tenant not found' });
+    res.json(t);
+  });
+
+  // Админка: сгенерировать /join-ссылку для конкретного tenant'а
   r.post('/admin/awo/join-link', requireAdmin, (req, res) => {
     const email  = (req.body?.email  || '').trim().toLowerCase();
     const course = (req.body?.course || '').trim();
+    const tenantId = (req.body?.tenantId || db.DEFAULT_TENANT_ID);
     if (!awo.isValidEmail(email)) return res.status(400).json({ error: 'Неверный email' });
-    const sig = awo.signJoin(email, course);
+    const tenant = db.getTenantById(tenantId);
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+    const sig = awo.signJoin(email, course, tenant.awo_join_secret);
     const base = process.env.PUBLIC_URL || (req.protocol + '://' + req.get('host'));
-    const url = `${base}/join?email=${encodeURIComponent(email)}&course=${encodeURIComponent(course)}&sig=${sig}`;
+    const tenantParam = tenantId !== db.DEFAULT_TENANT_ID ? `&tenant=${encodeURIComponent(tenantId)}` : '';
+    const url = `${base}/join?email=${encodeURIComponent(email)}&course=${encodeURIComponent(course)}${tenantParam}&sig=${sig}`;
     res.json({ url, sig });
   });
 
