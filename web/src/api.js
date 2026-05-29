@@ -84,6 +84,7 @@ export const api = {
   addContact:     (data)   => req('POST', '/contacts', data),
   deleteContact:  (id)     => req('DELETE', `/contacts/${id}`),
   updateContactNotes: (id, notes) => req('PATCH', `/contacts/${id}/notes`, { notes }),
+  updateContactNickname: (id, nickname) => req('PATCH', `/contacts/${id}/nickname`, { nickname }),
 
   // Blocks
   getBlocked:   ()       => req('GET', '/blocks'),

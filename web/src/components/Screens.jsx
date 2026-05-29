@@ -2309,6 +2309,9 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
   const [notes, setNotes]         = useState(contact.notes || '');
   const [notesSaved, setNotesSaved] = useState(false);
   const [avatarFull, setAvatarFull] = useState(false);
+  const [editingNick, setEditingNick] = useState(false);
+  const [nickDraft, setNickDraft] = useState(contact.nickname || '');
+  const [nickSaving, setNickSaving] = useState(false);
   // Свежие данные профиля (аватар / bio / headline / active_moments) —
   // подтягиваем при открытии чтобы карточка не показывала устаревшие данные.
   const [fresh, setFresh] = useState(null);
@@ -2378,10 +2381,58 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
             }}><Icon name="search" size={22}/></div>
           </div>
           <div style={{textAlign:'center', width:'100%'}}>
-            <div style={{color:'white',fontSize:20,fontWeight:700}}>
-              {merged.nickname || merged.name}
-            </div>
-            {merged.nickname && (
+            {!editingNick ? (
+              <div style={{color:'white',fontSize:20,fontWeight:700,display:'inline-flex',alignItems:'center',gap:6}}>
+                {merged.nickname || merged.name}
+                {isContact && !merged.is_system && !merged.is_deleted && (
+                  <button onClick={() => { setNickDraft(merged.nickname || ''); setEditingNick(true); }}
+                    title="Изменить прозвище"
+                    style={{background:'none',border:'none',color:'rgba(255,255,255,.45)',
+                      cursor:'pointer',padding:'2px 6px',fontSize:14,lineHeight:1,fontFamily:'inherit'}}>
+                    ✎
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div style={{display:'flex',gap:6,justifyContent:'center',alignItems:'center'}}>
+                <input value={nickDraft} onChange={e => setNickDraft(e.target.value)}
+                  autoFocus placeholder={merged.name} maxLength={60}
+                  onKeyDown={async e => {
+                    if (e.key === 'Escape') { setEditingNick(false); }
+                    if (e.key === 'Enter') {
+                      setNickSaving(true);
+                      try {
+                        await api.updateContactNickname(contact.id, nickDraft.trim() || null);
+                        merged.nickname = nickDraft.trim() || null;
+                        contact.nickname = merged.nickname;
+                      } catch {}
+                      setNickSaving(false); setEditingNick(false);
+                    }
+                  }}
+                  style={{background:'rgba(255,255,255,.1)',border:'1px solid rgba(255,255,255,.2)',
+                    borderRadius:8,padding:'6px 10px',color:'white',fontSize:15,
+                    fontFamily:'inherit',outline:'none',textAlign:'center',width:'70%'}}/>
+                <button disabled={nickSaving} onClick={async () => {
+                    setNickSaving(true);
+                    try {
+                      await api.updateContactNickname(contact.id, nickDraft.trim() || null);
+                      merged.nickname = nickDraft.trim() || null;
+                      contact.nickname = merged.nickname;
+                    } catch {}
+                    setNickSaving(false); setEditingNick(false);
+                  }}
+                  style={{background:'rgba(120,90,200,.7)',border:'none',color:'white',
+                    borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:13,fontFamily:'inherit'}}>
+                  ✓
+                </button>
+                <button onClick={() => setEditingNick(false)}
+                  style={{background:'rgba(255,255,255,.08)',border:'none',color:'rgba(255,255,255,.7)',
+                    borderRadius:8,padding:'6px 10px',cursor:'pointer',fontSize:13,fontFamily:'inherit'}}>
+                  ✕
+                </button>
+              </div>
+            )}
+            {merged.nickname && !editingNick && (
               <div style={{color:'rgba(255,255,255,.55)',fontSize:14,marginTop:2}}>{merged.name}</div>
             )}
             {merged.headline && (

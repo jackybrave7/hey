@@ -551,6 +551,11 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  r.patch('/contacts/:id/nickname', requireAuth, (req, res) => {
+    db.updateContactNickname(req.user.id, req.params.id, req.body.nickname);
+    res.json({ ok: true });
+  });
+
   // ── Blocks ──────────────────────────────────────────────────────────────────
   r.get('/blocks', requireAuth, (req, res) => {
     res.json(db.getBlockedUsers(req.user.id));

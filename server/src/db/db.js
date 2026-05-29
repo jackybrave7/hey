@@ -1532,6 +1532,11 @@ function updateContactNotes(ownerId, contactId, notes) {
   db.prepare('UPDATE contacts SET notes=? WHERE owner_id=? AND contact_id=?').run(notes ?? null, ownerId, contactId);
 }
 
+function updateContactNickname(ownerId, contactId, nickname) {
+  const v = nickname == null ? null : String(nickname).trim().slice(0, 60) || null;
+  db.prepare('UPDATE contacts SET nickname=? WHERE owner_id=? AND contact_id=?').run(v, ownerId, contactId);
+}
+
 // ── Reactions ──────────────────────────────────────────────────────────────
 
 function toggleReaction(messageId, userId, emoji) {
@@ -2704,7 +2709,7 @@ module.exports = {
   getCalls, createCall,
   setOnline, getPresence,
   toggleReaction, getMessageReactions, getReactionsForMessages,
-  blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes,
+  blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes, updateContactNickname,
   getReferralCount, findUserByInviteCode,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   getTotalUnreadFor,

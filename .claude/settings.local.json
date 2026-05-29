@@ -220,7 +220,8 @@
       "Bash(curl -s https://hey-messenger.ru/)",
       "Bash(curl -s https://hey-messenger.ru/assets/index-CACnnl9L.js)",
       "Bash(grep -oE '.{0,40}/chats?/.{0,40}' /tmp/heyjs.txt)",
-      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git pull && pm2 restart hey\")"
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git pull && pm2 restart hey\")",
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git pull && cd web && npm run build && pm2 restart hey\")"
     ]
   }
 }
