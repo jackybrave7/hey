@@ -7482,13 +7482,21 @@ export function ChatScreen() {
               </div>
             );
             if (item.type === 'typing') return (
-              <div style={{display:'flex',gap:4,alignItems:'center',padding:'6px 24px 14px'}}>
-                <div style={{color:'rgba(255,255,255,.6)',fontSize:13}}>{typing} печатает</div>
-                <div style={{display:'flex',gap:3}}>
-                  {[0,1,2].map(i=>(
-                    <div key={i} style={{width:6,height:6,borderRadius:'50%',
-                      background:'rgba(255,255,255,.5)',animation:`typing 1.2s ${i*.2}s infinite`}}/>
-                  ))}
+              // Та же ширина и центрирование что и у пузырьков — иначе
+              // на широких экранах индикатор уходит в левый край, а на
+              // мобиле подползает прямо под имя последнего сообщения.
+              <div style={{maxWidth:680,margin:'0 auto',padding:'4px 24px 12px'}}>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  <div style={{color:'rgba(255,255,255,.6)',fontSize:13,
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {typing} печатает
+                  </div>
+                  <div style={{display:'flex',gap:3,flexShrink:0}}>
+                    {[0,1,2].map(i=>(
+                      <div key={i} style={{width:6,height:6,borderRadius:'50%',
+                        background:'rgba(255,255,255,.5)',animation:`typing 1.2s ${i*.2}s infinite`}}/>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
@@ -7675,9 +7683,12 @@ export function ChatScreen() {
         if (!preview && (att?.type === 'image' || att?.type === 'images')) preview = '🖼 Фото';
         if (!preview && att?.type === 'audio') preview = '🎙 Голосовое';
         return (
-          <div style={{background:'rgba(100,78,148,.5)',flexShrink:0}}>
+          // overflow:hidden — критично для мобилок: длинное имя отправителя
+          // или длинный URL в превью не должен распирать чат и вызывать
+          // горизонтальный скролл всего экрана.
+          <div style={{background:'rgba(100,78,148,.5)',flexShrink:0,overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 14px',
-              maxWidth:680,margin:'0 auto'}}>
+              maxWidth:680,margin:'0 auto',minWidth:0}}>
               <div style={{
                 width:3,alignSelf:'stretch',minHeight:38,
                 background:'rgba(180,140,255,.85)',borderRadius:2,flexShrink:0,
@@ -7688,18 +7699,22 @@ export function ChatScreen() {
               )}
               <div style={{flex:1,minWidth:0}}>
                 <div style={{color:'rgba(200,170,255,.95)',fontSize:12,fontWeight:700,
-                  display:'flex',alignItems:'center',gap:6}}>
-                  <span>↩</span>
-                  <span>В ответ {isOwnReply ? 'себе' : (replyTo.sender_name || partner.name)}</span>
+                  display:'flex',alignItems:'center',gap:6,
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  <span style={{flexShrink:0}}>↩</span>
+                  <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0}}>
+                    В ответ {isOwnReply ? 'себе' : (replyTo.sender_name || partner.name)}
+                  </span>
                 </div>
                 <div style={{color:'rgba(255,255,255,.7)',fontSize:13,
-                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:2}}>
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:2,
+                  wordBreak:'break-all'}}>
                   {preview ? renderPreviewWithEmoji(preview) : '…'}
                 </div>
               </div>
               <button onClick={() => setReplyTo(null)}
                 style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
-                  fontSize:22,cursor:'pointer',lineHeight:1,padding:'0 4px'}}>✕</button>
+                  fontSize:22,cursor:'pointer',lineHeight:1,padding:'0 4px',flexShrink:0}}>✕</button>
             </div>
           </div>
         );
@@ -7707,17 +7722,17 @@ export function ChatScreen() {
 
       {/* Edit banner */}
       {editingMsg && (
-        <div style={{background:'rgba(100,78,148,.5)',flexShrink:0}}>
+        <div style={{background:'rgba(100,78,148,.5)',flexShrink:0,overflow:'hidden'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'6px 14px',
-            maxWidth:680,margin:'0 auto'}}>
-            <span style={{color:'rgba(255,255,255,.85)',display:'inline-flex'}}><Icon name="pencil" size={15}/></span>
-            <span style={{flex:1,color:'rgba(255,255,255,.8)',fontSize:13,
+            maxWidth:680,margin:'0 auto',minWidth:0}}>
+            <span style={{color:'rgba(255,255,255,.85)',display:'inline-flex',flexShrink:0}}><Icon name="pencil" size={15}/></span>
+            <span style={{flex:1,minWidth:0,color:'rgba(255,255,255,.8)',fontSize:13,
               overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
               {editingMsg.text}
             </span>
             <button onClick={cancelEdit}
               style={{background:'none',border:'none',color:'rgba(255,255,255,.6)',
-                fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+                fontSize:20,cursor:'pointer',lineHeight:1,flexShrink:0}}>✕</button>
           </div>
         </div>
       )}
@@ -8051,10 +8066,12 @@ export function ChatScreen() {
 
         {/* ── Normal text input bar (hidden while recording/preview/system) ── */}
         {!voiceState && !partner.isSystem && (
-        <div style={{padding:'8px 14px 14px',maxWidth:680,margin:'0 auto'}}>
+        <div style={{padding:'8px 14px 14px',maxWidth:680,margin:'0 auto',
+          minWidth:0,boxSizing:'border-box',width:'100%'}}>
           <div style={{
             borderRadius:26,
             display:'flex', alignItems:'center', padding:'8px 8px 8px 14px', gap:6,
+            minWidth:0,
             backgroundImage:'url(/input-bg.jpg)',
             backgroundSize:'cover',
             backgroundPosition:'center',
@@ -8064,7 +8081,7 @@ export function ChatScreen() {
             <textarea ref={textareaRef} value={text} onChange={handleInput} onKeyDown={handleKey}
               placeholder="Написать сообщение..."
               rows={1}
-              style={{flex:1,background:'none',border:'none',outline:'none',color:'white',
+              style={{flex:1,minWidth:0,background:'none',border:'none',outline:'none',color:'white',
                 fontFamily:'inherit',fontSize:14,resize:'none',lineHeight:'1.4',
                 maxHeight:100,overflow:'auto'}}/>
             {/* Emoji */}
