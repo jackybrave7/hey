@@ -713,15 +713,32 @@ function AvatarPicker({ avatar, onChange, size = 136, disabled = false }) {
         : <span style={{fontSize: size * 0.32, color: 'rgba(255,255,255,.7)'}}>+</span>
       }
       {!disabled && (
-        <div style={{
-          position:'absolute', inset:0, background:'rgba(0,0,0,.35)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          opacity: 0, transition:'opacity .2s',
-          borderRadius:'50%', fontSize:13, color:'white', textAlign:'center', padding:8
-        }}
-          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '0'}
-        ><div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Icon name="camera" size={20}/>Сменить</div></div>
+        <>
+          {/* Постоянно видимый бейдж-камера (важен для тач-устройств,
+              где hover не работает и пользователь не понимает, что
+              аватарку можно тапнуть для смены). */}
+          <div style={{
+            position:'absolute', right: size*0.02, bottom: size*0.02,
+            width: size*0.28, height: size*0.28, borderRadius:'50%',
+            background:'rgba(120,90,200,.95)',
+            border:'2px solid rgba(255,255,255,.9)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            color:'white', boxShadow:'0 2px 8px rgba(0,0,0,.4)',
+            pointerEvents:'none',
+          }}>
+            <Icon name="camera" size={Math.round(size*0.14)}/>
+          </div>
+          {/* Hover-оверлей для десктопа */}
+          <div style={{
+            position:'absolute', inset:0, background:'rgba(0,0,0,.35)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            opacity: 0, transition:'opacity .2s',
+            borderRadius:'50%', fontSize:13, color:'white', textAlign:'center', padding:8
+          }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+          ><div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Icon name="camera" size={20}/>Сменить</div></div>
+        </>
       )}
       <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleFile}/>
     </div>
