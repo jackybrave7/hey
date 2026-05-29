@@ -52,7 +52,7 @@ export default function GroupJoinScreen() {
     setBusy(true);
     try {
       const r = await api.groupInviteAccept(token);
-      nav('/chats/' + r.conversationId);
+      nav('/chat/' + r.conversationId);
     } catch (e) { setError(e.message); setBusy(false); }
   }
 
