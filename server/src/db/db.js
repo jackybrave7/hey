@@ -554,7 +554,7 @@ function normalizeAvatars(rows) {
 }
 
 function updateUser(id, fields) {
-  const allowed = ['name','phone','birthday','avatar','bio','headline','email'];
+  const allowed = ['name','phone','birthday','avatar','bio','headline','email','password','must_change_password'];
   const sets = Object.keys(fields).filter(k => allowed.includes(k));
   if (!sets.length) return findUserById(id);
   const normalized = { ...fields };

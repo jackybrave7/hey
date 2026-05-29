@@ -215,7 +215,12 @@
       "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && pm2 restart hey\")",
       "Bash(awk '/function getConversationsForUser/,/^function [a-z]/' /c/projects/hey/server/src/db/db.js)",
       "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@72.56.16.44 \"cd /app && git checkout -- package-lock.json 2>/dev/null; git pull && cd web && npm run build 2>&1 | tail -3 && pm2 restart hey\")",
-      "Bash(cd /c/projects/hey/web && sed -i \"s|location\\\\.origin|window.location.origin|g\" src/components/admin/AdminAwo.jsx && grep -n \"location\\\\.origin\" src/components/admin/AdminAwo.jsx | head -5)"
+      "Bash(cd /c/projects/hey/web && sed -i \"s|location\\\\.origin|window.location.origin|g\" src/components/admin/AdminAwo.jsx && grep -n \"location\\\\.origin\" src/components/admin/AdminAwo.jsx | head -5)",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "Bash(curl -s https://hey-messenger.ru/)",
+      "Bash(curl -s https://hey-messenger.ru/assets/index-CACnnl9L.js)",
+      "Bash(grep -oE '.{0,40}/chats?/.{0,40}' /tmp/heyjs.txt)",
+      "Bash(ssh -o StrictHostKeyChecking=no root@72.56.16.44 \"cd /app && git pull && pm2 restart hey\")"
     ]
   }
 }
