@@ -910,10 +910,11 @@ function getOrCreateDirectConversation(userId1, userId2) {
   ).get(userId1, userId2);
   if (existing) return existing;
 
-  // Determine if this is a request (neither is in the other's contacts)
+  // Request-lock: срабатывает, если отправитель (userId1) НЕ в контактах
+  // у получателя (userId2). Обратная связь не важна — наличие получателя
+  // в контактах у отправителя ничего не говорит о согласии получателя.
   const u1inU2 = !!db.prepare('SELECT 1 FROM contacts WHERE owner_id=? AND contact_id=?').get(userId2, userId1);
-  const u2inU1 = !!db.prepare('SELECT 1 FROM contacts WHERE owner_id=? AND contact_id=?').get(userId1, userId2);
-  const requestFrom = (u1inU2 || u2inU1) ? null : userId1;
+  const requestFrom = u1inU2 ? null : userId1;
 
   const id = uuid();
   db.transaction(() => {
