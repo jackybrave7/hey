@@ -7771,7 +7771,6 @@ export function ChatScreen() {
           })()}
           <div style={{textAlign:'center'}}>
             <div style={{
-              display:'inline-block',
               background:'rgba(80,50,140,.55)',
               border:'1px solid rgba(180,140,220,.5)',
               color:'white', fontSize:11, fontWeight:700,

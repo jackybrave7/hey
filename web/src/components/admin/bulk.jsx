@@ -91,24 +91,25 @@ export function BulkActionBar({ count, onClear, actions, onAction, busy }) {
         Выбрано: {count}
       </span>
       <div style={{ display:'flex', gap: 6, flexWrap: 'wrap' }}>
-        {actions.map(a => (
-          <button key={a.key} onClick={() => onAction(a)} disabled={busy}
-            style={{
-              padding: '8px 14px', borderRadius: 50, border: 'none',
-              fontSize: 12, fontWeight: 700, cursor: busy ? 'wait' : 'pointer',
-              fontFamily: 'inherit',
-              background: a.danger ? 'rgba(220,60,60,.85)'
-                        : a.accent ? 'rgba(140,110,220,.9)'
-                                   : 'rgba(255,255,255,.10)',
-              color: 'white',
-              border: a.danger ? '1px solid rgba(255,160,160,.5)'
-                    : a.accent ? '1px solid rgba(200,160,255,.45)'
-                               : '1px solid rgba(255,255,255,.18)',
-              opacity: busy ? .6 : 1,
-            }}>
-            {a.label}
-          </button>
-        ))}
+        {actions.map(a => {
+          const palette = a.danger
+            ? { bg: 'rgba(220,60,60,.85)',   border: 'rgba(255,160,160,.5)'  }
+            : a.accent
+              ? { bg: 'rgba(140,110,220,.9)', border: 'rgba(200,160,255,.45)' }
+              : { bg: 'rgba(255,255,255,.10)', border: 'rgba(255,255,255,.18)' };
+          return (
+            <button key={a.key} onClick={() => onAction(a)} disabled={busy}
+              style={{
+                padding: '8px 14px', borderRadius: 50,
+                fontSize: 12, fontWeight: 700, cursor: busy ? 'wait' : 'pointer',
+                fontFamily: 'inherit', color: 'white',
+                background: palette.bg, border: `1px solid ${palette.border}`,
+                opacity: busy ? .6 : 1,
+              }}>
+              {a.label}
+            </button>
+          );
+        })}
       </div>
       <button onClick={onClear} disabled={busy}
         style={{
