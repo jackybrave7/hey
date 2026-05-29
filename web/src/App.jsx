@@ -23,6 +23,7 @@ import AdminLogs from './components/admin/AdminLogs';
 import AdminSystem from './components/admin/AdminSystem';
 import AdminReports from './components/admin/AdminReports';
 import AdminFeedbacks from './components/admin/AdminFeedbacks';
+import AdminSettings from './components/admin/AdminSettings';
 import AdminAwo from './components/admin/AdminAwo';
 import AdminAwoTenants from './components/admin/AdminAwoTenants';
 import AdminBusinessRequests from './components/admin/AdminBusinessRequests';
@@ -359,6 +360,11 @@ export default function App() {
           <Route path="/admin/feedbacks" element={
             <RequireAdmin>
               <AdminLayout><AdminFeedbacks/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/settings" element={
+            <RequireAdmin>
+              <AdminLayout><AdminSettings/></AdminLayout>
             </RequireAdmin>
           }/>
           <Route path="/admin/awo" element={

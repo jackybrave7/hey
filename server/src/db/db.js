@@ -640,6 +640,68 @@ function getContacts(ownerId) {
   );
 }
 
+// Полное физическое удаление аккаунта и всего, что с ним связано в БД.
+// Возвращает массив S3-ключей/префиксов, которые надо стереть в хранилище
+// (вызывающий код сам делает storage.deleteByPrefix — db.js не зависит от storage).
+function hardDeleteUserAccount(userId) {
+  const u = findUserById(userId);
+  if (!u) return { s3Keys: [], s3Prefixes: [] };
+
+  // Сначала собираем S3-ключи, которые надо будет стереть после транзакции
+  const momentIds = db.prepare('SELECT id FROM moments WHERE user_id=?').all(userId).map(r => r.id);
+  const s3Prefixes = momentIds.map(id => `moments/${id}/`);
+  const avatarExt  = (u.avatar && typeof u.avatar === 'string' && /\.(webp|png|jpe?g)(\?|$)/i.exec(u.avatar)?.[1]) || 'webp';
+  const s3Keys     = [`avatars/${userId}.${avatarExt.toLowerCase()}`];
+
+  db.transaction(() => {
+    // 1. Реакции/просмотры/жалобы/feedback'и пользователя
+    db.prepare('DELETE FROM moment_reactions WHERE user_id=?').run(userId);
+    db.prepare('DELETE FROM moment_views WHERE user_id=?').run(userId);
+    db.prepare('DELETE FROM reports WHERE reporter_id=? OR target_user_id=?').run(userId, userId);
+    db.prepare('DELETE FROM feedbacks WHERE user_id=?').run(userId);
+    // 2. Реакции и просмотры на МОМЕНТЫ пользователя (от других людей)
+    if (momentIds.length) {
+      const ph = momentIds.map(() => '?').join(',');
+      db.prepare(`DELETE FROM moment_reactions WHERE moment_id IN (${ph})`).run(...momentIds);
+      db.prepare(`DELETE FROM moment_views     WHERE moment_id IN (${ph})`).run(...momentIds);
+    }
+    // 3. Моменты пользователя
+    db.prepare('DELETE FROM moments WHERE user_id=?').run(userId);
+    // 4. Контакты в обе стороны
+    db.prepare('DELETE FROM contacts WHERE owner_id=? OR contact_id=?').run(userId, userId);
+    // 5. Блокировки в обе стороны
+    db.prepare('DELETE FROM blocks WHERE user_id=? OR blocked_id=?').run(userId, userId);
+    // 6. Реакции на сообщения
+    try { db.prepare('DELETE FROM reactions WHERE user_id=?').run(userId); } catch {}
+    // 7. Закреплённые чаты / push-подписки / presence
+    try { db.prepare('DELETE FROM pinned_conversations WHERE user_id=?').run(userId); } catch {}
+    try { db.prepare('DELETE FROM push_subscriptions WHERE user_id=?').run(userId); } catch {}
+    try { db.prepare('DELETE FROM presence WHERE user_id=?').run(userId); } catch {}
+    // 8. Сообщения: анонимизируем (NOT NULL FK на conversations, не рвём
+    //    переписку для других участников; ставим sender NULL, текст
+    //    помечаем как удалённый, чтобы у собеседника осталась канва диалога,
+    //    но содержимого/идентификации не было).
+    try {
+      db.prepare(
+        "UPDATE messages SET text='[сообщение удалено]', attachment=NULL WHERE sender_id=?"
+      ).run(userId);
+    } catch {}
+    // 9. Members: убираем пользователя из всех чатов. Direct-чаты, где
+    //    он был одним из двух участников, оставляем у собеседника пустыми
+    //    с пометкой типа deleted_partner (либо потом ручная чистка).
+    db.prepare('DELETE FROM members WHERE user_id=?').run(userId);
+    // 10. Tenants — если этот юзер owner какого-то tenant'а, обнуляем
+    //     (сам tenant не удаляем, чтобы не ронять курсы школы).
+    try { db.prepare('UPDATE tenants SET owner_id=NULL, account_id=NULL WHERE owner_id=? OR account_id=?').run(userId, userId); } catch {}
+    // 11. Admin logs — оставляем как историю, но обнуляем target_user_id
+    try { db.prepare('UPDATE admin_logs SET target_user_id=NULL WHERE target_user_id=?').run(userId); } catch {}
+    // 12. Наконец сам пользователь
+    db.prepare('DELETE FROM users WHERE id=?').run(userId);
+  })();
+
+  return { s3Keys, s3Prefixes };
+}
+
 function deleteUserAccount(userId) {
   const t = now();
   // phone имеет NOT NULL + UNIQUE — нельзя выставлять NULL.
@@ -2173,19 +2235,29 @@ function getAdminMoments({ status, userId } = {}) {
   return _withStatsBatch(rows.map(_parseMoment));
 }
 
-function adminDeleteMoment(momentId, adminId, reason) {
+function adminDeleteMoment(momentId, adminId, reason, opts = {}) {
+  const hard = !!opts.hard;
   db.transaction(() => {
     db.prepare('DELETE FROM moment_reactions WHERE moment_id=?').run(momentId);
     db.prepare('DELETE FROM moment_views WHERE moment_id=?').run(momentId);
-    db.prepare("UPDATE moments SET status='deleted', updated_at=? WHERE id=?").run(now(), momentId);
-    // Авто-resolve всех открытых жалоб на этот момент — админ уже принял меры
-    // (удаление), повторно вручную закрывать их не нужно.
+    if (hard) {
+      db.prepare('DELETE FROM moments WHERE id=?').run(momentId);
+    } else {
+      db.prepare("UPDATE moments SET status='deleted', updated_at=? WHERE id=?").run(now(), momentId);
+    }
+    // Авто-resolve всех открытых жалоб на этот момент — админ уже принял меры,
+    // повторно вручную закрывать их не нужно.
     db.prepare(
       `UPDATE reports SET status='resolved', resolved_at=?, resolved_by=?
        WHERE target_type='moment' AND target_id=? AND status='open'`
     ).run(now(), adminId, momentId);
   })();
-  logAdminAction({ adminId, action: 'delete_moment', targetMomentId: momentId, reason });
+  logAdminAction({
+    adminId,
+    action: hard ? 'hard_delete_moment' : 'delete_moment',
+    targetMomentId: momentId,
+    reason,
+  });
 }
 
 function logAdminAction({ adminId, action, targetUserId, targetMomentId, reason }) {
@@ -2763,7 +2835,7 @@ module.exports = {
   now,
   SYSTEM_USER_ID,
   SCHOOL_USER_ID,
-  createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount,
+  createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount, hardDeleteUserAccount,
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,

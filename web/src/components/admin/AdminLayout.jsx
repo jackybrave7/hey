@@ -14,7 +14,8 @@ const NAV = [
   { to: '/admin/awo',     label: '🎓 АВО / Школы' },
   { to: '/admin/business-requests', label: '💼 Бизнес-заявки', countKey: 'pendingBusiness' },
   { to: '/admin/test-users', label: '🧪 Тестовые юзеры' },
-  { to: '/admin/logs',    label: '📋 Логи' },
+  { to: '/admin/logs',     label: '📋 Логи' },
+  { to: '/admin/settings', label: '⚙ Настройки' },
 ];
 
 const COUNT_POLL_MS = 30000;

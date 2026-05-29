@@ -130,6 +130,34 @@ export default function AdminUserDetail() {
     } catch (e) { showMsg('Ошибка: ' + e.message); }
   }
 
+  async function handleHardDeleteUser() {
+    const ok = await customConfirm(
+      <>
+        <div style={{fontWeight:700,marginBottom:8,color:'rgba(255,160,160,.95)'}}>
+          💣 ПОЛНОЕ удаление аккаунта
+        </div>
+        <div style={{color:'rgba(255,255,255,.65)',fontSize:13,lineHeight:1.6}}>
+          Будут стёрты <strong>безвозвратно</strong>:<br/>
+          — строка пользователя в БД<br/>
+          — все его моменты (БД + файлы в S3)<br/>
+          — аватарка в S3<br/>
+          — контакты, реакции, push-подписки, presence<br/>
+          — заявки на бизнес-доступ, жалобы от него и на него<br/>
+          Сообщения в чатах заменятся на «[сообщение удалено]»,
+          чтобы не порвать переписку у других участников.<br/><br/>
+          Восстановить нельзя.
+        </div>
+      </>,
+      { requireWord: 'СТЕРЕТЬ', danger: true, confirmLabel: '💣 Стереть' }
+    );
+    if (!ok) return;
+    try {
+      await api.adminHardDeleteUser(id);
+      showMsg('Пользователь стёрт полностью');
+      setTimeout(() => nav('/admin/users'), 800);
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+
   if (loading) return <div style={{ padding: 32, color: 'rgba(255,255,255,.4)' }}>Загрузка…</div>;
   if (error)   return <div style={{ padding: 32, color: 'rgba(255,140,140,.9)' }}>Ошибка: {error}</div>;
   if (!user)   return <div style={{ padding: 32, color: 'rgba(255,255,255,.4)' }}>Не найдено</div>;
@@ -357,16 +385,34 @@ export default function AdminUserDetail() {
           <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12, marginBottom: 12 }}>
             Полное удаление аккаунта. Данные пользователя будут анонимизированы и не восстанавливаются.
           </div>
-          <button onClick={handleDeleteUser}
-            style={{
-              padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-              cursor: 'pointer', border: '1px solid rgba(255,80,80,.4)',
-              background: 'rgba(200,50,50,.18)', color: 'rgba(255,140,140,.95)',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(200,50,50,.32)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(200,50,50,.18)'}>
-            🗑 Удалить пользователя
-          </button>
+          <div style={{ display:'flex', gap: 8, flexWrap:'wrap' }}>
+            <button onClick={handleDeleteUser}
+              style={{
+                padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', border: '1px solid rgba(255,80,80,.4)',
+                background: 'rgba(200,50,50,.18)', color: 'rgba(255,140,140,.95)',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(200,50,50,.32)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(200,50,50,.18)'}>
+              🗑 Удалить (мягко)
+            </button>
+            <button onClick={handleHardDeleteUser}
+              style={{
+                padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', border: '1px solid rgba(255,80,80,.6)',
+                background: 'rgba(200,50,50,.45)', color: 'white',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(200,50,50,.65)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(200,50,50,.45)'}>
+              💣 Стереть полностью
+            </button>
+          </div>
+          <div style={{ color:'rgba(255,255,255,.45)', fontSize:11, marginTop:10, lineHeight:1.5 }}>
+            <strong>Мягко</strong> — анонимизирует, оставляет данные в БД.{' '}
+            <strong>Полностью</strong> — удаляет аккаунт, все его моменты, медиа из S3,
+            аватарку, контакты, реакции, push-подписки. Сообщения в чатах
+            заменяются на «[сообщение удалено]».
+          </div>
           {user.is_admin && (
             <div style={{ color: 'rgba(255,180,80,.85)', fontSize: 12, marginTop: 8 }}>
               ⚠ Сначала снимите права администратора.

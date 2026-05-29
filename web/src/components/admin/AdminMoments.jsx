@@ -46,21 +46,32 @@ export default function AdminMoments() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleDelete(moment) {
+  async function handleDelete(moment, hard = false) {
     const reason = await customPrompt(
       <>
-        <div style={{fontWeight:600,marginBottom:8}}>Удалить момент?</div>
+        <div style={{fontWeight:600,marginBottom:8}}>
+          {hard ? '💣 ПОЛНОСТЬЮ стереть момент?' : 'Удалить момент?'}
+        </div>
         <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:4}}>
           «{(moment.text || '').slice(0, 120)}{(moment.text || '').length > 120 ? '…' : ''}»
         </div>
+        {hard && (
+          <div style={{color:'rgba(255,160,160,.85)',fontSize:12,marginTop:8,lineHeight:1.5}}>
+            Удалит строку из БД и медиа из S3. Восстановить нельзя.
+          </div>
+        )}
       </>,
-      { promptPlaceholder: 'Причина удаления (необязательно)', confirmLabel: 'Удалить', danger: true }
+      {
+        promptPlaceholder: 'Причина удаления (необязательно)',
+        confirmLabel: hard ? '💣 Стереть' : 'Удалить',
+        danger: true,
+      }
     );
     if (reason === null) return; // cancelled
     try {
-      await api.adminDeleteMoment(moment.id, reason || undefined);
+      await api.adminDeleteMoment(moment.id, reason || undefined, hard ? true : undefined);
       setMoments(prev => prev.filter(m => m.id !== moment.id));
-      showMsg('Момент удалён');
+      showMsg(hard ? 'Момент стёрт' : 'Момент удалён');
     } catch (e) {
       showMsg('Ошибка: ' + e.message);
     }
@@ -240,12 +251,22 @@ export default function AdminMoments() {
                     </span>
                   </td>
                   <td style={cell}>
-                    <button onClick={() => handleDelete(m)}
-                      style={{ background: 'rgba(200,50,50,.3)', border: 'none', borderRadius: 8,
-                        padding: '6px 10px', color: 'rgba(255,120,120,.9)', fontSize: 12,
-                        cursor: 'pointer', fontWeight: 600 }}>
-                      🗑 Удалить
-                    </button>
+                    <div style={{ display:'flex', gap: 6 }}>
+                      <button onClick={() => handleDelete(m, false)}
+                        title="Мягкое удаление (status=deleted)"
+                        style={{ background: 'rgba(200,50,50,.22)', border: 'none', borderRadius: 8,
+                          padding: '6px 10px', color: 'rgba(255,120,120,.9)', fontSize: 12,
+                          cursor: 'pointer', fontWeight: 600 }}>
+                        🗑
+                      </button>
+                      <button onClick={() => handleDelete(m, true)}
+                        title="Полное удаление (БД + S3)"
+                        style={{ background: 'rgba(200,50,50,.5)', border: 'none', borderRadius: 8,
+                          padding: '6px 10px', color: 'white', fontSize: 12,
+                          cursor: 'pointer', fontWeight: 700 }}>
+                        💣
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

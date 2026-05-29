@@ -192,6 +192,9 @@ export const api = {
   adminBlockUser:          (id, reason)    => req('POST',   `/admin/users/${id}/block`, { reason }),
   adminUnblockUser:        (id)            => req('POST',   `/admin/users/${id}/unblock`),
   adminDeleteUser:         (id)            => req('DELETE', `/admin/users/${id}`),
+  adminHardDeleteUser:     (id)            => req('DELETE', `/admin/users/${id}/hard`),
+  adminGetSettings:        ()              => req('GET',    '/admin/settings'),
+  adminUpdateSettings:     (data)          => req('PATCH',  '/admin/settings', data),
   adminSystemMoment:       (data)          => req('POST',   '/admin/system/moment', data),
   adminSystemBroadcast:    (text, attachment) => req('POST', '/admin/system/broadcast', { text, attachment }),
   adminSystemListMoments:  ()              => req('GET',    '/admin/system/moments'),
@@ -210,7 +213,7 @@ export const api = {
     const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v)).toString();
     return req('GET', `/admin/moments${qs ? '?' + qs : ''}`);
   },
-  adminDeleteMoment:       (id, reason)    => req('DELETE', `/admin/moments/${id}`, { reason }),
+  adminDeleteMoment:       (id, reason, hard) => req('DELETE', `/admin/moments/${id}`, { reason, hard }),
   adminGetLogs:            (limit)         => req('GET',    `/admin/logs${limit ? '?limit=' + limit : ''}`),
 
   // AWO / Школьная интеграция

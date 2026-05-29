@@ -1859,12 +1859,61 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getAdminMoments({ status, userId }));
   });
 
-  r.delete('/admin/moments/:id', requireAdmin, (req, res) => {
+  r.delete('/admin/moments/:id', requireAdmin, async (req, res) => {
     const m = db.getMomentById(req.params.id);
     if (!m) return res.status(404).json({ error: 'Not found' });
-    db.adminDeleteMoment(req.params.id, req.user.id, req.body?.reason);
+    // hard:
+    //   true  → стереть строку из БД и медиа из S3
+    //   false → пометить status='deleted', медиа остаётся (можно откатить)
+    //   undefined → используем системную политику db.getSetting('delete_policy')
+    const policy = db.getSetting('delete_policy', 'soft');
+    const explicit = req.body?.hard;
+    const hard = explicit === undefined ? policy === 'hard' : !!explicit;
+    db.adminDeleteMoment(req.params.id, req.user.id, req.body?.reason, { hard });
+    if (hard) {
+      try { await storage.deleteByPrefix(`moments/${req.params.id}/`); }
+      catch (e) { console.error('[hard-delete moment S3]', e.message); }
+    }
     broadcast(db.getContactOwners(m.user_id), { type: 'moment:deleted', momentId: req.params.id });
     broadcast([m.user_id], { type: 'moment:deleted', momentId: req.params.id });
+    res.json({ ok: true, hard });
+  });
+
+  // ── Admin settings ─────────────────────────────────────────────────────────
+  // Глобальные настройки админки (политика удаления и т.п.).
+  r.get('/admin/settings', requireAdmin, (_req, res) => {
+    res.json({
+      delete_policy: db.getSetting('delete_policy', 'soft'), // 'soft' | 'hard'
+    });
+  });
+  r.patch('/admin/settings', requireAdmin, (req, res) => {
+    const { delete_policy } = req.body || {};
+    if (delete_policy !== undefined) {
+      if (!['soft', 'hard'].includes(delete_policy)) {
+        return res.status(400).json({ error: 'Invalid delete_policy' });
+      }
+      db.setSetting('delete_policy', delete_policy);
+    }
+    res.json({ ok: true, delete_policy: db.getSetting('delete_policy', 'soft') });
+  });
+
+  // Полное удаление пользователя со всеми материалами (моменты, медиа в S3,
+  // контакты, реакции, push-подписки, аватарка, presence, ...). Сообщения
+  // анонимизируются ('[сообщение удалено]'), чтобы не порвать чаты других
+  // участников. Tenants освобождаются (owner=NULL), сам tenant остаётся.
+  r.delete('/admin/users/:id/hard', requireAdmin, async (req, res) => {
+    const target = db.findUserById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Not found' });
+    if (target.id === req.user.id) return res.status(400).json({ error: 'Нельзя удалить себя' });
+    try {
+      const { s3Keys, s3Prefixes } = db.hardDeleteUserAccount(req.params.id);
+      for (const k of s3Keys)     { try { await storage.deleteFile(k); }   catch (e) { console.error('[hard-delete user S3 key]', e.message); } }
+      for (const p of s3Prefixes) { try { await storage.deleteByPrefix(p); } catch (e) { console.error('[hard-delete user S3 prefix]', e.message); } }
+      broadcast([req.params.id], { type: 'account:deleted' });
+    } catch (e) {
+      console.error('[hard-delete user]', e);
+      return res.status(500).json({ error: 'Hard delete failed: ' + e.message });
+    }
     res.json({ ok: true });
   });
 

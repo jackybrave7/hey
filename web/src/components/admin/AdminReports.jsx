@@ -63,23 +63,33 @@ export default function AdminReports() {
     setLoadingMoment(false);
   }
 
-  async function handleAdminDeleteMoment(moment) {
+  async function handleAdminDeleteMoment(moment, hard = false) {
     const reason = await customPrompt(
       <>
-        <div style={{fontWeight:600,marginBottom:8}}>Удалить момент?</div>
+        <div style={{fontWeight:600,marginBottom:8}}>
+          {hard ? '💣 ПОЛНОСТЬЮ стереть момент?' : 'Удалить момент?'}
+        </div>
         <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:4}}>
           «{(moment.text || '').slice(0, 120)}{(moment.text || '').length > 120 ? '…' : ''}»
         </div>
+        {hard && (
+          <div style={{color:'rgba(255,160,160,.85)',fontSize:12,marginTop:8,lineHeight:1.5}}>
+            Удалит строку из БД и медиа из S3. Восстановить нельзя.
+          </div>
+        )}
       </>,
-      { promptPlaceholder: 'Причина удаления (необязательно)', confirmLabel: 'Удалить', danger: true }
+      {
+        promptPlaceholder: 'Причина удаления (необязательно)',
+        confirmLabel: hard ? '💣 Стереть' : 'Удалить',
+        danger: true,
+      }
     );
     if (reason === null) return;
     try {
-      await api.adminDeleteMoment(moment.id, reason || undefined);
-      showToast('✓ Момент удалён');
+      await api.adminDeleteMoment(moment.id, reason || undefined, hard ? true : undefined);
+      showToast(hard ? '✓ Момент стёрт' : '✓ Момент удалён');
       setMomentPopup(null);
-      // Если есть открытая жалоба на этот момент — авто-resolve её
-      // (опционально, без подтверждения).
+      // adminDeleteMoment в БД авто-резолвит все открытые жалобы на этот момент.
       load();
     } catch (e) {
       showToast('Ошибка: ' + e.message);
@@ -323,13 +333,23 @@ export default function AdminReports() {
             fontSize: 13, fontWeight: 700,
           }}>
             <span>⚙ Админ</span>
-            <button onClick={() => handleAdminDeleteMoment(momentPopup.moments[momentPopup.idx])}
+            <button onClick={() => handleAdminDeleteMoment(momentPopup.moments[momentPopup.idx], false)}
+              title="Мягкое удаление (status=deleted)"
               style={{
                 background:'rgba(255,255,255,.18)', border:'1px solid rgba(255,255,255,.35)',
-                color:'white', borderRadius:50, padding:'6px 14px',
+                color:'white', borderRadius:50, padding:'6px 12px',
                 fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
               }}>
-              🗑 Удалить момент
+              🗑 Удалить
+            </button>
+            <button onClick={() => handleAdminDeleteMoment(momentPopup.moments[momentPopup.idx], true)}
+              title="Полное удаление (БД + S3)"
+              style={{
+                background:'rgba(255,255,255,.32)', border:'1px solid rgba(255,255,255,.5)',
+                color:'white', borderRadius:50, padding:'6px 12px',
+                fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
+              }}>
+              💣 Стереть
             </button>
           </div>
         </>
