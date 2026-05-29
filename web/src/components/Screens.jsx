@@ -7205,25 +7205,71 @@ export function ChatScreen() {
     return result;
   }, [messages, typing]);
 
-  // ── Scroll to specific message (клик на цитату) ──────────────────────
+  // ── Scroll to specific message (клик на цитату / закреп) ──────────────
+  // Если сообщения нет в текущем буфере — подгружаем старые пакеты
+  // последовательно (по 50 штук) пока не найдём или не упрёмся в начало.
   useEffect(() => {
-    function onScrollTo(e) {
+    async function onScrollTo(e) {
       const targetId = e.detail;
       if (!targetId) return;
-      const idx = flatItems.findIndex(it => it.id === targetId);
+
+      // Снимок текущего состояния — но messages внутри замыкания
+      // обновится по перерендеру; для пагинации используем переменную.
+      let curMessages = messages;
+      let curHasMore  = hasMore;
+      const findIdx = () => {
+        let p = 0;
+        if (typing) p += 0; // typing — последний элемент; нам нужен индекс messages
+        const i = curMessages.findIndex(m => m.id === targetId);
+        return i < 0 ? -1 : i;
+      };
+
+      if (findIdx() < 0) {
+        // Подгружаем пока не найдём (макс. 20 страниц ≈ 1000 сообщений)
+        let attempts = 0;
+        let toastId = null;
+        try { toastId = heyToast('Загружаем сообщения…', 'info'); } catch {}
+        while (findIdx() < 0 && curHasMore && attempts < 20) {
+          attempts++;
+          if (!curMessages.length) break;
+          let older;
+          try { older = await api.getMessages(convId, curMessages[0].created_at); }
+          catch { older = null; }
+          if (!Array.isArray(older) || !older.length) {
+            setHasMore(false); curHasMore = false; break;
+          }
+          if (older.length < 50) curHasMore = false;
+          // Применяем в state и держим локальную копию для поиска
+          setFirstItemIndex(prev => prev - older.length);
+          setMessages(prev => {
+            curMessages = [...older, ...prev];
+            return curMessages;
+          });
+          if (!curHasMore) setHasMore(false);
+        }
+      }
+
+      // Финальный поиск по уже обновлённому массиву
+      const idx = curMessages.findIndex(m => m.id === targetId);
       if (idx < 0) {
-        heyToast('Сообщение не загружено — прокрути выше', 'info');
+        heyToast('Сообщение не найдено в истории', 'error');
         return;
       }
-      virtuosoRef.current?.scrollToIndex({
-        index: idx, align: 'center', behavior: 'smooth',
+      // flatItems = messages с возможным typing-итемом в конце; индекс совпадает
+      const flatIdx = flatItems.findIndex(it => it.id === targetId);
+      const finalIdx = flatIdx >= 0 ? flatIdx : idx;
+      // Даём React время отрисовать prepended-пакет, потом скроллим.
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({
+          index: finalIdx, align: 'center', behavior: 'smooth',
+        });
+        setFlashMsgId(targetId);
+        setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
       });
-      setFlashMsgId(targetId);
-      setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
     }
     window.addEventListener('hey:scroll-to-msg', onScrollTo);
     return () => window.removeEventListener('hey:scroll-to-msg', onScrollTo);
-  }, [flatItems]);
+  }, [flatItems, messages, hasMore, typing, convId]);
 
   // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
   const handleOpenMenu  = useCallback((e, m) => openMsgMenu(e, m), []);
