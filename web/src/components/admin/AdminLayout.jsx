@@ -1,22 +1,43 @@
 // AdminLayout.jsx — shared layout for admin panel
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
+import { api } from '../../api';
 
 const NAV = [
   { to: '/admin',         label: '📊 Дашборд',          exact: true },
   { to: '/admin/users',   label: '👥 Пользователи' },
   { to: '/admin/moments', label: '✦ Моменты' },
-  { to: '/admin/reports', label: '🚩 Жалобы' },
+  { to: '/admin/reports', label: '🚩 Жалобы',        countKey: 'openReports' },
   { to: '/admin/system',  label: '📢 HEY-заведующий' },
   { to: '/admin/awo',     label: '🎓 АВО / Школы' },
-  { to: '/admin/business-requests', label: '💼 Бизнес-заявки' },
+  { to: '/admin/business-requests', label: '💼 Бизнес-заявки', countKey: 'pendingBusiness' },
   { to: '/admin/test-users', label: '🧪 Тестовые юзеры' },
   { to: '/admin/logs',    label: '📋 Логи' },
 ];
 
+const COUNT_POLL_MS = 30000;
+
 export default function AdminLayout({ children }) {
   const nav = useNavigate();
   const { user } = useAuth();
+  const [counts, setCounts] = useState({ openReports: 0, pendingBusiness: 0 });
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      try {
+        const c = await api.adminGetCounts();
+        if (alive) setCounts(c);
+      } catch {}
+    }
+    load();
+    const t = setInterval(load, COUNT_POLL_MS);
+    // Перезагружаем при возврате к табу — чтобы не ждать 30с после простоя
+    const onVis = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { alive = false; clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, []);
 
   const sidebar = {
     width: 220,
@@ -31,6 +52,8 @@ export default function AdminLayout({ children }) {
   const linkBase = {
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
     padding: '11px 20px',
     fontSize: 14,
     fontWeight: 500,
@@ -39,6 +62,21 @@ export default function AdminLayout({ children }) {
     borderLeft: '3px solid transparent',
     transition: 'all .15s',
   };
+
+  function Badge({ n }) {
+    if (!n) return null;
+    return (
+      <span style={{
+        minWidth: 20, height: 20, padding: '0 6px',
+        borderRadius: 10,
+        background: 'rgba(220,80,80,.95)',
+        color: 'white',
+        fontSize: 11, fontWeight: 700,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 1px 4px rgba(120,30,30,.5)',
+      }}>{n > 99 ? '99+' : n}</span>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--grad, #0e0820)' }}>
@@ -54,7 +92,7 @@ export default function AdminLayout({ children }) {
         </div>
 
         <nav style={{ flex: 1, paddingTop: 8 }}>
-          {NAV.map(({ to, label, exact }) => (
+          {NAV.map(({ to, label, exact, countKey }) => (
             <NavLink
               key={to}
               to={to}
@@ -66,7 +104,8 @@ export default function AdminLayout({ children }) {
                 borderLeftColor: isActive ? 'rgba(140,110,220,.8)' : 'transparent',
               })}
             >
-              {label}
+              <span>{label}</span>
+              {countKey && <Badge n={counts[countKey] || 0}/>}
             </NavLink>
           ))}
         </nav>

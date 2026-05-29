@@ -1471,6 +1471,19 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true, id: report.id });
   });
 
+  // Админ: счётчики для бейджей в сайдбаре (лёгкий polling-endpoint)
+  r.get('/admin/counts', requireAdmin, (_req, res) => {
+    try {
+      const openReports = db.getReports({ status: 'open', limit: 9999 }).length;
+      const pendingBusiness = db.listBusinessRequests
+        ? db.listBusinessRequests('pending').length
+        : 0;
+      res.json({ openReports, pendingBusiness });
+    } catch (e) {
+      res.json({ openReports: 0, pendingBusiness: 0 });
+    }
+  });
+
   // Админ: список жалоб
   r.get('/admin/reports', requireAdmin, (req, res) => {
     const status = req.query.status || 'open';
