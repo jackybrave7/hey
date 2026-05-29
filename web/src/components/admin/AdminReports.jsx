@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
+import { useAuth } from '../../AuthContext';
+import MomentDetailPopup from '../moments/MomentDetailPopup';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -26,7 +28,11 @@ export default function AdminReports() {
   const [status, setStatus]   = useState('open');
   const [loading, setLoading] = useState(true);
   const [toast, setToast]     = useState('');
-  const [customConfirm, confirmModal] = useConfirm();
+  const [customConfirm, confirmModal, customPrompt] = useConfirm();
+  const { user: adminUser } = useAuth();
+  // momentPopup = null | { moments: [m], idx: 0 } — для inline-просмотра
+  const [momentPopup, setMomentPopup] = useState(null);
+  const [loadingMoment, setLoadingMoment] = useState(false);
 
   function showToast(msg) {
     setToast(msg);
@@ -45,6 +51,40 @@ export default function AdminReports() {
   }
 
   useEffect(() => { load(); }, [status]);
+
+  async function openMomentPopup(momentId) {
+    setLoadingMoment(true);
+    try {
+      const m = await api.getMoment(momentId);
+      setMomentPopup({ moments: [m], idx: 0 });
+    } catch (e) {
+      showToast('Момент недоступен: ' + (e.message || 'удалён'));
+    }
+    setLoadingMoment(false);
+  }
+
+  async function handleAdminDeleteMoment(moment) {
+    const reason = await customPrompt(
+      <>
+        <div style={{fontWeight:600,marginBottom:8}}>Удалить момент?</div>
+        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:4}}>
+          «{(moment.text || '').slice(0, 120)}{(moment.text || '').length > 120 ? '…' : ''}»
+        </div>
+      </>,
+      { promptPlaceholder: 'Причина удаления (необязательно)', confirmLabel: 'Удалить', danger: true }
+    );
+    if (reason === null) return;
+    try {
+      await api.adminDeleteMoment(moment.id, reason || undefined);
+      showToast('✓ Момент удалён');
+      setMomentPopup(null);
+      // Если есть открытая жалоба на этот момент — авто-resolve её
+      // (опционально, без подтверждения).
+      load();
+    } catch (e) {
+      showToast('Ошибка: ' + e.message);
+    }
+  }
 
   async function resolve(r, action) {
     const label = action === 'resolved' ? 'отметить как решённую' : 'отклонить';
@@ -200,25 +240,27 @@ export default function AdminReports() {
                       жалоб, чтобы админ мог посмотреть заблокированный контент
                       (если он не удалён). */}
                   {r.target_type === 'moment' && (
-                    <a href={`/moments/${r.target_id}`} target="_blank" rel="noopener noreferrer"
+                    <button onClick={() => openMomentPopup(r.target_id)}
+                      disabled={loadingMoment}
                       style={{
                         padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                        textDecoration: 'none',
+                        cursor: loadingMoment ? 'wait' : 'pointer', border: '1px solid rgba(180,140,220,.3)',
                         background: 'rgba(120,90,200,.25)', color: 'rgba(220,200,255,.95)',
-                        border: '1px solid rgba(180,140,220,.3)',
+                        fontFamily: 'inherit',
                       }}>
-                      → Открыть момент
-                    </a>
+                      {loadingMoment ? '…' : '→ Открыть момент'}
+                    </button>
                   )}
                   {r.target_user_id && (
                     <a href={`/admin/users/${r.target_user_id}`}
+                      target="_blank" rel="noopener noreferrer"
                       style={{
                         padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                         textDecoration: 'none',
                         background: 'rgba(120,90,200,.25)', color: 'rgba(220,200,255,.95)',
                         border: '1px solid rgba(180,140,220,.3)',
                       }}>
-                      → Карточка юзера
+                      → Карточка юзера ↗
                     </a>
                   )}
                 </div>
@@ -258,6 +300,40 @@ export default function AdminReports() {
         </div>
       )}
       {confirmModal}
+
+      {momentPopup && (
+        <>
+          <MomentDetailPopup
+            moments={momentPopup.moments}
+            initialIndex={momentPopup.idx}
+            currentUser={adminUser}
+            onClose={() => setMomentPopup(null)}
+            onDelete={handleAdminDeleteMoment}
+          />
+          {/* Поскольку в попапе админа не считают автором, кнопка «···»
+              у него скрыта. Рисуем явную admin-панель поверх для удаления
+              чужого момента прямо отсюда. */}
+          <div style={{
+            position:'fixed', top: 18, left: '50%', transform:'translateX(-50%)',
+            zIndex: 10001, display:'flex', gap:10, alignItems:'center',
+            background:'rgba(220,60,60,.92)', color:'white',
+            border:'1px solid rgba(255,180,180,.5)',
+            borderRadius: 50, padding:'8px 14px 8px 16px',
+            boxShadow:'0 6px 22px rgba(0,0,0,.5)',
+            fontSize: 13, fontWeight: 700,
+          }}>
+            <span>⚙ Админ</span>
+            <button onClick={() => handleAdminDeleteMoment(momentPopup.moments[momentPopup.idx])}
+              style={{
+                background:'rgba(255,255,255,.18)', border:'1px solid rgba(255,255,255,.35)',
+                color:'white', borderRadius:50, padding:'6px 14px',
+                fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
+              }}>
+              🗑 Удалить момент
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
