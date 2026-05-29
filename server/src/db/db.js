@@ -217,6 +217,18 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS pinned_conversations (
   pinned_at INTEGER NOT NULL,
   PRIMARY KEY (user_id, conv_id)
 )`); } catch {}
+
+// Личные закрепы сообщений в direct/monolog чатах. В группах
+// pinned_message_id остаётся на conversations (общий для всех, ставит
+// только админ). Здесь — приватный per-user pin для не-групповых чатов,
+// который собеседник НЕ видит.
+try { db.exec(`CREATE TABLE IF NOT EXISTS personal_message_pins (
+  user_id    TEXT NOT NULL,
+  conv_id    TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  pinned_at  INTEGER NOT NULL,
+  PRIMARY KEY (user_id, conv_id)
+)`); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS admin_logs (
   id               TEXT PRIMARY KEY,
   admin_id         TEXT NOT NULL,
