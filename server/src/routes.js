@@ -704,6 +704,14 @@ module.exports = function makeRouter(db, broadcast) {
     };
     try {
       const result = await storage.getPresignedUploadUrl(keyMap[category], contentType);
+      // Cache-buster для аватарок: S3-ключ avatars/{userId}.{ext} стабильный,
+      // поэтому publicUrl без версии всегда одинаков → браузер показывает
+      // закешированную старую картинку, и React не видит «изменения» в
+      // user.avatar (setUser получает ту же строку). Добавляем ?v=ts —
+      // картинка та же, но URL уникален.
+      if (category === 'avatar' && result.publicUrl) {
+        result.publicUrl = result.publicUrl + '?v=' + Date.now();
+      }
       res.json({ ...result, maxBytes });
     } catch (e) {
       console.error('[/upload/presign]', e);
