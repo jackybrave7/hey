@@ -1938,6 +1938,82 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getAdminLogs(limit));
   });
 
+  // ── Batch admin actions ──────────────────────────────────────────────────
+  // Общий помощник: применяет одиночную операцию `op(id)` к списку ids,
+  // собирает результат и не падает на первом фейле — фронт показывает
+  // сводку «N успешно, M с ошибкой».
+  async function runBatch(ids, op) {
+    if (!Array.isArray(ids) || !ids.length) return { processed: 0, failed: [] };
+    if (ids.length > 500) ids = ids.slice(0, 500); // hard cap
+    const failed = [];
+    let processed = 0;
+    for (const id of ids) {
+      try { await op(id); processed++; }
+      catch (e) { failed.push({ id, error: e.message || String(e) }); }
+    }
+    return { processed, failed };
+  }
+
+  // Пользователи: block / unblock / delete (soft) / hard_delete
+  r.post('/admin/users/batch', requireAdmin, async (req, res) => {
+    const { ids, action, reason } = req.body || {};
+    const ALLOWED = ['block', 'unblock', 'delete', 'hard_delete'];
+    if (!ALLOWED.includes(action)) return res.status(400).json({ error: 'Invalid action' });
+
+    const result = await runBatch(ids, async (id) => {
+      const u = db.findUserById(id);
+      if (!u) throw new Error('Not found');
+      if (u.id === req.user.id) throw new Error('Нельзя применить к себе');
+      if ((action === 'delete' || action === 'hard_delete') && u.is_admin) {
+        throw new Error('Сначала снимите права администратора');
+      }
+      if (action === 'block')   return db.adminBlockUser(id, req.user.id, reason);
+      if (action === 'unblock') return db.adminUnblockUser(id, req.user.id);
+      if (action === 'delete')  { db.deleteUserAccount(id); broadcast([id], { type: 'account:deleted' }); return; }
+      if (action === 'hard_delete') {
+        const { s3Keys, s3Prefixes } = db.hardDeleteUserAccount(id);
+        for (const k of s3Keys)     { try { await storage.deleteFile(k); }    catch {} }
+        for (const p of s3Prefixes) { try { await storage.deleteByPrefix(p); } catch {} }
+        broadcast([id], { type: 'account:deleted' });
+      }
+    });
+    res.json({ ok: true, ...result });
+  });
+
+  // Моменты: delete (soft) / hard_delete
+  r.post('/admin/moments/batch', requireAdmin, async (req, res) => {
+    const { ids, action, reason } = req.body || {};
+    const ALLOWED = ['delete', 'hard_delete'];
+    if (!ALLOWED.includes(action)) return res.status(400).json({ error: 'Invalid action' });
+    const hard = action === 'hard_delete';
+
+    const result = await runBatch(ids, async (id) => {
+      const m = db.getMomentById(id);
+      if (!m) throw new Error('Not found');
+      db.adminDeleteMoment(id, req.user.id, reason, { hard });
+      if (hard) { try { await storage.deleteByPrefix(`moments/${id}/`); } catch {} }
+      try {
+        broadcast(db.getContactOwners(m.user_id), { type: 'moment:deleted', momentId: id });
+        broadcast([m.user_id], { type: 'moment:deleted', momentId: id });
+      } catch {}
+    });
+    res.json({ ok: true, ...result });
+  });
+
+  // Жалобы: resolved / dismissed
+  r.post('/admin/reports/batch', requireAdmin, (req, res) => {
+    const { ids, action } = req.body || {};
+    const ALLOWED = ['resolved', 'dismissed'];
+    if (!ALLOWED.includes(action)) return res.status(400).json({ error: 'Invalid action' });
+    // resolveReport не бросает на «не найдено», просто 0 rows — считаем
+    // всё успешным; ошибки кроме программных не ожидаются.
+    let processed = 0;
+    for (const id of (Array.isArray(ids) ? ids.slice(0, 500) : [])) {
+      try { db.resolveReport(id, req.user.id, action); processed++; } catch {}
+    }
+    res.json({ ok: true, processed, failed: [] });
+  });
+
   // ═════════════════════════════════════════════════════════════════════════
   // AWO (АвтоВебОфис) integration
   // ═════════════════════════════════════════════════════════════════════════

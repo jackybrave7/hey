@@ -1,9 +1,10 @@
 // AdminReports.jsx — список жалоб от пользователей
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
 import { useAuth } from '../../AuthContext';
 import MomentDetailPopup from '../moments/MomentDetailPopup';
+import { useBulkSelection, Checkbox, BulkActionBar } from './bulk';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -33,6 +34,8 @@ export default function AdminReports() {
   // momentPopup = null | { moments: [m], idx: 0 } — для inline-просмотра
   const [momentPopup, setMomentPopup] = useState(null);
   const [loadingMoment, setLoadingMoment] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const bulk = useBulkSelection();
 
   function showToast(msg) {
     setToast(msg);
@@ -96,6 +99,35 @@ export default function AdminReports() {
     }
   }
 
+  const openIds = useMemo(
+    () => reports.filter(r => r.status === 'open').map(r => r.id),
+    [reports]
+  );
+  const headerCheckState = useMemo(() => {
+    if (!openIds.length || !bulk.count) return { checked: false, indeterminate: false };
+    const allSelected = openIds.every(id => bulk.has(id));
+    return { checked: allSelected, indeterminate: !allSelected };
+  }, [openIds, bulk]);
+
+  async function applyBulkAction(action) {
+    const ids = bulk.ids().filter(id => openIds.includes(id));
+    if (!ids.length) { showToast('Можно групповым действием закрыть только открытые жалобы'); return; }
+    const label = action === 'resolved' ? 'отметить как решённые' : 'отклонить';
+    const ok = await customConfirm(
+      `${action === 'resolved' ? 'Принять меры' : 'Отклонить'} по ${ids.length} ${ids.length === 1 ? 'жалобе' : 'жалобам'}?`,
+      { danger: action !== 'resolved', confirmLabel: action === 'resolved' ? '✓ Принять меры' : 'Отклонить' }
+    );
+    if (!ok) return;
+    setBulkBusy(true);
+    try {
+      const res = await api.adminBatchReports(ids, action);
+      showToast(`✓ ${label}: ${res.processed}`);
+      bulk.clear();
+      load();
+    } catch (e) { showToast('Ошибка: ' + e.message); }
+    setBulkBusy(false);
+  }
+
   async function resolve(r, action) {
     const label = action === 'resolved' ? 'отметить как решённую' : 'отклонить';
     if (!await customConfirm(`Действительно ${label} эту жалобу?`, { danger: action !== 'resolved' })) return;
@@ -153,16 +185,41 @@ export default function AdminReports() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {openIds.length > 0 && (
+            <div style={{
+              display:'flex', alignItems:'center', gap: 10,
+              padding:'8px 14px', borderRadius: 10,
+              background:'rgba(255,255,255,.04)',
+              border:'1px solid rgba(255,255,255,.08)',
+              color:'rgba(225,220,245,.75)', fontSize: 12,
+            }}>
+              <Checkbox
+                checked={headerCheckState.checked}
+                indeterminate={headerCheckState.indeterminate}
+                onClick={() => headerCheckState.checked ? bulk.clear() : bulk.selectAll(openIds)}
+                title="Выделить все открытые"
+              />
+              <span>Выделить все открытые ({openIds.length})</span>
+            </div>
+          )}
           {reports.map(r => {
             const st = STATUS_LABELS[r.status] || STATUS_LABELS.open;
+            const canBulk = r.status === 'open';
+            const isSelected = bulk.has(r.id);
             return (
               <div key={r.id} style={{
-                background: 'rgba(20,12,40,.65)',
-                border: '1px solid rgba(255,255,255,.14)',
+                background: isSelected ? 'rgba(120,90,200,.18)' : 'rgba(20,12,40,.65)',
+                border: isSelected ? '1px solid rgba(180,140,255,.45)' : '1px solid rgba(255,255,255,.14)',
                 borderRadius: 14, padding: 16,
                 backdropFilter: 'blur(8px)',
                 boxShadow: '0 4px 14px rgba(0,0,0,.15)',
+                position:'relative',
               }}>
+                {canBulk && (
+                  <div style={{ position:'absolute', top: 14, right: 14 }}>
+                    <Checkbox checked={isSelected} onClick={() => bulk.toggle(r.id)} title="Выделить"/>
+                  </div>
+                )}
                 {/* Meta */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10,
@@ -309,6 +366,16 @@ export default function AdminReports() {
           {toast}
         </div>
       )}
+      <BulkActionBar
+        count={bulk.count}
+        busy={bulkBusy}
+        onClear={bulk.clear}
+        onAction={(a) => applyBulkAction(a.key)}
+        actions={[
+          { key: 'resolved',  label: '✓ Принять меры', accent: true },
+          { key: 'dismissed', label: '◇ Отклонить' },
+        ]}
+      />
       {confirmModal}
 
       {momentPopup && (

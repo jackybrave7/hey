@@ -1,8 +1,9 @@
 // AdminMoments.jsx — all moments with moderation tools
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
+import { useBulkSelection, Checkbox, BulkActionBar } from './bulk';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -21,6 +22,40 @@ export default function AdminMoments() {
   const [deleting, setDeleting] = useState(null);
   const [preview, setPreview]   = useState(null); // { url, type } для модалки увеличения
   const [customConfirm, confirmModal, customPrompt] = useConfirm();
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const bulk = useBulkSelection();
+
+  async function applyBulkAction(action) {
+    const ids = bulk.ids();
+    if (!ids.length) return;
+    const hard = action === 'hard_delete';
+    const reason = await customPrompt(
+      <>
+        <div style={{fontWeight:700,marginBottom:8,color: hard ? 'rgba(255,160,160,.95)' : 'white'}}>
+          {hard ? '💣 ПОЛНОСТЬЮ стереть' : '🗑 Удалить'} {ids.length} {ids.length === 1 ? 'момент' : 'моментов'}?
+        </div>
+        {hard && (
+          <div style={{color:'rgba(255,160,160,.85)', fontSize: 13, lineHeight: 1.5}}>
+            Удалит строки из БД и медиа из S3. Восстановить нельзя.
+          </div>
+        )}
+      </>,
+      {
+        promptPlaceholder: 'Причина (необязательно, одна на все)',
+        confirmLabel: hard ? '💣 Стереть' : '🗑 Удалить',
+        danger: true,
+      }
+    );
+    if (reason === null) return;
+    setBulkBusy(true);
+    try {
+      const res = await api.adminBatchMoments(ids, action, reason || undefined);
+      showMsg(`✓ ${hard ? 'Стёрто' : 'Удалено'}: ${res.processed}${res.failed?.length ? `, ошибок: ${res.failed.length}` : ''}`);
+      bulk.clear();
+      load();
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+    setBulkBusy(false);
+  }
 
   function toggleSort(col) {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -149,12 +184,26 @@ export default function AdminMoments() {
           return sortDir === 'asc' ? va - vb : vb - va;
         });
         const sortHCell = (col) => ({...hcell, cursor:'pointer', userSelect:'none'});
+        const visibleIds = sorted.map(m => m.id);
+        const headerCheckState = (() => {
+          if (!visibleIds.length || !bulk.count) return { checked: false, indeterminate: false };
+          const allSelected = visibleIds.every(id => bulk.has(id));
+          return { checked: allSelected, indeterminate: !allSelected };
+        })();
         return (
         <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 14, overflow: 'hidden',
           border: '1px solid rgba(255,255,255,.08)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
+                <th style={{ ...hcell, width: 40 }}>
+                  <Checkbox
+                    checked={headerCheckState.checked}
+                    indeterminate={headerCheckState.indeterminate}
+                    onClick={() => headerCheckState.checked ? bulk.clear() : bulk.selectAll(visibleIds)}
+                    title="Выделить все"
+                  />
+                </th>
                 <th style={sortHCell('author_name')} onClick={() => toggleSort('author_name')}>Автор{sortIcon('author_name')}</th>
                 <th style={hcell}>Текст</th>
                 <th style={hcell}>Медиа</th>
@@ -167,12 +216,16 @@ export default function AdminMoments() {
             </thead>
             <tbody>
               {sorted.length === 0 && (
-                <tr><td colSpan={8} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={9} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
                   {q ? 'Ничего не найдено' : 'Пусто'}
                 </td></tr>
               )}
               {sorted.map(m => (
-                <tr key={m.id}>
+                <tr key={m.id}
+                  style={{ background: bulk.has(m.id) ? 'rgba(120,90,200,.10)' : 'transparent' }}>
+                  <td style={cell}>
+                    <Checkbox checked={bulk.has(m.id)} onClick={() => bulk.toggle(m.id)} title="Выделить"/>
+                  </td>
                   <td style={cell}>
                     {m.user_id ? (
                       <Link to={`/admin/users/${m.user_id}`}
@@ -279,6 +332,17 @@ export default function AdminMoments() {
       <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 12, marginTop: 12 }}>
         {moments.length} моментов{search.trim() && ` · показано совпадений`}
       </div>
+
+      <BulkActionBar
+        count={bulk.count}
+        busy={bulkBusy}
+        onClear={bulk.clear}
+        onAction={(a) => applyBulkAction(a.key)}
+        actions={[
+          { key: 'delete',      label: '🗑 Удалить', danger: true },
+          { key: 'hard_delete', label: '💣 Стереть полностью', danger: true },
+        ]}
+      />
 
       {/* Lightbox preview */}
       {preview && (
