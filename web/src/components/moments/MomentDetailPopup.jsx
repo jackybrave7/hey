@@ -582,7 +582,18 @@ export default function MomentDetailPopup({
     try {
       const conv = await api.openConversation(moment.user_id);
       onClose();
-      nav(`/chat/${conv.id}`);
+      // Прикрепляем мини-карточку момента к черновику чата как «зацепку
+      // общения». Подхватывает ChatScreen из location.state.momentRef.
+      const momentRef = {
+        id: moment.id,
+        text: moment.text || null,
+        media_url: moment.media_url || null,
+        media_type: moment.media_type || null,
+        media_position: moment.media_position || null,
+        author_name: moment.author_name || null,
+        author_id: moment.user_id || null,
+      };
+      nav(`/chat/${conv.id}`, { state: { momentRef } });
     } catch {}
   }
 

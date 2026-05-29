@@ -1602,7 +1602,7 @@ export function MyProfileScreen() {
                   style={iconBtn}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.18)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.10)'}>
-                  <Icon name="heart" size={17}/>
+                  <Icon name="chat" size={17}/>
                 </button>
                 <button
                   onClick={() => nav('/settings')}
@@ -1827,8 +1827,8 @@ export function MyProfileScreen() {
               onClick={() => setArchiveOpen(true)}
             />
             <Card
-              icon="🎟"
-              iconBg="rgba(255,120,140,.22)"
+              icon="🤝"
+              iconBg="rgba(255,200,120,.22)"
               title="Сохранённые моменты"
               subtitle="Закладки чужих работ"
               count={savedCount}
@@ -2064,28 +2064,6 @@ export function MyProfileScreen() {
             );
           })()}
 
-          {/* Disciplines cloud */}
-          {disciplines.length > 0 && (
-            <div style={{marginTop:24,padding:'14px 16px',
-              background:'rgba(255,255,255,.07)',borderRadius:16,
-              border:'1px solid rgba(255,255,255,.12)'}}>
-              <div style={{color:'rgba(255,255,255,.55)',fontSize:11,
-                textTransform:'uppercase',letterSpacing:.8,marginBottom:10}}>
-                Дисциплины
-              </div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
-                {disciplines.map(d => (
-                  <span key={d.tag} style={{
-                    background:'rgba(140,100,220,.35)',border:'1px solid rgba(200,160,255,.35)',
-                    borderRadius:20,padding:'5px 13px',fontSize:13,
-                    color:'rgba(235,215,255,.95)',fontWeight:500,
-                  }}>
-                    {d.tag} · {d.count}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2160,7 +2138,7 @@ export function MyProfileScreen() {
           }}>
             <div style={{ padding:'16px 20px 12px', display:'flex', alignItems:'center', gap:10,
               borderBottom:'1px solid rgba(255,255,255,.08)', flexShrink:0 }}>
-              <span style={{ fontSize: 22 }}>🎟</span>
+              <span style={{ fontSize: 22 }}>🤝</span>
               <div style={{ flex: 1 }}>
                 <div style={{ color:'white', fontSize: 17, fontWeight: 700 }}>Сохранённые моменты</div>
                 <div style={{ color:'rgba(255,255,255,.45)', fontSize: 12, marginTop: 1 }}>
@@ -2181,7 +2159,7 @@ export function MyProfileScreen() {
               ) : savedMoments.length === 0 ? (
                 <div style={{ background:'rgba(255,255,255,.04)', borderRadius: 16,
                   padding:'30px 20px', textAlign:'center', border:'2px dashed rgba(255,255,255,.1)' }}>
-                  <div style={{ fontSize: 32, marginBottom: 10, opacity: .6 }}>🎟</div>
+                  <div style={{ fontSize: 32, marginBottom: 10, opacity: .6 }}>🤝</div>
                   <div style={{ color:'rgba(255,255,255,.6)', fontSize: 14, fontWeight: 600 }}>
                     Пока пусто
                   </div>
@@ -2191,12 +2169,12 @@ export function MyProfileScreen() {
                 </div>
               ) : (
                 <div style={{ display:'grid',
-                  gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap: 10 }}>
+                  gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
                   {savedMoments.map(m => (
                     <div key={m.id} onClick={() => { setSavedOpen(false); setSavedSelected(m); }}
                       style={{ background:'rgba(255,255,255,.06)', borderRadius: 14,
                         border:'1px solid rgba(255,255,255,.1)', overflow:'hidden',
-                        cursor:'pointer', aspectRatio:'3/4', position:'relative' }}>
+                        cursor:'pointer', aspectRatio:'1/1', position:'relative' }}>
                       {m.media_url && m.media_type === 'image' ? (
                         <img src={m.media_url} alt=""
                           style={{ width:'100%', height:'100%', objectFit:'cover',
@@ -2863,23 +2841,27 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                 {resolvedIsContact ? (
                   <button onClick={onRemoveContact}
                     title="Убрать из контактов"
-                    style={{flex:1,padding:'12px 0',background:'rgba(60,160,90,.32)',
+                    style={{flex:1,padding:'12px 10px',background:'rgba(60,160,90,.32)',
                       border:'1px solid rgba(100,200,120,.45)',borderRadius:14,
                       color:'rgba(170,240,190,.95)',fontSize:14,fontWeight:600,cursor:'pointer',
-                      transition:'background .15s'}}
+                      transition:'background .15s',
+                      display:'flex',alignItems:'center',justifyContent:'center',gap:8,lineHeight:1.2}}
                     onMouseEnter={e=>e.currentTarget.style.background='rgba(60,160,90,.5)'}
                     onMouseLeave={e=>e.currentTarget.style.background='rgba(60,160,90,.32)'}>
-                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="check" size={16}/> В контактах</span>
+                    <Icon name="check" size={16}/>
+                    <span>В контактах</span>
                   </button>
                 ) : (
                   <button onClick={onAddContact}
-                    style={{flex:1,padding:'12px 0',background:'rgba(255,255,255,.08)',
+                    style={{flex:1,padding:'12px 10px',background:'rgba(255,255,255,.08)',
                       border:'1px solid rgba(255,255,255,.18)',borderRadius:14,
                       color:'white',fontSize:14,fontWeight:600,cursor:'pointer',
-                      transition:'background .15s'}}
+                      transition:'background .15s',
+                      display:'flex',alignItems:'center',justifyContent:'center',gap:8,lineHeight:1.2}}
                     onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.14)'}
                     onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}>
-                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="user-plus" size={16}/> Добавить в контакты</span>
+                    <Icon name="user-plus" size={16}/>
+                    <span style={{textAlign:'left'}}>Добавить в контакты</span>
                   </button>
                 )}
               </div>
@@ -5764,7 +5746,7 @@ export function GroupSettingsScreen() {
 const MessageRow = memo(function MessageRow({
   m, isOut, isGroup, editingMsgId, reactionPickerMsgId,
   partnerName, currentUserId, isFlashing,
-  onOpenMenu, onLightbox, onToggleReaction, onSetReactionPicker,
+  onOpenMenu, onLightbox, onToggleReaction, onSetReactionPicker, onOpenMomentRef,
   statusIcon, renderText,
 }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -5973,6 +5955,48 @@ const MessageRow = memo(function MessageRow({
               <span style={{fontSize:14,opacity:.6,flexShrink:0}}>⬇</span>
             </a>
           )}
+          {m.attachment?.type === 'moment' && m.attachment.moment && (() => {
+            const mom = m.attachment.moment;
+            return (
+              <button
+                onClick={() => onOpenMomentRef && onOpenMomentRef(mom.id)}
+                title="Открыть момент"
+                style={{
+                  display:'flex', alignItems:'center', gap:10,
+                  padding:'8px 10px', borderRadius:10, marginBottom: m.text ? 6 : 2,
+                  background: isOut ? 'rgba(255,255,255,.12)' : 'rgba(120,90,200,.18)',
+                  border:`1px solid ${isOut ? 'rgba(255,255,255,.18)' : 'rgba(180,140,220,.3)'}`,
+                  color:'inherit', cursor:'pointer', maxWidth: 280,
+                  fontFamily:'inherit', textAlign:'left',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = isOut ? 'rgba(255,255,255,.18)' : 'rgba(120,90,200,.28)'}
+                onMouseLeave={e => e.currentTarget.style.background = isOut ? 'rgba(255,255,255,.12)' : 'rgba(120,90,200,.18)'}>
+                <div style={{flexShrink:0, width: 42, height: 42, borderRadius: 8,
+                  overflow:'hidden', background:'#1a0a30',
+                  display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  {mom.media_url && mom.media_type === 'image' ? (
+                    <img src={mom.media_url} alt="" draggable={false}
+                      style={{width:'100%', height:'100%', objectFit:'cover',
+                        objectPosition: mom.media_position || '50% 50%'}}/>
+                  ) : (
+                    <span style={{fontSize: 20, color:'rgba(220,200,255,.85)'}}>✦</span>
+                  )}
+                </div>
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize: 10, fontWeight: 700,
+                    color: isOut ? 'rgba(255,255,255,.7)' : 'rgba(220,200,255,.85)',
+                    textTransform:'uppercase', letterSpacing: .5}}>
+                    ✦ Момент {mom.author_name ? `· ${mom.author_name}` : ''}
+                  </div>
+                  <div style={{fontSize: 12, marginTop: 2, opacity: .85,
+                    overflow:'hidden', textOverflow:'ellipsis',
+                    display:'-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient:'vertical'}}>
+                    {mom.text || '— без описания —'}
+                  </div>
+                </div>
+              </button>
+            );
+          })()}
           {m.text && <div style={{wordBreak:'break-word',whiteSpace:'pre-wrap'}}>{renderText(m.text)}</div>}
           <div style={{fontSize:11,opacity:.6,textAlign:'right',marginTop:3,display:'flex',justifyContent:'flex-end',gap:4}}>
             {m.edited_at && <span>изм.</span>}
@@ -6169,6 +6193,12 @@ export function ChatScreen() {
   const [replyTo,     setReplyTo]     = useState(null); // message object to reply to
   const [imgPreviews, setImgPreviews] = useState([]); // [{dataUrl, file, uploading?}]
   const [filePreview, setFilePreview] = useState(null); // { file, uploading?: bool }
+  // momentRef — мини-карточка момента, прицепленная к черновику.
+  // Прилетает через nav state, когда пользователь жмёт «Написать» в попапе момента.
+  const [momentRef,   setMomentRef]   = useState(null);
+  // Popup для открытия чужого момента из чата (когда тапаем по прицепленному моменту).
+  const [momentChatPopup, setMomentChatPopup] = useState(null); // null | { moments:[m], idx:0 }
+  const [momentChatLoading, setMomentChatLoading] = useState(false);
   const [lightbox,    setLightbox]    = useState(null); // null | { urls: string[], index: number }
   const [showMedia,   setShowMedia]   = useState(false);
   const [searchMode,  setSearchMode]  = useState(false);
@@ -6261,6 +6291,17 @@ export function ChatScreen() {
       .then(p => setRequesterProfile(p))
       .catch(() => setRequesterProfile(null));
   }, [requestLock?.requester?.id]);
+
+  // momentRef: при заходе в чат из попапа момента подцепляем мини-карточку
+  // к черновику. nav state одноразовый — снимаем сразу после чтения.
+  useEffect(() => {
+    if (location.state?.momentRef) {
+      setMomentRef(location.state.momentRef);
+      // Чистим state из history — чтобы при обновлении страницы не возвращалось
+      try { window.history.replaceState({}, ''); } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convId]);
 
   // Load history + partner info
   useEffect(() => {
@@ -6822,7 +6863,8 @@ export function ChatScreen() {
       return;
     }
 
-    if (!t) return;
+    // Если момент прицеплен — можно отправить и пустым текстом.
+    if (!t && !momentRef) return;
 
     if (editingMsg) {
       api.editMessage(convId, editingMsg.id, t)
@@ -6835,17 +6877,34 @@ export function ChatScreen() {
 
     const tempId = 'tmp-' + Date.now();
     const reply  = replyTo ? makeReplySnippet(replyTo) : null;
+    // Если к черновику прицеплен момент — кладём его как attachment.
+    const attachment = momentRef ? { type: 'moment', moment: momentRef } : null;
     forceScrollBottom.current = true;
     setMessages(prev => [...prev, {
       id: tempId, text: t, sender_id: user.id,
       sender_name: user.name, status:'sent',
       created_at: Math.floor(Date.now()/1000),
+      attachment,
       reply_to_id: replyTo?.id || null, reply_to: reply,
     }]);
-    socket.sendMessage(convId, t, tempId, null, replyTo?.id);
+    socket.sendMessage(convId, t, tempId, attachment, replyTo?.id);
     setText('');
     setReplyTo(null);
+    setMomentRef(null);
     socket.stopTyping(convId);
+  }
+
+  // Открытие момента из чата по клику на прицепленную мини-карточку
+  async function handleOpenMomentRef(momentId) {
+    if (!momentId) return;
+    setMomentChatLoading(true);
+    try {
+      const m = await api.getMoment(momentId);
+      setMomentChatPopup({ moments: [m], idx: 0 });
+    } catch (e) {
+      heyToast('Момент недоступен: ' + (e.message || 'удалён'), 'error');
+    }
+    setMomentChatLoading(false);
   }
 
   // Локальный snippet для оптимистического показа цитаты (до прихода реального с сервера)
@@ -7449,6 +7508,7 @@ export function ChatScreen() {
                   onLightbox={handleLightbox}
                   onToggleReaction={handleToggleRxn}
                   onSetReactionPicker={handleSetRxnPicker}
+                  onOpenMomentRef={handleOpenMomentRef}
                   statusIcon={statusIcon}
                   renderText={renderText}
                 />
@@ -7487,6 +7547,45 @@ export function ChatScreen() {
         >
           ↓
         </button>
+      )}
+
+      {/* Moment-ref pill — мини-карточка момента, прицепленная к черновику
+          (зацепка общения после «Написать» из попапа момента) */}
+      {momentRef && (
+        <div style={{background:'rgba(120,90,200,.2)',flexShrink:0,
+          borderTop:'1px solid rgba(180,140,220,.18)'}}>
+          <div style={{padding:'10px 14px',maxWidth:680,margin:'0 auto',
+            display:'flex',alignItems:'center',gap:12}}>
+            <div style={{flexShrink:0,width:44,height:44,borderRadius:10,
+              overflow:'hidden',background:'#1a0a30',
+              display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {momentRef.media_url && momentRef.media_type === 'image' ? (
+                <img src={momentRef.media_url} alt="" draggable={false}
+                  style={{width:'100%',height:'100%',objectFit:'cover',
+                    objectPosition: momentRef.media_position || '50% 50%'}}/>
+              ) : (
+                <span style={{fontSize:22,color:'rgba(220,200,255,.85)'}}>✦</span>
+              )}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:'rgba(220,200,255,.85)',fontSize:11,fontWeight:600,
+                textTransform:'uppercase',letterSpacing:.6}}>
+                ✦ Момент {momentRef.author_name ? `· ${momentRef.author_name}` : ''}
+              </div>
+              <div style={{color:'white',fontSize:13,marginTop:2,
+                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {momentRef.text || '— без описания —'}
+              </div>
+            </div>
+            <button onClick={() => setMomentRef(null)}
+              title="Открепить момент"
+              style={{background:'rgba(0,0,0,.4)',border:'none',color:'white',
+                fontSize:14,cursor:'pointer',
+                width:28,height:28,borderRadius:'50%',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                flexShrink:0,lineHeight:1}}>✕</button>
+          </div>
+        </div>
       )}
 
       {/* File preview bar — один файл с именем/размером */}
@@ -8122,6 +8221,16 @@ export function ChatScreen() {
           messageId={forwardModal.messageId}
           onClose={() => setForwardModal(null)}
           onDone={(count) => heyToast(`Переслано в ${count} ${count === 1 ? 'чат' : 'чатов'}`, 'success')}
+        />
+      )}
+
+      {/* Moment popup — открывается из чата при тапе по прицепленному моменту */}
+      {momentChatPopup && (
+        <MomentDetailPopup
+          moments={momentChatPopup.moments}
+          initialIndex={momentChatPopup.idx}
+          currentUser={user}
+          onClose={() => setMomentChatPopup(null)}
         />
       )}
 
