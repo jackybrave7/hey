@@ -242,6 +242,24 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS reports (
 )`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC)'); } catch {}
 
+// Feedbacks: «Написать разработчику» — обращения юзеров (анонимные тоже).
+// Раньше падали только в feedback.log + email. Теперь дублируются в БД,
+// чтобы видеть/обрабатывать из админки и считать незакрытые в бейдже.
+try { db.exec(`CREATE TABLE IF NOT EXISTS feedbacks (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT,                  -- NULL для анонимных
+  name        TEXT,                  -- name на момент отправки (для аноним: NULL)
+  phone       TEXT,                  -- phone на момент отправки
+  type        TEXT,                  -- 'bug' | 'idea' | 'общее' | etc.
+  text        TEXT NOT NULL,
+  status      TEXT DEFAULT 'open',   -- 'open' | 'done' | 'dismissed'
+  created_at  INTEGER NOT NULL,
+  handled_at  INTEGER,
+  handled_by  TEXT,                  -- admin user_id
+  admin_note  TEXT                   -- внутренний комментарий
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_feedbacks_status ON feedbacks(status, created_at DESC)'); } catch {}
+
 // Лист ожидания на открытую регистрацию (без инвайта)
 try { db.exec(`CREATE TABLE IF NOT EXISTS waitlist (
   id           TEXT PRIMARY KEY,
@@ -1996,6 +2014,47 @@ function resolveReport(id, adminId, action /* 'resolved' | 'dismissed' */) {
     .run(action, now(), adminId, id);
 }
 
+// ── Feedbacks ─────────────────────────────────────────────────────────────
+function createFeedback({ userId, name, phone, type, text }) {
+  const id = 'fb_' + uuid().replace(/-/g,'').slice(0,12);
+  db.prepare(
+    `INSERT INTO feedbacks (id, user_id, name, phone, type, text, status, created_at)
+     VALUES (?,?,?,?,?,?,'open',?)`
+  ).run(id, userId || null, name || null, phone || null, type || null, text, now());
+  return id;
+}
+
+function getFeedbacks({ status = 'open', limit = 200 } = {}) {
+  const where = status === 'all' ? '1=1' : 'f.status = @status';
+  return db.prepare(
+    `SELECT f.*,
+            u.name  AS current_name,
+            u.phone AS current_phone,
+            u.is_deleted AS user_is_deleted,
+            a.name  AS handled_by_name
+     FROM feedbacks f
+     LEFT JOIN users u ON u.id = f.user_id
+     LEFT JOIN users a ON a.id = f.handled_by
+     WHERE ${where}
+     ORDER BY f.created_at DESC
+     LIMIT @limit`
+  ).all({ status, limit });
+}
+
+function resolveFeedback(id, adminId, action /* 'done' | 'dismissed' | 'open' */, note) {
+  if (action === 'open') {
+    db.prepare('UPDATE feedbacks SET status=\'open\', handled_at=NULL, handled_by=NULL, admin_note=COALESCE(?, admin_note) WHERE id=?')
+      .run(note ?? null, id);
+  } else {
+    db.prepare('UPDATE feedbacks SET status=?, handled_at=?, handled_by=?, admin_note=COALESCE(?, admin_note) WHERE id=?')
+      .run(action, now(), adminId, note ?? null, id);
+  }
+}
+
+function countOpenFeedbacks() {
+  return db.prepare('SELECT COUNT(*) AS c FROM feedbacks WHERE status=\'open\'').get()?.c ?? 0;
+}
+
 // ── Waitlist ─────────────────────────────────────────────────────────────
 function addToWaitlist(email, source) {
   const id = 'wl_' + uuid().replace(/-/g,'').slice(0,12);
@@ -2751,6 +2810,7 @@ module.exports = {
   searchUsers,
   // Reports
   createReport, getReports, resolveReport,
+  createFeedback, getFeedbacks, resolveFeedback, countOpenFeedbacks,
   // Waitlist
   addToWaitlist, getWaitlist,
   // System (HEY-заведующий)

@@ -173,6 +173,8 @@ export const api = {
   createReport:     (data)      => req('POST', '/reports', data),
   adminGetReports:  (status='open') => req('GET', `/admin/reports?status=${status}`),
   adminGetCounts:   ()              => req('GET', '/admin/counts'),
+  adminGetFeedbacks:    (status='open')  => req('GET', `/admin/feedbacks?status=${status}`),
+  adminResolveFeedback: (id, action, note) => req('PATCH', `/admin/feedbacks/${id}`, { action, note }),
   adminResolveReport: (id, action) => req('PATCH', `/admin/reports/${id}`, { action }),
   viewMoment:       (id)         => req('POST',   `/moments/${id}/view`),
   getDisciplines:   (userId)     => req('GET',    `/moments/disciplines/${userId}`),

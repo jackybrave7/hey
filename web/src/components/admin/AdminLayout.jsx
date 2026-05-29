@@ -8,8 +8,9 @@ const NAV = [
   { to: '/admin',         label: '📊 Дашборд',          exact: true },
   { to: '/admin/users',   label: '👥 Пользователи' },
   { to: '/admin/moments', label: '✦ Моменты' },
-  { to: '/admin/reports', label: '🚩 Жалобы',        countKey: 'openReports' },
-  { to: '/admin/system',  label: '📢 HEY-заведующий' },
+  { to: '/admin/reports',   label: '🚩 Жалобы',         countKey: 'openReports' },
+  { to: '/admin/feedbacks', label: '✉ Обращения',      countKey: 'openFeedbacks' },
+  { to: '/admin/system',    label: '📢 HEY-заведующий' },
   { to: '/admin/awo',     label: '🎓 АВО / Школы' },
   { to: '/admin/business-requests', label: '💼 Бизнес-заявки', countKey: 'pendingBusiness' },
   { to: '/admin/test-users', label: '🧪 Тестовые юзеры' },
@@ -21,7 +22,7 @@ const COUNT_POLL_MS = 30000;
 export default function AdminLayout({ children }) {
   const nav = useNavigate();
   const { user } = useAuth();
-  const [counts, setCounts] = useState({ openReports: 0, pendingBusiness: 0 });
+  const [counts, setCounts] = useState({ openReports: 0, pendingBusiness: 0, openFeedbacks: 0 });
 
   useEffect(() => {
     let alive = true;

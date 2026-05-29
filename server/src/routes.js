@@ -1165,7 +1165,17 @@ module.exports = function makeRouter(db, broadcast) {
     const subject = `HEY Feedback [${type || 'общее'}] от ${from}`;
     const body = `От: ${from}\nТип: ${type || 'общее'}\n\n${text.trim()}`;
 
-    // Always save to file
+    // Кладём в БД (для админки), параллельно в файл (легаси).
+    try {
+      db.createFeedback({
+        userId: req.user?.id || null,
+        name:   req.user?.name || null,
+        phone:  req.user?.phone || null,
+        type:   type || null,
+        text:   text.trim(),
+      });
+    } catch (e) { console.error('[FEEDBACK] DB insert failed:', e.message); }
+
     saveFeedbackToFile(subject, body);
     console.log('[FEEDBACK]', subject);
 
@@ -1494,10 +1504,27 @@ module.exports = function makeRouter(db, broadcast) {
       const pendingBusiness = db.listBusinessRequests
         ? db.listBusinessRequests('pending').length
         : 0;
-      res.json({ openReports, pendingBusiness });
+      const openFeedbacks = db.countOpenFeedbacks ? db.countOpenFeedbacks() : 0;
+      res.json({ openReports, pendingBusiness, openFeedbacks });
     } catch (e) {
-      res.json({ openReports: 0, pendingBusiness: 0 });
+      res.json({ openReports: 0, pendingBusiness: 0, openFeedbacks: 0 });
     }
+  });
+
+  // Админ: список feedback
+  r.get('/admin/feedbacks', requireAdmin, (req, res) => {
+    const status = req.query.status || 'open';
+    res.json(db.getFeedbacks({ status }));
+  });
+
+  // Админ: закрыть/переоткрыть/добавить заметку к feedback
+  r.patch('/admin/feedbacks/:id', requireAdmin, (req, res) => {
+    const { action, note } = req.body;
+    if (!['done','dismissed','open'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action' });
+    }
+    db.resolveFeedback(req.params.id, req.user.id, action, note);
+    res.json({ ok: true });
   });
 
   // Админ: список жалоб
