@@ -3338,30 +3338,29 @@ export function ContactsScreen() {
   // или ввести номер телефона и нажать «+».
 
   // ── Add contact by phone (+ button) ─────────────────────────────────────
+  // Сначала lookup → показываем карточку пользователя → подтверждение →
+  // фактическое добавление. Карточка переиспользует ContactCardModal
+  // с isContact=false, поэтому в ней доступна кнопка «👤 Добавить в контакты».
   async function addContact() {
     const q = query.trim();
     if (!q) return;
-    // If looks like a phone number — try to add directly
     const looksLikePhone = /^[\d\s\-\+\(\)]{7,}$/.test(q);
-    if (looksLikePhone) {
-      const pv = validatePhone(q);
-      if (!pv.ok) { heyToast(pv.msg, 'error'); return; }
-      try {
-        const c = await api.addContact({ phone: pv.normalized });
-        setContacts(prev => prev.find(x => x.id === c.id) ? prev : [...prev, c]);
-        setQuery('');
-        setSearchResults(null);
-      } catch(e) {
-        // User not found — offer invite
-        if (e.message?.includes('не найден') || e.message?.includes('404') || e.status === 404) {
-          setInviteTarget(pv.normalized);
-        } else {
-          heyToast(e.message, 'error');
-        }
+    if (!looksLikePhone) return;
+    const pv = validatePhone(q);
+    if (!pv.ok) { heyToast(pv.msg, 'error'); return; }
+    try {
+      const profile = await api.lookupUserByPhone(pv.normalized);
+      // Открываем карточку через тот же state, что используется для тапа
+      // по контакту — но isContact=false ⇒ показывается кнопка «Добавить».
+      setCard(profile);
+    } catch(e) {
+      // Пользователь не найден — предлагаем пригласить.
+      if (e.message?.includes('не найден') || e.message?.includes('404') || e.status === 404) {
+        setInviteTarget(pv.normalized);
+      } else {
+        heyToast(e.message, 'error');
       }
     }
-    // Не телефон и не нашли локально → ничего не делаем,
-    // дальше нужно либо точнее ввести имя, либо ввести номер.
   }
 
   async function openChat(contactId) {
@@ -3554,25 +3553,41 @@ export function ContactsScreen() {
       })()}
 
       {/* Contact card modal */}
-      {card && (
-        <ContactCardModal
-          contact={card}
-          isBlocked={isBlockedId(card.id)}
-          isContact={true}
-          onClose={() => setCard(null)}
-          onChat={() => openChat(card.id)}
-          onAddContact={() => {}} /* уже в контактах — кнопка не показывается */
-          onRemoveContact={async () => {
-            if (!await customConfirm('Удалить из контактов? Чат и переписка останутся.', { confirmLabel: 'Удалить' })) return;
-            try { await api.deleteContact(card.id); setContacts(prev => prev.filter(c => c.id !== card.id)); setCard(null); }
-            catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
-          }}
-          onBlock={() => handleBlock(card)}
-          onUnblock={() => handleUnblock(card.id)}
-          onNotesChange={handleNotesChange}
-          onOpenMoment={(m) => { setCard(null); nav(`/moments/${m.id}`); }}
-        />
-      )}
+      {card && (() => {
+        // Если карточка пришла из lookup (по телефону) — этот юзер ещё НЕ в
+        // контактах: показываем кнопку «Добавить» вместо «В чат».
+        const cardIsContact = card.is_contact !== undefined
+          ? !!card.is_contact
+          : !!visibleContacts.find(c => c.id === card.id);
+        return (
+          <ContactCardModal
+            contact={card}
+            isBlocked={isBlockedId(card.id)}
+            isContact={cardIsContact}
+            onClose={() => setCard(null)}
+            onChat={() => openChat(card.id)}
+            onAddContact={async () => {
+              try {
+                const c = await api.addContact({ userId: card.id });
+                setContacts(prev => prev.find(x => x.id === c.id) ? prev : [...prev, c]);
+                setQuery('');
+                setSearchResults(null);
+                setCard(null);
+                heyToast('✓ Добавлено в контакты', 'success');
+              } catch (e) { heyToast(e.message || 'Не удалось добавить', 'error'); }
+            }}
+            onRemoveContact={async () => {
+              if (!await customConfirm('Удалить из контактов? Чат и переписка останутся.', { confirmLabel: 'Удалить' })) return;
+              try { await api.deleteContact(card.id); setContacts(prev => prev.filter(c => c.id !== card.id)); setCard(null); }
+              catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
+            }}
+            onBlock={() => handleBlock(card)}
+            onUnblock={() => handleUnblock(card.id)}
+            onNotesChange={handleNotesChange}
+            onOpenMoment={(m) => { setCard(null); nav(`/moments/${m.id}`); }}
+          />
+        );
+      })()}
 
       {showImport && (
         <ImportContactsModal

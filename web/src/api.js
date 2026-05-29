@@ -82,6 +82,7 @@ export const api = {
   // Contacts
   getContacts:    ()       => req('GET', '/contacts'),
   addContact:     (data)   => req('POST', '/contacts', data),
+  lookupUserByPhone: (phone) => req('GET', `/users/lookup?phone=${encodeURIComponent(phone)}`),
   deleteContact:  (id)     => req('DELETE', `/contacts/${id}`),
   updateContactNotes: (id, notes) => req('PATCH', `/contacts/${id}/notes`, { notes }),
   updateContactNickname: (id, nickname) => req('PATCH', `/contacts/${id}/nickname`, { nickname }),

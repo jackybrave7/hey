@@ -521,6 +521,22 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getContacts(req.user.id));
   });
 
+  // Lookup-only: найти юзера по телефону, ничего не добавляя.
+  // Нужно для UX «введи номер → покажи карточку → подтверди добавление».
+  r.get('/users/lookup', requireAuth, (req, res) => {
+    const digits = (req.query.phone || '').replace(/\D/g, '');
+    if (digits.length < 7) return res.status(400).json({ error: 'Слишком короткий номер' });
+    const phone = '+' + (digits.startsWith('8') ? '7' + digits.slice(1) : digits);
+    const target = db.findUserByPhone(phone);
+    if (!target || target.is_blocked) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (target.id === req.user.id) return res.status(400).json({ error: 'Это вы' });
+    if (target.is_deleted) return res.status(400).json({ error: 'Пользователь удалил аккаунт' });
+    // Возвращаем безопасный профиль (как /users/:id/profile) — без активных моментов.
+    const { password, ...safe } = target;
+    safe.is_contact = !!db.getContacts(req.user.id).find(c => c.id === target.id);
+    res.json(safe);
+  });
+
   r.post('/contacts', requireAuth, (req, res) => {
     const { phone: rawPhone, nickname, userId } = req.body;
     let target;
