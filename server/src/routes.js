@@ -280,12 +280,28 @@ module.exports = function makeRouter(db, broadcast) {
 
   r.post('/login', rateLimit(10, 15 * 60 * 1000), (req, res) => {
     const { phone, password } = req.body;
-    const user = db.findUserByPhone(phone);
+    let user = db.findUserByPhone(phone);
+
+    // Если по телефону юзера нет — может быть аккаунт сейчас в grace-периоде
+    // (само-удаление, телефон заменён на placeholder). Пробуем восстановить.
+    let restored = false;
+    if (!user) {
+      const restoreResult = db.tryRestoreFromGrace(phone, password, bcrypt);
+      if (restoreResult?.conflict === 'phone_taken') {
+        return res.status(409).json({
+          error: 'Этот номер уже зарегистрировал другой пользователь, пока ваш аккаунт был в очереди удаления. Восстановление невозможно.',
+          code: 'GRACE_PHONE_TAKEN',
+        });
+      }
+      if (restoreResult?.user) {
+        user = restoreResult.user;
+        restored = true;
+      }
+    }
+
     if (!user) return res.status(401).json({ error: 'Неверный телефон или пароль' });
     if (!bcrypt.compareSync(password, user.password))
       return res.status(401).json({ error: 'Неверный телефон или пароль' });
-    // Сначала верифицируем пароль, потом проверяем блокировку — чтобы
-    // блокировка не была способом проверить, существует ли аккаунт по телефону.
     if (user.is_blocked) {
       return res.status(403).json({
         error: 'Аккаунт заблокирован администрацией',
@@ -295,7 +311,7 @@ module.exports = function makeRouter(db, broadcast) {
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
     setSessionCookie(res, token);
     const { password: _, ...safe } = user;
-    res.json({ token, user: safe });
+    res.json({ token, user: safe, restored });
   });
 
   // Logout — очищает cookie-сессию (JWT в localStorage клиент чистит сам)
@@ -464,10 +480,10 @@ module.exports = function makeRouter(db, broadcast) {
     if (!user) return res.status(404).json({ error: 'Not found' });
     if (!bcrypt.compareSync(password, user.password))
       return res.status(403).json({ error: 'Неверный пароль' });
-    db.deleteUserAccount(req.user.id);
+    const result = db.deleteUserAccount(req.user.id);
     // Notify the deleted user's own WS connections so the client logs out
     broadcast([req.user.id], { type: 'account:deleted' });
-    res.json({ ok: true });
+    res.json({ ok: true, graceExpiresAt: result?.graceExpiresAt || null });
   });
 
   // ── Заявка на бизнес-доступ ────────────────────────────────────────────

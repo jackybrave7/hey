@@ -57,3 +57,19 @@ server.listen(PORT, () => {
   ╚══════════════════════════════╝
   `);
 });
+
+// ── Scheduled jobs ─────────────────────────────────────────────────────────
+// Раз в час прогоняем grace-период удаления: всё что просрочено (по умолчанию
+// >30 дней с момента self-delete) → hard-delete + S3 cleanup. На старте тоже
+// сразу прогоняем, чтобы не ждать целый час после рестарта.
+const storage = require('./storage');
+function runGraceExpiry() {
+  try {
+    const r = db.expireDeletionGrace(storage);
+    if (r.processed) console.log(`[grace-expire] hard-deleted ${r.processed} expired account(s)`);
+  } catch (e) {
+    console.error('[grace-expire] failed:', e.message);
+  }
+}
+setTimeout(runGraceExpiry, 30 * 1000);          // через 30с после старта
+setInterval(runGraceExpiry, 60 * 60 * 1000);    // далее каждый час

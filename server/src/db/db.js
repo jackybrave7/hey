@@ -260,6 +260,20 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS feedbacks (
 )`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_feedbacks_status ON feedbacks(status, created_at DESC)'); } catch {}
 
+// Two-step self-delete: после `DELETE /me` юзер становится `is_deleted=1`,
+// но 30 дней лежит в deletion_grace со снапшотом оригинальных полей.
+// Если за это время кто-то логинится с правильным телефоном+паролем —
+// аккаунт восстанавливается. Иначе scheduled task hard-удаляет.
+try { db.exec(`CREATE TABLE IF NOT EXISTS deletion_grace (
+  user_id        TEXT PRIMARY KEY,
+  original_phone TEXT NOT NULL,
+  snapshot       TEXT NOT NULL,   -- JSON: {name, phone, email, avatar, bio, headline, password}
+  created_at     INTEGER NOT NULL,
+  expires_at     INTEGER NOT NULL
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_grace_expires ON deletion_grace(expires_at)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_grace_phone   ON deletion_grace(original_phone)'); } catch {}
+
 // Лист ожидания на открытую регистрацию (без инвайта)
 try { db.exec(`CREATE TABLE IF NOT EXISTS waitlist (
   id           TEXT PRIMARY KEY,
@@ -702,13 +716,42 @@ function hardDeleteUserAccount(userId) {
   return { s3Keys, s3Prefixes };
 }
 
+// Self-delete юзера. Two-step:
+//   1. сейчас — анонимизируем как раньше + кладём в deletion_grace снапшот
+//      оригинальных полей (включая bcrypt password hash) на 30 дней.
+//   2. через 30 дней scheduled task превращает в hardDeleteUserAccount.
+//   3. если за 30 дней юзер логинится с оригинальным телефоном+паролем —
+//      см. tryRestoreFromGrace → восстанавливается, grace-строка удаляется.
+const GRACE_DAYS = 30;
 function deleteUserAccount(userId) {
   const t = now();
-  // phone имеет NOT NULL + UNIQUE — нельзя выставлять NULL.
-  // Подставляем уникальный плейсхолдер, чтобы освободить «настоящий» телефон
-  // для повторной регистрации и не нарушать constraint.
+  const u = findUserById(userId);
+  if (!u) return null;
+
+  const snapshot = {
+    name:     u.name,
+    phone:    u.phone,
+    email:    u.email,
+    avatar:   u.avatar,
+    bio:      u.bio,
+    headline: u.headline,
+    password: u.password, // bcrypt hash — нужен для проверки на восстановлении
+  };
+
   const placeholderPhone = `_deleted_${userId.replace(/-/g,'').slice(0,12)}_${t}`;
   db.transaction(() => {
+    // Снапшот в grace-таблицу
+    db.prepare(
+      `INSERT INTO deletion_grace (user_id, original_phone, snapshot, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         original_phone=excluded.original_phone,
+         snapshot=excluded.snapshot,
+         created_at=excluded.created_at,
+         expires_at=excluded.expires_at`
+    ).run(userId, u.phone, JSON.stringify(snapshot), t, t + GRACE_DAYS * 24 * 3600);
+
+    // Анонимизация (как раньше)
     db.prepare(
       `UPDATE users SET
          is_deleted=1, deleted_at=?,
@@ -721,11 +764,84 @@ function deleteUserAccount(userId) {
          password=?
        WHERE id=?`
     ).run(t, placeholderPhone, `DELETED_${userId}_${t}`, userId);
-    // Archive all active moments so they vanish from feeds
     db.prepare(
       `UPDATE moments SET status='archived' WHERE user_id=? AND status='active'`
     ).run(userId);
   })();
+
+  return { graceExpiresAt: t + GRACE_DAYS * 24 * 3600 };
+}
+
+// Восстановление из grace-периода. Возвращает { user } если пароль совпал
+// со снапшотом, иначе null. После успешного восстановления grace-строка
+// удаляется и моменты возвращаются в active.
+function tryRestoreFromGrace(originalPhone, plainPassword, bcrypt) {
+  const row = db.prepare(
+    'SELECT * FROM deletion_grace WHERE original_phone=? AND expires_at > ?'
+  ).get(originalPhone, now());
+  if (!row) return null;
+  let snap;
+  try { snap = JSON.parse(row.snapshot); } catch { return null; }
+  if (!snap?.password) return null;
+  if (!bcrypt.compareSync(plainPassword, snap.password)) return null;
+
+  // Проверка: телефон не занят кем-то другим за это время
+  const occupant = db.prepare('SELECT id FROM users WHERE phone=? AND id != ?')
+    .get(originalPhone, row.user_id);
+  if (occupant) return { conflict: 'phone_taken' };
+
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE users SET
+         is_deleted=0, deleted_at=NULL,
+         name=?, phone=?, email=?, avatar=?, bio=?, headline=?, password=?
+       WHERE id=?`
+    ).run(
+      snap.name || 'Пользователь',
+      snap.phone,
+      snap.email || null,
+      snap.avatar || null,
+      snap.bio || null,
+      snap.headline || null,
+      snap.password,
+      row.user_id,
+    );
+    db.prepare(`UPDATE moments SET status='active' WHERE user_id=? AND status='archived'`)
+      .run(row.user_id);
+    db.prepare('DELETE FROM deletion_grace WHERE user_id=?').run(row.user_id);
+  })();
+
+  return { user: findUserById(row.user_id) };
+}
+
+// Прогоняемый периодически — превращает истёкшие grace-записи в hard-delete.
+function expireDeletionGrace(storage) {
+  const rows = db.prepare(
+    'SELECT user_id, original_phone FROM deletion_grace WHERE expires_at <= ?'
+  ).all(now());
+  if (!rows.length) return { processed: 0 };
+  for (const r of rows) {
+    try {
+      const { s3Keys, s3Prefixes } = hardDeleteUserAccount(r.user_id);
+      // storage может быть undefined в тестах — тогда S3-cleanup пропускаем
+      if (storage) {
+        (async () => {
+          for (const k of s3Keys)     { try { await storage.deleteFile(k); }   catch {} }
+          for (const p of s3Prefixes) { try { await storage.deleteByPrefix(p); } catch {} }
+        })();
+      }
+    } catch (e) {
+      console.error('[expireDeletionGrace]', r.user_id, e.message);
+    }
+    db.prepare('DELETE FROM deletion_grace WHERE user_id=?').run(r.user_id);
+  }
+  return { processed: rows.length };
+}
+
+function getDeletionGraceInfo(userId) {
+  return db.prepare(
+    'SELECT user_id, original_phone, created_at, expires_at FROM deletion_grace WHERE user_id=?'
+  ).get(userId) || null;
 }
 
 function addContact(ownerId, contactId, nickname) {
@@ -2836,6 +2952,7 @@ module.exports = {
   SYSTEM_USER_ID,
   SCHOOL_USER_ID,
   createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount, hardDeleteUserAccount,
+  tryRestoreFromGrace, expireDeletionGrace, getDeletionGraceInfo,
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,

@@ -549,11 +549,24 @@ export function LoginScreen() {
     try {
       const res = await api.login({ phone: pv.normalized, password });
       login(res.token, res.user);
+      // Если аккаунт был в grace-периоде самоудаления — серверный /login
+      // отдаёт restored:true и возвращает все поля. Покажем подтверждение.
+      if (res.restored) {
+        try {
+          window.dispatchEvent(new CustomEvent('hey:toast', {
+            detail: { message: '🎉 Аккаунт восстановлен после самоудаления', type: 'success' },
+          }));
+        } catch {}
+      }
       // Если пришли с /gjoin/:token — возвращаемся туда, чтобы юзер нажал «Войти в группу»
       if (gjoinToken) nav('/gjoin/' + gjoinToken);
       else nav('/main');
     } catch(e) {
-      setErr('Неверный телефон или пароль');
+      if (e.code === 'GRACE_PHONE_TAKEN') {
+        setErr(e.message);
+      } else {
+        setErr('Неверный телефон или пароль');
+      }
     }
     setLoading(false);
   }
@@ -8862,8 +8875,14 @@ export function SettingsScreen() {
                 Удалить аккаунт?
               </div>
               <div style={{color:'rgba(255,255,255,.5)',fontSize:13,lineHeight:1.6}}>
-                Все данные будут удалены навсегда — сообщения, моменты, профиль.
-                Те, кто с тобой общался, увидят «Пользователь удалил аккаунт».
+                Профиль сразу пропадёт: имя, телефон, аватар, био — скроются;
+                собеседники увидят «Пользователь удалил аккаунт», моменты уйдут из ленты.
+                <br/><br/>
+                <span style={{color:'rgba(180,220,140,.85)'}}>
+                  💡 <strong>У тебя 30 дней передумать.</strong> Если за это время войдёшь
+                  с тем же телефоном и паролем — аккаунт восстановится со всеми данными.
+                  По истечении 30 дней — необратимое удаление со стиранием медиа.
+                </span>
               </div>
             </div>
             <div style={{marginBottom:14}}>
