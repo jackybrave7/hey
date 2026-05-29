@@ -3788,10 +3788,15 @@ export function ConversationsScreen() {
             <div style={{color:'rgba(180,140,220,.8)',fontSize:13}}>хочет написать вам</div>
           ) : c.is_group_invite ? (
             <div style={{color:'rgba(220,190,255,1)',fontSize:13,fontWeight:500,whiteSpace:'nowrap',
-              overflow:'hidden',textOverflow:'ellipsis'}}>
-              {c.group_invited_by_name
-                ? `${c.group_invited_by_name} приглашает в группу`
-                : 'приглашение в группу'}
+              overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',gap:6}}>
+              {c.group_invited_by_id && (
+                <AvatarDisplay avatar={c.group_invited_by_avatar} name={c.group_invited_by_name} size={18} fontSize={9}/>
+              )}
+              <span style={{overflow:'hidden',textOverflow:'ellipsis'}}>
+                {c.group_invited_by_name
+                  ? `${c.group_invited_by_name} приглашает в группу`
+                  : 'приглашение в группу'}
+              </span>
             </div>
           ) : c.partner_is_deleted ? (
             <div style={{color:'rgba(255,255,255,.3)',fontSize:13,fontStyle:'italic'}}>
@@ -7590,8 +7595,13 @@ export function ChatScreen() {
             </div>
             {groupInvite.invitedBy?.name && (
               <div style={{color:'rgba(255,255,255,.85)', fontSize:14, lineHeight:1.5,
-                textShadow:'0 1px 4px rgba(0,0,0,.2)'}}>
-                {groupInvite.invitedBy.name} приглашает тебя в группу
+                textShadow:'0 1px 4px rgba(0,0,0,.2)',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8}}>
+                <AvatarDisplay
+                  avatar={groupInvite.invitedBy.avatar}
+                  name={groupInvite.invitedBy.name}
+                  size={26} fontSize={12}/>
+                <span>{groupInvite.invitedBy.name} приглашает тебя в группу</span>
               </div>
             )}
           </div>

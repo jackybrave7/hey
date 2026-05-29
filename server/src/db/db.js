@@ -1118,10 +1118,14 @@ function getConversationsForUser(userId, opts = {}) {
     .filter(r => r.status === 'pending' && r.invited_by)
     .map(r => r.invited_by))];
   const inviterNames = {};
+  const inviterAvatars = {};
   if (inviterIds.length) {
     const iph = inviterIds.map(() => '?').join(',');
-    db.prepare(`SELECT id, name FROM users WHERE id IN (${iph})`).all(...inviterIds)
-      .forEach(u => { inviterNames[u.id] = u.name; });
+    db.prepare(`SELECT id, name, avatar FROM users WHERE id IN (${iph})`).all(...inviterIds)
+      .forEach(u => {
+        inviterNames[u.id] = u.name;
+        inviterAvatars[u.id] = avatarPayload(u.id, u.avatar);
+      });
   }
 
   return convIds.map(convId => {
@@ -1170,8 +1174,9 @@ function getConversationsForUser(userId, opts = {}) {
       pinned_message_id: conv.pinned_message_id || null,
       // Pending group invite
       is_group_invite: isGroupInvite,
-      group_invited_by_id:   isGroupInvite ? meta.invited_by : null,
-      group_invited_by_name: isGroupInvite && meta.invited_by ? (inviterNames[meta.invited_by] || null) : null,
+      group_invited_by_id:     isGroupInvite ? meta.invited_by : null,
+      group_invited_by_name:   isGroupInvite && meta.invited_by ? (inviterNames[meta.invited_by] || null) : null,
+      group_invited_by_avatar: isGroupInvite && meta.invited_by ? (inviterAvatars[meta.invited_by] || null) : null,
     };
   }).filter(Boolean).sort((a, b) => {
     if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
@@ -1229,7 +1234,7 @@ function getInviterForPendingMember(convId, userId) {
      WHERE m.conversation_id=? AND m.user_id=? AND m.status='pending'`
   ).get(convId, userId);
   if (!row) return null;
-  return { id: row.id, name: row.name, avatar: row.avatar || null };
+  return { id: row.id, name: row.name, avatar: avatarPayload(row.id, row.avatar) };
 }
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -2114,6 +2119,12 @@ function adminDeleteMoment(momentId, adminId, reason) {
     db.prepare('DELETE FROM moment_reactions WHERE moment_id=?').run(momentId);
     db.prepare('DELETE FROM moment_views WHERE moment_id=?').run(momentId);
     db.prepare("UPDATE moments SET status='deleted', updated_at=? WHERE id=?").run(now(), momentId);
+    // Авто-resolve всех открытых жалоб на этот момент — админ уже принял меры
+    // (удаление), повторно вручную закрывать их не нужно.
+    db.prepare(
+      `UPDATE reports SET status='resolved', resolved_at=?, resolved_by=?
+       WHERE target_type='moment' AND target_id=? AND status='open'`
+    ).run(now(), adminId, momentId);
   })();
   logAdminAction({ adminId, action: 'delete_moment', targetMomentId: momentId, reason });
 }
