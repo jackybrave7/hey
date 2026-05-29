@@ -471,6 +471,7 @@ export default function MomentDetailPopup({
   onArchive,      // (moment) => void
   onDelete,       // (moment) => void
   onRestore,
+  onMomentUpdated, // (freshMoment) => void — родитель синкает свой список
 }) {
   const nav = useNavigate();
 
@@ -577,12 +578,16 @@ export default function MomentDetailPopup({
       const fresh = await api.getMoment(moment.id);
       setMoment(fresh);
       setMyReaction(fresh.myReaction || null);
+      // Прокидываем в родителя — лента/каталог должны сразу показать
+      // новую мини-иконку реакции, а не ждать перезагрузки страницы.
+      onMomentUpdated?.(fresh);
     } catch {
       // На случай сетевого/серверного сбоя пересинхронизируем с сервером
       try {
         const fresh = await api.getMoment(moment.id);
         setMoment(fresh);
         setMyReaction(fresh.myReaction || null);
+        onMomentUpdated?.(fresh);
       } catch {}
     }
     setReacting(false);

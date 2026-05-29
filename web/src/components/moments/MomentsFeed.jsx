@@ -399,6 +399,14 @@ export default function MomentsFeed({ currentUser }) {
           onEdit={m => { setEditTarget(m); setSelected(null); }}
           onArchive={m => { handleArchive(m); setSelected(null); }}
           onDelete={m => { setDeleteTarget(m); setSelected(null); }}
+          // Реакция/просмотр изменились в попапе → апдейтим ленту,
+          // чтобы мини-иконки в каталоге показались сразу.
+          onMomentUpdated={(fresh) => {
+            const patch = (arr) => arr.map(m => m.id === fresh.id ? { ...m, ...fresh } : m);
+            setFeed(patch);
+            setMyMoments(patch);
+            setSelected(s => s ? { ...s, moments: patch(s.moments) } : s);
+          }}
         />
       )}
 

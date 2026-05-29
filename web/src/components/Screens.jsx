@@ -2114,6 +2114,9 @@ export function MyProfileScreen() {
               setActivePopupIdx(null);
               showProfileToast('Момент удалён');
             }}
+            onMomentUpdated={(fresh) => {
+              setMyMoments(prev => prev.map(x => x.id === fresh.id ? { ...x, ...fresh } : x));
+            }}
           />
         );
       })()}
