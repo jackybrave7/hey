@@ -705,7 +705,7 @@ export default function MomentDetailPopup({
           {!hasMedia && (
             hasEmbedVideo ? (
               <div style={{flexShrink:0,position:'relative',background:'#0a0518'}}>
-                <EmbeddedVideoPreview data={moment.embedded_video} size="full"/>
+                <EmbeddedVideoPreview data={moment.embedded_video} size="full" hideMeta/>
                 <button onClick={onClose} style={{position:'absolute',top:12,right:12,
                   background:'rgba(0,0,0,.5)',backdropFilter:'blur(8px)',
                   border:'none',borderRadius:'50%',width:36,height:36,
@@ -807,7 +807,7 @@ export default function MomentDetailPopup({
 
             {/* Embedded video (shown below text when there's also a media_url) */}
             {hasEmbedVideo && hasMedia && (
-              <EmbeddedVideoPreview data={moment.embedded_video} size="full"/>
+              <EmbeddedVideoPreview data={moment.embedded_video} size="full" hideMeta/>
             )}
 
             {/* Search flag */}

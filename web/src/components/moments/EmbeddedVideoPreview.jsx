@@ -26,7 +26,10 @@ function getEmbedUrl(provider, videoId) {
   }
 }
 
-export default function EmbeddedVideoPreview({ data, size = 'full' }) {
+// hideMeta — для моментов: не тащить с видеохостинга title/author/duration,
+// потому что момент — это контент автора, а не пересказ метаданных платформы.
+// В чате (где люди шарят ссылки) этот блок остаётся включённым.
+export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = false }) {
   const [playing, setPlaying] = useState(false);
   const [thumbBroken, setThumbBroken] = useState(false);
   if (!data) return null;
@@ -153,7 +156,7 @@ export default function EmbeddedVideoPreview({ data, size = 'full' }) {
           </div>
 
           {/* Info row (full size only) */}
-          {!isCard && (data.title || data.author || data.duration_seconds) && (
+          {!isCard && !hideMeta && (data.title || data.author || data.duration_seconds) && (
             <div style={{
               padding: '10px 14px', background: 'rgba(15,8,32,.9)',
               display: 'flex', flexDirection: 'column', gap: 3,
