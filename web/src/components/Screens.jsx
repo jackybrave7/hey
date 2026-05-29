@@ -1582,14 +1582,51 @@ export function MyProfileScreen() {
                 {saving ? '…' : 'Сохранить'}
               </button>
             </div>
-          ) : (
-            <button onClick={startEdit}
-              style={{padding:'8px 16px',borderRadius:50,fontSize:13,fontWeight:700,cursor:'pointer',
-                background:'rgba(120,90,200,.85)',border:'none',color:'white',
-                boxShadow:'0 2px 12px rgba(120,80,200,.4)'}}>
-              ✎ Изменить
-            </button>
-          )}
+          ) : (() => {
+            // Три круглые иконки: 💜 сохранённые моменты · ⚙ настройки · ✎ редактирование.
+            // Идея — компактный action-bar вместо одной кнопки «Изменить».
+            const iconBtn = {
+              width: 38, height: 38, borderRadius: '50%',
+              background: 'rgba(255,255,255,.10)',
+              border: '1px solid rgba(255,255,255,.16)',
+              color: 'white', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background .15s',
+              padding: 0,
+            };
+            return (
+              <div style={{ display:'flex', gap: 8 }}>
+                <button
+                  onClick={toggleSaved}
+                  title="Сохранённые моменты"
+                  style={iconBtn}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.18)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.10)'}>
+                  <Icon name="heart" size={17}/>
+                </button>
+                <button
+                  onClick={() => nav('/settings')}
+                  title="Настройки"
+                  style={iconBtn}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.18)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.10)'}>
+                  <Icon name="settings" size={17}/>
+                </button>
+                <button
+                  onClick={startEdit}
+                  title="Редактировать профиль"
+                  style={{ ...iconBtn,
+                    background: 'rgba(120,90,200,.85)',
+                    border: '1px solid rgba(180,140,255,.5)',
+                    boxShadow: '0 2px 12px rgba(120,80,200,.4)',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,110,220,.95)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(120,90,200,.85)'}>
+                  <Icon name="edit" size={17}/>
+                </button>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -1659,11 +1696,9 @@ export function MyProfileScreen() {
                 style={{colorScheme:'dark'}}/>
             </div>
           ) : (
-            <div style={{display:'flex',gap:8}}>
-              <div className="bday-box">{bdayD||'ДД'}</div>
-              <div className="bday-box">{bdayM||'ММ'}</div>
-              <div className="bday-box">{bdayY||'ГГГГ'}</div>
-            </div>
+            (bdayD && bdayM && bdayY)
+              ? <FieldLine value={`${bdayD}.${bdayM}.${bdayY}`}/>
+              : null
           )}
         </div>
       </div>
@@ -1718,22 +1753,13 @@ export function MyProfileScreen() {
           );
         })() : user?.bio ? (
           <div style={{
-            background:'rgba(255,255,255,.05)', borderRadius:14,
-            border:'1px solid rgba(255,255,255,.08)', padding:'12px 16px',
-            color:'rgba(255,255,255,.75)', fontSize:14, lineHeight:1.6,
+            color:'rgba(255,255,255,.88)', fontSize:14, lineHeight:1.6,
             wordBreak:'break-word', whiteSpace:'pre-wrap',
           }}>
             <BioWithLinks text={user.bio}/>
           </div>
         ) : null}
       </div>
-
-      {/* Hint when not editing */}
-      {!editing && (
-        <div style={{padding:'12px 26px 0',color:'rgba(255,255,255,.4)',fontSize:13}}>
-          Нажмите ✎ чтобы редактировать профиль
-        </div>
-      )}
 
       {/* Achievement badges остаются вверху рядом с инфо */}
       {!editing && (
@@ -1742,115 +1768,105 @@ export function MyProfileScreen() {
         </div>
       )}
 
-      {/* Shortcuts */}
-      {!editing && (
-        <div style={{padding:'16px 26px 0',display:'flex',flexDirection:'column',gap:10}}>
-          {/* Invite link block */}
-          <div style={{
-            background:'rgba(120,90,200,.12)', border:'1px solid rgba(180,140,220,.25)',
-            borderRadius:14, padding:'14px 18px', display:'flex', alignItems:'center', gap:12,
-          }}>
-            <span style={{fontSize:22}}>🔗</span>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{color:'white',fontSize:14,fontWeight:600}}>Пригласить в HEY</div>
-              <div style={{color:'rgba(255,255,255,.45)',fontSize:12,marginTop:2}}>
-                Друг зарегистрируется и увидит тебя в контактах
+      {/* Sections: SUPER banner + три карточки (Архив / Сохранённые / Пригласить) */}
+      {!editing && (() => {
+        // Подсчёты для бейджей в карточках
+        const archivedCount = myMoments.filter(m => m.status === 'archived').length;
+        const savedCount = savedLoaded ? savedMoments.length : null;
+
+        const Card = ({ icon, iconBg, title, subtitle, count, onClick, accent }) => (
+          <button onClick={onClick} style={{
+            display:'flex', alignItems:'center', gap: 14,
+            width:'100%', padding:'14px 16px', borderRadius: 16,
+            background: accent ? 'rgba(120,90,200,.18)' : 'rgba(255,255,255,.05)',
+            border: accent ? '1px solid rgba(180,140,255,.3)' : '1px solid rgba(255,255,255,.08)',
+            color:'white', cursor:'pointer', textAlign:'left',
+            transition:'background .15s, transform .12s', fontFamily:'inherit',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = accent
+              ? 'rgba(120,90,200,.28)' : 'rgba(255,255,255,.09)'}
+            onMouseLeave={e => e.currentTarget.style.background = accent
+              ? 'rgba(120,90,200,.18)' : 'rgba(255,255,255,.05)'}>
+            <div style={{
+              flexShrink: 0, width: 44, height: 44, borderRadius: 12,
+              background: iconBg || 'rgba(120,90,200,.25)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize: 22,
+            }}>{icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color:'white', fontSize: 15, fontWeight: 700 }}>{title}</div>
+              <div style={{ color:'rgba(255,255,255,.5)', fontSize: 12, marginTop: 2,
+                overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {subtitle}
               </div>
             </div>
-            <button onClick={() => {
+            {count !== null && count !== undefined && (
+              <span style={{ color:'rgba(255,255,255,.55)', fontSize: 14, fontWeight: 600 }}>{count}</span>
+            )}
+            <span style={{ color:'rgba(255,255,255,.35)', fontSize: 18, marginLeft: 6 }}>›</span>
+          </button>
+        );
+
+        return (
+          <div style={{ padding:'18px 26px 0', display:'flex', flexDirection:'column', gap: 12 }}>
+            {/* SUPER status banner */}
+            <SuperStatusCard user={user} onInvite={() => {
               const link = `${location.origin}/register?invite=${user?.id}`;
-              navigator.clipboard.writeText(link).then(() => {
+              navigator.clipboard?.writeText(link).then(() => {
                 setInviteCopied(true);
                 setTimeout(() => setInviteCopied(false), 2500);
               });
-            }} style={{
-              flexShrink:0, padding:'7px 14px', borderRadius:50, fontSize:12, fontWeight:700,
-              background: inviteCopied ? 'rgba(46,204,113,.35)' : 'rgba(120,90,200,.7)',
-              border: inviteCopied ? '1px solid rgba(46,204,113,.5)' : '1px solid rgba(180,140,220,.4)',
-              color:'white', cursor:'pointer', transition:'all .18s',
-            }}>
-              {inviteCopied ? '✓ Скопировано' : 'Скопировать'}
-            </button>
-          </div>
+            }}/>
 
-          {/* Поговорить — сохранённые моменты */}
-          <div style={{borderRadius:14,overflow:'hidden',border:'1px solid rgba(255,255,255,.08)'}}>
-            <button onClick={toggleSaved} style={{
-              width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',
-              padding:'13px 18px',background:'rgba(255,255,255,.06)',border:'none',
-              color:'white',fontSize:14,fontWeight:600,cursor:'pointer',
-            }}>
-              <span>🤝 Поговорить</span>
-              <span style={{opacity:.4,fontSize:12,transition:'transform .2s',
-                transform: savedOpen ? 'rotate(90deg)' : 'none'}}>›</span>
-            </button>
-            {savedOpen && (
-              <div style={{background:'rgba(255,255,255,.03)',padding:'12px 14px'}}>
-                {savedLoading ? (
-                  <div style={{textAlign:'center',padding:'20px 0',
-                    color:'rgba(255,255,255,.3)',fontSize:13}}>Загрузка…</div>
-                ) : savedMoments.length === 0 ? (
-                  <div style={{textAlign:'center',padding:'24px 0'}}>
-                    <div style={{fontSize:32,marginBottom:8}}>🤝</div>
-                    <div style={{color:'rgba(255,255,255,.4)',fontSize:13}}>
-                      Отмечай моменты реакцией 🤝 — они появятся здесь
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                    {savedMoments.map(m => (
-                      <div key={m.id} onClick={() => setSavedSelected(m)}
-                        style={{
-                          borderRadius:10,overflow:'hidden',cursor:'pointer',
-                          background:'#1a0a30',aspectRatio:'3/4',position:'relative',
-                        }}>
-                        {m.media_url && m.media_type==='image'
-                          ? <img src={m.media_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',
-                              objectPosition: m.media_position || '50% 50%'}}/>
-                          : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',
-                              justifyContent:'center',fontSize:28,
-                              background:'linear-gradient(135deg,#1e0a40,#3a1060)'}}>✦</div>
-                        }
-                        <div style={{position:'absolute',bottom:0,left:0,right:0,
-                          background:'rgba(0,0,0,.55)',backdropFilter:'blur(8px)',
-                          padding:'6px 8px',fontSize:11,color:'rgba(255,255,255,.8)',
-                          overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                          {m.author_name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <Card
+              icon="📦"
+              iconBg="rgba(255,200,150,.18)"
+              title="Архив моих моментов"
+              subtitle="Прошлые работы и публикации"
+              count={archivedCount || null}
+              onClick={() => setArchiveOpen(true)}
+            />
+            <Card
+              icon="🎟"
+              iconBg="rgba(255,120,140,.22)"
+              title="Сохранённые моменты"
+              subtitle="Закладки чужих работ"
+              count={savedCount}
+              onClick={() => { if (!savedOpen) toggleSaved(); else setSavedOpen(true); }}
+            />
+            <Card
+              icon="🔗"
+              iconBg="rgba(180,140,255,.28)"
+              title={inviteCopied ? '✓ Ссылка скопирована' : 'Пригласить друга'}
+              subtitle="Поделиться ссылкой на HEY"
+              count={null}
+              accent={true}
+              onClick={() => {
+                const link = `${location.origin}/register?invite=${user?.id}`;
+                navigator.clipboard?.writeText(link).then(() => {
+                  setInviteCopied(true);
+                  setTimeout(() => setInviteCopied(false), 2500);
+                });
+              }}
+            />
+
+            {user?.is_admin && (
+              <button onClick={() => nav('/admin')} style={{
+                display:'flex',alignItems:'center',justifyContent:'space-between',
+                padding:'13px 18px',borderRadius:14,cursor:'pointer',
+                background:'rgba(120,90,200,.18)',border:'1px solid rgba(180,140,255,.3)',
+                color:'rgba(200,180,255,.95)',fontSize:14,fontWeight:600,
+                transition:'background .15s', marginTop: 4,
+              }}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(120,90,200,.32)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.18)'}>
+                <span style={{display:'inline-flex',alignItems:'center',gap:10}}><Icon name="settings" size={18}/> Панель администратора</span>
+                <span style={{opacity:.5}}>›</span>
+              </button>
             )}
           </div>
-
-          <button onClick={() => nav('/settings')}
-            style={{
-              display:'flex',alignItems:'center',justifyContent:'space-between',
-              padding:'13px 18px',borderRadius:14,cursor:'pointer',
-              background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',
-              color:'white',fontSize:14,fontWeight:500,
-            }}>
-            <span style={{display:'inline-flex',alignItems:'center',gap:10}}><Icon name="settings" size={18}/> Настройки</span>
-            <span style={{opacity:.4}}>›</span>
-          </button>
-          {user?.is_admin && (
-            <button onClick={() => nav('/admin')} style={{
-              display:'flex',alignItems:'center',justifyContent:'space-between',
-              padding:'13px 18px',borderRadius:14,cursor:'pointer',
-              background:'rgba(120,90,200,.18)',border:'1px solid rgba(180,140,255,.3)',
-              color:'rgba(200,180,255,.95)',fontSize:14,fontWeight:600,
-              transition:'background .15s',
-            }}
-              onMouseEnter={e=>e.currentTarget.style.background='rgba(120,90,200,.32)'}
-              onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.18)'}>
-              <span style={{display:'inline-flex',alignItems:'center',gap:10}}><Icon name="settings" size={18}/> Панель администратора</span>
-              <span style={{opacity:.5}}>›</span>
-            </button>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* Moments section */}
       {!editing && (
@@ -2073,18 +2089,6 @@ export function MyProfileScreen() {
         </div>
       )}
 
-      {/* SUPER status card — в самом конце профиля */}
-      {!editing && (
-        <div style={{padding:'24px 26px 0'}}>
-          <SuperStatusCard user={user} onInvite={() => {
-            const link = `${location.origin}/register?invite=${user?.id}`;
-            navigator.clipboard?.writeText(link).then(() => {
-              setInviteCopied(true);
-              setTimeout(() => setInviteCopied(false), 2500);
-            });
-          }}/>
-        </div>
-      )}
 
       {/* Confirm dialog */}
       {confirmModal}
@@ -2140,6 +2144,82 @@ export function MyProfileScreen() {
           onArchive={() => {}}
           onDelete={() => {}}
         />
+      )}
+
+      {/* Saved moments — список всех сохранённых (закладки чужих работ) */}
+      {savedOpen && createPortal(
+        <div onMouseDown={e => { if (e.target === e.currentTarget) setSavedOpen(false); }}
+          style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,.6)',
+            backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+          <div style={{
+            width:'min(94vw,640px)', maxHeight:'88vh',
+            background:'rgba(38,28,68,.97)', backdropFilter:'blur(24px)',
+            borderRadius: 18, boxShadow:'0 24px 64px rgba(0,0,0,.55)',
+            border:'1px solid rgba(255,255,255,.12)',
+            display:'flex', flexDirection:'column', overflow:'hidden',
+          }}>
+            <div style={{ padding:'16px 20px 12px', display:'flex', alignItems:'center', gap:10,
+              borderBottom:'1px solid rgba(255,255,255,.08)', flexShrink:0 }}>
+              <span style={{ fontSize: 22 }}>🎟</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ color:'white', fontSize: 17, fontWeight: 700 }}>Сохранённые моменты</div>
+                <div style={{ color:'rgba(255,255,255,.45)', fontSize: 12, marginTop: 1 }}>
+                  {savedLoading ? 'загрузка…' :
+                    `${savedMoments.length} ${savedMoments.length === 1 ? 'момент' :
+                      (savedMoments.length % 10 >= 2 && savedMoments.length % 10 <= 4 &&
+                       (savedMoments.length % 100 < 10 || savedMoments.length % 100 >= 20) ? 'момента' : 'моментов')}`}
+                </div>
+              </div>
+              <button onClick={() => setSavedOpen(false)}
+                style={{ background:'none', border:'none', color:'rgba(255,255,255,.5)',
+                  fontSize: 24, cursor:'pointer', lineHeight: 1, padding: 0 }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY:'auto', padding: 14 }}>
+              {savedLoading ? (
+                <div style={{ textAlign:'center', padding:'40px 20px',
+                  color:'rgba(255,255,255,.3)', fontSize: 14 }}>Загрузка…</div>
+              ) : savedMoments.length === 0 ? (
+                <div style={{ background:'rgba(255,255,255,.04)', borderRadius: 16,
+                  padding:'30px 20px', textAlign:'center', border:'2px dashed rgba(255,255,255,.1)' }}>
+                  <div style={{ fontSize: 32, marginBottom: 10, opacity: .6 }}>🎟</div>
+                  <div style={{ color:'rgba(255,255,255,.6)', fontSize: 14, fontWeight: 600 }}>
+                    Пока пусто
+                  </div>
+                  <div style={{ color:'rgba(255,255,255,.35)', fontSize: 12, marginTop: 6 }}>
+                    Отмечай моменты реакцией 🤝 — они появятся здесь
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display:'grid',
+                  gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap: 10 }}>
+                  {savedMoments.map(m => (
+                    <div key={m.id} onClick={() => { setSavedOpen(false); setSavedSelected(m); }}
+                      style={{ background:'rgba(255,255,255,.06)', borderRadius: 14,
+                        border:'1px solid rgba(255,255,255,.1)', overflow:'hidden',
+                        cursor:'pointer', aspectRatio:'3/4', position:'relative' }}>
+                      {m.media_url && m.media_type === 'image' ? (
+                        <img src={m.media_url} alt=""
+                          style={{ width:'100%', height:'100%', objectFit:'cover',
+                            objectPosition: m.media_position || '50% 50%' }}/>
+                      ) : (
+                        <div style={{ width:'100%', height:'100%', display:'flex',
+                          alignItems:'center', justifyContent:'center', fontSize: 28,
+                          background:'linear-gradient(135deg,#1e0a40,#3a1060)' }}>✦</div>
+                      )}
+                      <div style={{ position:'absolute', bottom: 0, left: 0, right: 0,
+                        background:'rgba(0,0,0,.55)', backdropFilter:'blur(8px)',
+                        padding:'6px 8px', fontSize: 11, color:'rgba(255,255,255,.85)',
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {m.author_name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Archive list popup — модалка со всеми архивными моментами (может быть много) */}
