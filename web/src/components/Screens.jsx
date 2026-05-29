@@ -1400,6 +1400,7 @@ export function MyProfileScreen() {
   // Archive popup
   const [archiveSelected, setArchiveSelected] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false); // модалка со списком архивных моментов
+  const [archiveFilter, setArchiveFilter] = useState(null); // null = «все», иначе строка-тег
   // Active moment popup
   const [activePopupIdx, setActivePopupIdx] = useState(null);
 
@@ -1651,7 +1652,13 @@ export function MyProfileScreen() {
               <div style={{color:'rgba(255,255,255,.6)',fontSize:12,marginBottom:4}}>Имя</div>
               <input className="ul-input" value={name} onChange={e=>setName(e.target.value)} placeholder="Имя"/>
             </div>
-          ) : <FieldLine value={name || '—'}/>}
+          ) : (
+            // Имя — главный акцент шапки профиля: крупный жирный белый.
+            <div style={{color:'white',fontSize:24,fontWeight:800,lineHeight:1.15,
+              letterSpacing:-.3,paddingBottom:4,marginTop:-4}}>
+              {name || '—'}
+            </div>
+          )}
 
           {/* Телефон — нельзя менять после регистрации */}
           {editing ? (
@@ -1719,7 +1726,7 @@ export function MyProfileScreen() {
                 value={bio}
                 onChange={e => setBio(e.target.value.slice(0, 200))}
                 placeholder="Расскажи о себе — пару строк о том, чем занимаешься…"
-                rows={3}
+                rows={6}
                 style={{
                   width:'100%', boxSizing:'border-box',
                   background:'rgba(255,255,255,.08)',
@@ -1732,8 +1739,8 @@ export function MyProfileScreen() {
                 onBlur={e=>{ if(!overLimit) e.target.style.borderColor='rgba(255,255,255,.15)'; }}
               />
               <div style={{
-                marginTop:6,fontSize:11,
-                color: overLimit ? 'rgba(255,140,140,.95)' : 'rgba(255,255,255,.4)',
+                marginTop:6,fontSize:12,
+                color: overLimit ? 'rgba(255,150,150,1)' : 'rgba(220,210,255,.85)',
                 display:'flex',alignItems:'center',gap:6,
               }}>
                 <span>🔗</span>
@@ -1744,8 +1751,8 @@ export function MyProfileScreen() {
                   </span>
                 ) : (
                   <span>
-                    Ссылок: <strong style={{color:'rgba(200,170,255,.85)'}}>{urls.length} из {maxLinks}</strong>
-                    {!user?.is_super && <> · в ✦ Super — до 5</>}
+                    Ссылок: <strong style={{color:'rgba(200,170,255,1)',fontWeight:800}}>{urls.length} из {maxLinks}</strong>
+                    {!user?.is_super && <span style={{color:'rgba(255,255,255,.55)'}}> · в ✦ Super — до 5</span>}
                   </span>
                 )}
               </div>
@@ -2228,7 +2235,36 @@ export function MyProfileScreen() {
                   style={{background:'none',border:'none',color:'rgba(255,255,255,.5)',
                     fontSize:24,cursor:'pointer',lineHeight:1,padding:0}}>✕</button>
               </div>
-              <div style={{flex:1,overflowY:'auto',padding:14}}>
+              {/* Discipline chips — фильтр по тегам внутри попапа */}
+              {disciplines.length > 0 && archived.length > 0 && (
+                <div style={{padding:'12px 16px 4px',borderBottom:'1px solid rgba(255,255,255,.05)',flexShrink:0}}>
+                  <div style={{color:'rgba(255,255,255,.4)',fontSize:10,fontWeight:700,
+                    letterSpacing:.8,textTransform:'uppercase',marginBottom:8}}>
+                    Дисциплины
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                    {[{ tag: null, label: `Все · ${archived.length}` },
+                      ...disciplines.map(d => ({ tag: d.tag, label: `${d.tag} · ${d.count}` }))
+                     ].map(({ tag, label }) => {
+                      const active = archiveFilter === tag;
+                      return (
+                        <button key={tag ?? '__all__'}
+                          onClick={() => setArchiveFilter(tag)}
+                          style={{
+                            background: active ? 'rgba(140,100,220,.55)' : 'rgba(255,255,255,.06)',
+                            border: active ? '1px solid rgba(200,160,255,.55)' : '1px solid rgba(255,255,255,.12)',
+                            borderRadius:50,padding:'5px 12px',fontSize:12,fontWeight:600,
+                            color: active ? 'white' : 'rgba(235,215,255,.85)',
+                            cursor:'pointer',fontFamily:'inherit',
+                          }}>
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div style={{flex:1,overflowY:'auto',padding:14,minHeight:0}}>
                 {archived.length === 0 ? (
                   <div style={{background:'rgba(255,255,255,.04)',borderRadius:16,
                     padding:'30px 20px',textAlign:'center',border:'2px dashed rgba(255,255,255,.1)'}}>
@@ -2240,81 +2276,89 @@ export function MyProfileScreen() {
                       Архивные моменты появятся здесь после того, как ты сам уберёшь их с публикации
                     </div>
                   </div>
-                ) : (
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:10}}>
-                    {archived.map(m => {
-                      const hasImg = m.media_url && m.media_type === 'image';
-                      const isAudio = m.media_url && m.media_type === 'audio';
-                      return (
-                        <div key={m.id} onClick={() => { setArchiveOpen(false); setArchiveSelected(m); }}
-                          style={{background:'rgba(255,255,255,.06)',borderRadius:14,
-                            border:'1px solid rgba(255,255,255,.1)',overflow:'hidden',
-                            cursor:'pointer',transition:'background .15s',
-                            display:'flex',flexDirection:'column'}}
-                          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.1)'}
-                          onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.06)'}>
-                          {hasImg ? (
-                            <img src={m.media_url} alt=""
-                              style={{width:'100%',height:100,objectFit:'cover',
-                                objectPosition: m.media_position || '50% 50%',display:'block'}}/>
-                          ) : isAudio ? (
-                            <div style={{width:'100%',height:100,
-                              background:'linear-gradient(135deg,#1a0a38,#2a1858)',
-                              display:'flex',alignItems:'center',justifyContent:'center',
-                              fontSize:36,color:'rgba(255,255,255,.7)'}}>🎵</div>
-                          ) : (
-                            <div style={{width:'100%',height:100,overflow:'hidden'}}>
-                              <MoodEmoji type={m.mood_emoji || 'calm'} size={56}/>
-                            </div>
-                          )}
-                          <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:8}}>
-                            <div style={{color:'rgba(255,255,255,.85)',fontSize:12,lineHeight:1.45,
-                              overflow:'hidden',display:'-webkit-box',
-                              WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>
-                              {m.text}
-                            </div>
-                            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:'auto'}}>
-                              <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>👁 {m.views || 0}</span>
-                              <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>✨ {m.stats?.resonate || 0}</span>
-                              <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>🤝 {m.stats?.talk || 0}</span>
-                            </div>
-                            <div style={{color:'rgba(255,255,255,.3)',fontSize:11,
-                              display:'flex',alignItems:'center',gap:4}}>
-                              📦 {m.archived_at
-                                ? new Date(m.archived_at * 1000).toLocaleDateString('ru', {day:'numeric',month:'short'})
-                                : 'в архиве'}
-                            </div>
-                            <div style={{display:'flex',gap:6,marginTop:4}}>
-                              <button onClick={(e) => { e.stopPropagation(); restoreFromArchive(m); }}
-                                style={{
-                                  flex:1,padding:'7px 4px',borderRadius:10,
-                                  background:'rgba(120,90,200,.5)',border:'1px solid rgba(180,140,220,.3)',
-                                  color:'white',fontSize:11,fontWeight:600,cursor:'pointer',
-                                  transition:'background .15s',whiteSpace:'nowrap',
-                                }}
-                                onMouseEnter={e=>e.currentTarget.style.background='rgba(120,90,200,.7)'}
-                                onMouseLeave={e=>e.currentTarget.style.background='rgba(120,90,200,.5)'}>
-                                ↩ Восстановить
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); deleteForever(m); }}
-                                style={{
-                                  padding:'7px 9px',borderRadius:10,
-                                  background:'rgba(255,80,80,.12)',border:'1px solid rgba(255,80,80,.3)',
-                                  color:'rgba(255,140,140,.95)',fontSize:13,cursor:'pointer',
-                                  transition:'background .15s',flexShrink:0,
-                                }}
-                                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,80,80,.22)'}
-                                onMouseLeave={e=>e.currentTarget.style.background='rgba(255,80,80,.12)'}
-                                title="Удалить навсегда">
-                                🗑
-                              </button>
+                ) : (() => {
+                  const filtered = archiveFilter
+                    ? archived.filter(m => (m.auto_tags || []).includes(archiveFilter))
+                    : archived;
+                  if (!filtered.length) {
+                    return (
+                      <div style={{color:'rgba(255,255,255,.45)',fontSize:13,textAlign:'center',padding:30}}>
+                        В этой дисциплине пусто
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:10}}>
+                      {filtered.map(m => {
+                        const hasImg  = m.media_url && m.media_type === 'image';
+                        const isAudio = m.media_url && m.media_type === 'audio';
+                        return (
+                          <div key={m.id} onClick={() => { setArchiveOpen(false); setArchiveSelected(m); }}
+                            style={{
+                              position:'relative', aspectRatio:'1/1',
+                              background:'rgba(255,255,255,.06)', borderRadius:14,
+                              border:'1px solid rgba(255,255,255,.1)', overflow:'hidden',
+                              cursor:'pointer', transition:'transform .15s, box-shadow .15s',
+                            }}
+                            onMouseEnter={e=>{ e.currentTarget.style.transform='scale(1.02)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,.4)'; }}
+                            onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.boxShadow='none'; }}>
+                            {/* Background */}
+                            {hasImg ? (
+                              <img src={m.media_url} alt=""
+                                style={{position:'absolute',inset:0,width:'100%',height:'100%',
+                                  objectFit:'cover',objectPosition: m.media_position || '50% 50%'}}/>
+                            ) : isAudio ? (
+                              <div style={{position:'absolute',inset:0,display:'flex',
+                                alignItems:'center',justifyContent:'center',
+                                background:'linear-gradient(135deg,#1a0a38,#2a1858)',
+                                fontSize:44,color:'rgba(255,255,255,.7)'}}>🎵</div>
+                            ) : (
+                              <div style={{position:'absolute',inset:0,display:'flex',
+                                alignItems:'center',justifyContent:'center'}}>
+                                <MoodEmoji type={m.mood_emoji || 'calm'} size={64}/>
+                              </div>
+                            )}
+                            {/* Bottom overlay: title + actions */}
+                            <div style={{
+                              position:'absolute',left:0,right:0,bottom:0,
+                              background:'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.78) 70%)',
+                              padding:'24px 10px 10px',
+                              display:'flex',flexDirection:'column',gap:6,
+                            }}>
+                              <div style={{color:'white',fontSize:12,fontWeight:600,lineHeight:1.35,
+                                overflow:'hidden',display:'-webkit-box',
+                                WebkitLineClamp:2,WebkitBoxOrient:'vertical',
+                                textShadow:'0 1px 3px rgba(0,0,0,.6)'}}>
+                                {m.text || '✦'}
+                              </div>
+                              <div style={{display:'flex',gap:6}}>
+                                <button onClick={(e) => { e.stopPropagation(); restoreFromArchive(m); }}
+                                  title="Восстановить в активные"
+                                  style={{
+                                    flex:1,padding:'6px 4px',borderRadius:8,
+                                    background:'rgba(120,90,200,.7)',border:'1px solid rgba(180,140,220,.5)',
+                                    color:'white',fontSize:11,fontWeight:600,cursor:'pointer',
+                                    fontFamily:'inherit',whiteSpace:'nowrap',
+                                  }}>
+                                  ↩
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); deleteForever(m); }}
+                                  title="Удалить навсегда"
+                                  style={{
+                                    padding:'6px 10px',borderRadius:8,
+                                    background:'rgba(220,60,60,.5)',border:'1px solid rgba(255,140,140,.4)',
+                                    color:'white',fontSize:12,cursor:'pointer',fontFamily:'inherit',
+                                  }}>
+                                  <Icon name="trash" size={12}/>
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>,

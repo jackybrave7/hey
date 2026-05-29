@@ -116,7 +116,9 @@ function ForeignAuthorMenu({ open, onToggle, onReport }) {
             }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,80,80,.1)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            <span style={{fontSize:17}}>🚩</span>
+            <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:18}}>
+              <Icon name="flag" size={16}/>
+            </span>
             <span>Пожаловаться</span>
           </div>
         </div>,
@@ -398,10 +400,16 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
   }
 
   const menuItems = [
-    { icon: '✎', label: 'Изменить момент', color: 'rgba(255,255,255,.88)', action: () => { setOpen(false); onEdit(moment); } },
-    { icon: copied ? '✓' : '↗', label: copied ? 'Ссылка скопирована!' : 'Поделиться ссылкой', color: copied ? 'rgba(80,220,140,.9)' : 'rgba(255,255,255,.88)', action: copyLink },
-    { icon: '📦', label: 'В архив', color: 'rgba(255,255,255,.88)', action: () => { setOpen(false); onArchive(moment); onClose(); } },
-    { icon: '🗑', label: 'Удалить навсегда', color: 'rgba(255,100,100,.9)', action: () => { setOpen(false); onDelete(moment); onClose(); } },
+    { icon: 'edit',    label: 'Изменить момент',  color: 'rgba(255,255,255,.88)',
+      action: () => { setOpen(false); onEdit(moment); } },
+    { icon: copied ? 'check' : 'share',
+      label: copied ? 'Ссылка скопирована!' : 'Поделиться ссылкой',
+      color: copied ? 'rgba(80,220,140,.9)' : 'rgba(255,255,255,.88)',
+      action: copyLink },
+    { icon: 'archive', label: 'В архив',          color: 'rgba(255,255,255,.88)',
+      action: () => { setOpen(false); onArchive(moment); onClose(); } },
+    { icon: 'trash',   label: 'Удалить навсегда', color: 'rgba(255,100,100,.9)',
+      action: () => { setOpen(false); onDelete(moment); onClose(); } },
   ];
 
   return (
@@ -440,7 +448,9 @@ function InlineMenu({ moment, onEdit, onArchive, onDelete, onClose }) {
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.07)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              <span style={{ fontSize: 17 }}>{icon}</span>
+              <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width: 18 }}>
+                <Icon name={icon} size={16}/>
+              </span>
               <span>{label}</span>
             </div>
           ))}
