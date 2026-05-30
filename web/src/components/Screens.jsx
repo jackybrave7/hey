@@ -769,20 +769,34 @@ function AvatarCropperModal({ file, onCancel, onDone }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   // user-scale: множитель поверх baseScale (1 = картинка полностью покрывает окно)
   const [scale, setScale] = useState(1);
+  // rotation — поворот в градусах (0/90/180/270). Применяется как CSS-transform
+  // к img и как ctx.rotate в canvas при экспорте.
+  const [rotation, setRotation] = useState(0);
   const [saving, setSaving] = useState(false);
 
   // baseScale — масштаб, при котором меньшая сторона картинки точно совпадает
   // с окном кропа (cover-fit). Дальше scale=1.0 = base, можно увеличивать.
+  // При повороте на 90/270° меняем местами w и h при расчёте.
   const baseScale = useMemo(() => {
     if (!imgSize.w || !imgSize.h) return 1;
-    return Math.max(CROP / imgSize.w, CROP / imgSize.h);
-  }, [imgSize]);
+    const rotated = rotation % 180 !== 0;
+    const w = rotated ? imgSize.h : imgSize.w;
+    const h = rotated ? imgSize.w : imgSize.h;
+    return Math.max(CROP / w, CROP / h);
+  }, [imgSize, rotation]);
 
   function onImgLoad(e) {
     setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight });
     setPos({ x: 0, y: 0 });
     setScale(1);
+    setRotation(0);
     setImgLoaded(true);
+  }
+
+  // При повороте — сбрасываем pos, чтобы картинка осталась по центру окна.
+  function rotateBy(delta) {
+    setRotation(r => ((r + delta) % 360 + 360) % 360);
+    setPos({ x: 0, y: 0 });
   }
 
   // ── Pointer tracking (drag + pinch) ────────────────────────────────────────
@@ -851,21 +865,37 @@ function AvatarCropperModal({ file, onCancel, onDone }) {
       const canvas = document.createElement('canvas');
       canvas.width = OUT; canvas.height = OUT;
       const ctx = canvas.getContext('2d');
+
+      // Стратегия: рендерим повёрнутую картинку на промежуточный canvas
+      // bbox-size (с учётом rotation), затем cropping уже как обычно.
+      // Это позволяет переиспользовать ту же геометрию pos/scale, что в UI.
+      const rotated = rotation % 180 !== 0;
+      const naturalW = imgSize.w;
+      const naturalH = imgSize.h;
+      const bboxW = rotated ? naturalH : naturalW;
+      const bboxH = rotated ? naturalW : naturalH;
+      const rotCanvas = document.createElement('canvas');
+      rotCanvas.width = bboxW; rotCanvas.height = bboxH;
+      const rctx = rotCanvas.getContext('2d');
+      rctx.save();
+      rctx.translate(bboxW / 2, bboxH / 2);
+      rctx.rotate((rotation * Math.PI) / 180);
+      rctx.drawImage(imgRef.current, -naturalW / 2, -naturalH / 2);
+      rctx.restore();
+
       const total = baseScale * scale;
-      const dispW = imgSize.w * total;
-      const dispH = imgSize.h * total;
-      // Центр картинки на экране: центр окна + смещение pos
+      const dispW = bboxW * total;
+      const dispH = bboxH * total;
       const cx = CROP / 2 + pos.x;
       const cy = CROP / 2 + pos.y;
-      // Координаты крайнего верхнего-левого пикселя картинки на экране:
       const left = cx - dispW / 2;
       const top  = cy - dispH / 2;
-      // Окно [0..CROP, 0..CROP] на экране → в координатах исходной картинки:
       const srcX = (0   - left) / total;
       const srcY = (0   - top)  / total;
       const srcW = CROP / total;
       const srcH = CROP / total;
-      ctx.drawImage(imgRef.current, srcX, srcY, srcW, srcH, 0, 0, OUT, OUT);
+      ctx.drawImage(rotCanvas, srcX, srcY, srcW, srcH, 0, 0, OUT, OUT);
+
       const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', 0.9));
       const croppedFile = new File([blob], 'avatar.webp', { type: 'image/webp' });
       onDone(URL.createObjectURL(blob), croppedFile);
@@ -873,8 +903,10 @@ function AvatarCropperModal({ file, onCancel, onDone }) {
   }
 
   const total = baseScale * scale;
-  const dispW = imgSize.w * total;
-  const dispH = imgSize.h * total;
+  // bbox после поворота: для 90/270 размеры меняются местами.
+  const rotated = rotation % 180 !== 0;
+  const dispW = (rotated ? imgSize.h : imgSize.w) * total;
+  const dispH = (rotated ? imgSize.w : imgSize.h) * total;
 
   return (
     <div onClick={onCancel}
@@ -905,6 +937,11 @@ function AvatarCropperModal({ file, onCancel, onDone }) {
             border:'2px solid rgba(255,255,255,.18)',
             boxShadow:'0 8px 30px rgba(0,0,0,.4)',
           }}>
+          {/* Картинка повернута через CSS-transform; визуальные размеры
+              (dispW/dispH) уже учитывают поворот в обёртке выше. Используем
+              визуальный bbox после поворота, поэтому переводим в orig
+              w/h обратно: при rotation 90/270 ширина img.style.width =
+              dispH, чтобы после поворота это стало dispW. */}
           <img
             ref={imgRef}
             src={srcUrl}
@@ -915,7 +952,10 @@ function AvatarCropperModal({ file, onCancel, onDone }) {
               position:'absolute',
               left: (CROP - dispW) / 2 + pos.x,
               top:  (CROP - dispH) / 2 + pos.y,
-              width: dispW, height: dispH,
+              width:  rotated ? dispH : dispW,
+              height: rotated ? dispW : dispH,
+              transform: `translate(${rotated ? (dispW - dispH) / 2 : 0}px, ${rotated ? (dispH - dispW) / 2 : 0}px) rotate(${rotation}deg)`,
+              transformOrigin: 'center center',
               pointerEvents:'none',
               maxWidth:'none',
             }}
@@ -932,7 +972,31 @@ function AvatarCropperModal({ file, onCancel, onDone }) {
           <Icon name="image" size={22}/>
         </div>
 
-        <div style={{ color:'rgba(255,255,255,.5)', fontSize:11, textAlign:'center', marginTop:6 }}>
+        {/* Кнопки поворота */}
+        <div style={{ marginTop:10, display:'flex', justifyContent:'center', gap:10 }}>
+          <button type="button" onClick={() => rotateBy(-90)} title="Повернуть влево"
+            style={{
+              background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.15)',
+              borderRadius:50, padding:'6px 14px', color:'white',
+              fontSize:13, cursor:'pointer', fontFamily:'inherit',
+              display:'inline-flex', alignItems:'center', gap:6,
+            }}>
+            <span style={{fontSize:16,lineHeight:1}}>↺</span>
+            <span>Повернуть</span>
+          </button>
+          <button type="button" onClick={() => rotateBy(90)} title="Повернуть вправо"
+            style={{
+              background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.15)',
+              borderRadius:50, padding:'6px 14px', color:'white',
+              fontSize:13, cursor:'pointer', fontFamily:'inherit',
+              display:'inline-flex', alignItems:'center', gap:6,
+            }}>
+            <span style={{fontSize:16,lineHeight:1}}>↻</span>
+            <span>Повернуть</span>
+          </button>
+        </div>
+
+        <div style={{ color:'rgba(255,255,255,.5)', fontSize:11, textAlign:'center', marginTop:8 }}>
           Перетащи картинку • колесо / щипок — масштаб
         </div>
 
@@ -4601,14 +4665,10 @@ function ChatVideoCard({ url }) {
   );
 }
 
-const HEY_EMOJI = [
-  'smiling','happy','winking','sad','angry','surprised',
-  'wow','dead','discouraged','dissatisfied','chilly','silent',
-  'suspicious','tricky smile','no comments','congrats','cute hearts','heart kiss',
-  'cool','love','sleepy','nervous','starstruck','haha',
-];
+import { HEY_EMOJI as HEY_EMOJI_LIST, HEY_EMOJI_SET as HEY_EMOJI_SET_LIB, emojiLabel } from '../lib/heyEmoji';
 
-const HEY_EMOJI_SET = new Set(HEY_EMOJI);
+const HEY_EMOJI = HEY_EMOJI_LIST;
+const HEY_EMOJI_SET = HEY_EMOJI_SET_LIB;
 const EMOJI_RE = new RegExp('\\[(' + HEY_EMOJI.map(n => n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')\\]', 'g');
 
 // Лёгкий рендер для коротких превью (список чатов, цитаты): заменяет
@@ -7841,7 +7901,7 @@ export function ChatScreen() {
           <div style={{maxWidth:680,margin:'0 auto',padding:'10px 12px'}}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:4}}>
             {HEY_EMOJI.map(name => (
-              <button key={name} onClick={() => insertEmoji(name)} title={name}
+              <button key={name} onClick={() => insertEmoji(name)} title={emojiLabel(name)}
                 style={{background:'none',border:'none',cursor:'pointer',
                   padding:6,borderRadius:10,transition:'background .1s',
                   display:'flex',alignItems:'center',justifyContent:'center'}}
@@ -8263,7 +8323,7 @@ export function ChatScreen() {
               const isActive = myReaction === name;
               return (
                 <button key={name} onClick={() => toggleReaction(reactionPicker.msgId, name)}
-                  title={name}
+                  title={emojiLabel(name)}
                   style={{
                     background: isActive ? 'rgba(140,100,200,.55)' : 'none',
                     border: isActive ? '1px solid rgba(180,140,230,.7)' : '1px solid transparent',

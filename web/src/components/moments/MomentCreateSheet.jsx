@@ -4,6 +4,7 @@ import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 import MoodEmoji from './MoodEmoji';
+import { HEY_EMOJI, emojiLabel } from '../../lib/heyEmoji';
 
 // Набор настроений для ручного выбора (когда нет медиа)
 const MOOD_OPTIONS = [
@@ -46,6 +47,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
   const [mediaType, setMediaType] = useState(existing?.media_type || null);
   const [mediaPosition, setMediaPosition] = useState(existing?.media_position || '50% 50%'); // CSS object-position
   const [moodEmoji, setMoodEmoji] = useState(existing?.mood_emoji || null); // null = авто
+  const [emojiOpen, setEmojiOpen] = useState(false); // пикер HEY-эмодзи под textarea
   const [moodOpen,  setMoodOpen]  = useState(false); // свёрнуто по умолчанию
   const [saving,    setSaving]    = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -512,11 +514,101 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
             onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.55)'}
             onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.14)'}
           />
-          <div style={{display:'flex',justifyContent:'space-between',
-            color:'rgba(255,255,255,.3)',fontSize:11,marginTop:-12}}>
-            <span/>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',
+            color:'rgba(255,255,255,.45)',fontSize:11,marginTop:-12}}>
+            <button type="button"
+              onClick={() => setEmojiOpen(o => !o)}
+              title="HEY-эмодзи"
+              style={{
+                background: emojiOpen ? 'rgba(140,100,220,.4)' : 'rgba(255,255,255,.08)',
+                border:'1px solid rgba(255,255,255,.14)',
+                borderRadius:50, padding:'4px 10px 4px 6px',
+                color:'white', cursor:'pointer', fontFamily:'inherit',
+                display:'inline-flex', alignItems:'center', gap:6, fontSize:12,
+              }}>
+              <img src="/emoji/smiling.svg" alt=""
+                style={{width:16,height:16,pointerEvents:'none',
+                  filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
+              <span>{emojiOpen ? 'Скрыть' : 'Эмодзи'}</span>
+            </button>
             <span>{text.length}/2000</span>
           </div>
+
+          {/* HEY-эмодзи пикер: вставляет [name] в позицию курсора textarea */}
+          {emojiOpen && (
+            <div style={{
+              background:'rgba(48,38,78,.85)', borderRadius:12,
+              padding:'8px 6px', display:'grid',
+              gridTemplateColumns:'repeat(8, 1fr)', gap:2,
+              border:'1px solid rgba(255,255,255,.08)',
+            }}>
+              {HEY_EMOJI.map(name => (
+                <button key={name} type="button" title={emojiLabel(name)}
+                  onClick={() => {
+                    const ta = textRef.current;
+                    const insertTok = `[${name}]`;
+                    if (ta) {
+                      const start = ta.selectionStart ?? text.length;
+                      const end   = ta.selectionEnd   ?? text.length;
+                      const next  = text.slice(0, start) + insertTok + text.slice(end);
+                      setText(next.slice(0, 2000));
+                      // Возвращаем курсор после вставленного токена
+                      requestAnimationFrame(() => {
+                        ta.focus();
+                        const pos = start + insertTok.length;
+                        try { ta.setSelectionRange(pos, pos); } catch {}
+                      });
+                    } else {
+                      setText(t => (t + insertTok).slice(0, 2000));
+                    }
+                  }}
+                  style={{
+                    background:'none', border:'none', cursor:'pointer',
+                    padding:5, borderRadius:8, transition:'background .12s',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.12)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                  <img src={`/emoji/${encodeURIComponent(name)}.svg`} alt={name}
+                    style={{width:26,height:26,pointerEvents:'none',
+                      filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Превью токенов как SVG — пользователь видит как момент будет
+             выглядеть в ленте, эмодзи в textarea остаётся в форме [name]. */}
+          {/[a-z][^\[\]]*\]/.test(text) && /\[/.test(text) && (() => {
+            const re = /\[([a-z][a-z0-9 ]*?)\]/gi;
+            const parts = [];
+            let last = 0, m;
+            while ((m = re.exec(text)) !== null) {
+              if (m.index > last) parts.push({ kind:'t', v: text.slice(last, m.index) });
+              parts.push({ kind:'e', v: m[1] });
+              last = m.index + m[0].length;
+            }
+            if (last < text.length) parts.push({ kind:'t', v: text.slice(last) });
+            const hasEmoji = parts.some(p => p.kind === 'e');
+            if (!hasEmoji) return null;
+            return (
+              <div style={{
+                background:'rgba(255,255,255,.04)', borderRadius:12,
+                border:'1px dashed rgba(255,255,255,.15)',
+                padding:'10px 14px', color:'rgba(255,255,255,.8)',
+                fontSize:14, lineHeight:1.6, whiteSpace:'pre-wrap',
+                display:'flex', flexWrap:'wrap', alignItems:'center', gap:2,
+              }}>
+                {parts.map((p, i) => p.kind === 't'
+                  ? <span key={i}>{p.v}</span>
+                  : <img key={i} src={`/emoji/${encodeURIComponent(p.v)}.svg`} alt={p.v}
+                      title={emojiLabel(p.v)}
+                      style={{width:22,height:22,display:'inline-block',verticalAlign:'middle',
+                        filter:'drop-shadow(1px 2px 1px rgba(0,0,0,.5))'}}/>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Video URL detected feedback */}
           {detectedVideoUrl && (
