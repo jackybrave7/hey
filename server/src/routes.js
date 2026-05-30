@@ -852,7 +852,8 @@ module.exports = function makeRouter(db, broadcast) {
   r.get('/conversations/:id/pinned', requireAuth, (req, res) => {
     if (!db.isMember(req.params.id, req.user.id))
       return res.status(403).json({ error: 'Not a member' });
-    const pinned = db.getPinnedMessage(req.params.id);
+    // Передаём userId — для group вернётся общий пин, для direct/monolog личный
+    const pinned = db.getPinnedMessage(req.params.id, req.user.id);
     res.json(pinned || null);
   });
 
@@ -863,9 +864,15 @@ module.exports = function makeRouter(db, broadcast) {
     const { messageId } = req.body || {};
     if (!messageId) return res.status(400).json({ error: 'messageId required' });
     try {
-      const pinned = db.pinMessage(req.params.id, messageId, req.user.id);
-      const members = db.getConversationMembers(req.params.id);
-      broadcast(members, { type: 'message:pinned', conversationId: req.params.id, message: pinned });
+      const { scope, pinned } = db.pinMessage(req.params.id, messageId, req.user.id);
+      if (scope === 'group') {
+        // Группа — общий пин, рассылаем всем участникам
+        const members = db.getConversationMembers(req.params.id);
+        broadcast(members, { type: 'message:pinned', conversationId: req.params.id, message: pinned });
+      } else {
+        // direct/monolog — личный пин, только сам инициатор
+        broadcast([req.user.id], { type: 'message:pinned', conversationId: req.params.id, message: pinned });
+      }
       res.json({ ok: true, pinned });
     } catch (e) {
       const msg = String(e.message || '');
@@ -879,9 +886,13 @@ module.exports = function makeRouter(db, broadcast) {
 
   r.delete('/conversations/:id/pinned-message', requireAuth, (req, res) => {
     try {
-      db.unpinMessage(req.params.id, req.user.id);
-      const members = db.getConversationMembers(req.params.id);
-      broadcast(members, { type: 'message:pinned', conversationId: req.params.id, message: null });
+      const { scope } = db.unpinMessage(req.params.id, req.user.id);
+      if (scope === 'group') {
+        const members = db.getConversationMembers(req.params.id);
+        broadcast(members, { type: 'message:pinned', conversationId: req.params.id, message: null });
+      } else {
+        broadcast([req.user.id], { type: 'message:pinned', conversationId: req.params.id, message: null });
+      }
       res.json({ ok: true });
     } catch (e) {
       const msg = String(e.message || '');

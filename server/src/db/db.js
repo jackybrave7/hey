@@ -1321,6 +1321,17 @@ function getConversationsForUser(userId, opts = {}) {
   const blockedIds = new Set(getBlockedByIds(userId));
   const pinnedSet  = new Set(getPinnedConvIds(userId));
 
+  // Личные пины сообщений (для direct/monolog) — батчем за один запрос
+  const personalPinMap = {}; // convId → messageId
+  if (convIds.length) {
+    const ph2 = convIds.map(() => '?').join(',');
+    db.prepare(
+      `SELECT conv_id, message_id FROM personal_message_pins
+       WHERE user_id=? AND conv_id IN (${ph2})`
+    ).all(userId, ...convIds)
+      .forEach(r => { personalPinMap[r.conv_id] = r.message_id; });
+  }
+
   // Имена тех кто пригласил в pending-группы (для UI «X пригласил тебя в …»)
   const inviterIds = [...new Set(memberRows
     .filter(r => r.status === 'pending' && r.invited_by)
@@ -1379,7 +1390,10 @@ function getConversationsForUser(userId, opts = {}) {
       is_request: isRequest,
       request_from: conv.request_from || null,
       is_pinned: pinnedSet.has(convId),
-      pinned_message_id: conv.pinned_message_id || null,
+      // Для группы — общий пин из conversations; для direct/monolog — личный
+      pinned_message_id: conv.type === 'group'
+        ? (conv.pinned_message_id || null)
+        : (personalPinMap[convId] || null),
       // Pending group invite
       is_group_invite: isGroupInvite,
       group_invited_by_id:     isGroupInvite ? meta.invited_by : null,
@@ -1582,38 +1596,78 @@ function removePushSubscriptions(endpoints) {
   db.prepare(`DELETE FROM push_subscriptions WHERE endpoint IN (${ph})`).run(...endpoints);
 }
 
+// Пин сообщений с разной семантикой для типов чатов:
+//   • group  — общий пин (conversations.pinned_message_id), только admin
+//              может ставить/снимать, видят все участники
+//   • direct / monolog — личный пин юзера (personal_message_pins),
+//              ставит любой участник, видит только он сам
 function pinMessage(convId, messageId, byUserId) {
   const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
   if (!conv) throw new Error('Чат не найден');
   if (!isMember(convId, byUserId)) throw new Error('Вы не участник этого чата');
-  if (conv.type === 'group' && conv.admin_id !== byUserId) {
-    throw new Error('Только админ группы может закреплять сообщения');
-  }
   const msg = db.prepare('SELECT id FROM messages WHERE id=? AND conversation_id=?')
     .get(messageId, convId);
   if (!msg) throw new Error('Сообщение не найдено в этом чате');
-  db.prepare('UPDATE conversations SET pinned_message_id=? WHERE id=?').run(messageId, convId);
-  return getPinnedMessage(convId);
+
+  if (conv.type === 'group') {
+    if (conv.admin_id !== byUserId) {
+      throw new Error('Только админ группы может закреплять сообщения');
+    }
+    db.prepare('UPDATE conversations SET pinned_message_id=? WHERE id=?').run(messageId, convId);
+    return { scope: 'group', pinned: getPinnedMessage(convId, byUserId) };
+  }
+
+  // direct / monolog — личный пин юзера
+  db.prepare(
+    `INSERT INTO personal_message_pins (user_id, conv_id, message_id, pinned_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(user_id, conv_id) DO UPDATE SET
+       message_id=excluded.message_id,
+       pinned_at=excluded.pinned_at`
+  ).run(byUserId, convId, messageId, now());
+  return { scope: 'personal', pinned: getPinnedMessage(convId, byUserId) };
 }
 
 function unpinMessage(convId, byUserId) {
   const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
   if (!conv) throw new Error('Чат не найден');
   if (!isMember(convId, byUserId)) throw new Error('Вы не участник этого чата');
-  if (conv.type === 'group' && conv.admin_id !== byUserId) {
-    throw new Error('Только админ группы может откреплять сообщения');
+
+  if (conv.type === 'group') {
+    if (conv.admin_id !== byUserId) {
+      throw new Error('Только админ группы может откреплять сообщения');
+    }
+    db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE id=?').run(convId);
+    return { scope: 'group' };
   }
-  db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE id=?').run(convId);
+
+  db.prepare('DELETE FROM personal_message_pins WHERE user_id=? AND conv_id=?')
+    .run(byUserId, convId);
+  return { scope: 'personal' };
 }
 
-function getPinnedMessage(convId) {
-  const conv = db.prepare('SELECT pinned_message_id FROM conversations WHERE id=?').get(convId);
-  if (!conv?.pinned_message_id) return null;
+// Универсальный геттер: для группы возвращает общий пин, для direct/monolog —
+// личный пин этого userId.
+function getPinnedMessage(convId, userId) {
+  const conv = db.prepare('SELECT type, pinned_message_id FROM conversations WHERE id=?').get(convId);
+  if (!conv) return null;
+
+  let pinnedId = null;
+  if (conv.type === 'group') {
+    pinnedId = conv.pinned_message_id || null;
+  } else if (userId) {
+    const row = db.prepare(
+      'SELECT message_id FROM personal_message_pins WHERE user_id=? AND conv_id=?'
+    ).get(userId, convId);
+    pinnedId = row?.message_id || null;
+  }
+  if (!pinnedId) return null;
+
   const row = db.prepare(
     `SELECT m.*, u.name AS sender_name
      FROM messages m JOIN users u ON u.id=m.sender_id
      WHERE m.id=?`
-  ).get(conv.pinned_message_id);
+  ).get(pinnedId);
   if (!row) return null;
   return _parseMsg(row);
 }
@@ -1679,6 +1733,7 @@ function getMessageById(id) {
 
 function clearConversationMessages(convId) {
   db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE id=?').run(convId);
+  db.prepare('DELETE FROM personal_message_pins WHERE conv_id=?').run(convId);
   db.prepare('DELETE FROM messages WHERE conversation_id=?').run(convId);
 }
 
@@ -1689,8 +1744,10 @@ function editMessage(id, text) {
 }
 
 function deleteMessage(id) {
-  // Если это закреплённое сообщение — снять закрепление
+  // Если это закреплённое сообщение — снять закрепление (и общий пин группы,
+  // и личные пины в direct-чатах).
   db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE pinned_message_id=?').run(id);
+  db.prepare('DELETE FROM personal_message_pins WHERE message_id=?').run(id);
   db.prepare('DELETE FROM messages WHERE id=?').run(id);
 }
 
