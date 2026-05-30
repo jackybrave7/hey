@@ -6389,6 +6389,19 @@ export function ChatScreen() {
     return () => document.removeEventListener('mousedown', close);
   }, [reactionPicker]);
 
+  // Close emoji keyboard on outside click (тап в любое место кроме самой
+  // клавиатуры и кнопки "😊" в композере закрывает её — «передумал»).
+  useEffect(() => {
+    if (!showEmoji) return;
+    const close = (e) => {
+      if (e.target.closest('[data-emoji-kbd]')) return;       // тап по клавиатуре — игнор
+      if (e.target.closest('[data-emoji-toggle]')) return;    // тап по кнопке toggle — она сама закроет
+      setShowEmoji(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showEmoji]);
+
 
   // Debounced read receipt — sends only the LAST unread message ID (one DB query on server)
   function markVisibleAsRead(msgs) {
@@ -7949,9 +7962,11 @@ export function ChatScreen() {
         </div>
       )}
 
-      {/* Emoji keyboard */}
+      {/* Emoji keyboard. data-emoji-kbd используется в click-outside handler
+          ниже — клик в любую область вне клавиатуры (и не по кнопке "😊")
+          закрывает её. */}
       {showEmoji && (
-        <div style={{background:'rgba(100,78,148,.78)',flexShrink:0}}>
+        <div data-emoji-kbd style={{background:'rgba(100,78,148,.78)',flexShrink:0}}>
           <div style={{maxWidth:680,margin:'0 auto',padding:'10px 12px'}}>
           <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:4}}>
             {HEY_EMOJI.map(name => (
@@ -8337,7 +8352,7 @@ export function ChatScreen() {
               display:'flex', alignItems:'center', gap: 10,
               flexShrink:0, paddingBottom: 4,
             }}>
-              <button onClick={() => setShowEmoji(s=>!s)} title="Смайлики"
+              <button data-emoji-toggle onClick={() => setShowEmoji(s=>!s)} title="Смайлики"
                 style={{background:'none',border:'none',cursor:'pointer',padding:2,
                   opacity: showEmoji ? 1 : 0.78, transition:'opacity .15s'}}>
                 <img src="/emoji/smiling.svg" alt="emoji"
