@@ -228,7 +228,9 @@
       "mcp__Claude_in_Chrome__find",
       "mcp__Claude_in_Chrome__file_upload",
       "Bash(curl -s \"https://hey-messenger.ru/emoji/thumbs%20up.svg\")",
-      "Bash(python3)"
+      "Bash(python3)",
+      "Bash(curl -s https://hey-messenger.ru/assets/index-Df2Ow4hm.js)",
+      "Bash(grep -oE '80%[^\"]{0,40}')"
     ]
   }
 }

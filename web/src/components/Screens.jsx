@@ -7570,7 +7570,7 @@ export function ChatScreen() {
             borderBottom:'1px solid rgba(180,140,220,.18)',
             flexShrink:0,
           }}>
-            <div style={{maxWidth:680,margin:'0 auto',
+            <div style={{maxWidth: 540, margin:'0 auto',
               display:'flex',alignItems:'center',gap:10,padding:'8px 14px'}}>
               <span style={{flexShrink:0,color:'rgba(230,200,255,.95)',display:'inline-flex'}}>
                 <Icon name="pin" size={16}/>
