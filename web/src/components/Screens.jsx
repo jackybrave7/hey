@@ -7957,7 +7957,11 @@ export function ChatScreen() {
           // горизонтальный скролл всего экрана.
           <div style={{background:'rgba(100,78,148,.5)',flexShrink:0,overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 14px',
-              maxWidth:680,margin:'0 auto',minWidth:0}}>
+              // Совпадает с максимальной шириной пузыря сообщения
+              // (min(80%, 540px) от родителя ~680px ≈ 540px), чтобы
+              // ответ в композере не «выходил» за границы колонки чата
+              // на широких экранах.
+              maxWidth: 540, margin:'0 auto', minWidth:0}}>
               <div style={{
                 width:3,alignSelf:'stretch',minHeight:38,
                 background:'rgba(180,140,255,.85)',borderRadius:2,flexShrink:0,
@@ -7993,7 +7997,8 @@ export function ChatScreen() {
       {editingMsg && (
         <div style={{background:'rgba(100,78,148,.5)',flexShrink:0,overflow:'hidden'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'6px 14px',
-            maxWidth:680,margin:'0 auto',minWidth:0}}>
+            // Та же ширина что и у reply-banner / пузырей — в одну сетку.
+            maxWidth: 540, margin:'0 auto', minWidth:0}}>
             <span style={{color:'rgba(255,255,255,.85)',display:'inline-flex',flexShrink:0}}><Icon name="pencil" size={15}/></span>
             <span style={{flex:1,minWidth:0,color:'rgba(255,255,255,.8)',fontSize:13,
               overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
