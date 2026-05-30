@@ -9,6 +9,7 @@ export const HEY_EMOJI = [
   'suspicious','tricky smile','no comments','congrats','cute hearts','heart kiss',
   'cool','love','sleepy','nervous','starstruck','haha',
   'thumbs up', // 👍 «Класс»
+  'handshake', // 🤝 «Договорились»
 ];
 
 export const HEY_EMOJI_SET = new Set(HEY_EMOJI);
@@ -42,6 +43,7 @@ export const HEY_EMOJI_LABEL = {
   'starstruck':      'Восторг',
   'haha':            'Смешно',
   'thumbs up':       'Класс',
+  'handshake':       'Договорились',
 };
 
 export function emojiLabel(name) {

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <style>
+      .bg{fill:#fbefd1}
+      .skin-a{fill:#f3c98a}
+      .skin-a-dark{fill:#d9a866}
+      .skin-b{fill:#e9b97a}
+      .skin-b-dark{fill:#c99a55}
+      .cuff-a{fill:#846d9b}
+      .cuff-b{fill:#c96fa1}
+      .line{stroke:#846d9b;stroke-width:1.2;stroke-linecap:round;fill:none}
+      .check{fill:#5fbf7c}
+    </style>
+  </defs>
+  <title>handshake</title>
+  <!-- background cream circle -->
+  <circle class="bg" cx="32" cy="32" r="29.7"/>
+  <!-- left arm (purple cuff) -->
+  <rect class="cuff-a" x="3" y="32" rx="3" ry="3" width="14" height="10" transform="rotate(-8 10 37)"/>
+  <!-- left forearm -->
+  <path class="skin-a" d="M14 32 Q26 28, 33 33 Q33 36, 30 38 Q22 41, 16 39 Z"/>
+  <!-- right arm (pink cuff) -->
+  <rect class="cuff-b" x="47" y="32" rx="3" ry="3" width="14" height="10" transform="rotate(8 54 37)"/>
+  <!-- right forearm -->
+  <path class="skin-b" d="M50 32 Q38 28, 31 33 Q31 36, 34 38 Q42 41, 48 39 Z"/>
+  <!-- left hand clasp (overlap zone) -->
+  <path class="skin-a-dark" d="M27 30 Q33 28, 37 32 L37 40 Q33 42, 27 40 Z" opacity=".95"/>
+  <!-- right hand fingers wrapping over -->
+  <path class="skin-b" d="M32 28 Q39 28, 42 32 L42 40 Q39 42, 32 40 Q30 35, 32 28 Z"/>
+  <!-- knuckle highlights -->
+  <ellipse class="skin-b-dark" cx="38" cy="32" rx="2" ry="1.4" opacity=".7"/>
+  <ellipse class="skin-b-dark" cx="38" cy="36" rx="2" ry="1.4" opacity=".7"/>
+  <ellipse class="skin-b-dark" cx="38" cy="40" rx="2" ry="1.4" opacity=".7"/>
+  <!-- left thumb peeking -->
+  <path class="skin-a" d="M27 28 Q30 27, 31 31 Q30 33, 27 32 Z"/>
+  <!-- agreement check above (small badge) -->
+  <circle cx="32" cy="14" r="4.5" fill="#fff" stroke="#5fbf7c" stroke-width="1.5"/>
+  <path class="check" d="M29.5 14.5 L31 16 L34.5 12.5" stroke="#5fbf7c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
