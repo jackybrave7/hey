@@ -6332,6 +6332,7 @@ export function ChatScreen() {
   const nav = useNavigate();
   const location = useLocation();
   const { convId } = useParams();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
 
   const [messages,    setMessages]    = useState([]);
@@ -6594,6 +6595,19 @@ export function ChatScreen() {
     if (messages.length === 0) return;
     if (isInitialLoad.current) {
       isInitialLoad.current = false;
+      // Если в URL пришёл ?msg=<id> (открыли из push-уведомления) —
+      // вместо скролла в конец, диспатчим scroll-to-msg на нужное
+      // сообщение; existing listener умеет автоподгружать историю.
+      const targetMsg = searchParams.get('msg');
+      if (targetMsg) {
+        // Чистим query чтобы при дальнейшей навигации в чате параметр
+        // не реактивировался при ремаунте.
+        try { nav(`/chat/${convId}`, { replace: true }); } catch {}
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('hey:scroll-to-msg', { detail: targetMsg }));
+        }, 300);
+        return;
+      }
       // Несколько попыток: первая сразу, остальные после возможной загрузки картинок
       const scroll = () => virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'instant' });
       requestAnimationFrame(scroll);

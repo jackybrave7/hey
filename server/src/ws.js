@@ -184,7 +184,10 @@ module.exports = function setupWS(server) {
             }
             const payload = {
               title, body,
-              url: `/chat/${conversationId}`,
+              // ?msg=<id> — клиентский ChatScreen прочитает param и сразу
+              // скроллит к этому сообщению (с автоподгрузкой старых пакетов,
+              // если оно глубоко в истории).
+              url: `/chat/${conversationId}?msg=${saved.id}`,
               tag: `msg:${conversationId}`,
               messageId: saved.id,
             };

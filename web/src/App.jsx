@@ -1,5 +1,5 @@
 // web/src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { socket, api } from './api';
@@ -37,15 +37,44 @@ import ServerStatusBanner from './components/ServerStatusBanner';
 import { ensurePushIfGranted } from './lib/push';
 
 function useNotifications() {
+  const nav = useNavigate();
+  // 1) Inline-Notification (вкладка открыта, но не в фокусе) — клик
+  //    фокусирует окно и SPA-навигирует в чат с сообщением.
   useEffect(() => {
     return socket.on('message:new', ({ message }) => {
       if (Notification?.permission !== 'granted' || document.hasFocus()) return;
-      new Notification(message.sender_name || 'HEY', {
+      const n = new Notification(message.sender_name || 'HEY', {
         body: message.text || '📎 Изображение',
         tag: message.conversationId,
       });
+      n.onclick = (e) => {
+        e.preventDefault();
+        window.focus();
+        nav('/chat/' + message.conversationId + '?msg=' + message.id);
+        n.close();
+      };
     });
-  }, []);
+  }, [nav]);
+
+  // 2) Web-Push через Service Worker (вкладка закрыта / телефон в локе).
+  //    SW шлёт postMessage `hey:navigate` с url. Принимаем и SPA-переходим
+  //    — без перезагрузки.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onSwMsg = (e) => {
+      const data = e.data;
+      if (!data || data.type !== 'hey:navigate' || !data.url) return;
+      // url с сервера приходит в виде /chat/:id — отдаём в SPA-роутер.
+      try {
+        const u = new URL(data.url, window.location.origin);
+        nav(u.pathname + u.search + u.hash);
+      } catch {
+        nav(data.url);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onSwMsg);
+    return () => navigator.serviceWorker.removeEventListener('message', onSwMsg);
+  }, [nav]);
 }
 
 function Protected({ children }) {
@@ -251,11 +280,18 @@ function GlobalHandlers() {
   );
 }
 
-export default function App() {
+// useNotifications вызывает useNavigate, поэтому должен жить ВНУТРИ Router'а.
+// Inline-компонент-обёртка под это.
+function NotificationBridge() {
   useNotifications();
+  return null;
+}
+
+export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <NotificationBridge />
         <GlobalHandlers />
         <ServerStatusBanner />
         <ToastContainer />
