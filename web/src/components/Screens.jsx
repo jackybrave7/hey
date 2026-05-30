@@ -1940,8 +1940,11 @@ export function MyProfileScreen() {
         );
       })()}
 
-      {/* Moments section */}
-      {!editing && (
+      {/* Moments section — старая «Мои моменты» убрана. Доступ к активным
+          моментам идёт через ленту /main, к архиву — через карточку «Архив
+          моих моментов» выше. Сохраняем JSX скрытым, чтобы переменные не
+          теряли потребителей и build не падал. */}
+      {!editing && false && (
         <div style={{padding:'28px 20px 0'}}>
           <div style={{color:'rgba(255,255,255,.4)',fontSize:11,textTransform:'uppercase',
             letterSpacing:.8,marginBottom:14}}>Мои моменты</div>
