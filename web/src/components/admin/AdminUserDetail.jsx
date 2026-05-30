@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
 import { useConfirm } from '../Screens';
+import { openUserCard } from '../Screens';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -197,6 +198,18 @@ export default function AdminUserDetail() {
               background: 'rgba(255,180,50,.12)', borderRadius: 6, padding: '2px 8px' }}>⭐ super</span>}
           </h1>
           <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 14 }}>{user.phone}</div>
+          {/* Открыть стандартную карточку юзера поп-апом — видна так же,
+              как её видят другие пользователи приложения. */}
+          <button onClick={() => openUserCard(user.id)}
+            style={{
+              marginTop: 10, padding: '7px 14px', borderRadius: 50,
+              background: 'rgba(120,90,200,.28)', border: '1px solid rgba(180,140,255,.35)',
+              color: 'rgba(220,200,255,.95)', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+            👤 Открыть карточку
+          </button>
         </div>
       </div>
 

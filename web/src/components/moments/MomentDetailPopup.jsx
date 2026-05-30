@@ -818,16 +818,11 @@ export default function MomentDetailPopup({
               </div>
             )}
 
-            {/* Analytics / Reactions */}
-            {isMine ? (
+            {/* Analytics для собственных моментов — остаётся в скролл-области.
+               Реакции (для чужих) переехали ВНИЗ как липкая полоса — см. ниже. */}
+            {isMine && (
               <>
                 {moment.author_is_super ? (
-                  /* Super-автор — каждый счётчик кликабелен, открывает список реактивших.
-                     ВАЖНО: 👁 — это общее число просмотров (moment.views), как на превью-
-                     карточке. Раньше тут стояло stats.see (count людей которые нажали
-                     реакцию «Вижу») — выходила некорректная картина: карточка показывала
-                     «👁 3», попап «👁 0», тогда как 3 = просмотревших, 0 = нажавших «Вижу».
-                     Реактивший список для просмотров не показываем (это просто счётчик). */
                   <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'8px',
                     display:'flex',gap:4}}>
                     {[
@@ -860,7 +855,6 @@ export default function MomentDetailPopup({
                     ))}
                   </div>
                 ) : (
-                  /* Обычный — клик по строке открывает Super-промо */
                   <div
                     onClick={() => setShowAnalyticsPromo(true)}
                     style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
@@ -872,33 +866,44 @@ export default function MomentDetailPopup({
                   </div>
                 )}
               </>
-            ) : (
-              <div style={{display:'flex',gap:6}}>
-                {REACTIONS.map(r => {
-                  const active   = myReaction===r.id;
-                  const flashing = flashRxn===r.id;
-                  return (
-                    <button key={r.id + (flashing ? '-flash' : '')}
-                      onClick={() => handleReact(r.id)} title={r.label}
-                      className={flashing ? 'hey-flash' : ''}
-                      style={{
-                        flex:1,padding:'8px 6px',borderRadius:12,
-                        cursor:'pointer',transition:'all .15s',
-                        display:'flex',alignItems:'center',justifyContent:'center',gap:6,
-                        background: active ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.06)',
-                        border: active ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.1)',
-                        color: active ? 'white' : 'rgba(255,255,255,.65)',
-                        fontFamily:'inherit',
-                      }}>
-                      <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center'}}><Icon name={r.iconName} size={15}/></span>
-                      <span style={{fontSize:12,fontWeight:500}}>{r.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
             )}
           </div>
         </div>
+
+        {/* Реакции — sticky-полоса под скролл-областью, видна всегда */}
+        {!isMine && (
+          <div style={{
+            padding:'10px 20px 4px',
+            borderTop:'1px solid rgba(255,255,255,.08)',
+            flexShrink:0,
+            background:'rgba(22,15,50,.85)',
+            backdropFilter:'blur(10px)',
+          }}>
+            <div style={{display:'flex',gap:6}}>
+              {REACTIONS.map(r => {
+                const active   = myReaction===r.id;
+                const flashing = flashRxn===r.id;
+                return (
+                  <button key={r.id + (flashing ? '-flash' : '')}
+                    onClick={() => handleReact(r.id)} title={r.label}
+                    className={flashing ? 'hey-flash' : ''}
+                    style={{
+                      flex:1,padding:'8px 6px',borderRadius:12,
+                      cursor:'pointer',transition:'all .15s',
+                      display:'flex',alignItems:'center',justifyContent:'center',gap:6,
+                      background: active ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.06)',
+                      border: active ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.1)',
+                      color: active ? 'white' : 'rgba(255,255,255,.65)',
+                      fontFamily:'inherit',
+                    }}>
+                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center'}}><Icon name={r.iconName} size={15}/></span>
+                    <span style={{fontSize:12,fontWeight:500}}>{r.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         {onRestore ? (
