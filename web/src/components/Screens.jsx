@@ -8386,9 +8386,10 @@ export function ChatScreen() {
         />
       )}
 
-      {/* Reaction emoji picker — горизонтальная пилюля (свайп-скролл при
-          переполнении), кнопка ⌄ справа для закрытия. По макету. */}
+      {/* Reaction emoji picker — горизонтальная пилюля по умолчанию, ⌄
+          разворачивает в сетку чтобы видеть все эмодзи разом. */}
       {reactionPicker && (() => {
+        const expanded = !!reactionPicker.expanded;
         const PICKER_H = 56;
         const vw = window.innerWidth;
         const PICKER_W = Math.min(vw - 16, 420);
@@ -8400,51 +8401,71 @@ export function ChatScreen() {
         const myReaction = pickerMsg?.reactions
           ? Object.entries(pickerMsg.reactions).find(([, uids]) => uids.includes(user?.id))?.[0]
           : null;
+
+        const Item = (name) => {
+          const isActive = myReaction === name;
+          return (
+            <button key={name} onClick={() => toggleReaction(reactionPicker.msgId, name)}
+              title={emojiLabel(name)}
+              style={{
+                background: isActive ? 'rgba(140,100,200,.55)' : 'none',
+                border: isActive ? '1px solid rgba(180,140,230,.7)' : '1px solid transparent',
+                cursor:'pointer', padding:5, borderRadius:'50%', transition:'background .1s',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                width: 40, height: 40, flexShrink: 0,
+              }}
+              onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background='rgba(255,255,255,.18)'; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background = isActive ? 'rgba(140,100,200,.55)' : 'none'; }}>
+              <img src={`/emoji/${encodeURIComponent(name)}.svg`} alt={name}
+                style={{width:28, height:28, pointerEvents:'none',
+                  filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
+            </button>
+          );
+        };
+
         return (
           <div data-reaction-picker
             style={{position:'fixed', left:x, top:y, zIndex:300,
               width: PICKER_W,
               background:'rgba(48,38,78,.97)', backdropFilter:'blur(16px)',
-              borderRadius: 50, padding:'4px 6px',
+              borderRadius: expanded ? 18 : 50, padding:'6px 6px',
               boxShadow:'0 8px 32px rgba(0,0,0,.5)',
               border:'1px solid rgba(255,255,255,.08)',
-              display:'flex', alignItems:'center', gap: 2}}>
-            <div style={{
-              flex:1, minWidth:0, display:'flex', gap: 2,
-              overflowX: 'auto', overflowY: 'hidden',
-              scrollbarWidth:'none', msOverflowStyle:'none',
-            }}>
-              {HEY_EMOJI.map(name => {
-                const isActive = myReaction === name;
-                return (
-                  <button key={name} onClick={() => toggleReaction(reactionPicker.msgId, name)}
-                    title={emojiLabel(name)}
-                    style={{
-                      background: isActive ? 'rgba(140,100,200,.55)' : 'none',
-                      border: isActive ? '1px solid rgba(180,140,230,.7)' : '1px solid transparent',
-                      cursor:'pointer', padding:5, borderRadius:'50%', transition:'background .1s',
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      width: 40, height: 40, flexShrink: 0,
-                    }}
-                    onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background='rgba(255,255,255,.18)'; }}
-                    onMouseLeave={e=>{ e.currentTarget.style.background = isActive ? 'rgba(140,100,200,.55)' : 'none'; }}>
-                    <img src={`/emoji/${encodeURIComponent(name)}.svg`} alt={name}
-                      style={{width:28, height:28, pointerEvents:'none',
-                        filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
-                  </button>
-                );
-              })}
-            </div>
-            <button onClick={() => setReactionPicker(null)}
-              title="Закрыть"
+              display:'flex', alignItems: expanded ? 'flex-start' : 'center', gap: 2}}>
+            {expanded ? (
+              <div style={{
+                flex:1, minWidth:0,
+                display:'grid',
+                gridTemplateColumns:'repeat(7, 1fr)',
+                gap: 2,
+                padding: '2px',
+              }}>
+                {HEY_EMOJI.map(Item)}
+              </div>
+            ) : (
+              <div style={{
+                flex:1, minWidth:0, display:'flex', gap: 2,
+                overflowX: 'auto', overflowY: 'hidden',
+                scrollbarWidth:'none', msOverflowStyle:'none',
+              }}>
+                {HEY_EMOJI.map(Item)}
+              </div>
+            )}
+            <button
+              onClick={() => setReactionPicker(p => p ? { ...p, expanded: !p.expanded } : null)}
+              title={expanded ? 'Свернуть' : 'Все эмодзи'}
               style={{
                 flexShrink:0, width: 36, height: 36, borderRadius:'50%',
                 background: 'rgba(0,0,0,.25)', border: 'none', cursor:'pointer',
                 color: 'rgba(255,255,255,.85)', display:'flex',
                 alignItems:'center', justifyContent:'center',
                 fontSize: 14, fontWeight: 700,
+                alignSelf: expanded ? 'flex-start' : 'center',
               }}>
-              <span style={{transform:'rotate(180deg)',display:'inline-block',lineHeight:1}}>⌃</span>
+              <span style={{
+                transform: expanded ? 'none' : 'rotate(180deg)',
+                display:'inline-block', lineHeight:1
+              }}>⌃</span>
             </button>
           </div>
         );
