@@ -7292,9 +7292,14 @@ export function ChatScreen() {
 
   return (
     <div style={{
+      // 100dvw/dvh учитывают мобильную клавиатуру и адресную полоску;
+      // overflow:hidden + maxWidth:100vw — последняя страховка, чтобы
+      // длинная цитата в reply-banner не могла породить горизонтальный
+      // скролл всего экрана.
       position:'fixed', top:0, left:0, right:0, bottom:0,
+      width:'100dvw', maxWidth:'100vw',
       display:'flex', flexDirection:'column', overflow:'hidden',
-      background:'var(--grad)',
+      background:'var(--grad)', boxSizing:'border-box',
     }}>
       {/* TopBar — клик на аватар/имя собеседника открывает его профиль */}
       <div className="topbar">
