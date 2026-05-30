@@ -6113,7 +6113,28 @@ const MessageRow = memo(function MessageRow({
               </button>
             );
           })()}
-          {m.text && <div style={{wordBreak:'break-word',whiteSpace:'pre-wrap'}}>{renderText(m.text)}</div>}
+          {m.text && (() => {
+            // Если всё сообщение — один HEY-эмодзи (с любыми пробелами по краям),
+            // показываем его крупно — 3× обычного размера. Поведение как в
+            // Telegram/WhatsApp с single-emoji сообщениями.
+            const trimmed = m.text.trim();
+            const single  = trimmed.match(/^\[([^\]]+)\]$/);
+            if (single && HEY_EMOJI_SET.has(single[1])) {
+              return (
+                <div style={{padding:'4px 0', textAlign: isOut ? 'right' : 'left'}}>
+                  <img src={`/emoji/${encodeURIComponent(single[1])}.svg`} alt={single[1]}
+                    title={single[1]}
+                    style={{width:72,height:72,display:'inline-block',
+                      filter:'drop-shadow(1px 2px 2px rgba(0,0,0,.4))'}}/>
+                </div>
+              );
+            }
+            return (
+              <div style={{wordBreak:'break-word',whiteSpace:'pre-wrap'}}>
+                {renderText(m.text)}
+              </div>
+            );
+          })()}
           {m.link_preview && (
             <div style={{marginTop: m.text ? 8 : 0, width: 'min(100%, 360px)'}}>
               <EmbeddedVideoPreview data={m.link_preview} size="full"/>
