@@ -2249,7 +2249,7 @@ export function MyProfileScreen() {
                 <div style={{ display:'grid',
                   gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
                   {savedMoments.map(m => (
-                    <div key={m.id} onClick={() => { setSavedOpen(false); setSavedSelected(m); }}
+                    <div key={m.id} onClick={() => setSavedSelected(m)}
                       style={{ background:'rgba(255,255,255,.06)', borderRadius: 14,
                         border:'1px solid rgba(255,255,255,.1)', overflow:'hidden',
                         cursor:'pointer', aspectRatio:'1/1', position:'relative' }}>
