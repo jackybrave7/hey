@@ -13,6 +13,7 @@ import {
   InviteBadge, ForgotPasswordPopup
 } from './auth/AuthComponents';
 import MomentDetailPopup, { TextWithLinks } from './moments/MomentDetailPopup';
+import EmbeddedVideoPreview from './moments/EmbeddedVideoPreview';
 import MomentCard from './moments/MomentCard';
 import OnboardingTour from './OnboardingTour';
 import MoodEmoji from './moments/MoodEmoji';
@@ -6105,6 +6106,11 @@ const MessageRow = memo(function MessageRow({
             );
           })()}
           {m.text && <div style={{wordBreak:'break-word',whiteSpace:'pre-wrap'}}>{renderText(m.text)}</div>}
+          {m.link_preview && (
+            <div style={{marginTop: m.text ? 8 : 0, width: 'min(100%, 360px)'}}>
+              <EmbeddedVideoPreview data={m.link_preview} size="full"/>
+            </div>
+          )}
           <div style={{fontSize:11,opacity:.6,textAlign:'right',marginTop:3,display:'flex',justifyContent:'flex-end',gap:4}}>
             {m.edited_at && <span>изм.</span>}
             <span>{fmtTime(m.created_at)}</span>
@@ -6621,6 +6627,12 @@ export function ChatScreen() {
       setFlashMsgId(messageId);
       setTimeout(() => setFlashMsgId(curr => curr === messageId ? null : curr), 1000);
     });
+    // Асинхронное прибытие link-preview после первичного broadcast'а
+    // сообщения (когда url не было в кеше). Просто врезаем поле в state.
+    const u9b = socket.on('message:link-preview', ({ messageId, conversationId: cid, link_preview }) => {
+      if (cid !== convId) return;
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, link_preview } : m));
+    });
     // На reconnect WS — могли пропустить message:new из-за оборвавшегося соединения
     // (типичный сценарий на мобильном с плохой сетью). Подтягиваем свежие сообщения.
     const u10 = socket.on('connected', () => {
@@ -6662,7 +6674,7 @@ export function ChatScreen() {
       if (conversationId === convId) setPinnedMessage(message);
     });
     return () => {
-      u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u6b(); u7(); u8(); u9(); u10(); u11();
+      u1(); u2(); u3(); u4(); u4b(); u5(); u6(); u6b(); u7(); u8(); u9(); u9b(); u10(); u11();
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [convId, user?.id]);

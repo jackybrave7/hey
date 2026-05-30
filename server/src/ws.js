@@ -1,6 +1,7 @@
 const { WebSocketServer } = require('ws');
 const { wsAuth } = require('./auth');
 const db = require('./db/db');
+const { detectVideoUrl, fetchByProvider } = require('./linkPreview');
 
 const clients = new Map();
 
@@ -92,14 +93,42 @@ module.exports = function setupWS(server) {
             }
           }
 
+          // Если в тексте есть видео-ссылка и она уже в кеше — прикрепляем
+          // превью к message сразу. Если нет — отправляем сообщение, потом
+          // в фоне fetch'им и отдельным WS-событием апдейтим у всех клиентов.
+          const trimmedText = text?.trim() || null;
+          const videoHit    = trimmedText ? detectVideoUrl(trimmedText) : null;
+          const cachedPreview = videoHit ? db.getLinkPreviewCached(videoHit.url) : null;
+
           const saved = db.createMessage({
             conversationId, senderId: user.id,
-            text: text?.trim() || null,
+            text: trimmedText,
             attachment: attachment || null,
             replyToId: replyToId || null,
+            linkPreview: cachedPreview || null,
           });
           const full = { ...saved, sender_name: user.name, tempId, conversationId };
           broadcast(members, { type: 'message:new', message: full });
+
+          // Async-fetch для cache-miss. Не блокирует отправку сообщения.
+          if (videoHit && !cachedPreview) {
+            (async () => {
+              try {
+                const data = await fetchByProvider(videoHit);
+                if (!data) return;
+                db.setLinkPreviewCached(videoHit.url, data);
+                db.updateMessageLinkPreview(saved.id, data);
+                broadcast(members, {
+                  type: 'message:link-preview',
+                  conversationId,
+                  messageId: saved.id,
+                  link_preview: data,
+                });
+              } catch (e) {
+                console.error('[link-preview async]', e.message);
+              }
+            })();
+          }
 
           // Реферальный учёт: если это был первый message за всю жизнь —
           // подтверждаем реферал и засчитываем приглашающему. Идемпотентно

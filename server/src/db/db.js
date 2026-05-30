@@ -165,6 +165,15 @@ try { db.exec('ALTER TABLE messages ADD COLUMN reply_to_id TEXT'); } catch {}   
 try { db.exec('ALTER TABLE messages ADD COLUMN broadcast_id TEXT'); } catch {}    // группировка системных рассылок
 try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_user_id TEXT'); } catch {}    // переслано от автора
 try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_message_id TEXT'); } catch {} // ссылка на оригинал (опционально)
+try { db.exec('ALTER TABLE messages ADD COLUMN link_preview TEXT'); } catch {}              // JSON c metadata видео-ссылки (YouTube/Vimeo/RuTube/Kinescope)
+
+// Кеш og-tags / oEmbed для линк-превью. Если url-fetch успешен — кладём сюда,
+// а в новых сообщениях достаём из кеша. TTL ~7 дней (mark fetched_at и сверяем).
+try { db.exec(`CREATE TABLE IF NOT EXISTS link_previews (
+  url        TEXT PRIMARY KEY,
+  data       TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL
+)`); } catch {}
 try { db.exec('ALTER TABLE conversations ADD COLUMN pinned_message_id TEXT'); } catch {}    // одно закреплённое сообщение на чат
 
 // Статус участника группы: 'active' (обычно) | 'pending' (приглашён, ждёт подтверждения)
@@ -1463,7 +1472,10 @@ function getInviterForPendingMember(convId, userId) {
 
 function _parseMsg(m) {
   if (!m) return null;
-  const parsed = { ...m, attachment: m.attachment ? JSON.parse(m.attachment) : null };
+  const parsed = { ...m,
+    attachment:   m.attachment   ? JSON.parse(m.attachment)   : null,
+    link_preview: m.link_preview ? JSON.parse(m.link_preview) : null,
+  };
   if (parsed.forwarded_from_user_id) {
     const u = db.prepare('SELECT id, name, avatar, is_deleted FROM users WHERE id=?')
       .get(parsed.forwarded_from_user_id);
@@ -1545,24 +1557,48 @@ function getMessages(convId, before, limit = 50, requesterId = null) {
 }
 
 function createMessage({ conversationId, senderId, text, attachment, replyToId, broadcastId,
-  forwardedFromUserId, forwardedFromMessageId }) {
+  forwardedFromUserId, forwardedFromMessageId, linkPreview }) {
   const msg = { id: uuid(), conversation_id: conversationId, sender_id: senderId,
     text: text || null,
     attachment: attachment ? JSON.stringify(attachment) : null,
+    link_preview: linkPreview ? JSON.stringify(linkPreview) : null,
     status: 'sent', created_at: now(), edited_at: null,
     reply_to_id: replyToId || null,
     broadcast_id: broadcastId || null,
     forwarded_from_user_id: forwardedFromUserId || null,
     forwarded_from_message_id: forwardedFromMessageId || null };
   db.prepare(
-    `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,status,created_at,
+    `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,link_preview,status,created_at,
                            reply_to_id,broadcast_id,forwarded_from_user_id,forwarded_from_message_id)
-     VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@status,@created_at,
+     VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@link_preview,@status,@created_at,
              @reply_to_id,@broadcast_id,@forwarded_from_user_id,@forwarded_from_message_id)`
   ).run(msg);
   const parsed = _parseMsg(msg);
   if (parsed && parsed.reply_to_id) parsed.reply_to = _replySnippet(parsed.reply_to_id);
   return parsed;
+}
+
+// ── Link-preview cache (для видео-ссылок в чате) ─────────────────────────
+const LINK_PREVIEW_TTL = 7 * 24 * 3600; // 7 дней
+
+function getLinkPreviewCached(url) {
+  const row = db.prepare('SELECT data, fetched_at FROM link_previews WHERE url=?').get(url);
+  if (!row) return null;
+  if (now() - row.fetched_at > LINK_PREVIEW_TTL) return null;
+  try { return JSON.parse(row.data); } catch { return null; }
+}
+
+function setLinkPreviewCached(url, data) {
+  if (!url || !data) return;
+  db.prepare(
+    `INSERT INTO link_previews (url, data, fetched_at) VALUES (?, ?, ?)
+     ON CONFLICT(url) DO UPDATE SET data=excluded.data, fetched_at=excluded.fetched_at`
+  ).run(url, JSON.stringify(data), now());
+}
+
+function updateMessageLinkPreview(messageId, linkPreview) {
+  db.prepare('UPDATE messages SET link_preview=? WHERE id=?')
+    .run(linkPreview ? JSON.stringify(linkPreview) : null, messageId);
 }
 
 // ── Pin message ────────────────────────────────────────────────────────────
@@ -3031,6 +3067,7 @@ module.exports = {
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
+  getLinkPreviewCached, setLinkPreviewCached, updateMessageLinkPreview,
   pinMessage, unpinMessage, getPinnedMessage, forwardMessageToChats,
   pushSubscribe, pushUnsubscribe, getPushSubscriptions, removePushSubscriptions,
   clearConversationMessages, editMessage, deleteMessage,
