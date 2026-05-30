@@ -1,34 +1,34 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
     <style>
-      .bg{fill:#fbefd1}
-      .skin{fill:#f3c98a}
-      .skin-dark{fill:#d9a866}
-      .cuff{fill:#846d9b}
-      .accent{fill:#c96fa1}
-      .line{stroke:#846d9b;stroke-width:1.4;stroke-linecap:round;fill:none}
-      .spark{fill:#c96fa1;opacity:.7}
+      .cls-1{fill:#fbefd1;}
+      .cls-2{fill:#846d9b;}
+      .cls-3{fill:#c96fa1;opacity:0.5;}
+      .cls-4{fill:#f3c98a;}
+      .cls-5{fill:#d9a866;}
     </style>
   </defs>
   <title>thumbs up</title>
-  <!-- background cream circle -->
-  <circle class="bg" cx="32" cy="32" r="29.7"/>
-  <!-- approval sparks around -->
-  <circle class="spark" cx="14" cy="20" r="1.6"/>
-  <circle class="spark" cx="50" cy="18" r="2"/>
-  <circle class="spark" cx="49" cy="48" r="1.4"/>
-  <!-- thumb -->
-  <path class="skin" d="M27 28 Q27 12, 34 11 Q40 11, 40 17 L40 24 L46 24 Q49 24, 49 27 Q49 30, 46 31 L40 31 Z"/>
-  <!-- fist body -->
-  <rect class="skin" x="22" y="30" rx="4" ry="4" width="22" height="20"/>
-  <!-- finger separators (subtle curves) -->
-  <path class="line" d="M24 36 Q28 35, 32 36 T42 36"/>
-  <path class="line" d="M24 41 Q28 40, 32 41 T42 41"/>
-  <path class="line" d="M24 46 Q28 45, 32 46 T42 46"/>
-  <!-- shadow under fist (dark skin tone) -->
-  <path class="skin-dark" d="M22 47 Q33 51, 44 47 L44 50 Q33 53, 22 50 Z" opacity=".55"/>
-  <!-- wrist cuff -->
-  <rect class="cuff" x="20" y="49" rx="3" ry="3" width="26" height="7"/>
-  <!-- subtle highlight on cuff -->
-  <rect fill="#a187c6" x="20" y="49" rx="3" ry="3" width="26" height="2.2" opacity=".7"/>
+  <!-- основной кремовый круг — как у всех -->
+  <circle class="cls-1" cx="32" cy="32" r="29.7"/>
+  <!-- розовые щёчки — стандартный приём -->
+  <ellipse class="cls-3" cx="47.4" cy="34" rx="6.28" ry="4.7"/>
+  <ellipse class="cls-3" cx="16.6" cy="34" rx="6.28" ry="4.7"/>
+  <!-- глаза: довольное прищуривание (как у happy/winking) -->
+  <path class="cls-2" d="M16,26.5 Q22,21.5 28,26.5" fill="none" stroke="#846d9b" stroke-width="2.4" stroke-linecap="round"/>
+  <path class="cls-2" d="M36,26.5 Q42,21.5 48,26.5" fill="none" stroke="#846d9b" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- широкая довольная улыбка (как у happy) -->
+  <polygon class="cls-2" points="32 44 24 36 26 34 32 40 38 34 40 36"/>
+  <!-- мини-жест «палец вверх» в правом нижнем углу круга — узнаваемо -->
+  <g transform="translate(46 46) rotate(-15)">
+    <!-- кулак -->
+    <rect class="cls-4" x="-5" y="0" rx="2.5" ry="2.5" width="11" height="10"/>
+    <!-- большой палец -->
+    <path class="cls-4" d="M-3 0 Q-3 -7, 0 -8 Q3 -8, 3 -5 L3 -2 L5 -2 Q7 -2, 7 0 L7 1 Q7 3, 5 3 L3 3 Z"/>
+    <!-- манжет -->
+    <rect class="cls-2" x="-6" y="9" rx="1.5" ry="1.5" width="13" height="3"/>
+    <!-- тень-сгибы -->
+    <line x1="-4" y1="3" x2="5" y2="3" stroke="#d9a866" stroke-width=".8" stroke-linecap="round"/>
+    <line x1="-4" y1="6" x2="5" y2="6" stroke="#d9a866" stroke-width=".8" stroke-linecap="round"/>
+  </g>
 </svg>
