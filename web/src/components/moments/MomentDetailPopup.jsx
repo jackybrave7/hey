@@ -822,21 +822,26 @@ export default function MomentDetailPopup({
             {isMine ? (
               <>
                 {moment.author_is_super ? (
-                  /* Super-автор — каждый счётчик кликабелен, открывает список реактивших */
+                  /* Super-автор — каждый счётчик кликабелен, открывает список реактивших.
+                     ВАЖНО: 👁 — это общее число просмотров (moment.views), как на превью-
+                     карточке. Раньше тут стояло stats.see (count людей которые нажали
+                     реакцию «Вижу») — выходила некорректная картина: карточка показывала
+                     «👁 3», попап «👁 0», тогда как 3 = просмотревших, 0 = нажавших «Вижу».
+                     Реактивший список для просмотров не показываем (это просто счётчик). */
                   <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'8px',
                     display:'flex',gap:4}}>
                     {[
-                      { key: 'see',      iconName: 'eye',     count: moment.stats?.see || 0,      label: 'просмотры'   },
+                      { key: 'views',    iconName: 'eye',     count: moment.views || 0,           label: 'просмотры',   noReactors: true },
                       { key: 'resonate', iconName: 'sparkle', count: moment.stats?.resonate || 0, label: 'резонирует' },
                       { key: 'talk',     iconName: 'chat',    count: moment.stats?.talk || 0,     label: 'поговорить' },
                     ].map(stat => (
                       <button key={stat.key}
                         onClick={() => {
-                          if (stat.count === 0) return;
+                          if (stat.count === 0 || stat.noReactors) return;
                           setReactorsModal(stat.key);
                           if (!reactors) api.getMomentReactors(moment.id).then(setReactors).catch(() => {});
                         }}
-                        disabled={stat.count === 0}
+                        disabled={stat.count === 0 || stat.noReactors}
                         style={{
                           flex:1,padding:'8px 6px',borderRadius:10,
                           background: stat.count > 0 ? 'rgba(255,255,255,.04)' : 'transparent',
