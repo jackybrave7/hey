@@ -8253,56 +8253,51 @@ export function ChatScreen() {
         )}
 
         {/* ── Normal text input bar (hidden while recording/preview/system) ── */}
-        {!voiceState && !partner.isSystem && (
-        <div style={{padding:'8px 14px 14px',maxWidth:680,margin:'0 auto',
+        {!voiceState && !partner.isSystem && (() => {
+          const hasContent = text.trim() || imgPreviews.length > 0 || filePreview;
+          return (
+        <div style={{padding:'6px 12px 14px',maxWidth:680,margin:'0 auto',
           minWidth:0,boxSizing:'border-box',width:'100%'}}>
+          {/* Внешний layout: [pill с textarea] [emoji] [attach] [mic | send].
+              Раньше всё было внутри пилюли с тиснёным фоном — по макету
+              кнопки выносим в отдельный ряд, фон пилюли чистый-полупрозрачный. */}
           <div style={{
-            borderRadius: composerExpanded ? 18 : 26,
-            // В expanded режиме layout вертикальный: справа стек кнопок
-            // [↕] [📎] [😊] [➤], слева — большое поле текста.
             display:'flex',
-            alignItems: composerExpanded ? 'stretch' : 'center',
-            padding: composerExpanded ? '10px 10px 10px 14px' : '8px 8px 8px 14px',
-            gap: composerExpanded ? 8 : 6,
+            alignItems: composerExpanded ? 'stretch' : 'flex-end',
+            gap: 8,
             minWidth:0,
-            backgroundImage:'url(/input-bg.jpg)',
-            backgroundSize:'cover',
-            backgroundPosition:'center',
-            border:'1px solid rgba(255,255,255,0.5)',
-            boxShadow:'inset 0 1px 0 rgba(255,255,255,0.7), 0 4px 18px rgba(0,0,0,0.15)',
           }}>
-            <textarea ref={textareaRef} value={text} onChange={handleInput} onKeyDown={handleKey}
-              placeholder="Написать сообщение..."
-              rows={1}
-              style={{flex:1,minWidth:0,background:'none',border:'none',outline:'none',color:'white',
-                fontFamily:'inherit',fontSize:14,resize:'none',lineHeight:'1.4',
-                // В expanded задаём фиксированную «большую» высоту, в normal —
-                // высоту контролирует useEffect через element.style.height
-                ...(composerExpanded
-                  ? { height:'min(60vh, 480px)', overflow:'auto' }
-                  : { maxHeight: NORMAL_MAX, overflow:'auto' }),
-              }}/>
-
-            {/* Стек кнопок справа.
-               • В normal: flex-row (как было) — emoji, attach, send/mic.
-               • В expanded: flex-column — сверху ↕, ниже attach, emoji, send. */}
+            {/* Pill: только textarea + chevron */}
             <div style={{
+              flex:1, minWidth:0,
               display:'flex',
-              flexDirection: composerExpanded ? 'column' : 'row',
-              alignItems: composerExpanded ? 'flex-end' : 'center',
-              justifyContent: composerExpanded ? 'space-between' : 'flex-end',
-              gap: composerExpanded ? 8 : 6,
-              flexShrink:0,
+              alignItems: composerExpanded ? 'stretch' : 'center',
+              padding: composerExpanded ? '10px 12px 10px 18px' : '4px 10px 4px 18px',
+              gap: 6,
+              borderRadius: composerExpanded ? 18 : 24,
+              background: 'rgba(255,255,255,.10)',
+              border: '1px solid rgba(255,255,255,.18)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,.08)',
             }}>
-              {/* Expand / collapse chevrons — только если контент действительно
-                  не влезает в normal-режим, либо мы уже в expanded. */}
+              <textarea ref={textareaRef} value={text} onChange={handleInput} onKeyDown={handleKey}
+                placeholder="Написать сообщение..."
+                rows={1}
+                style={{flex:1,minWidth:0,background:'none',border:'none',outline:'none',color:'white',
+                  fontFamily:'inherit',fontSize:15,resize:'none',lineHeight:'1.4',
+                  paddingTop: composerExpanded ? 0 : 8,
+                  paddingBottom: composerExpanded ? 0 : 8,
+                  ...(composerExpanded
+                    ? { height:'min(60vh, 480px)', overflow:'auto' }
+                    : { maxHeight: NORMAL_MAX, overflow:'auto' }),
+                }}/>
               {(composerOverflow || composerExpanded) && (
                 <button onClick={() => setComposerExpanded(v => !v)}
                   title={composerExpanded ? 'Свернуть поле' : 'Раскрыть поле'}
                   style={{
-                    background: 'rgba(0,0,0,.15)', border: 'none',
-                    borderRadius: 12, padding: '4px 8px',
-                    cursor:'pointer', flexShrink:0,
+                    background: 'rgba(0,0,0,.18)', border: 'none',
+                    borderRadius: 10, padding: '4px 8px',
+                    cursor:'pointer', flexShrink:0, alignSelf: composerExpanded ? 'flex-start' : 'center',
                     display:'flex', alignItems:'center', justifyContent:'center',
                     color:'white', lineHeight: 1,
                   }}>
@@ -8311,52 +8306,50 @@ export function ChatScreen() {
                     display:'inline-block'}}>⌃</span>
                 </button>
               )}
-              {/* Emoji */}
+            </div>
+
+            {/* Внешний ряд кнопок (по макету — иконки без фона) */}
+            <div style={{
+              display:'flex', alignItems:'center', gap: 10,
+              flexShrink:0, paddingBottom: 4,
+            }}>
               <button onClick={() => setShowEmoji(s=>!s)} title="Смайлики"
-                style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
-                  padding:4,opacity: showEmoji ? 1 : 0.75,transition:'opacity .15s'}}>
+                style={{background:'none',border:'none',cursor:'pointer',padding:2,
+                  opacity: showEmoji ? 1 : 0.78, transition:'opacity .15s'}}>
                 <img src="/emoji/smiling.svg" alt="emoji"
-                  style={{width:22,height:22,display:'block',pointerEvents:'none'}}/>
+                  style={{width:26,height:26,display:'block',pointerEvents:'none',
+                    filter:'drop-shadow(1px 1px 1px rgba(0,0,0,.4))'}}/>
               </button>
-              {/* Attach */}
               <button onClick={() => fileInputRef.current?.click()} title="Прикрепить файл или картинку"
-                style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
-                  padding:4,opacity:.8,transition:'opacity .15s'}}
+                style={{background:'none',border:'none',cursor:'pointer',padding:2,
+                  opacity:.85, transition:'opacity .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.opacity='1'}
-                onMouseLeave={e=>e.currentTarget.style.opacity='.8'}>
+                onMouseLeave={e=>e.currentTarget.style.opacity='.85'}>
                 <img src="/emoji/paperclip.svg" alt="attach"
-                  style={{width:22,height:22,display:'block',pointerEvents:'none',
-                    filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
+                  style={{width:26,height:26,display:'block',pointerEvents:'none',
+                    filter:'drop-shadow(1px 1px 1px rgba(0,0,0,.4))'}}/>
               </button>
               <input ref={fileInputRef} type="file" multiple
                 accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
                 style={{display:'none'}} onChange={handleFileSelect}/>
-            {/* Mic / Send — inside the pill */}
-            {text.trim() || imgPreviews.length > 0 || filePreview ? (
-              <button onClick={send} title="Отправить"
-                style={{width:36,height:36,background:'rgba(100,78,148,.85)',border:'none',
-                  borderRadius:18,cursor:'pointer',display:'flex',alignItems:'center',
-                  justifyContent:'center',flexShrink:0,fontSize:17,color:'white',
-                  transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.95)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.85)'}>
-                ➤
-              </button>
-            ) : (
-              <button onClick={startRecording} title="Голосовое сообщение"
-                style={{width:36,height:36,background:'rgba(100,78,148,.85)',border:'none',
-                  borderRadius:18,cursor:'pointer',display:'flex',alignItems:'center',
-                  justifyContent:'center',flexShrink:0,fontSize:17,color:'white',
-                  transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(130,100,180,.95)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(100,78,148,.85)'}>
-                <Icon name="mic" size={18}/>
-              </button>
-            )}
-            </div>{/* /button stack (vert/horiz depending on composerExpanded) */}
+              {hasContent ? (
+                <button onClick={send} title="Отправить"
+                  style={{background:'none',border:'none',cursor:'pointer',padding:2,
+                    color:'white', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  <Icon name="send" size={24}/>
+                </button>
+              ) : (
+                <button onClick={startRecording} title="Голосовое сообщение"
+                  style={{background:'none',border:'none',cursor:'pointer',padding:2,
+                    color:'white', opacity:.9, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  <Icon name="mic" size={24}/>
+                </button>
+              )}
+            </div>
           </div>
         </div>
-        )}
+          );
+        })()}
 
         <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
       </div>}{/* end input bar outer (hidden when requestLock) */}
@@ -8369,15 +8362,16 @@ export function ChatScreen() {
         />
       )}
 
-      {/* Reaction emoji picker */}
+      {/* Reaction emoji picker — горизонтальная пилюля (свайп-скролл при
+          переполнении), кнопка ⌄ справа для закрытия. По макету. */}
       {reactionPicker && (() => {
-        const PICKER_W = 210, PICKER_H = 165;
+        const PICKER_H = 56;
         const vw = window.innerWidth;
-        const x = Math.min(Math.max(reactionPicker.x, 8), vw - PICKER_W - 8);
-        const y = reactionPicker.y - PICKER_H - 8 < 8
+        const PICKER_W = Math.min(vw - 16, 420);
+        const x = Math.min(Math.max(reactionPicker.x - PICKER_W / 2, 8), vw - PICKER_W - 8);
+        const y = reactionPicker.y - PICKER_H - 12 < 8
           ? reactionPicker.y + 36
-          : reactionPicker.y - PICKER_H - 8;
-        // Find which emoji (if any) the current user already put on this message
+          : reactionPicker.y - PICKER_H - 12;
         const pickerMsg = messages.find(m => m.id === reactionPicker.msgId);
         const myReaction = pickerMsg?.reactions
           ? Object.entries(pickerMsg.reactions).find(([, uids]) => uids.includes(user?.id))?.[0]
@@ -8385,69 +8379,107 @@ export function ChatScreen() {
         return (
           <div data-reaction-picker
             style={{position:'fixed', left:x, top:y, zIndex:300,
+              width: PICKER_W,
               background:'rgba(48,38,78,.97)', backdropFilter:'blur(16px)',
-              borderRadius:16, padding:'8px 6px',
+              borderRadius: 50, padding:'4px 6px',
               boxShadow:'0 8px 32px rgba(0,0,0,.5)',
-              display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:2}}>
-            {HEY_EMOJI.map(name => {
-              const isActive = myReaction === name;
-              return (
-                <button key={name} onClick={() => toggleReaction(reactionPicker.msgId, name)}
-                  title={emojiLabel(name)}
-                  style={{
-                    background: isActive ? 'rgba(140,100,200,.55)' : 'none',
-                    border: isActive ? '1px solid rgba(180,140,230,.7)' : '1px solid transparent',
-                    cursor:'pointer', padding:5, borderRadius:10, transition:'background .1s',
-                    display:'flex', alignItems:'center', justifyContent:'center'}}
-                  onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background='rgba(255,255,255,.18)'; }}
-                  onMouseLeave={e=>{ e.currentTarget.style.background = isActive ? 'rgba(140,100,200,.55)' : 'none'; }}>
-                  <img src={`/emoji/${encodeURIComponent(name)}.svg`} alt={name}
-                    style={{width:26, height:26, pointerEvents:'none',
-                      filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
-                </button>
-              );
-            })}
+              border:'1px solid rgba(255,255,255,.08)',
+              display:'flex', alignItems:'center', gap: 2}}>
+            <div style={{
+              flex:1, minWidth:0, display:'flex', gap: 2,
+              overflowX: 'auto', overflowY: 'hidden',
+              scrollbarWidth:'none', msOverflowStyle:'none',
+            }}>
+              {HEY_EMOJI.map(name => {
+                const isActive = myReaction === name;
+                return (
+                  <button key={name} onClick={() => toggleReaction(reactionPicker.msgId, name)}
+                    title={emojiLabel(name)}
+                    style={{
+                      background: isActive ? 'rgba(140,100,200,.55)' : 'none',
+                      border: isActive ? '1px solid rgba(180,140,230,.7)' : '1px solid transparent',
+                      cursor:'pointer', padding:5, borderRadius:'50%', transition:'background .1s',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      width: 40, height: 40, flexShrink: 0,
+                    }}
+                    onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background='rgba(255,255,255,.18)'; }}
+                    onMouseLeave={e=>{ e.currentTarget.style.background = isActive ? 'rgba(140,100,200,.55)' : 'none'; }}>
+                    <img src={`/emoji/${encodeURIComponent(name)}.svg`} alt={name}
+                      style={{width:28, height:28, pointerEvents:'none',
+                        filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={() => setReactionPicker(null)}
+              title="Закрыть"
+              style={{
+                flexShrink:0, width: 36, height: 36, borderRadius:'50%',
+                background: 'rgba(0,0,0,.25)', border: 'none', cursor:'pointer',
+                color: 'rgba(255,255,255,.85)', display:'flex',
+                alignItems:'center', justifyContent:'center',
+                fontSize: 14, fontWeight: 700,
+              }}>
+              <span style={{transform:'rotate(180deg)',display:'inline-block',lineHeight:1}}>⌃</span>
+            </button>
           </div>
         );
       })()}
 
-      {/* Message context menu */}
+      {/* Message context menu — светлая полупрозрачная карточка по макету.
+          Над «Удалить» — тонкий разделитель (визуально отделяет деструктив). */}
       {msgMenu && (
         <div onMouseDown={e => e.stopPropagation()}
           style={{
             position:'fixed', left: msgMenu.x, top: msgMenu.y, zIndex:200,
-            background:'rgba(60,50,90,0.97)', backdropFilter:'blur(16px)',
-            borderRadius:14, overflow:'hidden', minWidth:190,
-            boxShadow:'0 8px 32px rgba(0,0,0,.4)'
+            background:'rgba(255,255,255,.96)', backdropFilter:'blur(20px)',
+            borderRadius:18, overflow:'hidden', minWidth:210,
+            boxShadow:'0 12px 36px rgba(40,20,80,.35), 0 0 0 1px rgba(255,255,255,.6) inset',
+            border:'1px solid rgba(120,90,200,.18)',
+            padding:'6px 0',
           }}>
           {(() => {
             const isOwn   = msgMenu.msg.sender_id === user?.id;
             const canEdit = isOwn && (Date.now()/1000 - msgMenu.msg.created_at) < 3*60*60 && !!msgMenu.msg.text;
-            // Pin rights: в группе только админ, в direct/monolog — любой участник
             const canPin  = partner.isGroup ? (partner.admin_id === user?.id) : true;
             const isPinned = pinnedMessage && pinnedMessage.id === msgMenu.msg.id;
-            // Copy text — только если есть текст
             const canCopy = !!msgMenu.msg.text;
             const copyText = () => {
               setMsgMenu(null);
               try { navigator.clipboard.writeText(msgMenu.msg.text || ''); heyToast('Скопировано', 'success'); }
               catch { heyToast('Не удалось скопировать', 'error'); }
             };
-            return [
-              { label:'Ответить', icon:<Icon name="reply" size={18}/>, danger:false, action:() => { setReplyTo(msgMenu.msg); setMsgMenu(null); textareaRef.current?.focus(); } },
-              { label:'Переслать', icon:<Icon name="forward" size={18}/>, danger:false, action:() => openForwardModal(msgMenu.msg) },
-              canCopy && { label:'Копировать', icon:<Icon name="copy" size={18}/>, danger:false, action: copyText },
-              canPin && !isPinned && { label:'Закрепить', icon:<Icon name="pin" size={18}/>, danger:false, action:() => pinMsg(msgMenu.msg) },
-              canPin &&  isPinned && { label:'Открепить', icon:<Icon name="unpin" size={18}/>, danger:false, action:() => unpinMsg() },
-              canEdit && { label:'Редактировать', icon:<Icon name="pencil" size={18}/>, danger:false, action:() => startEdit(msgMenu.msg) },
-              isOwn  && { label:'Удалить', icon:<Icon name="trash" size={18}/>, danger:true, action:() => deleteMsg(msgMenu.msg) },
-            ].filter(Boolean).map(({ label, icon, danger, action }) => (
-              <div key={label} onClick={action}
-                style={{padding:'13px 18px',color:danger?'#ff6b6b':'white',fontSize:15,
-                  cursor:'pointer',display:'flex',alignItems:'center',gap:10,transition:'background .15s'}}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}
-                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,color:danger?'#ff6b6b':'rgba(255,255,255,.85)'}}>{icon}</span>{label}
+            const items = [
+              { label:'Ответить', icon:'reply',    danger:false, action:() => { setReplyTo(msgMenu.msg); setMsgMenu(null); textareaRef.current?.focus(); } },
+              canCopy && { label:'Копировать', icon:'copy', danger:false, action: copyText },
+              { label:'Переслать', icon:'forward', danger:false, action:() => openForwardModal(msgMenu.msg) },
+              canPin && !isPinned && { label:'Закрепить', icon:'pin',    danger:false, action:() => pinMsg(msgMenu.msg) },
+              canPin &&  isPinned && { label:'Открепить', icon:'unpin',  danger:false, action:() => unpinMsg() },
+              canEdit && { label:'Редактировать', icon:'pencil', danger:false, action:() => startEdit(msgMenu.msg) },
+              isOwn  && { label:'Удалить',  icon:'trash',  danger:true,  action:() => deleteMsg(msgMenu.msg), sep:true },
+            ].filter(Boolean);
+            return items.map(({ label, icon, danger, action, sep }) => (
+              <div key={label}>
+                {sep && (
+                  <div style={{height:1,background:'rgba(60,30,120,.14)',margin:'4px 14px'}}/>
+                )}
+                <div onClick={action}
+                  style={{
+                    padding:'10px 18px',
+                    color: danger ? 'rgba(200,50,60,.95)' : 'rgba(50,30,90,.95)',
+                    fontSize:15, fontWeight:500,
+                    cursor:'pointer', display:'flex', alignItems:'center', gap:14,
+                    transition:'background .12s',
+                  }}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(120,90,200,.10)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
+                    width:20,height:20,
+                    color: danger ? 'rgba(200,50,60,.85)' : 'rgba(80,50,140,.85)'}}>
+                    <Icon name={icon} size={18}/>
+                  </span>
+                  {label}
+                </div>
               </div>
             ));
           })()}
