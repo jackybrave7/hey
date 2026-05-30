@@ -4669,7 +4669,7 @@ function ChatVideoCard({ url }) {
   );
 }
 
-import { HEY_EMOJI as HEY_EMOJI_LIST, HEY_EMOJI_SET as HEY_EMOJI_SET_LIB, emojiLabel } from '../lib/heyEmoji';
+import { HEY_EMOJI as HEY_EMOJI_LIST, HEY_EMOJI_SET as HEY_EMOJI_SET_LIB, emojiLabel, emojiUrl } from '../lib/heyEmoji';
 
 const HEY_EMOJI = HEY_EMOJI_LIST;
 const HEY_EMOJI_SET = HEY_EMOJI_SET_LIB;
@@ -4686,7 +4686,7 @@ function renderPreviewWithEmoji(text, iconSize = 14) {
     if (!HEY_EMOJI_SET.has(m[1])) continue;
     if (m.index > last) out.push(text.slice(last, m.index));
     out.push(
-      <img key={'e'+(i++)} src={`/emoji/${encodeURIComponent(m[1])}.svg`} alt={m[1]}
+      <img key={'e'+(i++)} src={emojiUrl(m[1])} alt={m[1]}
         style={{width:iconSize,height:iconSize,verticalAlign:'-2px',display:'inline-block'}}/>
     );
     last = m.index + m[0].length;
@@ -4785,7 +4785,7 @@ function renderText(text) {
       continue;
     } else if (m[2] && HEY_EMOJI_SET.has(m[2])) {
       result.push(
-        <img key={i++} src={`/emoji/${encodeURIComponent(m[2])}.svg`} alt={m[2]}
+        <img key={i++} src={emojiUrl(m[2])} alt={m[2]}
           style={{width:24,height:24,verticalAlign:'middle',display:'inline-block',
             filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
       );
@@ -6132,7 +6132,7 @@ const MessageRow = memo(function MessageRow({
             if (single && HEY_EMOJI_SET.has(single[1])) {
               return (
                 <div style={{padding:'4px 0', textAlign: isOut ? 'right' : 'left'}}>
-                  <img src={`/emoji/${encodeURIComponent(single[1])}.svg`} alt={single[1]}
+                  <img src={emojiUrl(single[1])} alt={single[1]}
                     title={single[1]}
                     style={{width:72,height:72,display:'inline-block',
                       filter:'drop-shadow(1px 2px 2px rgba(0,0,0,.4))'}}/>
@@ -6167,7 +6167,7 @@ const MessageRow = memo(function MessageRow({
                     display:'flex', alignItems:'center', gap:4, fontSize:12,
                     color:'white', transition:'background .15s'
                   }}>
-                  <img src={`/emoji/${encodeURIComponent(emoji)}.svg`} alt={emoji}
+                  <img src={emojiUrl(emoji)} alt={emoji}
                     style={{width:16, height:16,
                       filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
                   <span style={{fontWeight:600}}>{userIds.length}</span>
@@ -8020,7 +8020,7 @@ export function ChatScreen() {
                   display:'flex',alignItems:'center',justifyContent:'center'}}
                 onMouseEnter={ev=>ev.currentTarget.style.background='rgba(255,255,255,.15)'}
                 onMouseLeave={ev=>ev.currentTarget.style.background='none'}>
-                <img src={`/emoji/${encodeURIComponent(name)}.svg`} alt={name}
+                <img src={emojiUrl(name)} alt={name}
                   style={{width:32,height:32,pointerEvents:'none',
                     filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
               </button>
@@ -8475,7 +8475,7 @@ export function ChatScreen() {
               }}
               onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.background='rgba(255,255,255,.18)'; }}
               onMouseLeave={e=>{ e.currentTarget.style.background = isActive ? 'rgba(140,100,200,.55)' : 'none'; }}>
-              <img src={`/emoji/${encodeURIComponent(name)}.svg`} alt={name}
+              <img src={emojiUrl(name)} alt={name}
                 style={{width:28, height:28, pointerEvents:'none',
                   filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
             </button>

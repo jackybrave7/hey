@@ -4,7 +4,7 @@ import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 import MoodEmoji from './MoodEmoji';
-import { HEY_EMOJI, emojiLabel } from '../../lib/heyEmoji';
+import { HEY_EMOJI, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
 
 // Набор настроений для ручного выбора (когда нет медиа)
 const MOOD_OPTIONS = [
@@ -569,7 +569,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                   }}
                   onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.12)'}
                   onMouseLeave={e=>e.currentTarget.style.background='none'}>
-                  <img src={`/emoji/${encodeURIComponent(name)}.svg`} alt={name}
+                  <img src={emojiUrl(name)} alt={name}
                     style={{width:26,height:26,pointerEvents:'none',
                       filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
                 </button>
@@ -601,7 +601,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               }}>
                 {parts.map((p, i) => p.kind === 't'
                   ? <span key={i}>{p.v}</span>
-                  : <img key={i} src={`/emoji/${encodeURIComponent(p.v)}.svg`} alt={p.v}
+                  : <img key={i} src={emojiUrl(p.v)} alt={p.v}
                       title={emojiLabel(p.v)}
                       style={{width:22,height:22,display:'inline-block',verticalAlign:'middle',
                         filter:'drop-shadow(1px 2px 1px rgba(0,0,0,.5))'}}/>

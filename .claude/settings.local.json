@@ -226,7 +226,9 @@
       "Bash(python3 -c ' *)",
       "Bash(mkdir -p C:/Users/User/.claude/uploads)",
       "mcp__Claude_in_Chrome__find",
-      "mcp__Claude_in_Chrome__file_upload"
+      "mcp__Claude_in_Chrome__file_upload",
+      "Bash(curl -s \"https://hey-messenger.ru/emoji/thumbs%20up.svg\")",
+      "Bash(python3)"
     ]
   }
 }

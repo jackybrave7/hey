@@ -49,3 +49,13 @@ export const HEY_EMOJI_LABEL = {
 export function emojiLabel(name) {
   return HEY_EMOJI_LABEL[name] || name;
 }
+
+// Версия SVG-набора. Дописывается к URL'ам как ?v=N — клиенты
+// насильно перетянут эмодзи когда мы редактируем SVG в /public/emoji.
+// Без этого long-cache на статике (nginx etag) держит старые версии
+// у пользователей которые не делают hard-reload.
+export const HEY_EMOJI_VERSION = '3';
+
+export function emojiUrl(name) {
+  return `/emoji/${encodeURIComponent(name)}.svg?v=${HEY_EMOJI_VERSION}`;
+}
