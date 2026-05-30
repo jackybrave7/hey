@@ -2364,7 +2364,7 @@ export function MyProfileScreen() {
                         const hasImg  = m.media_url && m.media_type === 'image';
                         const isAudio = m.media_url && m.media_type === 'audio';
                         return (
-                          <div key={m.id} onClick={() => { setArchiveOpen(false); setArchiveSelected(m); }}
+                          <div key={m.id} onClick={() => setArchiveSelected(m)}
                             style={{
                               position:'relative', aspectRatio:'1/1',
                               background:'rgba(255,255,255,.06)', borderRadius:14,
