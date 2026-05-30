@@ -5890,7 +5890,12 @@ const MessageRow = memo(function MessageRow({
       )}
 
       <div style={{display:'flex', flexDirection:'column',
-        alignItems: isOut ? 'flex-end' : 'flex-start', maxWidth:'80%'}}>
+        // 80% от ширины родителя (что бывает огромным если родитель
+        // не клампится), и жёсткие 540px как физическая верхняя
+        // граница на широких экранах — пузыри не вытягиваются на весь
+        // экран даже если что-то выше неожиданно отдало 100vw.
+        alignItems: isOut ? 'flex-end' : 'flex-start',
+        maxWidth: 'min(80%, 540px)', minWidth: 0}}>
         <div
           key={isFlashing ? 'flash-' + m.id : m.id}
           className={isFlashing ? 'hey-flash' : ''}
@@ -7706,7 +7711,11 @@ export function ChatScreen() {
             // Regular message
             const isOut = item.sender_id === user?.id;
             return (
-              <div style={{maxWidth:680,margin:'0 auto',padding:'0 16px'}}>
+              // width:100% + boxSizing — критично: иначе Virtuoso-item
+              // не передаёт детям полную ширину контейнера, и `margin:0 auto`
+              // не центрирует, а «уходит» вправо на широких экранах.
+              <div style={{maxWidth:680, width:'100%', margin:'0 auto',
+                padding:'0 16px', boxSizing:'border-box'}}>
                 <MessageRow
                   m={item}
                   isOut={isOut}
