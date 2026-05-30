@@ -5893,12 +5893,11 @@ const MessageRow = memo(function MessageRow({
       )}
 
       <div style={{display:'flex', flexDirection:'column',
-        // 80% от ширины родителя (что бывает огромным если родитель
-        // не клампится), и жёсткие 540px как физическая верхняя
-        // граница на широких экранах — пузыри не вытягиваются на весь
-        // экран даже если что-то выше неожиданно отдало 100vw.
         alignItems: isOut ? 'flex-end' : 'flex-start',
-        maxWidth: 'min(80%, 540px)', minWidth: 0}}>
+        // Жёсткий пиксельный cap (без CSS min() — на случай нестандартного
+        // поведения flex-min-content). Достаточно для всех нормальных
+        // viewport'ов, на узких мобилках всё равно ограничится width родителя.
+        maxWidth: 540, minWidth: 0}}>
         <div
           key={isFlashing ? 'flash-' + m.id : m.id}
           className={isFlashing ? 'hey-flash' : ''}
@@ -5910,7 +5909,12 @@ const MessageRow = memo(function MessageRow({
             padding:'10px 13px 6px',
             color: isOut ? 'white' : '#2a2040',
             fontSize:14, lineHeight:'1.5',
-            transition:'background .2s'
+            transition:'background .2s',
+            // Подстраховка на сам пузырь — даже если родитель почему-то даст
+            // больше, сам bubble не вырастет шире.
+            maxWidth: '100%',
+            minWidth: 0,
+            wordBreak: 'break-word',
           }}>
           {isGroup && !isOut && (
             <div

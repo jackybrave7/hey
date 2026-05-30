@@ -230,7 +230,8 @@
       "Bash(curl -s \"https://hey-messenger.ru/emoji/thumbs%20up.svg\")",
       "Bash(python3)",
       "Bash(curl -s https://hey-messenger.ru/assets/index-Df2Ow4hm.js)",
-      "Bash(grep -oE '80%[^\"]{0,40}')"
+      "Bash(grep -oE '80%[^\"]{0,40}')",
+      "Bash(curl -s https://hey-messenger.ru/assets/index-BQqASZi3.js)"
     ]
   }
 }
