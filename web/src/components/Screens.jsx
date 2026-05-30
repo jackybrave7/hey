@@ -7382,28 +7382,23 @@ export function ChatScreen() {
   // ── Scroll to specific message (клик на цитату / закреп) ──────────────
   // Если сообщения нет в текущем буфере — подгружаем старые пакеты
   // последовательно (по 50 штук) пока не найдём или не упрёмся в начало.
+  // ВАЖНО: Virtuoso использует firstItemIndex как offset; чтобы scrollToIndex
+  // попал в нужную позицию, передаём ему index = firstItemIndex + arrayIdx,
+  // а не просто arrayIdx (раньше срабатывало непредсказуемо).
   useEffect(() => {
     async function onScrollTo(e) {
       const targetId = e.detail;
       if (!targetId) return;
 
-      // Снимок текущего состояния — но messages внутри замыкания
-      // обновится по перерендеру; для пагинации используем переменную.
-      let curMessages = messages;
-      let curHasMore  = hasMore;
-      const findIdx = () => {
-        let p = 0;
-        if (typing) p += 0; // typing — последний элемент; нам нужен индекс messages
-        const i = curMessages.findIndex(m => m.id === targetId);
-        return i < 0 ? -1 : i;
-      };
+      let curMessages       = messages;
+      let curHasMore        = hasMore;
+      let curFirstItemIndex = firstItemIndex;
+      const findArrayIdx = () => curMessages.findIndex(m => m.id === targetId);
 
-      if (findIdx() < 0) {
-        // Подгружаем пока не найдём (макс. 20 страниц ≈ 1000 сообщений)
+      if (findArrayIdx() < 0) {
         let attempts = 0;
-        let toastId = null;
-        try { toastId = heyToast('Загружаем сообщения…', 'info'); } catch {}
-        while (findIdx() < 0 && curHasMore && attempts < 20) {
+        try { heyToast('Загружаем сообщения…', 'info'); } catch {}
+        while (findArrayIdx() < 0 && curHasMore && attempts < 20) {
           attempts++;
           if (!curMessages.length) break;
           let older;
@@ -7413,37 +7408,49 @@ export function ChatScreen() {
             setHasMore(false); curHasMore = false; break;
           }
           if (older.length < 50) curHasMore = false;
-          // Применяем в state и держим локальную копию для поиска
-          setFirstItemIndex(prev => prev - older.length);
-          setMessages(prev => {
-            curMessages = [...older, ...prev];
-            return curMessages;
-          });
+          curFirstItemIndex = curFirstItemIndex - older.length;
+          curMessages = [...older, ...curMessages];
+          setFirstItemIndex(curFirstItemIndex);
+          setMessages(curMessages);
           if (!curHasMore) setHasMore(false);
         }
       }
 
-      // Финальный поиск по уже обновлённому массиву
-      const idx = curMessages.findIndex(m => m.id === targetId);
-      if (idx < 0) {
+      const arrayIdx = findArrayIdx();
+      if (arrayIdx < 0) {
         heyToast('Сообщение не найдено в истории', 'error');
         return;
       }
-      // flatItems = messages с возможным typing-итемом в конце; индекс совпадает
-      const flatIdx = flatItems.findIndex(it => it.id === targetId);
-      const finalIdx = flatIdx >= 0 ? flatIdx : idx;
-      // Даём React время отрисовать prepended-пакет, потом скроллим.
-      requestAnimationFrame(() => {
+      // Virtuoso-индекс = firstItemIndex + позиция-в-массиве. flatItems в нашей
+      // схеме совпадает с messages по индексам (typing — это последний extra
+      // item; для прокрутки к существующему сообщению совпадение по индексу
+      // гарантировано).
+      const virtuosoIndex = curFirstItemIndex + arrayIdx;
+
+      // Ждём пока React успеет отрендерить новый messages → Virtuoso
+      // переразложит итемы (нужно double-rAF + небольшой setTimeout —
+      // Virtuoso измеряет высоты в layout-эффектах, scrollToIndex до этого
+      // момента иногда «промахивается» и срабатывает только со второй
+      // попытки или вообще не срабатывает).
+      const doScroll = () => {
         virtuosoRef.current?.scrollToIndex({
-          index: finalIdx, align: 'center', behavior: 'smooth',
+          index: virtuosoIndex, align: 'center', behavior: 'smooth',
         });
         setFlashMsgId(targetId);
         setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
+      };
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          doScroll();
+          // Подстраховка — повторная попытка через 250мс на случай если
+          // Virtuoso не успел измерить высоты подгруженных сообщений.
+          setTimeout(doScroll, 250);
+        });
       });
     }
     window.addEventListener('hey:scroll-to-msg', onScrollTo);
     return () => window.removeEventListener('hey:scroll-to-msg', onScrollTo);
-  }, [flatItems, messages, hasMore, typing, convId]);
+  }, [messages, hasMore, firstItemIndex, convId]);
 
   // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
   const handleOpenMenu  = useCallback((e, m) => openMsgMenu(e, m), []);
