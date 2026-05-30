@@ -28,8 +28,9 @@ function getEmbedUrl(provider, videoId) {
 
 // hideMeta — для моментов: не тащить с видеохостинга title/author/duration,
 // потому что момент — это контент автора, а не пересказ метаданных платформы.
-// В чате (где люди шарят ссылки) этот блок остаётся включённым.
-export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = false }) {
+// onlyTitleMeta — для чата: показываем только title+author, без правой кнопки
+// «↗ YouTube/Vimeo/…», которая дублирует бейдж платформы на самой обложке.
+export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = false, onlyTitleMeta = false }) {
   const [playing, setPlaying] = useState(false);
   const [thumbBroken, setThumbBroken] = useState(false);
   if (!data) return null;
@@ -180,14 +181,16 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
                     </span>
                   )}
                 </div>
-                <button onClick={openExternal}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: `${p.color}99`, fontSize: 11, fontFamily: 'inherit',
-                    padding: 0, flexShrink: 0,
-                  }}>
-                  ↗ {p.label.replace(/[▶●]\s*/, '')}
-                </button>
+                {!onlyTitleMeta && (
+                  <button onClick={openExternal}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: `${p.color}99`, fontSize: 11, fontFamily: 'inherit',
+                      padding: 0, flexShrink: 0,
+                    }}>
+                    ↗ {p.label.replace(/[▶●]\s*/, '')}
+                  </button>
+                )}
               </div>
             </div>
           )}

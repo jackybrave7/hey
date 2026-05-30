@@ -6116,10 +6116,17 @@ const MessageRow = memo(function MessageRow({
               </button>
             );
           })()}
+          {/* Превью видео-ссылки идёт ПЕРЕД текстом сообщения — карточка
+             с обложкой + плеером важнее самой ссылки. hideMeta скрывает
+             нижний блок «↗ YouTube/Vimeo/…», который дублирует бейдж
+             платформы на самой обложке. */}
+          {m.link_preview && (
+            <div style={{marginBottom: m.text ? 8 : 0, width: 'min(100%, 360px)'}}>
+              <EmbeddedVideoPreview data={m.link_preview} size="full" hideMeta={false}
+                onlyTitleMeta/>
+            </div>
+          )}
           {m.text && (() => {
-            // Если всё сообщение — один HEY-эмодзи (с любыми пробелами по краям),
-            // показываем его крупно — 3× обычного размера. Поведение как в
-            // Telegram/WhatsApp с single-emoji сообщениями.
             const trimmed = m.text.trim();
             const single  = trimmed.match(/^\[([^\]]+)\]$/);
             if (single && HEY_EMOJI_SET.has(single[1])) {
@@ -6138,11 +6145,6 @@ const MessageRow = memo(function MessageRow({
               </div>
             );
           })()}
-          {m.link_preview && (
-            <div style={{marginTop: m.text ? 8 : 0, width: 'min(100%, 360px)'}}>
-              <EmbeddedVideoPreview data={m.link_preview} size="full"/>
-            </div>
-          )}
           <div style={{fontSize:11,opacity:.6,textAlign:'right',marginTop:3,display:'flex',justifyContent:'flex-end',gap:4}}>
             {m.edited_at && <span>изм.</span>}
             <span>{fmtTime(m.created_at)}</span>

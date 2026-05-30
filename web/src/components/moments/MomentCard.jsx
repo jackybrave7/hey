@@ -143,12 +143,15 @@ export default function MomentCard({ moment, isMine, onClick }) {
               background:'linear-gradient(135deg,#1e0a40,#4a1a80,#7030b0)'}}/>
           )}
           <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.22)'}}/>
-          {/* Центральная иконка плёнки для случая когда обложка не загрузилась */}
-          <div style={{
-            position:'absolute',top:'50%',left:'50%',
-            transform:'translate(-50%,-50%)',fontSize:42,
-            opacity:.35,color:'white',pointerEvents:'none',
-          }}>🎬</div>
+          {/* 🎬 показываем ТОЛЬКО когда нет обложки — иначе это водяной
+              знак поверх нормальной превьюшки и пользователь жалуется. */}
+          {!moment.embedded_video.thumbnail_url && (
+            <div style={{
+              position:'absolute',top:'50%',left:'50%',
+              transform:'translate(-50%,-50%)',fontSize:42,
+              opacity:.35,color:'white',pointerEvents:'none',
+            }}>🎬</div>
+          )}
         </>
       ) : (
         <MoodEmoji type={moment.mood_emoji || 'calm'} size={130}/>
