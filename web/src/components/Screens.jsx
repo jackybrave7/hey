@@ -6206,12 +6206,16 @@ const MessageRow = memo(function MessageRow({
 // AudioPlayer — compact player for voice messages in bubbles
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut, wide = false }) {
+export const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, isOut, wide = false, onPlayingChange }) {
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [total,   setTotal]   = useState(initDur || 0);
   const [error,   setError]   = useState(null);
   const audioRef = useRef();
+
+  // Уведомляем родителя о смене play/pause — нужно для того, чтобы
+  // в моменте можно было показывать анимацию волн при проигрывании.
+  useEffect(() => { onPlayingChange?.(playing); }, [playing, onPlayingChange]);
 
   useEffect(() => {
     const a = audioRef.current;

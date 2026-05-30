@@ -482,6 +482,7 @@ export default function MomentDetailPopup({
   const [flashRxn, setFlashRxn] = useState(null); // id реакции которая на секунду подсвечивается
   const [reportOpen, setReportOpen] = useState(false);
   const [foreignMenuOpen, setForeignMenuOpen] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   const [reactorsModal, setReactorsModal] = useState(null); // null | 'all' | 'see' | 'resonate' | 'talk'
   const [reactors, setReactors] = useState(null);
   const [showAnalyticsPromo, setShowAnalyticsPromo] = useState(false);
@@ -684,11 +685,38 @@ export default function MomentDetailPopup({
                 style={{width:'100%',maxHeight:'45vh',display:'block',background:'#000'}}/>
             )}
             {moment.media_type === 'audio' && (
-              <div style={{padding:'28px 22px 24px',display:'flex',flexDirection:'column',gap:14,
-                background:'linear-gradient(135deg,#1a0a38,#2a1858)'}}>
-                <div style={{fontSize:34,textAlign:'center',opacity:.9}}>🎵</div>
+              // Высота шапки выровнена с image/video (≈45vh), как просил
+              // пользователь — раньше аудио было «коротеньким», а
+              // картинка/видео занимали полэкрана. По центру — большая
+              // нота, а во время воспроизведения вокруг неё «дышит»
+              // дорожка вертикальных полосок-волн (CSS keyframes).
+              <div style={{
+                padding:'28px 22px 24px',
+                display:'flex',flexDirection:'column',justifyContent:'space-between',
+                gap:18, minHeight:'min(45vh, 380px)',
+                background:'linear-gradient(135deg,#1a0a38,#2a1858)',
+                position:'relative',
+              }}>
+                <div style={{flex:1,display:'flex',flexDirection:'column',
+                  alignItems:'center',justifyContent:'center',gap:18,position:'relative'}}>
+                  <div style={{fontSize:64,opacity:.9,lineHeight:1}}>🎵</div>
+                  {/* Анимированный «эквалайзер» — рендерим всегда, но
+                      animation-play-state переключается по `audioPlaying`,
+                      чтобы при паузе полоски замирали. */}
+                  <div className={`hey-audio-wave ${audioPlaying ? 'is-playing' : ''}`}
+                    style={{display:'flex',alignItems:'flex-end',gap:5,height:48}}>
+                    {[0,1,2,3,4,5,6,7,8,9,10,11].map(i => (
+                      <span key={i} style={{
+                        width:5, borderRadius:3,
+                        background:'linear-gradient(180deg, #c8a8ff, #7858b0)',
+                        animationDelay: `${(i % 6) * 0.12}s`,
+                      }}/>
+                    ))}
+                  </div>
+                </div>
                 <AudioPlayer url={moment.media_url}
-                  duration={moment.media_duration} wide={true}/>
+                  duration={moment.media_duration} wide={true}
+                  onPlayingChange={setAudioPlaying}/>
               </div>
             )}
             <button onClick={onClose} style={{position:'absolute',top:12,right:12,
