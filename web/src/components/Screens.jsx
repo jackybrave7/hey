@@ -6293,6 +6293,12 @@ export function ChatScreen() {
   const [messages,    setMessages]    = useState([]);
   const [text,        setText]        = useState('');
   const [showEmoji,   setShowEmoji]   = useState(false);
+  // Composer expand: при длинном тексте инпут можно вручную раскрыть на
+  // почти всю высоту чата для удобного редактирования / просмотра вставленного.
+  // Шевроны ↕ появляются только когда контент реально не помещается в
+  // нормальный режим — чтобы не мозолить глаза при коротких сообщениях.
+  const [composerExpanded, setComposerExpanded] = useState(false);
+  const [composerOverflow, setComposerOverflow] = useState(false);
   const [typing,      setTyping]      = useState(null);
   const [partner,     setPartner]     = useState({ name:'Диалог', online:false, id:null, isGroup:false, icon:null, admin_id:null, avatar:null, isDeleted:false });
   const [editingMsg,  setEditingMsg]  = useState(null);
@@ -6667,6 +6673,30 @@ export function ChatScreen() {
     clearTimeout(typingTimer.current);
     typingTimer.current = setTimeout(() => socket.stopTyping(convId), 1500);
   }
+
+  // Auto-grow + overflow detection. Замеряем scrollHeight после каждой
+  // правки. В нормальном режиме textarea растёт до NORMAL_MAX (~140px),
+  // дальше включается scroll и показываются шевроны раскрытия. В expanded
+  // режиме высоту задаём отдельно из render-ветки (там min(60vh, 480px)).
+  const NORMAL_MAX = 140;
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    if (composerExpanded) {
+      // В раскрытом режиме высоту задаёт inline-style ниже
+      ta.style.height = '';
+      // Всё равно меряем, чтобы знать что overflow=true и кнопка свернуть
+      // должна быть видна.
+      const sh = ta.scrollHeight;
+      setComposerOverflow(sh > NORMAL_MAX);
+      return;
+    }
+    // Сбрасываем, чтобы scrollHeight отразил реальный контент, а не предыдущую высоту
+    ta.style.height = 'auto';
+    const sh = ta.scrollHeight;
+    ta.style.height = Math.min(sh, NORMAL_MAX) + 'px';
+    setComposerOverflow(sh > NORMAL_MAX);
+  }, [text, composerExpanded]);
 
   // ── Voice recording ────────────────────────────────────────────────────────
 
@@ -8227,8 +8257,13 @@ export function ChatScreen() {
         <div style={{padding:'8px 14px 14px',maxWidth:680,margin:'0 auto',
           minWidth:0,boxSizing:'border-box',width:'100%'}}>
           <div style={{
-            borderRadius:26,
-            display:'flex', alignItems:'center', padding:'8px 8px 8px 14px', gap:6,
+            borderRadius: composerExpanded ? 18 : 26,
+            // В expanded режиме layout вертикальный: справа стек кнопок
+            // [↕] [📎] [😊] [➤], слева — большое поле текста.
+            display:'flex',
+            alignItems: composerExpanded ? 'stretch' : 'center',
+            padding: composerExpanded ? '10px 10px 10px 14px' : '8px 8px 8px 14px',
+            gap: composerExpanded ? 8 : 6,
             minWidth:0,
             backgroundImage:'url(/input-bg.jpg)',
             backgroundSize:'cover',
@@ -8241,27 +8276,61 @@ export function ChatScreen() {
               rows={1}
               style={{flex:1,minWidth:0,background:'none',border:'none',outline:'none',color:'white',
                 fontFamily:'inherit',fontSize:14,resize:'none',lineHeight:'1.4',
-                maxHeight:100,overflow:'auto'}}/>
-            {/* Emoji */}
-            <button onClick={() => setShowEmoji(s=>!s)} title="Смайлики"
-              style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
-                padding:4,opacity: showEmoji ? 1 : 0.75,transition:'opacity .15s'}}>
-              <img src="/emoji/smiling.svg" alt="emoji"
-                style={{width:22,height:22,display:'block',pointerEvents:'none'}}/>
-            </button>
-            {/* Attach */}
-            <button onClick={() => fileInputRef.current?.click()} title="Прикрепить файл или картинку"
-              style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
-                padding:4,opacity:.8,transition:'opacity .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.opacity='1'}
-              onMouseLeave={e=>e.currentTarget.style.opacity='.8'}>
-              <img src="/emoji/paperclip.svg" alt="attach"
-                style={{width:22,height:22,display:'block',pointerEvents:'none',
-                  filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
-            </button>
-            <input ref={fileInputRef} type="file" multiple
-              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
-              style={{display:'none'}} onChange={handleFileSelect}/>
+                // В expanded задаём фиксированную «большую» высоту, в normal —
+                // высоту контролирует useEffect через element.style.height
+                ...(composerExpanded
+                  ? { height:'min(60vh, 480px)', overflow:'auto' }
+                  : { maxHeight: NORMAL_MAX, overflow:'auto' }),
+              }}/>
+
+            {/* Стек кнопок справа.
+               • В normal: flex-row (как было) — emoji, attach, send/mic.
+               • В expanded: flex-column — сверху ↕, ниже attach, emoji, send. */}
+            <div style={{
+              display:'flex',
+              flexDirection: composerExpanded ? 'column' : 'row',
+              alignItems: composerExpanded ? 'flex-end' : 'center',
+              justifyContent: composerExpanded ? 'space-between' : 'flex-end',
+              gap: composerExpanded ? 8 : 6,
+              flexShrink:0,
+            }}>
+              {/* Expand / collapse chevrons — только если контент действительно
+                  не влезает в normal-режим, либо мы уже в expanded. */}
+              {(composerOverflow || composerExpanded) && (
+                <button onClick={() => setComposerExpanded(v => !v)}
+                  title={composerExpanded ? 'Свернуть поле' : 'Раскрыть поле'}
+                  style={{
+                    background: 'rgba(0,0,0,.15)', border: 'none',
+                    borderRadius: 12, padding: '4px 8px',
+                    cursor:'pointer', flexShrink:0,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    color:'white', lineHeight: 1,
+                  }}>
+                  <span style={{fontSize:14, fontWeight:700, opacity:.75,
+                    transform: composerExpanded ? 'none' : 'rotate(180deg)',
+                    display:'inline-block'}}>⌃</span>
+                </button>
+              )}
+              {/* Emoji */}
+              <button onClick={() => setShowEmoji(s=>!s)} title="Смайлики"
+                style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
+                  padding:4,opacity: showEmoji ? 1 : 0.75,transition:'opacity .15s'}}>
+                <img src="/emoji/smiling.svg" alt="emoji"
+                  style={{width:22,height:22,display:'block',pointerEvents:'none'}}/>
+              </button>
+              {/* Attach */}
+              <button onClick={() => fileInputRef.current?.click()} title="Прикрепить файл или картинку"
+                style={{background:'none',border:'none',cursor:'pointer',flexShrink:0,
+                  padding:4,opacity:.8,transition:'opacity .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                onMouseLeave={e=>e.currentTarget.style.opacity='.8'}>
+                <img src="/emoji/paperclip.svg" alt="attach"
+                  style={{width:22,height:22,display:'block',pointerEvents:'none',
+                    filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
+              </button>
+              <input ref={fileInputRef} type="file" multiple
+                accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                style={{display:'none'}} onChange={handleFileSelect}/>
             {/* Mic / Send — inside the pill */}
             {text.trim() || imgPreviews.length > 0 || filePreview ? (
               <button onClick={send} title="Отправить"
@@ -8284,6 +8353,7 @@ export function ChatScreen() {
                 <Icon name="mic" size={18}/>
               </button>
             )}
+            </div>{/* /button stack (vert/horiz depending on composerExpanded) */}
           </div>
         </div>
         )}
