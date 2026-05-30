@@ -4768,17 +4768,20 @@ function renderText(text) {
     if (m[1]) {
       const url     = trimUrlTail(m[1]);
       const tailLen = m[1].length - url.length;
-      if (isChatVideoUrl(url)) {
-        result.push(<ChatVideoCard key={i++} url={url}/>);
-      } else {
-        result.push(
-          <a key={i++} href={url} target="_blank" rel="noopener noreferrer"
-            style={{color:'inherit',textDecoration:'underline',wordBreak:'break-all'}}
-            onClick={e => e.stopPropagation()}>{url}</a>
-        );
-      }
+      // Видеоплатформы теперь рендерятся через server-side link_preview
+      // (EmbeddedVideoPreview под текстом сообщения). Здесь — только
+      // короткая ссылка-текст: длинные URL обрезаем многоточием
+      // (host/path…hash), чтобы пузырь не «расползался».
+      const display = url.length > 48
+        ? url.slice(0, 32) + '…' + url.slice(-12)
+        : url;
+      result.push(
+        <a key={i++} href={url} target="_blank" rel="noopener noreferrer"
+          title={url}
+          style={{color:'inherit',textDecoration:'underline',wordBreak:'break-all'}}
+          onClick={e => e.stopPropagation()}>{display}</a>
+      );
       last = m.index + m[1].length - tailLen;
-      // Хвост (например '.') остаётся как текст — обработается в следующей итерации
       continue;
     } else if (m[2] && HEY_EMOJI_SET.has(m[2])) {
       result.push(
@@ -8599,11 +8602,35 @@ export function ChatScreen() {
         const current = urls[idx];
         const canPrev = idx > 0;
         const canNext = idx < total - 1;
+        // Touch-swipe для перелистывания галереи на мобильном.
+        // Порог 50px по горизонтали + игнор если вертикальное движение
+        // больше — пользователь скроллит, а не свайпает.
+        let touchStart = null;
+        const onTouchStart = (e) => {
+          if (e.touches.length !== 1 || total <= 1) return;
+          const t = e.touches[0];
+          touchStart = { x: t.clientX, y: t.clientY, t: Date.now() };
+        };
+        const onTouchEnd = (e) => {
+          if (!touchStart) return;
+          const t = e.changedTouches[0];
+          const dx = t.clientX - touchStart.x;
+          const dy = t.clientY - touchStart.y;
+          const dt = Date.now() - touchStart.t;
+          touchStart = null;
+          if (dt > 600) return;                // слишком медленно — не свайп
+          if (Math.abs(dy) > Math.abs(dx)) return; // вертикальное — игнор
+          if (Math.abs(dx) < 50) return;       // короткий тап
+          if (dx < 0 && canNext) setLightbox({ urls, index: idx + 1 });
+          else if (dx > 0 && canPrev) setLightbox({ urls, index: idx - 1 });
+        };
         return (
           <div onClick={() => setLightbox(null)}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
             style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,.92)',
               display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-              backdropFilter:'blur(8px)'}}>
+              backdropFilter:'blur(8px)', touchAction: 'pan-y'}}>
             {/* Стрелки навигации (если в галерее больше одной) */}
             {canPrev && (
               <button onClick={(e) => { e.stopPropagation(); setLightbox({ urls, index: idx - 1 }); }}

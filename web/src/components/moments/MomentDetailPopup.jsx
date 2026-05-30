@@ -984,7 +984,13 @@ export default function MomentDetailPopup({
         reactors={reactors}
         loading={!reactors}
         onClose={() => setReactorsModal(null)}
-        onOpenUser={(uid) => { setReactorsModal(null); onClose?.(); nav(`/profile/${uid}`); }}
+        onOpenUser={(uid) => {
+          // По макету: тап по строчке открывает карточку юзера поп-апом,
+          // не уводит на отдельную страницу профиля. openUserCard монтирует
+          // её через глобальный портал — момент остаётся открытым под ней.
+          setReactorsModal(null);
+          openUserCard(uid);
+        }}
       />
     )}
 
