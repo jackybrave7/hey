@@ -2230,7 +2230,62 @@ function getAdminStats() {
      JOIN users u ON u.id = p.user_id
      WHERE p.last_seen >= ? AND u.is_blocked = 0 AND u.is_deleted = 0`
   ).get(threeDaysAgo).c;
-  return { users, blocked, admins, moments, activeMoments, reactions, messages, openReports, activeUsers };
+  const groups = db.prepare("SELECT COUNT(*) as c FROM conversations WHERE type='group'").get().c;
+  return { users, blocked, admins, moments, activeMoments, reactions, messages, openReports, activeUsers, groups };
+}
+
+// Список групп для админки. Считаем количество активных участников,
+// общее число сообщений и время последней активности — чтобы было видно
+// какие группы реально живут, а какие давно «мертвы».
+function getAdminGroups({ search } = {}) {
+  let where = "c.type='group'";
+  const params = [];
+  if (search) {
+    where += ' AND c.name LIKE ?';
+    params.push(`%${search}%`);
+  }
+  return db.prepare(
+    `SELECT c.id, c.name, c.icon, c.admin_id, c.created_at,
+            c.history_visibility,
+            (SELECT COUNT(*) FROM members  m WHERE m.conversation_id=c.id AND m.status='active')  AS members_count,
+            (SELECT COUNT(*) FROM members  m WHERE m.conversation_id=c.id AND m.status='pending') AS pending_count,
+            (SELECT COUNT(*) FROM messages msg WHERE msg.conversation_id=c.id)                    AS messages_count,
+            (SELECT MAX(created_at) FROM messages msg WHERE msg.conversation_id=c.id)             AS last_message_at,
+            (SELECT u.name FROM users u WHERE u.id=c.admin_id)                                    AS admin_name
+     FROM conversations c
+     WHERE ${where}
+     ORDER BY last_message_at DESC NULLS LAST, c.created_at DESC`
+  ).all(...params);
+}
+
+function getAdminGroupDetail(convId) {
+  const c = db.prepare(
+    `SELECT c.id, c.name, c.icon, c.admin_id, c.created_at, c.history_visibility, c.pinned_message_id,
+            (SELECT u.name FROM users u WHERE u.id=c.admin_id) AS admin_name,
+            (SELECT COUNT(*) FROM messages msg WHERE msg.conversation_id=c.id) AS messages_count,
+            (SELECT MAX(created_at) FROM messages msg WHERE msg.conversation_id=c.id) AS last_message_at
+     FROM conversations c
+     WHERE c.id=? AND c.type='group'`
+  ).get(convId);
+  if (!c) return null;
+  const members = db.prepare(
+    `SELECT m.user_id AS id, m.status, m.is_admin, m.joined_at, m.invited_by,
+            u.name, u.avatar, u.is_blocked, u.is_deleted,
+            p.online, p.last_seen
+     FROM members m
+     JOIN users u ON u.id = m.user_id
+     LEFT JOIN presence p ON p.user_id = m.user_id
+     WHERE m.conversation_id = ?
+     ORDER BY m.is_admin DESC, m.joined_at ASC`
+  ).all(convId).map(r => ({
+    ...r,
+    is_admin:   !!r.is_admin,
+    is_blocked: !!r.is_blocked,
+    is_deleted: !!r.is_deleted,
+    online:     !!r.online,
+    avatar:     avatarPayload(r.id, r.avatar),
+  }));
+  return { ...c, members };
 }
 
 // ── Системные публикации HEY-заведующего ────────────────────────────────
