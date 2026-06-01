@@ -1,6 +1,7 @@
 // MomentCard.jsx
 import MoodEmoji from './MoodEmoji';
 import EmbeddedVideoPreview from './EmbeddedVideoPreview';
+import { useSalesPressure } from '../../lib/publicSettings';
 
 function fmtTime(ts) {
   if (!ts) return '';
@@ -51,11 +52,14 @@ const PROVIDER_BADGE = {
 };
 
 export default function MomentCard({ moment, isMine, onClick }) {
+  const salesPressure  = useSalesPressure();
   const hasMedia       = !!moment.media_url;
   // Считаем что embedded видео есть, если есть объект (даже без thumbnail — покажем плейсхолдер)
   const hasEmbedVideo  = !hasMedia && !!moment.embedded_video;
   const preview        = (moment.text || '').slice(0, 80);
-  const isAuthorSuper  = !!moment.author_is_super;
+  // На L1 (мягком) Super-авторов визуально не выделяем — не должно быть
+  // никаких намёков на платный статус на главной ленте.
+  const isAuthorSuper  = salesPressure >= 2 && !!moment.author_is_super;
   // Истинный провайдер с фолбэком на сохранённый
   const embedProvider = hasEmbedVideo
     ? detectProvider(moment.embedded_video.url, moment.embedded_video.provider)

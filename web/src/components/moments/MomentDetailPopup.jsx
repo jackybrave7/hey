@@ -782,7 +782,7 @@ export default function MomentDetailPopup({
                     : (moment.author_name||'?')[0].toUpperCase()
                   }
                 </div>
-                {moment.author_is_super && (
+                {moment.author_is_super && salesPressure >= 2 && (
                   <div style={{
                     position:'absolute',bottom:-1,right:-1,
                     width:14,height:14,borderRadius:'50%',
