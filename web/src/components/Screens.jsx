@@ -5922,11 +5922,12 @@ const MessageRow = memo(function MessageRow({
             const rect = e.currentTarget.getBoundingClientRect();
             onSetReactionPicker(p => p?.msgId === m.id ? null : { msgId: m.id, x: rect.right + 6, y: rect.top });
           }}
+          className="hey-react-btn"
+          data-hovered={isHovered ? 'y' : 'n'}
           style={{background: isHovered ? 'rgba(100,78,148,.55)' : 'transparent',
             border:'none', borderRadius:'50%', width:28, height:28, cursor:'pointer',
             flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-            padding:4, transition:'background .15s', marginBottom:6,
-            opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none'}}>
+            padding:4, transition:'background .15s, opacity .15s', marginBottom:6}}>
           <img src="/emoji/smiling.svg" alt="react"
             style={{width:16, height:16, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
         </button>
@@ -6229,11 +6230,12 @@ const MessageRow = memo(function MessageRow({
             const rect = e.currentTarget.getBoundingClientRect();
             onSetReactionPicker(p => p?.msgId === m.id ? null : { msgId: m.id, x: rect.left - 210, y: rect.top });
           }}
+          className="hey-react-btn"
+          data-hovered={isHovered ? 'y' : 'n'}
           style={{background: isHovered ? 'rgba(100,78,148,.55)' : 'transparent',
             border:'none', borderRadius:'50%', width:28, height:28, cursor:'pointer',
             flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-            padding:4, transition:'background .15s', marginBottom:6,
-            opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none'}}>
+            padding:4, transition:'background .15s, opacity .15s', marginBottom:6}}>
           <img src="/emoji/smiling.svg" alt="react"
             style={{width:16, height:16, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
         </button>

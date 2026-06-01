@@ -2,6 +2,17 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 button, input, textarea, select { font-family: inherit; }
 
+/* Кнопка реакции рядом с сообщением.
+   На устройствах с hover (десктоп) — появляется только при наведении.
+   На сенсорных (планшеты/смартфоны) — всегда видна с пониженной opacity,
+   иначе на reply-сообщениях и картинках до реакций физически не дотянуться. */
+.hey-react-btn { opacity: 0; pointer-events: none; }
+.hey-react-btn[data-hovered="y"] { opacity: 1; pointer-events: auto; }
+@media (hover: none) {
+  .hey-react-btn { opacity: .55; pointer-events: auto; }
+  .hey-react-btn:active { opacity: 1; }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
