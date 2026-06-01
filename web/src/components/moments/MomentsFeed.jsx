@@ -9,8 +9,10 @@ import MomentDelete from './MomentDelete';
 import MomentDilemma from './MomentDilemma';
 import SuperMomentGallery from './SuperMomentGallery';
 import SuperInfoScreen from '../super/SuperInfoScreen';
+import { useSalesPressure } from '../../lib/publicSettings';
 
 export default function MomentsFeed({ currentUser }) {
+  const salesPressure = useSalesPressure();
   const [feed, setFeed]             = useState([]);
   const [myMoments, setMyMoments]   = useState([]);   // active own moments (array)
   const [loading, setLoading]       = useState(true);
@@ -279,8 +281,11 @@ export default function MomentsFeed({ currentUser }) {
                 </button>
               )}
 
-              {/* Non-Super: "Ещё в СУПЕР" locked teaser (only when has 1 moment) */}
-              {!isSuper && myMoments.length === 1 && (
+              {/* Non-Super: "Ещё в СУПЕР" locked teaser (only when has 1 moment).
+                  В мягком режиме продаж (L1) промо на главной не показываем
+                  совсем — это одна из ключевых точек, которые админ просил
+                  убрать, чтобы лента не напоминала о платных фичах. */}
+              {!isSuper && myMoments.length === 1 && salesPressure >= 2 && (
                 <button onClick={() => setShowSuperInfo(true)}
                   style={{
                     aspectRatio:'1 / 1', borderRadius:12, cursor:'pointer',
