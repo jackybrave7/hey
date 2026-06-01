@@ -7233,9 +7233,14 @@ export function ChatScreen() {
 
   function openMsgMenu(e, msg) {
     e.preventDefault();
-    const MENU_W = 200, MENU_H = 100;
-    const x = e.clientX + MENU_W > window.innerWidth  ? e.clientX - MENU_W : e.clientX;
-    const y = e.clientY + MENU_H > window.innerHeight ? e.clientY - MENU_H : e.clientY;
+    // Контекстное меню реально ~7 пунктов × ~44px + паддинги ≈ 320 px.
+    // Раньше использовали MENU_H=100 — поэтому меню часто открывалось
+    // под сообщением и нижние пункты («Удалить») уходили за край экрана.
+    const MENU_W = 220, MENU_H = 320;
+    let x = e.clientX;
+    let y = e.clientY;
+    if (x + MENU_W > window.innerWidth)  x = Math.max(8, window.innerWidth  - MENU_W - 8);
+    if (y + MENU_H > window.innerHeight) y = Math.max(8, window.innerHeight - MENU_H - 8);
     setMsgMenu({ x, y, msg });
   }
 
