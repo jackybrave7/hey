@@ -2,6 +2,20 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 button, input, textarea, select { font-family: inherit; }
 
+/* Адаптив админки: на узких экранах раздуваем содержимое страниц до
+   полного ширины. Каждая страница админки делает внешний div c
+   inline-style padding: '28px 32px' — на смартфоне это съедает 64px
+   горизонтально, чего нельзя себе позволить. !important нужен чтобы
+   перебить inline-style. */
+@media (max-width: 759px) {
+  .adm-page-shell > div {
+    padding: 16px 12px !important;
+    max-width: 100% !important;
+  }
+  /* Таблицы — горизонтальный скролл вместо обрезки */
+  .adm-page-shell table { display: block; overflow-x: auto; }
+}
+
 /* Чат-композер на contenteditable — рендерит [name] как картинки.
    Плейсхолдер реализован через :empty::before, т.к. у contenteditable
    нет нативного placeholder. */
