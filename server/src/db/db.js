@@ -2399,6 +2399,13 @@ function getAdminUsers({ search, filter } = {}) {
   }
   if (filter === 'blocked')  { where += ' AND u.is_blocked=1'; }
   if (filter === 'admins')   { where += ' AND u.is_admin=1'; }
+  if (filter === 'active3d') {
+    // Активные за 3 дня: presence.last_seen в окне, не забан, не удалён.
+    // Та же логика что и в getAdminStats.activeUsers — клик по кафлю
+    // дашборда «Активные за 3 дня» открывает ровно тот же список.
+    where += ' AND p.last_seen >= ? AND u.is_blocked=0 AND u.is_deleted=0';
+    params.push(now() - 3 * 24 * 60 * 60);
+  }
   const rows = db.prepare(
     `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_super, u.is_blocked,
             u.super_expires_at,

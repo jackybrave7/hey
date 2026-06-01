@@ -1,6 +1,6 @@
 // AdminUsers.jsx — user list with search and filters
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
 import { useBulkSelection, Checkbox, BulkActionBar } from './bulk';
@@ -12,9 +12,13 @@ function fmtDate(ts) {
 
 export default function AdminUsers() {
   const nav = useNavigate();
+  // ?filter=active3d приходит c карточки дашборда «Активные за 3 дня».
+  // Поддерживаем все значения, которые есть в FILTERS, плюс active3d.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilter = searchParams.get('filter') || '';
   const [users, setUsers]     = useState([]);
   const [search, setSearch]   = useState('');
-  const [filter, setFilter]   = useState('');
+  const [filter, setFilter]   = useState(initialFilter);
   const [sortBy, setSortBy]   = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
   const [loading, setLoading] = useState(true);
@@ -50,9 +54,17 @@ export default function AdminUsers() {
 
   const FILTERS = [
     { value: '', label: 'Все' },
+    { value: 'active3d', label: 'Активные за 3 дня' },
     { value: 'admins', label: 'Администраторы' },
     { value: 'blocked', label: 'Заблокированные' },
   ];
+
+  // Синхронизируем фильтр обратно в URL (для шарабельности и истории).
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (filter) next.set('filter', filter); else next.delete('filter');
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+  }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cell = { padding: '12px 16px', color: 'rgba(255,255,255,.8)', fontSize: 13, borderBottom: '1px solid rgba(255,255,255,.06)' };
   const hcell = { ...cell, color: 'rgba(255,255,255,.4)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .8 };

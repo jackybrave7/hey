@@ -70,7 +70,7 @@ export default function AdminDashboard() {
             sub={`${stats.admins} адм · ${stats.blocked} забл`} link="/admin/users"/>
           <StatCard label="Активные за 3 дня" value={stats.activeUsers}
             sub={stats.users ? `${Math.round((stats.activeUsers / stats.users) * 100)}% от всех` : null}
-            accent="rgba(110,235,150,.95)" link="/admin/users"/>
+            accent="rgba(110,235,150,.95)" link="/admin/users?filter=active3d"/>
           <StatCard label="Активные моменты" value={stats.activeMoments}
             link="/admin/moments"/>
           <StatCard label="Всего моментов" value={stats.moments}
