@@ -990,6 +990,10 @@ module.exports = function makeRouter(db, broadcast) {
     try {
       const target = db.findUserById(req.body.userId);
       if (!target) return res.status(404).json({ error: 'User not found' });
+      // HEY-заведующий и прочие системные аккаунты не могут быть участниками групп.
+      if (target.is_system || String(target.id).startsWith('system_')) {
+        return res.status(400).json({ error: 'Системный аккаунт нельзя добавить в группу' });
+      }
       const r2 = db.addGroupMember(req.params.id, req.user.id, req.body.userId);
       // Уведомление приглашённому — обновить список чатов
       broadcast([req.body.userId], { type: 'group:invited', conversationId: req.params.id });

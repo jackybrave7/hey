@@ -5585,7 +5585,12 @@ export function GroupSettingsScreen() {
     nav('/chats', { replace: true });
   }
 
-  const nonMembers = contacts.filter(c => !members.find(m => m.id === c.id));
+  const nonMembers = contacts.filter(c =>
+    !members.find(m => m.id === c.id) &&
+    // HEY-заведующий и прочие системные аккаунты — не добавляем в группы.
+    !c.is_system &&
+    !(typeof c.id === 'string' && c.id.startsWith('system_'))
+  );
   const memberSearchQ = memberSearch.trim().toLowerCase();
   const filteredNonMembers = memberSearchQ
     ? nonMembers.filter(c =>

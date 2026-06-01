@@ -231,7 +231,8 @@
       "Bash(python3)",
       "Bash(curl -s https://hey-messenger.ru/assets/index-Df2Ow4hm.js)",
       "Bash(grep -oE '80%[^\"]{0,40}')",
-      "Bash(curl -s https://hey-messenger.ru/assets/index-BQqASZi3.js)"
+      "Bash(curl -s https://hey-messenger.ru/assets/index-BQqASZi3.js)",
+      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && cd web && npm run build && pm2 restart hey\")"
     ]
   }
 }
