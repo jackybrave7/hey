@@ -1005,7 +1005,26 @@ module.exports = function makeRouter(db, broadcast) {
   r.delete('/groups/:id/members/:userId', requireAuth, (req, res) => {
     try {
       const members = db.getConversationMembers(req.params.id);
+      const conv    = db.getConversationById(req.params.id);
+      const target  = db.findUserById(req.params.userId);
+      const actor   = db.findUserById(req.user.id);
+      const isLeave = req.user.id === req.params.userId;
+      // Только в группах кидаем системное сообщение — direct/monolog не трогаем.
+      const postSystemMsg = conv?.type === 'group' && target;
       db.removeGroupMember(req.params.id, req.user.id, req.params.userId);
+
+      if (postSystemMsg) {
+        const sysMsg = db.createSystemEventMessage(req.params.id, isLeave
+          ? { type: 'member_left', userId: target.id, userName: target.name }
+          : { type: 'member_removed', userId: target.id, userName: target.name,
+              byUserId: actor?.id, byUserName: actor?.name }
+        );
+        // Удалённого/вышедшего УЖЕ нет в members — поэтому он системку не увидит,
+        // и это правильно (у него чат пропадёт из списка).
+        broadcast(members.filter(uid => uid !== req.params.userId),
+          { type: 'message:new', message: sysMsg });
+      }
+
       broadcast(members, { type: 'group:member_removed', conversationId: req.params.id, userId: req.params.userId });
       // Удаляемого тоже уведомляем (вдруг он сейчас в чате)
       broadcast([req.params.userId], { type: 'group:member_removed', conversationId: req.params.id, userId: req.params.userId });

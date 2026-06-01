@@ -7788,6 +7788,29 @@ export function ChatScreen() {
                 </div>
               </div>
             );
+            // Системное событие группы (вход/выход/удаление): серая плашка по центру.
+            const sysEvent = item.attachment?.system_event;
+            if (sysEvent) {
+              let label = '';
+              if (sysEvent.type === 'member_left') {
+                label = `${sysEvent.userName || 'Участник'} покинул(а) группу`;
+              } else if (sysEvent.type === 'member_removed') {
+                label = sysEvent.byUserName
+                  ? `${sysEvent.byUserName} удалил(а) ${sysEvent.userName || 'участника'} из группы`
+                  : `${sysEvent.userName || 'Участник'} удалён(а) из группы`;
+              } else {
+                label = sysEvent.text || 'Системное событие';
+              }
+              return (
+                <div style={{display:'flex',justifyContent:'center',margin:'6px 16px'}}>
+                  <div style={{background:'rgba(100,72,140,.28)',borderRadius:14,padding:'4px 14px',
+                    color:'rgba(255,255,255,.65)',fontSize:12,fontWeight:500,
+                    maxWidth:480,textAlign:'center'}}>
+                    {label}
+                  </div>
+                </div>
+              );
+            }
             // Regular message
             const isOut = item.sender_id === user?.id;
             return (

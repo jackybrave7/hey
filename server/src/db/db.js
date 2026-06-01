@@ -1312,7 +1312,7 @@ function getConversationsForUser(userId, opts = {}) {
   // 1 query: last message per conversation
   const lastMap = {}; // convId -> { text, created_at, sender_id }
   db.prepare(
-    `SELECT m.conversation_id, m.text, m.created_at, m.sender_id
+    `SELECT m.conversation_id, m.text, m.attachment, m.created_at, m.sender_id
      FROM messages m
      JOIN (
        SELECT conversation_id, MAX(created_at) AS max_at
@@ -1321,7 +1321,23 @@ function getConversationsForUser(userId, opts = {}) {
      ) t ON m.conversation_id = t.conversation_id AND m.created_at = t.max_at
      GROUP BY m.conversation_id`
   ).all(...convIds)
-    .forEach(r => { lastMap[r.conversation_id] = r; });
+    .forEach(r => {
+      // Если последнее сообщение — системное событие группы, генерим читаемое превью.
+      if (!r.text && r.attachment) {
+        try {
+          const att = JSON.parse(r.attachment);
+          const ev = att?.system_event;
+          if (ev?.type === 'member_left') {
+            r.text = `${ev.userName || 'Участник'} покинул(а) группу`;
+          } else if (ev?.type === 'member_removed') {
+            r.text = ev.byUserName
+              ? `${ev.byUserName} удалил(а) ${ev.userName || 'участника'}`
+              : `${ev.userName || 'Участник'} удалён(а) из группы`;
+          }
+        } catch {}
+      }
+      lastMap[r.conversation_id] = r;
+    });
 
   // 1 query: unread counts
   const unreadMap = getUnreadCounts(userId, convIds);
@@ -1576,6 +1592,18 @@ function createMessage({ conversationId, senderId, text, attachment, replyToId, 
   const parsed = _parseMsg(msg);
   if (parsed && parsed.reply_to_id) parsed.reply_to = _replySnippet(parsed.reply_to_id);
   return parsed;
+}
+
+// Системное событие в групповом чате: «X удалил Y из группы», «Y покинул группу»
+// и т.п. Кладётся как обычное сообщение от SYSTEM_USER_ID с attachment.system_event.
+// Клиент рендерит такие сообщения отдельной серой плашкой по центру.
+function createSystemEventMessage(convId, event) {
+  return createMessage({
+    conversationId: convId,
+    senderId: SYSTEM_USER_ID,
+    text: null,
+    attachment: { system_event: event },
+  });
 }
 
 // ── Link-preview cache (для видео-ссылок в чате) ─────────────────────────
@@ -3066,7 +3094,7 @@ module.exports = {
   getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
-  getMessages, createMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
+  getMessages, createMessage, createSystemEventMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
   getLinkPreviewCached, setLinkPreviewCached, updateMessageLinkPreview,
   pinMessage, unpinMessage, getPinnedMessage, forwardMessageToChats,
   pushSubscribe, pushUnsubscribe, getPushSubscriptions, removePushSubscriptions,
