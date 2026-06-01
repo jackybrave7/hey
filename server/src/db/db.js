@@ -2254,7 +2254,7 @@ function getAdminGroups({ search } = {}) {
             (SELECT u.name FROM users u WHERE u.id=c.admin_id)                                    AS admin_name
      FROM conversations c
      WHERE ${where}
-     ORDER BY last_message_at DESC NULLS LAST, c.created_at DESC`
+     ORDER BY last_message_at IS NULL, last_message_at DESC, c.created_at DESC`
   ).all(...params);
 }
 
@@ -3205,6 +3205,7 @@ module.exports = {
   getSystemMoments, getSystemBroadcasts, deleteBroadcast, editBroadcast,
   // Admin
   getAdminStats, getAdminUsers, getAdminUserById,
+  getAdminGroups, getAdminGroupDetail,
   adminResetPassword, adminBlockUser, adminUnblockUser,
   adminMakeAdmin, adminRevokeAdmin, makeUserSuper, revokeUserSuper,
   getAdminMoments, adminDeleteMoment,

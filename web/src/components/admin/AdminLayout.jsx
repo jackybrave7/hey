@@ -12,6 +12,7 @@ import { api } from '../../api';
 const NAV = [
   { to: '/admin',         label: '📊 Дашборд',          exact: true },
   { to: '/admin/users',   label: '👥 Пользователи' },
+  { to: '/admin/groups',  label: '🫂 Группы' },
   { to: '/admin/moments', label: '✦ Моменты' },
   { to: '/admin/reports',   label: '🚩 Жалобы',         countKey: 'openReports' },
   { to: '/admin/feedbacks', label: '✉ Обращения',      countKey: 'openFeedbacks' },

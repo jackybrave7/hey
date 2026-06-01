@@ -188,6 +188,11 @@ export const api = {
     return req('GET', `/admin/users${qs ? '?' + qs : ''}`);
   },
   adminGetUser:            (id)            => req('GET',    `/admin/users/${id}`),
+  adminGetGroups:          (params = {})   => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([,v]) => v)).toString();
+    return req('GET', `/admin/groups${qs ? '?' + qs : ''}`);
+  },
+  adminGetGroup:           (id)            => req('GET',    `/admin/groups/${id}`),
   adminResetPassword:      (id)            => req('POST',   `/admin/users/${id}/reset-password`),
   adminBlockUser:          (id, reason)    => req('POST',   `/admin/users/${id}/block`, { reason }),
   adminUnblockUser:        (id)            => req('POST',   `/admin/users/${id}/unblock`),

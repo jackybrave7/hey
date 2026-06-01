@@ -1812,6 +1812,17 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getAdminUsers({ search, filter }));
   });
 
+  // ── Admin: Groups ───────────────────────────────────────────────────────
+  r.get('/admin/groups', requireAdmin, (req, res) => {
+    res.json(db.getAdminGroups({ search: req.query.search }));
+  });
+
+  r.get('/admin/groups/:id', requireAdmin, (req, res) => {
+    const g = db.getAdminGroupDetail(req.params.id);
+    if (!g) return res.status(404).json({ error: 'Not found' });
+    res.json(g);
+  });
+
   r.get('/admin/users/:id', requireAdmin, (req, res) => {
     const user = db.getAdminUserById(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });

@@ -17,6 +17,8 @@ import BottomNav from './components/BottomNav';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminUsers from './components/admin/AdminUsers';
+import AdminGroups from './components/admin/AdminGroups';
+import AdminGroupDetail from './components/admin/AdminGroupDetail';
 import AdminUserDetail from './components/admin/AdminUserDetail';
 import AdminMoments from './components/admin/AdminMoments';
 import AdminLogs from './components/admin/AdminLogs';
@@ -373,6 +375,16 @@ export default function App() {
           <Route path="/admin/users/:id" element={
             <RequireAdmin>
               <AdminLayout><AdminUserDetail/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/groups" element={
+            <RequireAdmin>
+              <AdminLayout><AdminGroups/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/groups/:id" element={
+            <RequireAdmin>
+              <AdminLayout><AdminGroupDetail/></AdminLayout>
             </RequireAdmin>
           }/>
           <Route path="/admin/moments" element={
