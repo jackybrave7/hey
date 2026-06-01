@@ -59,8 +59,9 @@ export default function GroupJoinScreen() {
   function handleRegister() {
     sessionStorage.setItem('hey_group_invite', JSON.stringify({
       token,
-      groupName: info?.group?.name,
-      inviterName: info?.inviter?.name,
+      groupName:     info?.group?.name,
+      inviterName:   info?.inviter?.name,
+      inviterAvatar: info?.inviter?.avatar || null,
     }));
     nav('/register');
   }

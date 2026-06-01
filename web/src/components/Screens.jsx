@@ -1133,7 +1133,14 @@ export function RegisterScreen() {
               <div style={{fontWeight:700, color:'white'}}>Приглашение в группу</div>
               <div style={{opacity:.85, marginTop:2}}>«{groupInvite.groupName}»</div>
               {groupInvite.inviterName && (
-                <div style={{opacity:.65, marginTop:2, fontSize:12}}>от {groupInvite.inviterName}</div>
+                <div style={{opacity:.75, marginTop:4, fontSize:12,
+                  display:'flex', alignItems:'center', gap:6}}>
+                  <AvatarDisplay
+                    avatar={groupInvite.inviterAvatar}
+                    name={groupInvite.inviterName}
+                    size={18} fontSize={9}/>
+                  <span>от {groupInvite.inviterName}</span>
+                </div>
               )}
             </div>
           </div>
