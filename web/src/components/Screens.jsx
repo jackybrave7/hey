@@ -6385,7 +6385,18 @@ export function ChatScreen() {
   const salesPressure = useSalesPressure();
 
   const [messages,    setMessages]    = useState([]);
-  const [text,        setText]        = useState('');
+  // Чёрновики храним в localStorage по ключу draft_<convId>. Ленивый
+  // инициализатор подтягивает сохранённое — чтобы при возврате в чат
+  // незавершённое сообщение оставалось в инпуте без мигания пустого
+  // поля. Дальнейшие смены convId обрабатывает useEffect ниже.
+  const draftKey = (id) => 'hey_draft_' + id;
+  const [text, setText] = useState(() => {
+    try { return convId ? (localStorage.getItem(draftKey(convId)) || '') : ''; }
+    catch { return ''; }
+  });
+  // Бэкап текущего черновика на время правки чужого сообщения, чтобы
+  // отмена / отправка правки не затёрла то, что пользователь набирал.
+  const savedDraftRef = useRef('');
   const [showEmoji,   setShowEmoji]   = useState(false);
   // Composer expand: при длинном тексте инпут можно вручную раскрыть на
   // почти всю высоту чата для удобного редактирования / просмотра вставленного.
@@ -6450,6 +6461,30 @@ export function ChatScreen() {
   const isInitialLoad      = useRef(true);  // true until first messages batch is rendered
   const forceScrollBottom  = useRef(false); // true after user sends a message
   const readDebounceTimer  = useRef(null);  // debounce read receipts
+
+  // Подтянуть черновик при смене чата. Если в новом чате draft нет —
+  // обнулим инпут (а не унаследуем текст предыдущего диалога).
+  useEffect(() => {
+    if (!convId) return;
+    let saved = '';
+    try { saved = localStorage.getItem(draftKey(convId)) || ''; } catch {}
+    setText(saved);
+    savedDraftRef.current = '';
+  }, [convId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Авто-сохранение черновика (debounced). Во время правки чужого
+  // сообщения не пишем — у нас уже есть бэкап исходного черновика
+  // в savedDraftRef, и его восстанавливают cancelEdit / окончание правки.
+  useEffect(() => {
+    if (!convId || editingMsg) return;
+    const t = setTimeout(() => {
+      try {
+        if (text) localStorage.setItem(draftKey(convId), text);
+        else      localStorage.removeItem(draftKey(convId));
+      } catch {}
+    }, 300);
+    return () => clearTimeout(t);
+  }, [text, convId, editingMsg]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -7139,7 +7174,10 @@ export function ChatScreen() {
         .then(updated => setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, text: updated.text, edited_at: updated.edited_at } : m)))
         .catch(e => heyToast(e.message, 'error'));
       setEditingMsg(null);
-      setText('');
+      // После завершения правки возвращаем тот черновик собеседнику,
+      // который был до старта правки (а не очищаем безусловно).
+      setText(savedDraftRef.current);
+      savedDraftRef.current = '';
       return;
     }
 
@@ -7190,6 +7228,8 @@ export function ChatScreen() {
   }
 
   function startEdit(msg) {
+    // Запоминаем текущий черновик чтобы вернуть после отмены/окончания правки.
+    savedDraftRef.current = text;
     setEditingMsg(msg);
     setText(msg.text);
     setMsgMenu(null);
@@ -7198,7 +7238,9 @@ export function ChatScreen() {
 
   function cancelEdit() {
     setEditingMsg(null);
-    setText('');
+    // Восстанавливаем то, что пользователь набирал собеседнику до правки.
+    setText(savedDraftRef.current);
+    savedDraftRef.current = '';
   }
 
   async function deleteMsg(msg) {
