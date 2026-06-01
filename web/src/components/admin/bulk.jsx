@@ -39,14 +39,21 @@ export function useBulkSelection() {
   }), [selected, toggle, setAll, clear]);
 }
 
-export function Checkbox({ checked, onChange, indeterminate, title, onClick }) {
+// Кнопка-чекбокс под тёмную палитру. Раньше тут был <label> с вложенным
+// hidden <input type="checkbox"> — но label автоматически проксирует клик
+// на input, чей onChange не обновлял внешний state (мы используем onClick).
+// Из-за этого таблица «Пользователи» вела себя так, будто выделение
+// мгновенно сбрасывалось. Заменили на обычный <button>.
+export function Checkbox({ checked, indeterminate, title, onClick }) {
   return (
-    <label
+    <button
+      type="button"
       onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
       title={title}
+      aria-pressed={!!checked}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 18, height: 18, borderRadius: 5,
+        width: 18, height: 18, borderRadius: 5, padding: 0,
         border: `1.5px solid ${checked || indeterminate ? 'rgba(180,140,255,.85)' : 'rgba(255,255,255,.25)'}`,
         background: checked
           ? 'rgba(140,110,220,.9)'
@@ -56,10 +63,6 @@ export function Checkbox({ checked, onChange, indeterminate, title, onClick }) {
         cursor: 'pointer', flexShrink: 0,
         transition: 'background .12s, border-color .12s',
       }}>
-      <input type="checkbox"
-        checked={!!checked}
-        onChange={e => onChange?.(e.target.checked)}
-        style={{ position:'absolute', opacity: 0, pointerEvents:'none', width:0, height:0 }}/>
       {checked && (
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
           <path d="M5 12.5l5 5L20 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -68,7 +71,7 @@ export function Checkbox({ checked, onChange, indeterminate, title, onClick }) {
       {indeterminate && !checked && (
         <div style={{ width: 9, height: 2, borderRadius: 1, background: 'white' }}/>
       )}
-    </label>
+    </button>
   );
 }
 
