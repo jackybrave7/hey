@@ -744,8 +744,13 @@ export default function MomentDetailPopup({
                 {navArrows}
               </div>
             ) : (
-              <div style={{height:160,flexShrink:0,position:'relative'}}>
-                <MoodEmoji type={moment.mood_emoji||'calm'} size={80}/>
+              <div style={{
+                // Эмодзи-момент в попапе должен занимать ту же «шапку», что и
+                // фото/видео (~45vh). Иначе он смотрелся в 2-3 раза ниже.
+                height:'min(45vh, 360px)',
+                flexShrink:0,position:'relative',
+              }}>
+                <MoodEmoji type={moment.mood_emoji||'calm'} fill/>
                 <button onClick={onClose} style={{position:'absolute',top:12,right:12,
                   background:'rgba(0,0,0,.35)',border:'none',borderRadius:'50%',
                   width:36,height:36,color:'white',fontSize:18,cursor:'pointer',

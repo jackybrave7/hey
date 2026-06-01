@@ -1,10 +1,15 @@
-// MoodEmoji.jsx — SVG-персонажи для карточек без медиа
-export default function MoodEmoji({ type = 'calm', size = 130 }) {
+// MoodEmoji.jsx — SVG-персонажи для карточек без медиа.
+// fill=true → SVG растягивается на 100% контейнера (для плиток/попапа).
+// size=N    → фиксированный пиксельный размер (для мелких превью).
+export default function MoodEmoji({ type = 'calm', size = 130, fill = false }) {
+  const dim = fill
+    ? { width: '100%', height: '100%' }
+    : { width: size, height: size };
 
   const emojis = {
 
     sleepy: (
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width={size} height={size}>
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" {...dim}>
         <circle cx="50" cy="50" r="46" fill="#FFFFFF"/>
         <circle cx="50" cy="50" r="40" fill="#B8B8E0"/>
         {/* sleepy closed eyes */}
@@ -22,7 +27,7 @@ export default function MoodEmoji({ type = 'calm', size = 130 }) {
     ),
 
     starstruck: (
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width={size} height={size}>
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" {...dim}>
         <circle cx="50" cy="50" r="46" fill="#FFFFFF"/>
         <circle cx="50" cy="50" r="40" fill="#FFE0A0"/>
         {/* star eyes */}
@@ -41,7 +46,7 @@ export default function MoodEmoji({ type = 'calm', size = 130 }) {
     ),
 
     dreamy: (
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width={size} height={size}>
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" {...dim}>
         <circle cx="50" cy="50" r="46" fill="#FFFFFF"/>
         <circle cx="50" cy="50" r="40" fill="#F0B8D0"/>
         {/* half-open dreamy eyes */}
@@ -62,7 +67,7 @@ export default function MoodEmoji({ type = 'calm', size = 130 }) {
     ),
 
     calm: (
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width={size} height={size}>
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" {...dim}>
         <circle cx="50" cy="50" r="46" fill="#FFFFFF"/>
         <circle cx="50" cy="50" r="40" fill="#A8D8C0"/>
         {/* open calm eyes */}
@@ -79,7 +84,7 @@ export default function MoodEmoji({ type = 'calm', size = 130 }) {
     ),
 
     excited: (
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width={size} height={size}>
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" {...dim}>
         <circle cx="50" cy="50" r="46" fill="#FFFFFF"/>
         <circle cx="50" cy="50" r="40" fill="#F0C090"/>
         {/* round excited eyes */}
@@ -117,6 +122,8 @@ export default function MoodEmoji({ type = 'calm', size = 130 }) {
       <div style={{
         filter:'drop-shadow(0 6px 20px rgba(0,0,0,.25))',
         display:'flex',alignItems:'center',justifyContent:'center',
+        width: fill ? '88%'  : 'auto',
+        height: fill ? '88%' : 'auto',
       }}>
         {emojis[type] || emojis.calm}
       </div>

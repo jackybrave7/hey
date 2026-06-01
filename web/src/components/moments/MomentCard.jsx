@@ -154,7 +154,10 @@ export default function MomentCard({ moment, isMine, onClick }) {
           )}
         </>
       ) : (
-        <MoodEmoji type={moment.mood_emoji || 'calm'} size={130}/>
+        {/* Эмодзи-момент должен зрительно занимать ту же площадь, что и
+            фото/видео-момент. Раньше size=130px давал маленький кругляш
+            посреди карточки — теперь масштабируется по ширине плитки. */}
+        <MoodEmoji type={moment.mood_emoji || 'calm'} fill/>
       )}
 
       {/* Media type badge (top-right corner) */}
