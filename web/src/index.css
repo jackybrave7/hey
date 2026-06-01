@@ -2,6 +2,16 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 button, input, textarea, select { font-family: inherit; }
 
+/* Чат-композер на contenteditable — рендерит [name] как картинки.
+   Плейсхолдер реализован через :empty::before, т.к. у contenteditable
+   нет нативного placeholder. */
+.hey-emoji-input:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(255,255,255,.45);
+  pointer-events: none;
+}
+.hey-emoji-input { caret-color: white; }
+
 /* Кнопка реакции рядом с сообщением.
    На устройствах с hover (десктоп) — появляется только при наведении.
    На сенсорных (планшеты/смартфоны) — всегда видна с пониженной opacity,
