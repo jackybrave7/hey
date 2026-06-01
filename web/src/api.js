@@ -195,6 +195,7 @@ export const api = {
   adminHardDeleteUser:     (id)            => req('DELETE', `/admin/users/${id}/hard`),
   adminGetSettings:        ()              => req('GET',    '/admin/settings'),
   adminUpdateSettings:     (data)          => req('PATCH',  '/admin/settings', data),
+  getPublicSettings:       ()              => req('GET',    '/settings/public'),
   adminBatchUsers:         (ids, action, reason) => req('POST', '/admin/users/batch',   { ids, action, reason }),
   adminBatchMoments:       (ids, action, reason) => req('POST', '/admin/moments/batch', { ids, action, reason }),
   adminBatchReports:       (ids, action)         => req('POST', '/admin/reports/batch', { ids, action }),

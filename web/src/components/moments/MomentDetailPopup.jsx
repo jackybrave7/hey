@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import MoodEmoji from './MoodEmoji';
 import EmbeddedVideoPreview from './EmbeddedVideoPreview';
+import { useSalesPressure } from '../../lib/publicSettings';
 import SuperInfoScreen from '../super/SuperInfoScreen';
 import { AudioPlayer, openUserCard } from '../Screens';
 import Icon from '../Icon';
@@ -474,6 +475,7 @@ export default function MomentDetailPopup({
   onMomentUpdated, // (freshMoment) => void — родитель синкает свой список
 }) {
   const nav = useNavigate();
+  const salesPressure = useSalesPressure();
 
   const [idx, setIdx]           = useState(initialIndex ?? 0);
   const [moment, setMoment]     = useState(moments[initialIndex ?? 0]);
@@ -884,13 +886,18 @@ export default function MomentDetailPopup({
                   </div>
                 ) : (
                   <div
-                    onClick={() => setShowAnalyticsPromo(true)}
+                    // L1: показываем счётчики без CTA «купи Super чтобы увидеть кто».
+                    // L2: тап открывает промо-попап (старое поведение).
+                    onClick={() => salesPressure >= 2 && setShowAnalyticsPromo(true)}
                     style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
-                      display:'flex',gap:20,cursor:'pointer'}}>
+                      display:'flex',gap:20,
+                      cursor: salesPressure >= 2 ? 'pointer' : 'default'}}>
                     <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>👁 {moment.views || 0}</span>
                     <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0}</span>
                     <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>🤝 {moment.stats?.talk || 0}</span>
-                    <span style={{marginLeft:'auto',color:'rgba(255,255,255,.25)',fontSize:12}}>кто? ›</span>
+                    {salesPressure >= 2 && (
+                      <span style={{marginLeft:'auto',color:'rgba(255,255,255,.25)',fontSize:12}}>кто? ›</span>
+                    )}
                   </div>
                 )}
               </>

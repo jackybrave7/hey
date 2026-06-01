@@ -35,6 +35,7 @@ import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
 import ServerStatusBanner from './components/ServerStatusBanner';
 import { ensurePushIfGranted } from './lib/push';
+import { PublicSettingsProvider } from './lib/publicSettings';
 
 function useNotifications() {
   const nav = useNavigate();
@@ -290,6 +291,7 @@ function NotificationBridge() {
 export default function App() {
   return (
     <AuthProvider>
+      <PublicSettingsProvider>
       <BrowserRouter>
         <NotificationBridge />
         <GlobalHandlers />
@@ -452,6 +454,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace/>}/>
         </Routes>
       </BrowserRouter>
+      </PublicSettingsProvider>
     </AuthProvider>
   );
 }

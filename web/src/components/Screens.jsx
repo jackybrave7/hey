@@ -19,6 +19,7 @@ import OnboardingTour from './OnboardingTour';
 import MoodEmoji from './moments/MoodEmoji';
 import Icon from './Icon';
 import SuperStatusCard from './super/SuperStatusCard';
+import { useSalesPressure } from '../lib/publicSettings';
 import AchievementBadges from './super/AchievementBadges';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6338,6 +6339,7 @@ export function ChatScreen() {
   const { convId } = useParams();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const salesPressure = useSalesPressure();
 
   const [messages,    setMessages]    = useState([]);
   const [text,        setText]        = useState('');
@@ -6862,7 +6864,12 @@ export function ChatScreen() {
           const next = t + 1;
           if (next >= MAX_VOICE_SEC) {
             stopRecording();
-            if (!user?.is_super) setShowVoiceLimit(true);
+            if (!user?.is_super) {
+              // L1 (мягкий): просто тост о лимите, без промо СУПЕР.
+              // L2 (жёсткий): полноэкранный попап с призывом к СУПЕР.
+              if (salesPressure >= 2) setShowVoiceLimit(true);
+              else heyToast('Лимит голосового — 1 минута', 'info');
+            }
           }
           return next;
         });

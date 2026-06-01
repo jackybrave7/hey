@@ -1910,18 +1910,39 @@ module.exports = function makeRouter(db, broadcast) {
   // Глобальные настройки админки (политика удаления и т.п.).
   r.get('/admin/settings', requireAdmin, (_req, res) => {
     res.json({
-      delete_policy: db.getSetting('delete_policy', 'soft'), // 'soft' | 'hard'
+      delete_policy:        db.getSetting('delete_policy', 'soft'),        // 'soft' | 'hard'
+      sales_pressure_level: db.getSetting('sales_pressure_level', 1),      // 1 (мягкий) | 2 (жёсткий)
     });
   });
   r.patch('/admin/settings', requireAdmin, (req, res) => {
-    const { delete_policy } = req.body || {};
+    const { delete_policy, sales_pressure_level } = req.body || {};
     if (delete_policy !== undefined) {
       if (!['soft', 'hard'].includes(delete_policy)) {
         return res.status(400).json({ error: 'Invalid delete_policy' });
       }
       db.setSetting('delete_policy', delete_policy);
     }
-    res.json({ ok: true, delete_policy: db.getSetting('delete_policy', 'soft') });
+    if (sales_pressure_level !== undefined) {
+      const lvl = Number(sales_pressure_level);
+      if (![1, 2].includes(lvl)) {
+        return res.status(400).json({ error: 'Invalid sales_pressure_level' });
+      }
+      db.setSetting('sales_pressure_level', lvl);
+    }
+    res.json({
+      ok: true,
+      delete_policy:        db.getSetting('delete_policy', 'soft'),
+      sales_pressure_level: db.getSetting('sales_pressure_level', 1),
+    });
+  });
+
+  // Публичный (без admin) геттер для клиентского кода — клиент должен
+  // знать уровень нажима чтобы показывать/не показывать промо-блоки.
+  // Возвращаем только public-флаги, не утечка delete_policy и прочего.
+  r.get('/settings/public', (_req, res) => {
+    res.json({
+      sales_pressure_level: db.getSetting('sales_pressure_level', 1),
+    });
   });
 
   // Полное удаление пользователя со всеми материалами (моменты, медиа в S3,

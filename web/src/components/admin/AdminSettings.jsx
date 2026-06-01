@@ -109,6 +109,54 @@ export default function AdminSettings() {
         </div>
       </div>
 
+      {/* Уровень нажима продаж */}
+      <div style={{ ...card, marginTop: 16 }}>
+        <div style={{ color:'white', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+          💰 Уровень нажима продаж
+        </div>
+        <div style={{ color:'rgba(225,220,245,.7)', fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
+          Контролирует частоту и навязчивость промо-материалов СУПЕР для бесплатных пользователей.
+        </div>
+
+        <div style={{ display:'flex', flexDirection:'column', gap: 10 }}>
+          <label style={{ ...optionBase, ...(settings.sales_pressure_level === 1 ? selected : {}) }}>
+            <input type="radio" name="sales_pressure_level" value="1"
+              checked={settings.sales_pressure_level === 1}
+              disabled={saving}
+              onChange={() => update({ sales_pressure_level: 1 })}
+              style={{ marginTop: 3, accentColor:'#a884e0' }}/>
+            <div>
+              <div style={{ color:'white', fontWeight:600, fontSize: 14 }}>
+                Мягкий (по умолчанию)
+              </div>
+              <div style={{ color:'rgba(225,220,245,.65)', fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
+                Промо СУПЕР показывается <strong>только</strong> в развилке создания
+                2-го момента и в инфо-экране СУПЕР по клику.
+                Прогресс-бар приглашений «N/3» — только начиная со 2/3.
+                Промо на счётчиках аналитики и при превышении лимита голосового — выключены.
+              </div>
+            </div>
+          </label>
+
+          <label style={{ ...optionBase, ...(settings.sales_pressure_level === 2 ? selected : {}) }}>
+            <input type="radio" name="sales_pressure_level" value="2"
+              checked={settings.sales_pressure_level === 2}
+              disabled={saving}
+              onChange={() => update({ sales_pressure_level: 2 })}
+              style={{ marginTop: 3, accentColor:'#a884e0' }}/>
+            <div>
+              <div style={{ color:'white', fontWeight:600, fontSize: 14 }}>
+                Жёсткий
+              </div>
+              <div style={{ color:'rgba(225,220,245,.65)', fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
+                Все промо-точки активны: прогресс приглашений виден с самого начала (0/3),
+                промо на тапе по счётчикам аналитики, призыв к СУПЕР при попытке голосового больше минуты.
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       {toast && (
         <div style={{ position:'fixed', bottom:32, left:'50%', transform:'translateX(-50%)',
           background:'rgba(22,15,50,.97)', border:'1px solid rgba(255,255,255,.15)',

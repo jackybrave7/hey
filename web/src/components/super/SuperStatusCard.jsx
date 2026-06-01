@@ -1,6 +1,7 @@
 // SuperStatusCard.jsx — 4 states + progress bar + super expiry date
 import { useState } from 'react';
 import SuperInfoScreen from './SuperInfoScreen';
+import { useSalesPressure } from '../../lib/publicSettings';
 
 function fmtDate(ts) {
   return new Date(ts * 1000).toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -12,11 +13,16 @@ function daysLeft(ts) {
 
 export default function SuperStatusCard({ user, onInvite }) {
   const [showInfo, setShowInfo] = useState(false);
+  const salesPressure = useSalesPressure();
 
   const isSuper         = !!user?.is_super;
   const bonusClaimed    = !!user?.super_bonus_claimed;
   const expiresAt       = user?.super_expires_at || null;
   const invitedCount    = user?.invited_count ?? 0;
+  // L1 (мягкий): прогресс-бар появляется только начиная с 2/3 — раньше юзер
+  // не должен видеть «давай-давай», пока не близок к цели.
+  // L2 (жёсткий): прогресс с 0/3.
+  const showProgressBar = salesPressure >= 2 ? true : invitedCount >= 2;
 
   // State A: is_super && !bonus_claimed
   // State B: !is_super && !bonus_claimed
@@ -178,7 +184,7 @@ export default function SuperStatusCard({ user, onInvite }) {
       <>
         <div style={inactiveCardStyle}>
           <InactiveHeader subtitle="До 3 Моментов, длинные голосовые, аналитика" />
-          <ProgressBar />
+          {showProgressBar && <ProgressBar />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button onClick={onInvite} style={{
               width: '100%', padding: '12px', borderRadius: 12,
