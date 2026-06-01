@@ -1904,15 +1904,6 @@ export function MyProfileScreen() {
 
         return (
           <div style={{ padding:'18px 26px 0', display:'flex', flexDirection:'column', gap: 12 }}>
-            {/* SUPER status banner */}
-            <SuperStatusCard user={user} onInvite={() => {
-              const link = `${location.origin}/register?invite=${user?.id}`;
-              navigator.clipboard?.writeText(link).then(() => {
-                setInviteCopied(true);
-                setTimeout(() => setInviteCopied(false), 2500);
-              });
-            }}/>
-
             <Card
               icon="📦"
               iconBg="rgba(255,200,150,.18)"
@@ -1961,6 +1952,18 @@ export function MyProfileScreen() {
                 <span style={{opacity:.5}}>›</span>
               </button>
             )}
+
+            {/* SUPER status banner — переносим в конец списка карточек.
+                Раньше висел над «Архив / Поговорить / Пригласить», но
+                юзер просил убрать оттуда — это статус, а не действие,
+                и место ему внизу, после операционных карточек. */}
+            <SuperStatusCard user={user} onInvite={() => {
+              const link = `${location.origin}/register?invite=${user?.id}`;
+              navigator.clipboard?.writeText(link).then(() => {
+                setInviteCopied(true);
+                setTimeout(() => setInviteCopied(false), 2500);
+              });
+            }}/>
           </div>
         );
       })()}
