@@ -3826,9 +3826,23 @@ export function ConversationsScreen() {
           if (c.is_request && c.request_from !== user?.id) return c; // don't update locked request
           return {
             ...c,
-            last_text: message.text || null,
+            last_text: (() => {
+              if (message.text) return message.text;
+              // Системное событие группы — генерим читаемое превью.
+              const ev = message.attachment?.system_event;
+              if (ev?.type === 'member_left') {
+                return `${ev.userName || 'Участник'} покинул(а) группу`;
+              }
+              if (ev?.type === 'member_removed') {
+                return ev.byUserName
+                  ? `${ev.byUserName} удалил(а) ${ev.userName || 'участника'}`
+                  : `${ev.userName || 'Участник'} удалён(а) из группы`;
+              }
+              return null;
+            })(),
             last_at: message.created_at,
             last_sender_id: message.sender_id,
+            last_sender_name: message.sender_name || c.last_sender_name || null,
             unread_count: message.sender_id === user?.id ? c.unread_count : c.unread_count + 1,
           };
         })
@@ -3996,7 +4010,20 @@ export function ConversationsScreen() {
           ) : (
             <div style={{color:'rgba(255,255,255,.45)',fontSize:13,
               whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-              {c.last_sender_id===user?.id ? 'Вы: ' : ''}{c.last_text ? renderPreviewWithEmoji(c.last_text) : '…'}
+              {(() => {
+                // Префикс отправителя в превью списка чатов:
+                //  • своё сообщение — «Вы: »
+                //  • в группе — «Имя: » (без этого непонятно кто написал)
+                //  • в директе — без префикса
+                //  • системные сообщения (HEY-заведующий, system_event плашки) — без префикса
+                let prefix = '';
+                if (c.last_sender_id === user?.id) prefix = 'Вы: ';
+                else if (c.type === 'group' && c.last_sender_name &&
+                         c.last_sender_id && !String(c.last_sender_id).startsWith('system_')) {
+                  prefix = c.last_sender_name + ': ';
+                }
+                return <>{prefix}{c.last_text ? renderPreviewWithEmoji(c.last_text) : '…'}</>;
+              })()}
             </div>
           )}
         </div>

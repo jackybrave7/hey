@@ -1310,15 +1310,17 @@ function getConversationsForUser(userId, opts = {}) {
   }
 
   // 1 query: last message per conversation
-  const lastMap = {}; // convId -> { text, created_at, sender_id }
+  const lastMap = {}; // convId -> { text, created_at, sender_id, sender_name }
   db.prepare(
-    `SELECT m.conversation_id, m.text, m.attachment, m.created_at, m.sender_id
+    `SELECT m.conversation_id, m.text, m.attachment, m.created_at, m.sender_id,
+            u.name AS sender_name
      FROM messages m
      JOIN (
        SELECT conversation_id, MAX(created_at) AS max_at
        FROM messages WHERE conversation_id IN (${ph})
        GROUP BY conversation_id
      ) t ON m.conversation_id = t.conversation_id AND m.created_at = t.max_at
+     LEFT JOIN users u ON u.id = m.sender_id
      GROUP BY m.conversation_id`
   ).all(...convIds)
     .forEach(r => {
@@ -1411,6 +1413,7 @@ function getConversationsForUser(userId, opts = {}) {
       last_text: (isRecipient || isGroupInvite) ? null : (last?.text || null),
       last_at:   last?.created_at || conv.created_at,
       last_sender_id: isRecipient ? null : (last?.sender_id || null),
+      last_sender_name: (isRecipient || isGroupInvite) ? null : (last?.sender_name || null),
       unread_count: (isRecipient || isGroupInvite) ? 0 : (unreadMap[convId] || 0),
       is_request: isRequest,
       request_from: conv.request_from || null,
