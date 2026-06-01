@@ -8433,6 +8433,26 @@ export function ChatScreen() {
           return (
         <div style={{padding:'6px 12px 14px',maxWidth:680,margin:'0 auto',
           minWidth:0,boxSizing:'border-box',width:'100%'}}>
+          {/* Live-превью эмодзи поверх инпута: в textarea нельзя вставить
+              <img>, поэтому пока пользователь набирает «[smiling]» он видит
+              сырой код. Эта плашка под полем расшифровывает токены —
+              показываем только если в тексте есть хотя бы один [name]. */}
+          {/\[[a-z][a-z 0-9_-]*\]/i.test(text) && (
+            <div style={{
+              margin:'0 4px 6px', padding:'6px 12px',
+              background:'rgba(255,255,255,.06)',
+              border:'1px solid rgba(255,255,255,.10)',
+              borderRadius:12, color:'rgba(255,255,255,.85)',
+              fontSize:14, lineHeight:1.45,
+              display:'flex', alignItems:'center', gap:6, flexWrap:'wrap',
+              maxHeight: 96, overflow:'auto',
+            }}>
+              <span style={{opacity:.5,fontSize:11,marginRight:4,flexShrink:0}}>Превью:</span>
+              <span style={{display:'inline-flex',alignItems:'center',gap:2,flexWrap:'wrap'}}>
+                {renderPreviewWithEmoji(text, 18)}
+              </span>
+            </div>
+          )}
           {/* Внешний layout: [pill с textarea] [emoji] [attach] [mic | send].
               Раньше всё было внутри пилюли с тиснёным фоном — по макету
               кнопки выносим в отдельный ряд, фон пилюли чистый-полупрозрачный. */}
