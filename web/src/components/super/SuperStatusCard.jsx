@@ -153,21 +153,17 @@ export default function SuperStatusCard({ user, onInvite }) {
     );
   }
 
-  // State A: active, bonus not yet claimed
+  // State A: active, bonus not yet claimed.
+  // Раньше тут была кнопка «Пригласи 3 друзей — активируй бонус 3 месяца»,
+  // но юзеру с уже активным СУПЕР такая акция выглядит как навязывание.
+  // Оставляем только статус и дату; за приглашения отвечает отдельная
+  // карточка «Пригласить друга» ниже по экрану профиля.
   if (isSuper && !bonusClaimed) {
     return (
       <>
         <div style={activeCardStyle}>
           <SuperHeader subtitle="До 3 Моментов, длинные голосовые, аналитика" />
           <ExpiryInfo />
-          <button onClick={onInvite} style={{
-            width: '100%', padding: '11px', borderRadius: 12,
-            background: 'rgba(180,140,255,.2)', border: '1px solid rgba(180,140,255,.3)',
-            color: 'rgba(200,170,255,.9)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            transition: 'all .18s',
-          }}>
-            🔗 Пригласи 3 друзей — активируй бонус 3 месяца
-          </button>
           {/* TODO: enable when payments are ready */}
           {false && <button>Продлить</button>}
         </div>

@@ -1499,6 +1499,15 @@ export function MyProfileScreen() {
     });
   }
 
+  // Прелоад «Поговорить» при открытии профиля — чтобы счётчик показывался
+  // сразу рядом с названием карточки, а не только после первого клика.
+  useEffect(() => {
+    if (savedLoaded) return;
+    api.getSavedMoments()
+      .then(items => { setSavedMoments(items); setSavedLoaded(true); })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Moments state
   const [momentsTab,    setMomentsTab]   = useState('active');
   const [myMoments,     setMyMoments]    = useState([]);
@@ -1673,7 +1682,7 @@ export function MyProfileScreen() {
               <div style={{ display:'flex', gap: 8 }}>
                 <button
                   onClick={toggleSaved}
-                  title="Сохранённые моменты"
+                  title="Поговорить"
                   style={iconBtn}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.18)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.10)'}>
@@ -1910,8 +1919,8 @@ export function MyProfileScreen() {
             <Card
               icon="🤝"
               iconBg="rgba(255,200,120,.22)"
-              title="Сохранённые моменты"
-              subtitle="Закладки чужих работ"
+              title="Поговорить"
+              subtitle="Закладки, что меня зацепило"
               count={savedCount}
               onClick={() => { if (!savedOpen) toggleSaved(); else setSavedOpen(true); }}
             />
@@ -2227,7 +2236,7 @@ export function MyProfileScreen() {
               borderBottom:'1px solid rgba(255,255,255,.08)', flexShrink:0 }}>
               <span style={{ fontSize: 22 }}>🤝</span>
               <div style={{ flex: 1 }}>
-                <div style={{ color:'white', fontSize: 17, fontWeight: 700 }}>Сохранённые моменты</div>
+                <div style={{ color:'white', fontSize: 17, fontWeight: 700 }}>Поговорить</div>
                 <div style={{ color:'rgba(255,255,255,.45)', fontSize: 12, marginTop: 1 }}>
                   {savedLoading ? 'загрузка…' :
                     `${savedMoments.length} ${savedMoments.length === 1 ? 'момент' :
