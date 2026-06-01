@@ -2895,40 +2895,25 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                 textTransform:'uppercase',letterSpacing:.6,marginBottom:8}}>
                 ✦ Сейчас в моментах · {merged.active_moments.length}
               </div>
-              <div style={{display:'flex',gap:8,overflowX:'auto',padding:'2px 0 4px'}}>
-                {merged.active_moments.map(m => {
-                  const hasImg = m.media_url && m.media_type === 'image';
-                  return (
-                    <div key={m.id} onClick={() => onOpenMoment?.(m)}
-                      title={m.text ? m.text.slice(0, 80) : 'Момент'}
-                      style={{
-                        width:84,height:84,flexShrink:0,borderRadius:10,
-                        overflow:'hidden',cursor:'pointer',
-                        background: hasImg ? '#0a0518' : 'linear-gradient(135deg,#2a1858,#4a2898)',
-                        border:'1px solid rgba(255,255,255,.12)',
-                        display:'flex',alignItems:'center',justifyContent:'center',
-                        color:'white',fontSize:11,padding: hasImg ? 0 : 6,
-                        textAlign:'center',lineHeight:1.3,
-                        transition:'transform .15s',
+              {/* Полноценные превью моментов как в общей ленте — горизонтальная
+                  карусель. До этого тут были мини-плитки 84×84 с урезанным
+                  текстом, картинка момента не показывалась как надо
+                  (фон-градиент с обрезанным «Премьера спектакля…»). */}
+              <div style={{display:'flex',gap:10,overflowX:'auto',padding:'2px 0 6px',
+                  scrollbarWidth:'thin'}}>
+                {merged.active_moments.map(m => (
+                  <div key={m.id} style={{ width: 140, flexShrink: 0 }}>
+                    <MomentCard
+                      moment={{ ...m,
+                        author_name: merged.name,
+                        author_avatar: merged.avatar,
+                        author_is_super: merged.is_super,
                       }}
-                      onMouseEnter={e=>e.currentTarget.style.transform='scale(1.04)'}
-                      onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
-                      {hasImg ? (
-                        <img src={m.media_url} alt=""
-                          style={{width:'100%',height:'100%',objectFit:'cover',
-                            objectPosition: m.media_position || '50% 50%'}}/>
-                      ) : (
-                        <div style={{
-                          overflow:'hidden',display:'-webkit-box',
-                          WebkitLineClamp:4,WebkitBoxOrient:'vertical',
-                          opacity:.9,
-                        }}>
-                          {m.text ? m.text.slice(0,40) : '✦'}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      isMine={false}
+                      onClick={() => onOpenMoment?.(m)}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           )}
