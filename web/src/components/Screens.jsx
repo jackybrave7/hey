@@ -1863,6 +1863,11 @@ export function MyProfileScreen() {
         // Подсчёты для бейджей в карточках
         const archivedCount = myMoments.filter(m => m.status === 'archived').length;
         const savedCount = savedLoaded ? savedMoments.length : null;
+        // SuperStatusCard в state B уже содержит CTA «Пригласи 3 друзей —
+        // получи 3 месяца СУПЕР». Дублировать ещё одну карточку «Пригласить
+        // друга» в этом случае не нужно — выводим её только в остальных
+        // состояниях (Super уже активен / бонус исчерпан).
+        const superHasInviteCta = !user?.is_super && !user?.super_bonus_claimed;
 
         const Card = ({ icon, iconBg, title, subtitle, count, onClick, accent }) => (
           <button onClick={onClick} style={{
@@ -1924,23 +1929,25 @@ export function MyProfileScreen() {
               count={savedCount}
               onClick={() => { if (!savedOpen) toggleSaved(); else setSavedOpen(true); }}
             />
-            <Card
-              icon="🔗"
-              iconBg="rgba(180,140,255,.28)"
-              title={inviteCopied ? '✓ Ссылка скопирована' : 'Пригласить друга'}
-              subtitle="Поделиться ссылкой на HEY"
-              count={null}
-              accent={true}
-              onClick={() => {
-                const link = `${location.origin}/register?invite=${user?.id}`;
-                navigator.clipboard?.writeText(link).then(() => {
-                  setInviteCopied(true);
-                  setTimeout(() => setInviteCopied(false), 2500);
-                });
-              }}
-            />
+            {!superHasInviteCta && (
+              <Card
+                icon="🔗"
+                iconBg="rgba(180,140,255,.28)"
+                title={inviteCopied ? '✓ Ссылка скопирована' : 'Пригласить друга'}
+                subtitle="Поделиться ссылкой на HEY"
+                count={null}
+                accent={true}
+                onClick={() => {
+                  const link = `${location.origin}/register?invite=${user?.id}`;
+                  navigator.clipboard?.writeText(link).then(() => {
+                    setInviteCopied(true);
+                    setTimeout(() => setInviteCopied(false), 2500);
+                  });
+                }}
+              />
+            )}
 
-            {user?.is_admin && (
+            {!!user?.is_admin && (
               <button onClick={() => nav('/admin')} style={{
                 display:'flex',alignItems:'center',justifyContent:'space-between',
                 padding:'13px 18px',borderRadius:14,cursor:'pointer',
