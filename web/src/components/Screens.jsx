@@ -7935,24 +7935,35 @@ export function ChatScreen() {
                 </div>
               </div>
             );
-            // Системное событие группы (вход/выход/удаление): серая плашка по центру.
+            // Системные плашки группы: и явные system_event (вход/выход/
+            // удаление), и любые сообщения от системного аккаунта
+            // (`system_*`) — это «X присоединился к курсу», «👋 X
+            // присоединился по приглашению» и т.п. Раньше последние
+            // рендерились как обычные пузыри с подписью «HEY-заведующий»
+            // — пользователь просил оформить иначе, как событие, по
+            // центру и без имени отправителя.
             const sysEvent = item.attachment?.system_event;
-            if (sysEvent) {
+            const isSystemSender = typeof item.sender_id === 'string' &&
+              item.sender_id.startsWith('system_') && partner.isGroup;
+            if (sysEvent || isSystemSender) {
               let label = '';
-              if (sysEvent.type === 'member_left') {
+              if (sysEvent?.type === 'member_left') {
                 label = `${sysEvent.userName || 'Участник'} покинул(а) группу`;
-              } else if (sysEvent.type === 'member_removed') {
+              } else if (sysEvent?.type === 'member_removed') {
                 label = sysEvent.byUserName
                   ? `${sysEvent.byUserName} удалил(а) ${sysEvent.userName || 'участника'} из группы`
                   : `${sysEvent.userName || 'Участник'} удалён(а) из группы`;
-              } else {
+              } else if (sysEvent) {
                 label = sysEvent.text || 'Системное событие';
+              } else {
+                label = item.text || 'Системное событие';
               }
               return (
                 <div style={{display:'flex',justifyContent:'center',margin:'6px 16px'}}>
                   <div style={{background:'rgba(100,72,140,.28)',borderRadius:14,padding:'4px 14px',
-                    color:'rgba(255,255,255,.65)',fontSize:12,fontWeight:500,
-                    maxWidth:480,textAlign:'center'}}>
+                    color:'rgba(255,255,255,.75)',fontSize:12,fontWeight:500,
+                    maxWidth:520,textAlign:'center',lineHeight:1.45,
+                    wordBreak:'break-word'}}>
                     {label}
                   </div>
                 </div>
