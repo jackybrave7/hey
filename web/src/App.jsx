@@ -120,7 +120,11 @@ function RequireBusinessOrAdmin({ children }) {
     </div>
   );
   if (!user) return <Navigate to="/login" replace/>;
-  if (!user.is_admin && user.business_status !== 'approved') {
+  // Доступ к /integrations/awo: системный админ, бизнес-юзер с
+  // approved-статусом ИЛИ со-админ хоть какой-то школы (см. /me →
+  // tenants_accessible). Иначе кидаем обратно в профиль.
+  const hasTenantAccess = (user.tenants_accessible || 0) > 0;
+  if (!user.is_admin && user.business_status !== 'approved' && !hasTenantAccess) {
     return <Navigate to="/me" replace/>;
   }
   return children;

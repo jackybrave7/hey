@@ -9564,6 +9564,14 @@ export function SettingsScreen() {
             {!user?.is_admin && user?.business_status === 'approved' ? (
               <Row icon={<Icon name="users" size={18}/>} label="Мои школы (АВО)"
                 sub="Интеграции с АвтоВебОфис" onClick={() => nav('/integrations/awo')}/>
+            ) : !user?.is_admin && (user?.tenants_accessible || 0) > 0 ? (
+              // Со-админ хотя бы одной школы, но не business-approved
+              // (его добавил владелец). Даём прямой путь в /integrations/awo —
+              // там tenant-list уже отфильтрован по доступу.
+              <Row icon={<Icon name="users" size={18}/>}
+                label="Школы, где я админ"
+                sub="Доступ к настройкам и привязкам"
+                onClick={() => nav('/integrations/awo')}/>
             ) : !user?.is_admin && (
               <Row icon={<Icon name="users" size={18}/>}
                 label="HEY для бизнеса"

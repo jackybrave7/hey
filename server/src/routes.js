@@ -414,7 +414,11 @@ module.exports = function makeRouter(db, broadcast) {
     if (!user) return res.status(404).json({ error: 'Not found' });
     const { password, achievements: achRaw, ...safe } = user;
     const achievements = (() => { try { return JSON.parse(achRaw || '[]'); } catch { return []; } })();
-    res.json({ ...safe, achievements });
+    // Сколько школ юзеру доступно (как владельцу или со-админу) — UI
+    // прячет/показывает по этому полю карточку «АВО / Школы» в /me и
+    // пускает в /integrations/awo даже тех, у кого business_status != approved.
+    const tenantsAccessible = db.listTenantsForUser(user.id).length;
+    res.json({ ...safe, achievements, tenants_accessible: tenantsAccessible });
   });
 
   r.patch('/me', requireAuth, (req, res) => {
