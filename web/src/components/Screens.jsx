@@ -2898,26 +2898,33 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                 textTransform:'uppercase',letterSpacing:.6,marginBottom:8}}>
                 ✦ Сейчас в моментах · {merged.active_moments.length}
               </div>
-              {/* Полноценные превью моментов как в общей ленте — горизонтальная
-                  карусель. До этого тут были мини-плитки 84×84 с урезанным
-                  текстом, картинка момента не показывалась как надо
-                  (фон-градиент с обрезанным «Премьера спектакля…»). */}
-              <div style={{display:'flex',gap:10,overflowX:'auto',padding:'2px 0 6px',
-                  scrollbarWidth:'thin'}}>
-                {merged.active_moments.map(m => (
-                  <div key={m.id} style={{ width: 140, flexShrink: 0 }}>
-                    <MomentCard
-                      moment={{ ...m,
-                        author_name: merged.name,
-                        author_avatar: merged.avatar,
-                        author_is_super: merged.is_super,
-                      }}
-                      isMine={false}
-                      onClick={() => onOpenMoment?.(m)}
-                    />
+              {/* Полноценные превью моментов как в общей ленте. Раньше тут
+                  была горизонтальная карусель 140px-плиток — на 3 моментах
+                  она уезжала за край карточки и приходилось скроллить.
+                  Теперь — grid с фиксированным числом колонок (до 3),
+                  все моменты гарантированно помещаются по ширине. */}
+              {(() => {
+                const cols = Math.min(merged.active_moments.length, 3);
+                return (
+                  <div style={{
+                    display:'grid',
+                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                    gap: 8,
+                  }}>
+                    {merged.active_moments.map(m => (
+                      <MomentCard key={m.id}
+                        moment={{ ...m,
+                          author_name: merged.name,
+                          author_avatar: merged.avatar,
+                          author_is_super: merged.is_super,
+                        }}
+                        isMine={false}
+                        onClick={() => onOpenMoment?.(m)}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           )}
 
