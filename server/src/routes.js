@@ -30,7 +30,13 @@ function requireBusinessOrAdmin(req, res, next) {
   requireAuth(req, res, () => {
     const user = db.findUserById(req.user.id);
     if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
-    if (!user.is_admin && user.business_status !== 'approved') {
+    // Доступ к /integrations/awo получают:
+    //  • системные админы (is_admin);
+    //  • бизнес-юзеры со статусом approved (свои школы);
+    //  • со-админы хотя бы одной школы — пускаем посмотреть список и
+    //    зайти в настройки той школы, куда их добавил владелец.
+    const hasTenantAccess = db.listTenantsForUser(user.id).length > 0;
+    if (!user.is_admin && user.business_status !== 'approved' && !hasTenantAccess) {
       return res.status(403).json({
         error: 'Доступ только для бизнес-аккаунтов',
         code: 'BUSINESS_REQUIRED',
@@ -2416,6 +2422,13 @@ module.exports = function makeRouter(db, broadcast) {
     if (!name?.trim()) return res.status(400).json({ error: 'name required' });
     const user = req.businessUser;
     if (!user.is_admin) {
+      // Создавать новые школы могут только системные админы и
+      // approved-бизнес-юзеры. Со-админы чужих школ — нет.
+      if (user.business_status !== 'approved') {
+        return res.status(403).json({
+          error: 'Создавать школы могут только бизнес-аккаунты с подтверждённым доступом',
+        });
+      }
       const own = db.listTenantsForOwner(user.id);
       if (own.length >= MAX_TENANTS_PER_USER) {
         return res.status(403).json({ error: `Лимит школ — ${MAX_TENANTS_PER_USER}` });

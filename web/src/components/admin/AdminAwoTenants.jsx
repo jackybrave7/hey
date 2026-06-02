@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../api';
 import { useConfirm } from '../Screens';
+import { useAuth } from '../../AuthContext';
 import AwoGuide from './AwoGuide';
 
 const cardStyle = {
@@ -36,6 +37,11 @@ function fmtDate(ts) {
 export default function AdminAwoTenants() {
   const nav = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  // Создавать школы могут только админы или approved-бизнес-юзеры.
+  // Со-админ чужой школы — нет (он попадает сюда чтобы зайти в школу,
+  // где его сделали соадмином).
+  const canCreate = !!user?.is_admin || user?.business_status === 'approved';
   // Базовый путь: /admin/awo для админов, /integrations/awo для бизнес-юзеров
   const basePath = location.pathname.startsWith('/integrations') ? '/integrations/awo' : '/admin/awo';
   const [tenants, setTenants] = useState(null);
@@ -107,24 +113,26 @@ export default function AdminAwoTenants() {
         </div>
       )}
 
-      {/* Create form */}
-      <div style={{
-        background: 'rgba(20,12,40,.5)', border: '1px solid rgba(255,255,255,.12)',
-        borderRadius: 14, padding: '14px 16px', marginBottom: 22,
-        display:'flex', gap:8,
-      }}>
-        <input value={newName} onChange={e => setNewName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && create()}
-          placeholder="Название новой школы"
-          style={{
-            flex:1, padding:'10px 12px', borderRadius:10,
-            background:'rgba(0,0,0,.4)', border:'1px solid rgba(255,255,255,.18)',
-            color:'white', fontSize:14, outline:'none', fontFamily:'inherit',
-          }}/>
-        <button onClick={create} disabled={creating || !newName.trim()} style={btn}>
-          {creating ? '…' : '+ Создать школу'}
-        </button>
-      </div>
+      {/* Create form — только для создателей школ */}
+      {canCreate && (
+        <div style={{
+          background: 'rgba(20,12,40,.5)', border: '1px solid rgba(255,255,255,.12)',
+          borderRadius: 14, padding: '14px 16px', marginBottom: 22,
+          display:'flex', gap:8,
+        }}>
+          <input value={newName} onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && create()}
+            placeholder="Название новой школы"
+            style={{
+              flex:1, padding:'10px 12px', borderRadius:10,
+              background:'rgba(0,0,0,.4)', border:'1px solid rgba(255,255,255,.18)',
+              color:'white', fontSize:14, outline:'none', fontFamily:'inherit',
+            }}/>
+          <button onClick={create} disabled={creating || !newName.trim()} style={btn}>
+            {creating ? '…' : '+ Создать школу'}
+          </button>
+        </div>
+      )}
 
       {tenants === null && (
         <div style={{ color: 'rgba(225,220,245,.7)', textAlign:'center', padding: 30 }}>Загрузка…</div>
