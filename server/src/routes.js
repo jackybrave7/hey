@@ -956,10 +956,11 @@ module.exports = function makeRouter(db, broadcast) {
     const convId = req.params.id;
     if (!db.isMember(convId, req.user.id))
       return res.status(403).json({ error: 'Not a member' });
-    // Для групповых чатов содержимое может удалить только админ группы.
-    // Direct-чаты (1-на-1) и monolog — любой участник.
+    // Для групповых чатов содержимое может удалить только админ группы
+    // (создатель ИЛИ назначенный со-админ). Direct-чаты (1-на-1) и
+    // monolog — любой участник.
     const conv = db.getConversationById(convId);
-    if (conv?.type === 'group' && conv.admin_id !== req.user.id) {
+    if (conv?.type === 'group' && !db.isGroupAdmin(convId, req.user.id)) {
       return res.status(403).json({
         error: 'Только администратор группы может удалить содержимое чата',
         code: 'ADMIN_ONLY',
@@ -1117,12 +1118,15 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   // ── Group invite links (admin shares a link, anyone can join) ────────────
-  // Только админ группы может сгенерировать ссылку. Сама ссылка self-contained
-  // (HMAC-подписанный токен), без записи в БД.
+  // Сгенерировать invite-ссылку. Доступно как создателю (conv.admin_id),
+  // так и назначенным со-админам (members.is_admin=1). Раньше проверяли
+  // только admin_id и со-админы упирались в 403 при попытке поделиться.
   r.post('/groups/:id/invite-link', requireAuth, (req, res) => {
     const conv = db.getConversationById(req.params.id);
     if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Группа не найдена' });
-    if (conv.admin_id !== req.user.id) return res.status(403).json({ error: 'Только админ группы может создавать ссылки' });
+    if (!db.isGroupAdmin(conv.id, req.user.id)) {
+      return res.status(403).json({ error: 'Только админ группы может создавать ссылки' });
+    }
     const token = awo.signGroupInvite(conv.id, req.user.id);
     res.json({ token, ttl_days: 30 });
   });

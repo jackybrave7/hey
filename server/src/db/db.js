@@ -1701,7 +1701,8 @@ function pinMessage(convId, messageId, byUserId) {
   if (!msg) throw new Error('Сообщение не найдено в этом чате');
 
   if (conv.type === 'group') {
-    if (conv.admin_id !== byUserId) {
+    // Закрепить сообщение в группе может создатель ИЛИ назначенный со-админ.
+    if (!isGroupAdmin(convId, byUserId)) {
       throw new Error('Только админ группы может закреплять сообщения');
     }
     db.prepare('UPDATE conversations SET pinned_message_id=? WHERE id=?').run(messageId, convId);
@@ -1725,7 +1726,7 @@ function unpinMessage(convId, byUserId) {
   if (!isMember(convId, byUserId)) throw new Error('Вы не участник этого чата');
 
   if (conv.type === 'group') {
-    if (conv.admin_id !== byUserId) {
+    if (!isGroupAdmin(convId, byUserId)) {
       throw new Error('Только админ группы может откреплять сообщения');
     }
     db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE id=?').run(convId);
