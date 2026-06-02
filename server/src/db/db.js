@@ -207,6 +207,24 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id)'); } catch {}
 
+// Отложенные сообщения. Лежат до момента send_at, потом фоновый
+// диспетчер превращает в обычное сообщение через createMessage и
+// удаляет запись. status='pending' пока не отправлено; никакого
+// «sent»-состояния не храним — отправленные удаляем сразу.
+try { db.exec(`CREATE TABLE IF NOT EXISTS scheduled_messages (
+  id              TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL,
+  sender_id       TEXT NOT NULL,
+  text            TEXT,
+  attachment      TEXT,            -- JSON, как в messages.attachment
+  reply_to_id     TEXT,
+  send_at         INTEGER NOT NULL,
+  created_at      INTEGER NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending'
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_scheduled_due ON scheduled_messages(status, send_at)'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_scheduled_sender ON scheduled_messages(sender_id, conversation_id)'); } catch {}
+
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0'); } catch {}
@@ -1619,6 +1637,60 @@ function createMessage({ conversationId, senderId, text, attachment, replyToId, 
   const parsed = _parseMsg(msg);
   if (parsed && parsed.reply_to_id) parsed.reply_to = _replySnippet(parsed.reply_to_id);
   return parsed;
+}
+
+// ── Scheduled messages ────────────────────────────────────────────────────
+function scheduleMessage({ conversationId, senderId, text, attachment, replyToId, sendAt }) {
+  const id = 'sched_' + uuid().replace(/-/g,'').slice(0,12);
+  db.prepare(
+    `INSERT INTO scheduled_messages
+       (id, conversation_id, sender_id, text, attachment, reply_to_id, send_at, created_at, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
+  ).run(
+    id, conversationId, senderId,
+    text || null,
+    attachment ? JSON.stringify(attachment) : null,
+    replyToId || null,
+    sendAt, now()
+  );
+  return getScheduledMessage(id);
+}
+
+function getScheduledMessage(id) {
+  const r = db.prepare('SELECT * FROM scheduled_messages WHERE id=?').get(id);
+  if (!r) return null;
+  return { ...r, attachment: r.attachment ? JSON.parse(r.attachment) : null };
+}
+
+function listScheduledMessages(senderId, conversationId) {
+  const rows = db.prepare(
+    `SELECT * FROM scheduled_messages
+     WHERE sender_id=? AND conversation_id=? AND status='pending'
+     ORDER BY send_at ASC`
+  ).all(senderId, conversationId);
+  return rows.map(r => ({ ...r, attachment: r.attachment ? JSON.parse(r.attachment) : null }));
+}
+
+function cancelScheduledMessage(id, senderId) {
+  const info = db.prepare(
+    "DELETE FROM scheduled_messages WHERE id=? AND sender_id=? AND status='pending'"
+  ).run(id, senderId);
+  return info.changes > 0;
+}
+
+// Достать всё что пора отправить. Удаляем запись внутри транзакции
+// при создании реального сообщения — чтобы не отправить дважды.
+function popDueScheduledMessages(nowTs, limit = 50) {
+  const rows = db.prepare(
+    `SELECT * FROM scheduled_messages
+     WHERE status='pending' AND send_at <= ?
+     ORDER BY send_at ASC LIMIT ?`
+  ).all(nowTs, limit);
+  return rows.map(r => ({ ...r, attachment: r.attachment ? JSON.parse(r.attachment) : null }));
+}
+
+function deleteScheduledMessageById(id) {
+  db.prepare('DELETE FROM scheduled_messages WHERE id=?').run(id);
 }
 
 // Системное событие в групповом чате: «X удалил Y из группы», «Y покинул группу»
@@ -3253,6 +3325,8 @@ module.exports = {
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, createSystemEventMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
+  scheduleMessage, getScheduledMessage, listScheduledMessages, cancelScheduledMessage,
+  popDueScheduledMessages, deleteScheduledMessageById,
   getLinkPreviewCached, setLinkPreviewCached, updateMessageLinkPreview,
   pinMessage, unpinMessage, getPinnedMessage, forwardMessageToChats,
   pushSubscribe, pushUnsubscribe, getPushSubscriptions, removePushSubscriptions,

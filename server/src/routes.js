@@ -1869,6 +1869,43 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getAdminUsers({ search, filter }));
   });
 
+  // ── Scheduled messages ─────────────────────────────────────────────────
+  // Запланировать сообщение. Тело — то же, что у обычного: text, attachment,
+  // reply_to_id + send_at (unix-секунды). Минимально через 30с в будущем
+  // и максимум через 365 дней — чтобы не плодить «вечные» драфты.
+  r.post('/conversations/:id/scheduled', requireAuth, (req, res) => {
+    const convId = req.params.id;
+    if (!db.isMember(convId, req.user.id)) {
+      return res.status(403).json({ error: 'Not a member' });
+    }
+    const { text, attachment, reply_to_id, send_at } = req.body || {};
+    const sendAt = Number(send_at);
+    if (!Number.isFinite(sendAt)) return res.status(400).json({ error: 'send_at required' });
+    const now = Math.floor(Date.now() / 1000);
+    if (sendAt < now + 30) return res.status(400).json({ error: 'Время отправки — минимум через 30 секунд' });
+    if (sendAt > now + 365 * 24 * 3600) return res.status(400).json({ error: 'Не больше года вперёд' });
+    if (!text?.trim() && !attachment) return res.status(400).json({ error: 'Пустое сообщение' });
+    const sched = db.scheduleMessage({
+      conversationId: convId, senderId: req.user.id,
+      text: text || null, attachment: attachment || null,
+      replyToId: reply_to_id || null, sendAt,
+    });
+    res.json(sched);
+  });
+
+  r.get('/conversations/:id/scheduled', requireAuth, (req, res) => {
+    if (!db.isMember(req.params.id, req.user.id)) {
+      return res.status(403).json({ error: 'Not a member' });
+    }
+    res.json(db.listScheduledMessages(req.user.id, req.params.id));
+  });
+
+  r.delete('/scheduled/:id', requireAuth, (req, res) => {
+    const ok = db.cancelScheduledMessage(req.params.id, req.user.id);
+    if (!ok) return res.status(404).json({ error: 'Не найдено или уже отправлено' });
+    res.json({ ok: true });
+  });
+
   // ── Admin: Groups ───────────────────────────────────────────────────────
   r.get('/admin/groups', requireAdmin, (req, res) => {
     res.json(db.getAdminGroups({ search: req.query.search }));

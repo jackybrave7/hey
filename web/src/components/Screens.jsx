@@ -6418,6 +6418,123 @@ export const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, i
 const chatImgDrafts  = new Map();  // convId -> array of {dataUrl, file, uploading?}
 const chatFileDrafts = new Map();  // convId -> { file, uploading? } | null
 
+// Модалка выбора времени для «Отправить позже». Простой <input
+// type="datetime-local"> без сторонних библиотек. Время — локальное
+// пользователя, сервер сохраняет уже в unix-секундах.
+function ScheduleModal({ defaultValue, onCancel, onSubmit }) {
+  const [val, setVal] = useState(defaultValue);
+  return createPortal(
+    <div onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+      style={{ position:'fixed', inset:0, zIndex:10000,
+        background:'rgba(0,0,0,.6)', backdropFilter:'blur(10px)',
+        display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{
+        background:'rgba(22,15,50,.98)', borderRadius:18, padding:'22px 22px 18px',
+        width:'min(94vw, 380px)', boxShadow:'0 20px 60px rgba(0,0,0,.55)',
+        border:'1px solid rgba(255,255,255,.1)',
+      }}>
+        <div style={{ color:'white', fontSize: 17, fontWeight: 700, marginBottom: 6 }}>
+          📅 Отправить позже
+        </div>
+        <div style={{ color:'rgba(255,255,255,.55)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+          Сообщение уйдёт в этот чат автоматически в выбранное время.
+          Минимум — через минуту от сейчас.
+        </div>
+        <input type="datetime-local" value={val} onChange={(e) => setVal(e.target.value)}
+          style={{
+            width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius: 10,
+            background:'rgba(0,0,0,.4)', border:'1px solid rgba(255,255,255,.18)',
+            color:'white', fontSize: 14, outline: 'none', fontFamily: 'inherit',
+            marginBottom: 16, colorScheme: 'dark',
+          }}/>
+        <div style={{ display:'flex', gap: 10 }}>
+          <button onClick={onCancel}
+            style={{ flex: 1, padding:'11px', borderRadius: 12,
+              background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.14)',
+              color:'rgba(255,255,255,.7)', fontSize: 14, fontWeight: 600,
+              cursor:'pointer', fontFamily: 'inherit' }}>
+            Отмена
+          </button>
+          <button onClick={() => onSubmit(val)}
+            style={{ flex: 2, padding:'11px', borderRadius: 12,
+              background:'rgba(140,110,220,.9)', border:'1px solid rgba(180,140,220,.4)',
+              color:'white', fontSize: 14, fontWeight: 700,
+              cursor:'pointer', fontFamily: 'inherit' }}>
+            Запланировать
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// Индикатор + раскрывающийся список запланированных сообщений в чате.
+// Закрытый — одна тонкая строка над композером. Открытый — карточка с
+// каждой записью и кнопкой «отменить».
+function ScheduledList({ items, onCancel }) {
+  const [open, setOpen] = useState(false);
+  const n = items.length;
+  if (!n) return null;
+  return (
+    <div style={{
+      margin:'0 4px 6px', borderRadius: 12,
+      background:'rgba(140,110,220,.10)',
+      border:'1px solid rgba(180,140,220,.22)',
+    }}>
+      <button onClick={() => setOpen(v => !v)}
+        style={{ width:'100%', padding:'8px 12px', background:'transparent',
+          border:'none', cursor:'pointer', fontFamily:'inherit',
+          display:'flex', alignItems:'center', gap: 8,
+          color:'rgba(220,200,255,.95)', fontSize: 12, textAlign:'left' }}>
+        <span>📅</span>
+        <span style={{ flex: 1 }}>
+          {n === 1 ? 'Одно запланированное сообщение' : `Запланировано: ${n}`}
+        </span>
+        <span style={{ opacity: .6, transform: open ? 'rotate(180deg)' : 'none', transition:'transform .15s' }}>⌃</span>
+      </button>
+      {open && (
+        <div style={{
+          padding:'4px 8px 8px', display:'flex', flexDirection:'column', gap: 6,
+          maxHeight: 220, overflowY:'auto',
+        }}>
+          {items.map(s => {
+            const at = new Date(s.send_at * 1000);
+            return (
+              <div key={s.id} style={{
+                display:'flex', alignItems:'flex-start', gap: 8,
+                padding:'8px 10px', borderRadius: 10,
+                background:'rgba(255,255,255,.05)',
+                border:'1px solid rgba(255,255,255,.08)',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color:'rgba(220,200,255,.75)', fontSize: 11, marginBottom: 3 }}>
+                    {at.toLocaleString('ru', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
+                  </div>
+                  <div style={{ color:'white', fontSize: 13, lineHeight: 1.4,
+                    overflow:'hidden', display:'-webkit-box',
+                    WebkitLineClamp: 3, WebkitBoxOrient:'vertical' }}>
+                    {s.text || '(вложение)'}
+                  </div>
+                </div>
+                <button onClick={() => onCancel(s.id)}
+                  title="Отменить"
+                  style={{ background:'rgba(200,60,60,.18)',
+                    border:'1px solid rgba(255,120,120,.35)',
+                    color:'rgba(255,180,180,.95)',
+                    borderRadius: 8, padding:'4px 8px', fontSize: 12,
+                    cursor:'pointer', fontFamily:'inherit', flexShrink: 0 }}>
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ChatScreen() {
   const nav = useNavigate();
   const location = useLocation();
@@ -6439,6 +6556,13 @@ export function ChatScreen() {
   // Бэкап текущего черновика на время правки чужого сообщения, чтобы
   // отмена / отправка правки не затёрла то, что пользователь набирал.
   const savedDraftRef = useRef('');
+  // Контекст-меню кнопки «Отправить» — правый клик/long-press открывает
+  // вариант «📅 Отправить позже…». scheduleOpen — модалка с date-time.
+  // scheduled — список запланированных сообщений для индикатора над инпутом.
+  const [sendMenu, setSendMenu]         = useState(null); // { x, y } | null
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduled, setScheduled]       = useState([]);
+  const longPressTimer = useRef(null);
   const [showEmoji,   setShowEmoji]   = useState(false);
   // Composer expand: при длинном тексте инпут можно вручную раскрыть на
   // почти всю высоту чата для удобного редактирования / просмотра вставленного.
@@ -6514,7 +6638,16 @@ export function ChatScreen() {
     setImgPreviews(chatImgDrafts.get(convId)  || []);
     setFilePreview(chatFileDrafts.get(convId) || null);
     savedDraftRef.current = '';
+    // Список запланированных сообщений в этом чате — для индикатора.
+    api.listScheduledMessages(convId).then(setScheduled).catch(() => setScheduled([]));
   }, [convId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Уведомление от сервера, что один из запланированных уже отправлен —
+  // убираем его из локального индикатора без перезапроса.
+  useEffect(() => socket.on('scheduled:sent', ({ conversationId, scheduledId }) => {
+    if (conversationId !== convId) return;
+    setScheduled(prev => prev.filter(s => s.id !== scheduledId));
+  }), [convId]);
 
   // Сохраняем картинки/файл в module Map при любом изменении. Это даёт
   // переживание ChatScreen unmount/remount при навигации.
@@ -8550,6 +8683,20 @@ export function ChatScreen() {
           return (
         <div style={{padding:'6px 12px 14px',maxWidth:680,margin:'0 auto',
           minWidth:0,boxSizing:'border-box',width:'100%'}}>
+          {/* Индикатор запланированных сообщений: показываем количество,
+              по клику открываем список с возможностью отменить каждое. */}
+          {scheduled.length > 0 && (
+            <ScheduledList
+              items={scheduled}
+              onCancel={async (id) => {
+                try {
+                  await api.cancelScheduledMessage(id);
+                  setScheduled(prev => prev.filter(s => s.id !== id));
+                  heyToast('Запланированное сообщение отменено', 'info');
+                } catch (e) { heyToast('Не удалось отменить', 'error'); }
+              }}
+            />
+          )}
           {/* Внешний layout: [pill с textarea] [emoji] [attach] [mic | send].
               Раньше всё было внутри пилюли с тиснёным фоном — по макету
               кнопки выносим в отдельный ряд, фон пилюли чистый-полупрозрачный. */}
@@ -8624,7 +8771,22 @@ export function ChatScreen() {
                 accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
                 style={{display:'none'}} onChange={handleFileSelect}/>
               {hasContent ? (
-                <button onClick={send} title="Отправить"
+                <button onClick={send}
+                  title="Отправить (правый клик / долгое нажатие — отправить позже)"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setSendMenu({ x: r.right - 220, y: r.top - 60 });
+                  }}
+                  onPointerDown={(e) => {
+                    if (e.pointerType === 'mouse') return; // правый клик уже обрабатываем
+                    const r = e.currentTarget.getBoundingClientRect();
+                    longPressTimer.current = setTimeout(() => {
+                      setSendMenu({ x: r.right - 220, y: r.top - 60 });
+                    }, 550);
+                  }}
+                  onPointerUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                  onPointerLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
                   style={{background:'none',border:'none',cursor:'pointer',padding:2,
                     color:'white', display:'flex', alignItems:'center', justifyContent:'center'}}>
                   <Icon name="send" size={24}/>
@@ -8821,6 +8983,66 @@ export function ChatScreen() {
           onClose={() => setMomentChatPopup(null)}
         />
       )}
+
+      {/* Send-button context menu (right-click / long-press) */}
+      {sendMenu && (
+        <div onMouseDown={(e) => { if (e.target === e.currentTarget) setSendMenu(null); }}
+          style={{ position:'fixed', inset:0, zIndex:300, background:'transparent' }}>
+          <div style={{
+            position:'fixed', left: Math.max(8, sendMenu.x), top: Math.max(8, sendMenu.y),
+            background:'rgba(255,255,255,.96)', borderRadius: 16, padding:'4px 0',
+            minWidth: 220, boxShadow:'0 12px 36px rgba(40,20,80,.35)',
+            border:'1px solid rgba(120,90,200,.18)',
+          }}>
+            <div onClick={() => { setSendMenu(null); setScheduleOpen(true); }}
+              style={{ padding:'12px 18px', cursor:'pointer', display:'flex', gap: 12,
+                alignItems:'center', color:'rgba(50,30,90,.95)', fontSize: 15, fontWeight: 500 }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(120,90,200,.10)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ fontSize: 18 }}>📅</span>
+              <span>Отправить позже…</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule date-time modal */}
+      {scheduleOpen && (() => {
+        // Дефолт — через час от текущего времени, округлённый до 5 минут.
+        const def = new Date(Date.now() + 60 * 60 * 1000);
+        def.setSeconds(0, 0);
+        const pad = (n) => String(n).padStart(2, '0');
+        const defStr = `${def.getFullYear()}-${pad(def.getMonth()+1)}-${pad(def.getDate())}T${pad(def.getHours())}:${pad(def.getMinutes())}`;
+        return (
+          <ScheduleModal
+            defaultValue={defStr}
+            onCancel={() => setScheduleOpen(false)}
+            onSubmit={async (localStr) => {
+              const at = new Date(localStr);
+              const sendAt = Math.floor(at.getTime() / 1000);
+              if (!Number.isFinite(sendAt) || sendAt < Math.floor(Date.now() / 1000) + 30) {
+                heyToast('Выбери время хотя бы через минуту', 'warning'); return;
+              }
+              try {
+                const t = text.trim();
+                if (!t) { heyToast('Пустое сообщение', 'warning'); return; }
+                const sched = await api.scheduleMessage(convId, {
+                  text: t,
+                  reply_to_id: replyTo?.id || null,
+                  send_at: sendAt,
+                });
+                setScheduled(prev => [...prev, sched].sort((a, b) => a.send_at - b.send_at));
+                setText('');
+                setReplyTo(null);
+                setScheduleOpen(false);
+                heyToast(`📅 Запланировано на ${at.toLocaleString('ru')}`, 'success');
+              } catch (e) {
+                heyToast('Ошибка: ' + (e.message || ''), 'error');
+              }
+            }}
+          />
+        );
+      })()}
 
       {/* Lightbox */}
       {lightbox && (() => {

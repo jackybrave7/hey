@@ -73,3 +73,47 @@ function runGraceExpiry() {
 }
 setTimeout(runGraceExpiry, 30 * 1000);          // через 30с после старта
 setInterval(runGraceExpiry, 60 * 60 * 1000);    // далее каждый час
+
+// Диспетчер отложенных сообщений. Раз в 10 секунд достаёт все
+// scheduled_messages с send_at <= now и отправляет их через обычный
+// createMessage + WS-broadcast. Удаляем запись сразу после успешной
+// доставки, чтобы исключить повторную отправку. Точность 10 секунд
+// нас устраивает: пользовательский ввод send_at и так с минутной
+// гранулярностью, плюс minDelay 30 секунд в роуте.
+function runScheduledDispatcher() {
+  let due;
+  try { due = db.popDueScheduledMessages(Math.floor(Date.now() / 1000), 50); }
+  catch (e) { return console.error('[scheduled] poll failed:', e.message); }
+  if (!due.length) return;
+  for (const s of due) {
+    try {
+      // Проверим что отправитель ещё существует и состоит в чате —
+      // могли удалить аккаунт / выйти из группы за это время.
+      const u = db.findUserById(s.sender_id);
+      if (!u || u.is_blocked || u.is_deleted || !db.isMember(s.conversation_id, s.sender_id)) {
+        db.deleteScheduledMessageById(s.id);
+        continue;
+      }
+      const msg = db.createMessage({
+        conversationId: s.conversation_id,
+        senderId: s.sender_id,
+        text: s.text,
+        attachment: s.attachment,
+        replyToId: s.reply_to_id,
+      });
+      db.deleteScheduledMessageById(s.id);
+      const members = db.getConversationMembers(s.conversation_id);
+      broadcast(members, { type: 'message:new', message: { ...msg, sender_name: u.name } });
+      // Отправителю отдельно — чтобы его клиент убрал запись из
+      // индикатора «Запланировано: N» без перезапроса.
+      broadcast([s.sender_id], { type: 'scheduled:sent',
+        conversationId: s.conversation_id, scheduledId: s.id });
+    } catch (e) {
+      console.error('[scheduled] dispatch failed for', s.id, e.message);
+      // На ошибке оставляем запись — может succeed на следующем тике.
+      // Если становится зомби (повторяющиеся фейлы) — потом разберём.
+    }
+  }
+}
+setTimeout(runScheduledDispatcher, 5 * 1000);
+setInterval(runScheduledDispatcher, 10 * 1000);
