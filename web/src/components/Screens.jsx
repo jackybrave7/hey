@@ -6653,6 +6653,10 @@ export function ChatScreen() {
       if (c.type === 'group') {
         setPartner({ name: c.name||'Группа', online:false, id:null,
           isGroup:true, icon:c.icon||'👥', admin_id:c.admin_id, isDeleted:false,
+          // Создатель ИЛИ назначенный соадмин (members.is_admin=1).
+          // Используется внутри ChatScreen для прав «копировать инвайт»,
+          // «удалить чат», «пин сообщений» и т.д.
+          myIsGroupAdmin: !!c.my_is_group_admin,
           isArchived });
       } else if (c.type === 'monolog') {
         setPartner({ name:'Монолог', online:false, id:null,
@@ -7450,7 +7454,7 @@ export function ChatScreen() {
   }
 
   // В группе содержимое может чистить только админ; в direct/monolog — любой участник
-  const isGroupAdmin = partner.isGroup && partner.admin_id === user?.id;
+  const isGroupAdmin = partner.isGroup && !!partner.myIsGroupAdmin;
   const canClearChat = !partner.isGroup || isGroupAdmin;
   // Админ группы не выходит через «выйти» — должен сначала передать админство
   // или удалить группу полностью
@@ -7714,7 +7718,7 @@ export function ChatScreen() {
 
       {/* Pinned message banner */}
       {pinnedMessage && !searchMode && (() => {
-        const canUnpin = partner.isGroup ? (partner.admin_id === user?.id) : true;
+        const canUnpin = partner.isGroup ? !!partner.myIsGroupAdmin : true;
         let preview = pinnedMessage.text || '';
         if (!preview && pinnedMessage.attachment) {
           const t = pinnedMessage.attachment.type;
@@ -8731,7 +8735,7 @@ export function ChatScreen() {
           {(() => {
             const isOwn   = msgMenu.msg.sender_id === user?.id;
             const canEdit = isOwn && (Date.now()/1000 - msgMenu.msg.created_at) < 3*60*60 && !!msgMenu.msg.text;
-            const canPin  = partner.isGroup ? (partner.admin_id === user?.id) : true;
+            const canPin  = partner.isGroup ? !!partner.myIsGroupAdmin : true;
             const isPinned = pinnedMessage && pinnedMessage.id === msgMenu.msg.id;
             const canCopy = !!msgMenu.msg.text;
             const copyText = () => {

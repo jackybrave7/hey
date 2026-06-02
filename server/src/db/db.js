@@ -1265,7 +1265,7 @@ function getConversationsForUser(userId, opts = {}) {
   const { archived = false } = opts; // false → активные, true → только архивные
   // Включаем и активные, и pending членства — pending покажем как «приглашение»
   const memberRows = db.prepare(
-    'SELECT conversation_id, status, invited_by, archived_at FROM members WHERE user_id=?'
+    'SELECT conversation_id, status, invited_by, archived_at, is_admin FROM members WHERE user_id=?'
   ).all(userId)
     .filter(r => archived ? r.archived_at != null : r.archived_at == null);
   if (!memberRows.length) return [];
@@ -1273,6 +1273,7 @@ function getConversationsForUser(userId, opts = {}) {
   const memberMeta = Object.fromEntries(
     memberRows.map(r => [r.conversation_id, {
       status: r.status || 'active', invited_by: r.invited_by, archived_at: r.archived_at,
+      is_admin: !!r.is_admin,
     }])
   );
 
@@ -1416,7 +1417,15 @@ function getConversationsForUser(userId, opts = {}) {
     const partnerUser = conv.type === 'direct' && partnerId ? usersMap[partnerId] : null;
     return {
       id: convId, type: conv.type, name, icon: conv.icon || null,
-      admin_id: conv.admin_id || null, partner_id: partnerId,
+      admin_id: conv.admin_id || null,
+      // Текущий юзер — админ этой группы (создатель ИЛИ назначенный
+      // через members.is_admin). Раньше клиент проверял только
+      // admin_id === me.id и назначенные соадмины не получали
+      // прав в UI чата.
+      my_is_group_admin: conv.type === 'group'
+        ? (conv.admin_id === userId || !!meta.is_admin)
+        : false,
+      partner_id: partnerId,
       avatar: partnerAvatar,
       partner_is_deleted: !!(partnerUser?.is_deleted),
       partner_is_blocked: !!(partnerUser?.is_blocked),
