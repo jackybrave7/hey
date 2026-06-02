@@ -2321,14 +2321,19 @@ module.exports = function makeRouter(db, broadcast) {
   }
 
   // Helper: формирует объект ответа settings из tenant'а (без секретов лишних)
-  function tenantToSettings(t) {
+  function tenantToSettings(t, opts = {}) {
     const account = t.account_id ? db.findUserById(t.account_id) : null;
+    // Со-админам не отдаём webhook_token (это секрет владельца) — у них
+    // в UI всё равно нет блоков, его потребляющих, и зная токен можно
+    // подделывать запросы от АВО. Владелец и системный админ видят токен.
+    const includeSecrets = opts.includeSecrets !== false;
     return {
       tenant_id:    t.id,
+      owner_id:     t.owner_id || null,
       test_mode:    !!t.test_mode,
       test_course:  t.test_course || '',
       chat_excludes: t.chat_excludes || 'слушатель,запись',
-      webhook_token: t.awo_webhook_token,
+      webhook_token: includeSecrets ? t.awo_webhook_token : null,
       school_account: account ? {
         id: account.id, name: account.name, avatar: account.avatar, phone: account.phone,
         is_default: false,
@@ -2337,12 +2342,20 @@ module.exports = function makeRouter(db, broadcast) {
   }
 
   r.get('/admin/awo/settings', requireTenantAccess(tenantFromReq), (req, res) => {
-    res.json(tenantToSettings(req.tenant));
+    res.json(tenantToSettings(req.tenant, { includeSecrets: req.isTenantOwner }));
   });
   r.put('/admin/awo/settings', requireTenantAccess(tenantFromReq), (req, res) => {
     const tid = req.tenant.id;
     const { test_mode, test_course, chat_excludes, school_account_id } = req.body || {};
     try {
+      // Привязка/отвязка официального школьного аккаунта — только владелец
+      // или системный админ. Со-админ не может перепривязать школу на
+      // другой профиль: это операция уровня владельца.
+      if (school_account_id !== undefined && !req.isTenantOwner) {
+        return res.status(403).json({
+          error: 'Менять привязанный аккаунт школы может только владелец',
+        });
+      }
       // school_account_id: не-админу разрешаем привязывать ТОЛЬКО себя
       // или кого-то из своих контактов (контакты — двустороннее согласие на
       // взаимодействие, так что «угона» чужого профиля не происходит).
@@ -2363,7 +2376,7 @@ module.exports = function makeRouter(db, broadcast) {
         test_mode, test_course, chat_excludes,
         ...(school_account_id !== undefined ? { account_id: school_account_id || null } : {}),
       });
-      res.json(tenantToSettings(t));
+      res.json(tenantToSettings(t, { includeSecrets: req.isTenantOwner }));
     } catch (e) {
       res.status(400).json({ error: e.message });
     }
@@ -2496,6 +2509,12 @@ module.exports = function makeRouter(db, broadcast) {
   r.post('/admin/awo/tenants/:id/rotate-token',
     requireTenantAccess(req => req.params.id),
     (req, res) => {
+      // Ротация webhook-токена — только владелец / системный админ.
+      // Со-админ не должен иметь возможность поломать боевой webhook,
+      // от которого зависят чужие курсы.
+      if (!req.isTenantOwner) {
+        return res.status(403).json({ error: 'Ротация токена доступна только владельцу' });
+      }
       const t = db.rotateTenantToken(req.params.id);
       if (!t) return res.status(404).json({ error: 'Tenant not found' });
       res.json(t);

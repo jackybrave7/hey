@@ -55,10 +55,22 @@ export default function AdminAwo() {
   const { user: me } = useAuth();
   const isAdmin = !!me?.is_admin;
   const tenantId = params.tenantId || 'tnt_default';
+  // Со-админу прячем секреты/опасные действия. isOwner вычисляется из
+  // settings.owner_id (приходит из tenantToSettings). Системный админ
+  // — тоже считается «владельцем» с точки зрения UI.
+  // settings ещё может быть null до первого фетча — считаем co-admin'ом
+  // по умолчанию, иначе при первом рендере вспыхивает «лишний» блок.
+  // Обновится после fetch.
+  // Использует state `settings` из ниже — определена далее, но JSX
+  // ссылается на это значение только после загрузки.
   const basePath = location.pathname.startsWith('/integrations') ? '/integrations/awo' : '/admin/awo';
 
   const [tenants, setTenants] = useState([]); // для переключателя
   const [settings, setSettings] = useState(null);
+  // isOwner: владелец школы или системный админ. До первого fetch
+  // settings.owner_id ещё нет, поэтому считаем co-admin'ом — UI
+  // прячет опасные блоки пока не убедится в обратном.
+  const isOwner = isAdmin || (settings?.owner_id && settings.owner_id === me?.id);
   const [testCourse, setTestCourse] = useState('');
   const [testMode, setTestMode] = useState(false);
   const [chatExcludes, setChatExcludes] = useState('слушатель,запись');
@@ -292,7 +304,9 @@ export default function AdminAwo() {
         </div>
       )}
 
-      {/* Официальный школьный аккаунт */}
+      {/* Официальный школьный аккаунт — только владелец. Со-админ не
+          должен перепривязывать школу на свой профиль. */}
+      {isOwner && (
       <div style={cardStyle}>
         <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
           🎓 Официальный аккаунт школы
@@ -474,11 +488,14 @@ export default function AdminAwo() {
           </div>
         )}
       </div>
+      )}
 
       {/* Со-админы школы (видна только владельцу — внутри 403→null) */}
       <TenantAdminsSection tenantId={tenantId} notify={notify}/>
 
-      {/* Настройки */}
+      {/* Настройки webhook'а и сам Webhook URL — только владелец.
+          Со-админ управляет привязками курсов и читает логи. */}
+      {isOwner && (
       <div style={cardStyle}>
         <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
           ⚙ Настройки webhook
@@ -549,6 +566,7 @@ export default function AdminAwo() {
           );
         })()}
       </div>
+      )}
 
       {/* Маппинг курс → чат */}
       <div style={cardStyle}>
@@ -593,7 +611,9 @@ export default function AdminAwo() {
         )}
       </div>
 
-      {/* Виджет HEY для ЛК АВО */}
+      {/* Виджет HEY для ЛК АВО — только владелец (это интеграционный
+          сниппет уровня учётной записи школы в АВО). */}
+      {isOwner && (
       <div style={cardStyle}>
         <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 10 }}>
           📦 Виджет HEY в ЛК АВО
@@ -633,6 +653,7 @@ export default function AdminAwo() {
             color: 'rgba(200,220,255,1)', fontSize: 11.5 }}>{window.location.origin}/widget.js</code>.
         </div>
       </div>
+      )}
 
       {/* Генератор join-ссылки */}
       <div style={cardStyle}>
