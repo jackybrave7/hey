@@ -2030,11 +2030,20 @@ function _withStatsBatch(moments) {
      GROUP BY moment_id, reaction`
   ).all(...ids);
 
-  // All view counts in one query
+  // All view counts in one query.
+  // Исключаем тех, кто оставил «сильную» реакцию (resonate/talk) на этом
+  // же моменте — иначе автору кажется, что один зритель посчитан
+  // дважды (и в просмотрах, и в реакции). «Резонирует»/«Поговорить»
+  // implicitly включают факт просмотра.
   const viewRows = db.prepare(
-    `SELECT moment_id, COUNT(*) as cnt
-     FROM moment_views WHERE moment_id IN (${ph})
-     GROUP BY moment_id`
+    `SELECT mv.moment_id, COUNT(*) as cnt
+     FROM moment_views mv
+     WHERE mv.moment_id IN (${ph})
+       AND NOT EXISTS (
+         SELECT 1 FROM moment_reactions mr
+         WHERE mr.moment_id = mv.moment_id AND mr.user_id = mv.user_id
+       )
+     GROUP BY mv.moment_id`
   ).all(...ids);
 
   // Build lookup maps
@@ -2079,13 +2088,22 @@ function getMomentReactorsList(momentId) {
   ).all(momentId);
   // Просмотры — один user_id = одна запись. PK (moment_id,user_id), но всё равно
   // оборачиваем в GROUP BY на случай legacy-данных.
+  // ВАЖНО: исключаем тех, у кого уже есть «сильная» реакция (resonate/talk) —
+  // иначе они появляются и в «Вижу», и в своей реакции, и юзер думает что
+  // одна реакция повлекла другую. Резонирует/Поговорить implicitly включают
+  // факт того, что момент видели.
+  const reactedUserIds = new Set(reactions.map(r => r.id));
+  const reactedPh = reactedUserIds.size
+    ? Array.from(reactedUserIds).map(() => '?').join(',')
+    : null;
   const views = db.prepare(
     `SELECT mv.user_id AS id, 'see' AS reaction, MAX(mv.viewed_at) AS created_at, u.name, u.avatar
      FROM moment_views mv JOIN users u ON u.id=mv.user_id
      WHERE mv.moment_id=? AND u.is_blocked=0 AND u.is_deleted=0
+       ${reactedPh ? `AND mv.user_id NOT IN (${reactedPh})` : ''}
      GROUP BY mv.user_id
      ORDER BY created_at DESC`
-  ).all(momentId);
+  ).all(momentId, ...(reactedPh ? Array.from(reactedUserIds) : []));
   return normalizeAvatars([...reactions, ...views]);
 }
 
