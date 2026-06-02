@@ -58,11 +58,18 @@ function requireTenantAccess(getTenantIdFromReq) {
     if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
     const user = db.findUserById(req.user.id);
     if (!user || user.is_blocked) return res.status(403).json({ error: 'Forbidden' });
-    if (!user.is_admin && tenant.owner_id !== user.id) {
+    // Доступ к ручкам tenant'а: системный админ, владелец или со-админ
+    // (запись в tenant_admins). Со-админ получает весь self-service:
+    // привязки чатов к курсам, чтение логов, секрет вебхука, /join-ссылки.
+    // Управление списком со-админов и удаление школы остаются за владельцем.
+    const isOwner   = tenant.owner_id === user.id;
+    const isCoAdmin = db.isTenantOwnerOrAdmin(tenant.id, user.id);
+    if (!user.is_admin && !isOwner && !isCoAdmin) {
       return res.status(403).json({ error: 'Нет доступа к этой школе' });
     }
     req.tenant = tenant;
     req.tenantUser = user;
+    req.isTenantOwner = isOwner || user.is_admin;
     next();
   });
 }
@@ -2392,11 +2399,11 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   // ── Multi-tenant CRUD ───────────────────────────────────────────────────
-  // Список школ: админу — все, бизнес-юзеру — только свои
+  // Список школ: админу — все, бизнес-юзеру — свои + те, где он со-админ
   r.get('/admin/awo/tenants', requireBusinessOrAdmin, (req, res) => {
     const user = req.businessUser;
     if (user.is_admin) return res.json(db.listTenants());
-    res.json(db.listTenantsForOwner(user.id));
+    res.json(db.listTenantsForUser(user.id));
   });
   // Создание школы: бизнес-юзер или админ, non-admin лимит 3 школы
   const MAX_TENANTS_PER_USER = 3;
@@ -2421,8 +2428,53 @@ module.exports = function makeRouter(db, broadcast) {
       if (req.params.id === db.DEFAULT_TENANT_ID) {
         return res.status(400).json({ error: 'Нельзя удалить tenant по умолчанию' });
       }
+      // Только владелец (или системный админ) может удалить школу.
+      if (!req.isTenantOwner) {
+        return res.status(403).json({ error: 'Удалить школу может только владелец' });
+      }
       db.deleteTenant(req.params.id);
       res.json({ ok: true });
+    });
+
+  // ── Tenant admins (co-admins) ───────────────────────────────────────────
+  // Только владелец (и системный админ) видят и меняют этот список.
+  r.get('/admin/awo/tenants/:id/admins',
+    requireTenantAccess(req => req.params.id),
+    (req, res) => {
+      if (!req.isTenantOwner) {
+        return res.status(403).json({ error: 'Только владелец может управлять админами' });
+      }
+      res.json(db.listTenantAdmins(req.params.id));
+    });
+
+  r.post('/admin/awo/tenants/:id/admins',
+    requireTenantAccess(req => req.params.id),
+    (req, res) => {
+      if (!req.isTenantOwner) {
+        return res.status(403).json({ error: 'Только владелец может добавлять админов' });
+      }
+      // Принимаем либо userId, либо phone — для удобства из UI школы.
+      let { userId, phone } = req.body || {};
+      if (!userId && phone) {
+        const u = db.findUserByPhone(phone);
+        if (!u) return res.status(404).json({ error: 'Пользователь с таким телефоном не найден' });
+        userId = u.id;
+      }
+      if (!userId) return res.status(400).json({ error: 'userId или phone обязателен' });
+      try {
+        const admins = db.addTenantAdmin(req.params.id, userId, req.user.id);
+        res.json(admins);
+      } catch (e) { res.status(400).json({ error: e.message }); }
+    });
+
+  r.delete('/admin/awo/tenants/:id/admins/:userId',
+    requireTenantAccess(req => req.params.id),
+    (req, res) => {
+      if (!req.isTenantOwner) {
+        return res.status(403).json({ error: 'Только владелец может удалять админов' });
+      }
+      db.removeTenantAdmin(req.params.id, req.params.userId);
+      res.json(db.listTenantAdmins(req.params.id));
     });
   r.post('/admin/awo/tenants/:id/rotate-token',
     requireTenantAccess(req => req.params.id),

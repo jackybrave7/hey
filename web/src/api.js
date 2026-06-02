@@ -247,6 +247,9 @@ export const api = {
   adminCreateAwoTenant:    (name)          => req('POST',   '/admin/awo/tenants', { name }),
   adminDeleteAwoTenant:    (id)            => req('DELETE', `/admin/awo/tenants/${encodeURIComponent(id)}`),
   adminRotateAwoToken:     (id)            => req('POST',   `/admin/awo/tenants/${encodeURIComponent(id)}/rotate-token`),
+  awoListTenantAdmins:     (tenantId)      => req('GET',    `/admin/awo/tenants/${encodeURIComponent(tenantId)}/admins`),
+  awoAddTenantAdmin:       (tenantId, body) => req('POST',  `/admin/awo/tenants/${encodeURIComponent(tenantId)}/admins`, body),
+  awoRemoveTenantAdmin:    (tenantId, userId) => req('DELETE', `/admin/awo/tenants/${encodeURIComponent(tenantId)}/admins/${encodeURIComponent(userId)}`),
 
   // Business access (заявка на бизнес-доступ)
   requestBusinessAccess:   (note)          => req('POST',   '/me/business/request', { note }),

@@ -7,6 +7,7 @@ import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
 import { useConfirm } from '../Screens';
 import AwoGuide from './AwoGuide';
+import TenantAdminsSection from './TenantAdminsSection';
 
 // Тёмные карточки + высоко-контрастный текст — фон админки имеет светлые
 // области градиента, поэтому используем не прозрачно-белые, а тёмные подложки.
@@ -473,6 +474,9 @@ export default function AdminAwo() {
           </div>
         )}
       </div>
+
+      {/* Со-админы школы (видна только владельцу — внутри 403→null) */}
+      <TenantAdminsSection tenantId={tenantId} notify={notify}/>
 
       {/* Настройки */}
       <div style={cardStyle}>

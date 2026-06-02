@@ -382,6 +382,20 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS tenants (
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_tenants_owner ON tenants(owner_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_tenants_token ON tenants(awo_webhook_token)'); } catch {}
 
+// Соадмины школы: дополнительно к одному `owner_id` можно прокинуть
+// права администратора школы любому юзеру. У них тот же доступ к
+// CRUD интеграции (привязки чатов к курсам, секреты вебхука,
+// /join-ссылки) — кроме удаления самой школы и управления списком
+// соадминов: это делает только владелец.
+try { db.exec(`CREATE TABLE IF NOT EXISTS tenant_admins (
+  tenant_id  TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  added_by   TEXT,
+  added_at   INTEGER NOT NULL,
+  PRIMARY KEY (tenant_id, user_id)
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_tenant_admins_user ON tenant_admins(user_id)'); } catch {}
+
 // tenant_id — на все ключевые таблицы интеграции. NULL = дефолтный tenant
 // (для существующих записей). После миграции мы их перекодируем.
 try { db.exec('ALTER TABLE awo_course_chats ADD COLUMN tenant_id TEXT'); } catch {}
@@ -728,6 +742,7 @@ function hardDeleteUserAccount(userId) {
     // 10. Tenants — если этот юзер owner какого-то tenant'а, обнуляем
     //     (сам tenant не удаляем, чтобы не ронять курсы школы).
     try { db.prepare('UPDATE tenants SET owner_id=NULL, account_id=NULL WHERE owner_id=? OR account_id=?').run(userId, userId); } catch {}
+    try { db.prepare('DELETE FROM tenant_admins WHERE user_id=?').run(userId); } catch {}
     // 11. Admin logs — оставляем как историю, но обнуляем target_user_id
     try { db.prepare('UPDATE admin_logs SET target_user_id=NULL WHERE target_user_id=?').run(userId); } catch {}
     // 12. Наконец сам пользователь
@@ -3064,6 +3079,56 @@ function listTenantsForOwner(ownerId) {
   return db.prepare('SELECT * FROM tenants WHERE owner_id=? ORDER BY created_at ASC')
     .all(ownerId).map(_rowToTenant);
 }
+
+// Школы, к которым у юзера есть доступ как у владельца ИЛИ как у
+// со-админа. Используется в self-service UI «Мои школы».
+function listTenantsForUser(userId) {
+  return db.prepare(
+    `SELECT t.* FROM tenants t
+     WHERE t.owner_id = ?
+        OR EXISTS (SELECT 1 FROM tenant_admins ta
+                   WHERE ta.tenant_id = t.id AND ta.user_id = ?)
+     ORDER BY t.created_at ASC`
+  ).all(userId, userId).map(_rowToTenant);
+}
+
+function isTenantOwnerOrAdmin(tenantId, userId) {
+  if (!tenantId || !userId) return false;
+  const t = db.prepare('SELECT owner_id FROM tenants WHERE id=?').get(tenantId);
+  if (!t) return false;
+  if (t.owner_id === userId) return true;
+  return !!db.prepare(
+    'SELECT 1 FROM tenant_admins WHERE tenant_id=? AND user_id=?'
+  ).get(tenantId, userId);
+}
+
+function listTenantAdmins(tenantId) {
+  return db.prepare(
+    `SELECT u.id, u.name, u.phone, u.avatar, ta.added_at, ta.added_by,
+            (SELECT inv.name FROM users inv WHERE inv.id = ta.added_by) AS added_by_name
+     FROM tenant_admins ta
+     JOIN users u ON u.id = ta.user_id
+     WHERE ta.tenant_id = ?
+     ORDER BY ta.added_at ASC`
+  ).all(tenantId).map(r => ({ ...r, avatar: avatarPayload(r.id, r.avatar) }));
+}
+
+function addTenantAdmin(tenantId, userId, addedBy) {
+  const t = db.prepare('SELECT owner_id FROM tenants WHERE id=?').get(tenantId);
+  if (!t) throw new Error('Tenant not found');
+  if (t.owner_id === userId) throw new Error('Владелец уже имеет доступ к школе');
+  const u = db.prepare('SELECT id, is_deleted FROM users WHERE id=?').get(userId);
+  if (!u || u.is_deleted) throw new Error('Пользователь не найден');
+  db.prepare(
+    `INSERT OR IGNORE INTO tenant_admins (tenant_id, user_id, added_by, added_at)
+     VALUES (?, ?, ?, ?)`
+  ).run(tenantId, userId, addedBy || null, now());
+  return listTenantAdmins(tenantId);
+}
+
+function removeTenantAdmin(tenantId, userId) {
+  db.prepare('DELETE FROM tenant_admins WHERE tenant_id=? AND user_id=?').run(tenantId, userId);
+}
 function getTenantById(id) {
   return _rowToTenant(db.prepare('SELECT * FROM tenants WHERE id=?').get(id));
 }
@@ -3180,7 +3245,8 @@ module.exports = {
   getSetting, setSetting, getAwoSettings, setAwoSettings,
   // Multi-tenant AWO (Шаг 1)
   DEFAULT_TENANT_ID,
-  listTenants, listTenantsForOwner, getTenantById, getTenantByToken,
+  listTenants, listTenantsForOwner, listTenantsForUser, getTenantById, getTenantByToken,
+  isTenantOwnerOrAdmin, listTenantAdmins, addTenantAdmin, removeTenantAdmin,
   createTenant, updateTenant, deleteTenant, rotateTenantToken,
   // Business access (Шаг 4.2)
   requestBusinessAccess, cancelBusinessRequest, listBusinessRequests,
