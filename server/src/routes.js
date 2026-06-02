@@ -143,7 +143,7 @@ module.exports = function makeRouter(db, broadcast) {
       if (data) {
         const conv = db.getConversationById(data.groupId);
         const inv  = db.findUserById(data.inviterId);
-        if (conv && conv.type === 'group' && inv && conv.admin_id === inv.id && !inv.is_blocked) {
+        if (conv && conv.type === 'group' && inv && !inv.is_blocked && db.isGroupAdmin(conv.id, inv.id)) {
           groupInvite = { groupId: conv.id, inviterId: inv.id };
         }
       }
@@ -1139,8 +1139,12 @@ module.exports = function makeRouter(db, broadcast) {
     if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Группа не найдена' });
     const inviter = db.findUserById(data.inviterId);
     if (!inviter || inviter.is_blocked) return res.status(404).json({ error: 'Приглашающий недоступен' });
-    // Если приглашающий уже не админ — ссылка теряет силу
-    if (conv.admin_id !== inviter.id) return res.status(400).json({ error: 'Приглашающий больше не админ группы' });
+    // Ссылка теряет силу, если приглашающий перестал быть админом
+    // (создатель ИЛИ соадмин). Раньше проверяли только admin_id и
+    // ссылки от соадминов сразу отдавали «больше не админ группы».
+    if (!db.isGroupAdmin(conv.id, inviter.id)) {
+      return res.status(400).json({ error: 'Приглашающий больше не админ группы' });
+    }
     const memberCount = db.getGroupMembers(conv.id, false).length;
     res.json({
       group:   { id: conv.id, name: conv.name, icon: conv.icon, member_count: memberCount },
@@ -1155,7 +1159,7 @@ module.exports = function makeRouter(db, broadcast) {
     const conv = db.getConversationById(data.groupId);
     if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Группа не найдена' });
     const inviter = db.findUserById(data.inviterId);
-    if (!inviter || conv.admin_id !== inviter.id) {
+    if (!inviter || !db.isGroupAdmin(conv.id, inviter.id)) {
       return res.status(400).json({ error: 'Ссылка недействительна' });
     }
     try {
