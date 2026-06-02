@@ -51,7 +51,10 @@ const PROVIDER_BADGE = {
   kinescope: { label: '▶ Kinescope', color: '#b89aff' },
 };
 
-export default function MomentCard({ moment, isMine, onClick }) {
+// bare=true — скрывает glass-caption (имя автора, текст, статистика) и
+// бейдж «поиск». Используется в карточке контакта: там нужно только
+// визуальное превью момента (фото / эмодзи / иконка музыки).
+export default function MomentCard({ moment, isMine, onClick, bare }) {
   const salesPressure  = useSalesPressure();
   const hasMedia       = !!moment.media_url;
   // Считаем что embedded видео есть, если есть объект (даже без thumbnail — покажем плейсхолдер)
@@ -184,7 +187,7 @@ export default function MomentCard({ moment, isMine, onClick }) {
         }}>🎧</div>
       )}
       {/* Embedded video badge */}
-      {hasEmbedVideo && providerBadge && (
+      {hasEmbedVideo && providerBadge && !bare && (
         <div style={{
           position:'absolute',top:10,right:10,zIndex:3,
           background:'rgba(0,0,0,.65)',backdropFilter:'blur(8px)',
@@ -200,7 +203,7 @@ export default function MomentCard({ moment, isMine, onClick }) {
 
 
       {/* Search badge */}
-      {moment.is_search && !isMine && (
+      {moment.is_search && !isMine && !bare && (
         <div style={{
           position:'absolute',top:10,right: moment.media_type ? 44 : 10,zIndex:3,
           background:'rgba(60,140,100,.75)',backdropFilter:'blur(6px)',
@@ -211,7 +214,7 @@ export default function MomentCard({ moment, isMine, onClick }) {
       )}
 
       {/* Glass caption — только для чужих моментов; на своих ничего не перекрывает превью */}
-      {!isMine && (
+      {!isMine && !bare && (
         <div style={{
           position:'absolute',bottom:8,left:8,right:8,zIndex:2,
           background:'rgba(20,12,40,.65)',backdropFilter:'blur(14px)',
@@ -263,7 +266,7 @@ export default function MomentCard({ moment, isMine, onClick }) {
       )}
 
       {/* На своих моментах — компактный счётчик просмотров в углу */}
-      {isMine && (moment.views > 0 || moment.stats?.resonate > 0 || moment.stats?.talk > 0) && (
+      {isMine && !bare && (moment.views > 0 || moment.stats?.resonate > 0 || moment.stats?.talk > 0) && (
         <div style={{
           position:'absolute',bottom:8,left:8,zIndex:2,
           background:'rgba(20,12,40,.6)',backdropFilter:'blur(10px)',

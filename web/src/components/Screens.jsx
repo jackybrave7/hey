@@ -2921,6 +2921,7 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                       author_is_super: merged.is_super,
                     }}
                     isMine={false}
+                    bare
                     onClick={() => onOpenMoment?.(m)}
                   />
                 ))}
