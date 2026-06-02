@@ -6500,13 +6500,46 @@ function ScheduledList({ items, onCancel }) {
         }}>
           {items.map(s => {
             const at = new Date(s.send_at * 1000);
+            const att = s.attachment;
+            // Превью миниатюры вложения: одиночное фото, первое из галереи,
+            // эмодзи-иконка для файла. Для аудио — иконка нот.
+            let thumb = null, badge = null;
+            if (att?.type === 'image' && att.url) {
+              thumb = att.url;
+            } else if (att?.type === 'images' && Array.isArray(att.urls) && att.urls[0]) {
+              thumb = att.urls[0];
+              badge = `+${att.urls.length - 1}`;
+            } else if (att?.type === 'file') {
+              badge = '📎';
+            } else if (att?.type === 'audio') {
+              badge = '🎙';
+            }
             return (
               <div key={s.id} style={{
-                display:'flex', alignItems:'flex-start', gap: 8,
+                display:'flex', alignItems:'flex-start', gap: 10,
                 padding:'8px 10px', borderRadius: 10,
                 background:'rgba(255,255,255,.05)',
                 border:'1px solid rgba(255,255,255,.08)',
               }}>
+                {(thumb || badge) && (
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 8, flexShrink: 0,
+                    background: thumb ? '#0a0518' : 'rgba(120,90,200,.25)',
+                    overflow: 'hidden', position: 'relative',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                  }}>
+                    {thumb
+                      ? <img src={thumb} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                      : <span style={{ fontSize: 20 }}>{badge}</span>}
+                    {thumb && badge && (
+                      <span style={{ position:'absolute', right: 2, bottom: 2,
+                        background:'rgba(0,0,0,.65)', color:'white',
+                        fontSize: 10, fontWeight: 700, padding:'1px 5px', borderRadius: 6 }}>
+                        {badge}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color:'rgba(220,200,255,.75)', fontSize: 11, marginBottom: 3 }}>
                     {at.toLocaleString('ru', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}
@@ -6514,7 +6547,9 @@ function ScheduledList({ items, onCancel }) {
                   <div style={{ color:'white', fontSize: 13, lineHeight: 1.4,
                     overflow:'hidden', display:'-webkit-box',
                     WebkitLineClamp: 3, WebkitBoxOrient:'vertical' }}>
-                    {s.text || '(вложение)'}
+                    {s.text || (att?.type === 'file' ? (att.name || 'файл')
+                              : att?.type === 'audio' ? 'голосовое'
+                              : att?.type ? 'изображение' : '(пусто)')}
                   </div>
                 </div>
                 <button onClick={() => onCancel(s.id)}
@@ -7277,6 +7312,39 @@ export function ChatScreen() {
     if (lname.endsWith('.zip') || lname.endsWith('.rar')) return '🗜️';
     if (lname.endsWith('.txt') || mime?.startsWith('text/')) return '📄';
     return '📎';
+  }
+
+  // Загрузить текущие вложения композера (картинки или файл) и собрать
+  // объект attachment, как у обычного сообщения. Используется и обычной
+  // отправкой, и планированием — переиспользуем единый код заливки.
+  // Возвращает: { attachment | null, kind: 'images'|'file'|null }
+  async function uploadComposerAttachment() {
+    if (imgPreviews.length > 0) {
+      if (imgPreviews.some(p => p.uploading)) return { attachment: null, kind: null, busy: true };
+      const captured = imgPreviews;
+      const results = await Promise.all(captured.map(p =>
+        uploadMedia(p.file, 'chat-image', {
+          getPresignUrl: api.getPresignUrl,
+          uploadImage:   api.uploadImage,
+        })
+      ));
+      const urls = results.map(r => r.url);
+      const attachment = urls.length === 1
+        ? { type: 'image',  url:  urls[0] }
+        : { type: 'images', urls };
+      return { attachment, kind: 'images', captured };
+    }
+    if (filePreview) {
+      const uploaded = await uploadFile(filePreview.file, { getPresignUrl: api.getPresignUrl });
+      return {
+        attachment: {
+          type: 'file', url: uploaded.url, name: uploaded.name,
+          size: uploaded.size, mime: uploaded.mime,
+        },
+        kind: 'file',
+      };
+    }
+    return { attachment: null, kind: null };
   }
 
   async function send() {
@@ -9025,15 +9093,45 @@ export function ChatScreen() {
               }
               try {
                 const t = text.trim();
-                if (!t) { heyToast('Пустое сообщение', 'warning'); return; }
+                // Заранее загружаем вложения (картинки/файл) в S3 —
+                // запланированному сообщению нужна постоянная ссылка,
+                // blob:/File живут только в текущей сессии. После
+                // успешной заливки чистим из composer'а; на ошибке
+                // оставляем как есть.
+                let attachment = null;
+                let capturedImgs = null;
+                if (imgPreviews.length > 0 || filePreview) {
+                  if (imgPreviews.some(p => p.uploading)) {
+                    heyToast('Дождись загрузки', 'warning'); return;
+                  }
+                  setImgPreviews(prev => prev.map(p => ({ ...p, uploading: true })));
+                  setFilePreview(p => p ? { ...p, uploading: true } : p);
+                  let up;
+                  try { up = await uploadComposerAttachment(); }
+                  catch (err) {
+                    heyToast(err.message || 'Не удалось загрузить вложение', 'error');
+                    setImgPreviews(prev => prev.map(p => ({ ...p, uploading: false })));
+                    setFilePreview(p => p ? { ...p, uploading: false } : p);
+                    return;
+                  }
+                  attachment   = up.attachment;
+                  capturedImgs = up.captured;
+                }
+                if (!t && !attachment) { heyToast('Пустое сообщение', 'warning'); return; }
                 const sched = await api.scheduleMessage(convId, {
-                  text: t,
+                  text: t || null,
+                  attachment,
                   reply_to_id: replyTo?.id || null,
                   send_at: sendAt,
                 });
                 setScheduled(prev => [...prev, sched].sort((a, b) => a.send_at - b.send_at));
                 setText('');
                 setReplyTo(null);
+                setImgPreviews([]);
+                setFilePreview(null);
+                if (capturedImgs) {
+                  capturedImgs.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
+                }
                 setScheduleOpen(false);
                 heyToast(`📅 Запланировано на ${at.toLocaleString('ru')}`, 'success');
               } catch (e) {
