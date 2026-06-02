@@ -2742,6 +2742,17 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
   const [editingNick, setEditingNick] = useState(false);
   const [nickDraft, setNickDraft] = useState(contact.nickname || '');
   const [nickSaving, setNickSaving] = useState(false);
+  // Защита от двойного тапа по «Добавить в контакты»: при первом клике
+  // блокируем кнопку до завершения колбэка. Раньше юзер видел двойной
+  // тост — успешный от первого запроса и «Already in contacts»
+  // от второго, отправленного до того как модалка успела перерисоваться.
+  const [adding, setAdding] = useState(false);
+  async function handleAdd() {
+    if (adding) return;
+    setAdding(true);
+    try { await onAddContact?.(); }
+    finally { setAdding(false); }
+  }
   // Свежие данные профиля (аватар / bio / headline / active_moments) —
   // подтягиваем при открытии чтобы карточка не показывала устаревшие данные.
   const [fresh, setFresh] = useState(null);
@@ -2988,16 +2999,19 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                     <span>В контактах</span>
                   </button>
                 ) : (
-                  <button onClick={onAddContact}
-                    style={{flex:1,padding:'12px 10px',background:'rgba(255,255,255,.08)',
+                  <button onClick={handleAdd} disabled={adding}
+                    style={{flex:1,padding:'12px 10px',
+                      background: adding ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.08)',
                       border:'1px solid rgba(255,255,255,.18)',borderRadius:14,
-                      color:'white',fontSize:14,fontWeight:600,cursor:'pointer',
+                      color:'white',fontSize:14,fontWeight:600,
+                      cursor: adding ? 'wait' : 'pointer',
                       transition:'background .15s',
-                      display:'flex',alignItems:'center',justifyContent:'center',gap:8,lineHeight:1.2}}
-                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.14)'}
-                    onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.08)'}>
+                      display:'flex',alignItems:'center',justifyContent:'center',gap:8,lineHeight:1.2,
+                      opacity: adding ? .6 : 1}}
+                    onMouseEnter={e=>{ if (!adding) e.currentTarget.style.background='rgba(255,255,255,.14)'; }}
+                    onMouseLeave={e=>{ if (!adding) e.currentTarget.style.background='rgba(255,255,255,.08)'; }}>
                     <Icon name="user-plus" size={16}/>
-                    <span style={{textAlign:'left'}}>Добавить в контакты</span>
+                    <span style={{textAlign:'left'}}>{adding ? 'Добавляю…' : 'Добавить в контакты'}</span>
                   </button>
                 )}
               </div>

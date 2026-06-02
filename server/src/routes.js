@@ -584,8 +584,17 @@ module.exports = function makeRouter(db, broadcast) {
     if (target.id === req.user.id) return res.status(400).json({ error: 'Нельзя добавить себя' });
     if (target.is_blocked) return res.status(404).json({ error: 'Пользователь не найден' });
     if (target.is_deleted) return res.status(400).json({ error: 'Пользователь удалил аккаунт' });
+    // Идемпотентность: повторное добавление того же контакта не должно
+    // ломать UX 409-ой. Часто срабатывает на двойном тапе по кнопке
+    // «Добавить в контакты» в карточке — первый запрос отрабатывает,
+    // второй приходит когда client-state ещё не успел перейти в
+    // «уже в контактах». Возвращаем 200 с тем же телом.
     try { db.addContact(req.user.id, target.id, nickname); }
-    catch(e) { return res.status(409).json({ error: e.message }); }
+    catch (e) {
+      if (!/Already in contacts/i.test(e.message)) {
+        return res.status(409).json({ error: e.message });
+      }
+    }
     const { password, ...safe } = target;
     res.json({ ...safe, nickname });
   });
