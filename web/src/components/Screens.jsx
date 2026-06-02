@@ -2903,28 +2903,28 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                   она уезжала за край карточки и приходилось скроллить.
                   Теперь — grid с фиксированным числом колонок (до 3),
                   все моменты гарантированно помещаются по ширине. */}
-              {(() => {
-                const cols = Math.min(merged.active_moments.length, 3);
-                return (
-                  <div style={{
-                    display:'grid',
-                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                    gap: 8,
-                  }}>
-                    {merged.active_moments.map(m => (
-                      <MomentCard key={m.id}
-                        moment={{ ...m,
-                          author_name: merged.name,
-                          author_avatar: merged.avatar,
-                          author_is_super: merged.is_super,
-                        }}
-                        isMine={false}
-                        onClick={() => onOpenMoment?.(m)}
-                      />
-                    ))}
-                  </div>
-                );
-              })()}
+              {/* Сетка фиксированной формы: ВСЕГДА 3 колонки, чтобы плитка
+                  имела одинаковый размер независимо от того, сколько у
+                  пользователя моментов (1 / 2 / 3). Один момент займёт
+                  левую треть, остальные слоты — пустые. Так визуально
+                  не «прыгает» размер карточек между разными собеседниками. */}
+              <div style={{
+                display:'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: 8,
+              }}>
+                {merged.active_moments.slice(0, 3).map(m => (
+                  <MomentCard key={m.id}
+                    moment={{ ...m,
+                      author_name: merged.name,
+                      author_avatar: merged.avatar,
+                      author_is_super: merged.is_super,
+                    }}
+                    isMine={false}
+                    onClick={() => onOpenMoment?.(m)}
+                  />
+                ))}
+              </div>
             </div>
           )}
 
