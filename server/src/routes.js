@@ -1054,7 +1054,30 @@ module.exports = function makeRouter(db, broadcast) {
 
       broadcast(members, { type: 'group:member_removed', conversationId: req.params.id, userId: req.params.userId });
       // Удаляемого тоже уведомляем (вдруг он сейчас в чате)
-      broadcast([req.params.userId], { type: 'group:member_removed', conversationId: req.params.id, userId: req.params.userId });
+      broadcast([req.params.userId], { type: 'group:member_removed', conversationId: req.params.id, userId: req.params.userId,
+        // Сразу везём ему причину — кто и из какой группы убрал. Клиент
+        // покажет toast, иначе чат просто пропадёт без объяснений.
+        kicked_by_name: !isLeave ? (actor?.name || null) : null,
+        group_name:     !isLeave ? (conv?.name || null) : null,
+      });
+
+      // Push-уведомление выгнанному (только если не сам ушёл и есть подписки).
+      // Без него кикнутый юзер увидит лишь исчезнувший чат — никакой
+      // обратной связи о том, что и кем сделано.
+      if (!isLeave && conv?.type === 'group' && target) {
+        try {
+          const subs = db.getPushSubscriptions(target.id);
+          if (subs.length) {
+            push.sendPushToUser(subs, {
+              title: `Группа «${conv.name || 'без названия'}»`,
+              body:  `${actor?.name || 'Администратор'} удалил вас из группы`,
+              tag:   `group-kick:${conv.id}`,
+            }).then(gone => { if (gone?.length) db.removePushSubscriptions(gone); })
+              .catch(() => {});
+          }
+        } catch {}
+      }
+
       res.json({ ok: true });
     } catch(e) { res.status(403).json({ error: e.message }); }
   });

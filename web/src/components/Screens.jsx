@@ -3893,8 +3893,15 @@ export function ConversationsScreen() {
   useEffect(() => socket.on('group:invite_declined', ({ conversationId }) => {
     setConvs(prev => prev.filter(c => c.id !== conversationId));
   }), []);
-  useEffect(() => socket.on('group:member_removed', ({ conversationId, userId }) => {
-    if (userId === user?.id) setConvs(prev => prev.filter(c => c.id !== conversationId));
+  useEffect(() => socket.on('group:member_removed', ({ conversationId, userId, kicked_by_name, group_name }) => {
+    if (userId === user?.id) {
+      setConvs(prev => prev.filter(c => c.id !== conversationId));
+      // Сервер прокидывает имя кикнувшего + название группы — показываем
+      // тост, иначе чат просто молча исчезает из списка.
+      if (kicked_by_name) {
+        heyToast(`${kicked_by_name} удалил вас из группы «${group_name || ''}»`, 'info');
+      }
+    }
   }), [user?.id]);
 
   // ── Поиск по чатам ────────────────────────────────────────────────────
