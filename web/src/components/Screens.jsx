@@ -6379,6 +6379,16 @@ export const AudioPlayer = memo(function AudioPlayer({ url, duration: initDur, i
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Module-level хранилище черновиков-вложений (картинки и файл) по convId.
+// Текст черновика умеет переживать перезагрузку через localStorage, а вот
+// картинки/файлы — это blob: URL + File-объекты, в localStorage их класть
+// дорого и бессмысленно (после reload blob: URL мёртв). Зато в рамках
+// сессии Map переживает уход со страницы /chats и обратно: ChatScreen
+// демонтируется, но модуль остаётся, и при возврате в чат мы достаём
+// прежние превью.
+const chatImgDrafts  = new Map();  // convId -> array of {dataUrl, file, uploading?}
+const chatFileDrafts = new Map();  // convId -> { file, uploading? } | null
+
 export function ChatScreen() {
   const nav = useNavigate();
   const location = useLocation();
@@ -6412,8 +6422,8 @@ export function ChatScreen() {
   const [editingMsg,  setEditingMsg]  = useState(null);
   const [msgMenu,     setMsgMenu]     = useState(null);
   const [replyTo,     setReplyTo]     = useState(null); // message object to reply to
-  const [imgPreviews, setImgPreviews] = useState([]); // [{dataUrl, file, uploading?}]
-  const [filePreview, setFilePreview] = useState(null); // { file, uploading?: bool }
+  const [imgPreviews, setImgPreviews] = useState(() => convId ? (chatImgDrafts.get(convId)  || []) : []);   // [{dataUrl, file, uploading?}]
+  const [filePreview, setFilePreview] = useState(() => convId ? (chatFileDrafts.get(convId) || null) : null); // { file, uploading?: bool }
   // momentRef — мини-карточка момента, прицепленная к черновику.
   // Прилетает через nav state, когда пользователь жмёт «Написать» в попапе момента.
   const [momentRef,   setMomentRef]   = useState(null);
@@ -6472,8 +6482,24 @@ export function ChatScreen() {
     let saved = '';
     try { saved = localStorage.getItem(draftKey(convId)) || ''; } catch {}
     setText(saved);
+    setImgPreviews(chatImgDrafts.get(convId)  || []);
+    setFilePreview(chatFileDrafts.get(convId) || null);
     savedDraftRef.current = '';
   }, [convId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Сохраняем картинки/файл в module Map при любом изменении. Это даёт
+  // переживание ChatScreen unmount/remount при навигации.
+  useEffect(() => {
+    if (!convId) return;
+    if (imgPreviews.length) chatImgDrafts.set(convId, imgPreviews);
+    else                    chatImgDrafts.delete(convId);
+  }, [imgPreviews, convId]);
+
+  useEffect(() => {
+    if (!convId) return;
+    if (filePreview) chatFileDrafts.set(convId, filePreview);
+    else             chatFileDrafts.delete(convId);
+  }, [filePreview, convId]);
 
   // Авто-сохранение черновика (debounced). Во время правки чужого
   // сообщения не пишем — у нас уже есть бэкап исходного черновика
