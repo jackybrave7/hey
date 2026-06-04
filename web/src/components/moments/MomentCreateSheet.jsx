@@ -5,6 +5,7 @@ import { useAuth } from '../../AuthContext';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 import MoodEmoji from './MoodEmoji';
 import { HEY_EMOJI, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
+import EmojiInput from '../EmojiInput';
 
 // Набор настроений для ручного выбора (когда нет медиа)
 const MOOD_OPTIONS = [
@@ -496,23 +497,27 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
             </div>
           )}
 
-          {/* Text */}
-          <textarea
+          {/* Text. EmojiInput (contenteditable) рендерит [name]-токены
+              как картинки сразу при наборе — то же поведение, что и
+              в чат-композере. Maxlength 2000 эмулируется в onChange. */}
+          <EmojiInput
             ref={textRef}
             value={text}
-            onChange={e => setText(e.target.value)}
-            placeholder="Расскажи как другу — что у тебя сейчас."
-            maxLength={2000}
-            rows={5}
-            style={{
-              width:'100%',boxSizing:'border-box',
-              background:'rgba(255,255,255,.07)',border:'1px solid rgba(255,255,255,.14)',
-              borderRadius:14,padding:'13px 15px',color:'white',fontSize:15,
-              fontFamily:'inherit',resize:'vertical',outline:'none',lineHeight:1.7,
-              minHeight:120,transition:'border-color .15s',whiteSpace:'pre-wrap'
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v.length > 2000) return; // отсекаем дальше клавиатуру
+              setText(v);
             }}
-            onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.55)'}
-            onBlur={e=>e.target.style.borderColor='rgba(255,255,255,.14)'}
+            placeholder="Расскажи как другу — что у тебя сейчас."
+            style={{
+              width:'100%', boxSizing:'border-box',
+              background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.14)',
+              borderRadius:14, padding:'13px 15px', color:'white', fontSize:15,
+              lineHeight:1.7, minHeight:120, maxHeight: 360, overflow:'auto',
+              transition:'border-color .15s', whiteSpace:'pre-wrap',
+            }}
+            onFocus={(e)=>{ e.currentTarget.style.borderColor='rgba(180,140,220,.55)'; }}
+            onBlur={(e)=>{ e.currentTarget.style.borderColor='rgba(255,255,255,.14)'; }}
           />
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',
             color:'rgba(255,255,255,.45)',fontSize:11,marginTop:-12}}>
@@ -544,20 +549,26 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
             }}>
               {HEY_EMOJI.map(name => (
                 <button key={name} type="button" title={emojiLabel(name)}
+                  // Вставка в EmojiInput (contenteditable): фокусируемся
+                  // на div и через execCommand вставляем токен в текущую
+                  // позицию каретки. handleInput внутри EmojiInput сразу
+                  // же подменит [name] на <img>.
+                  onMouseDown={(e) => e.preventDefault()} // не сбрасываем фокус инпута
                   onClick={() => {
-                    const ta = textRef.current;
+                    const el = textRef.current;
                     const insertTok = `[${name}]`;
-                    if (ta) {
-                      const start = ta.selectionStart ?? text.length;
-                      const end   = ta.selectionEnd   ?? text.length;
-                      const next  = text.slice(0, start) + insertTok + text.slice(end);
-                      setText(next.slice(0, 2000));
-                      // Возвращаем курсор после вставленного токена
-                      requestAnimationFrame(() => {
-                        ta.focus();
-                        const pos = start + insertTok.length;
-                        try { ta.setSelectionRange(pos, pos); } catch {}
-                      });
+                    if (el && el.isContentEditable) {
+                      el.focus();
+                      const sel = window.getSelection();
+                      if (!sel || !el.contains(sel.anchorNode)) {
+                        // курсор вне инпута — клеим в конец
+                        const range = document.createRange();
+                        range.selectNodeContents(el);
+                        range.collapse(false);
+                        sel?.removeAllRanges();
+                        sel?.addRange(range);
+                      }
+                      document.execCommand('insertText', false, insertTok);
                     } else {
                       setText(t => (t + insertTok).slice(0, 2000));
                     }

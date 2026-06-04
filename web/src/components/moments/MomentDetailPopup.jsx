@@ -861,17 +861,22 @@ export default function MomentDetailPopup({
                   <div style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'8px',
                     display:'flex',gap:4}}>
                     {[
-                      { key: 'views',    iconName: 'eye',     count: moment.views || 0,           label: 'просмотры',   noReactors: true },
+                      // Раньше у «👁 просмотры» стоял флаг noReactors:true и
+                      // список «кто видел» не открывался. Теперь имя
+                      // совпадает с фильтром в ReactorsModal ('see'), и
+                      // тап показывает список юзеров с переходом в их
+                      // карточки (как у резонирует / поговорить).
+                      { key: 'see',      iconName: 'eye',     count: moment.views || 0,           label: 'просмотры'   },
                       { key: 'resonate', iconName: 'sparkle', count: moment.stats?.resonate || 0, label: 'резонирует' },
                       { key: 'talk',     iconName: 'chat',    count: moment.stats?.talk || 0,     label: 'поговорить' },
                     ].map(stat => (
                       <button key={stat.key}
                         onClick={() => {
-                          if (stat.count === 0 || stat.noReactors) return;
+                          if (stat.count === 0) return;
                           setReactorsModal(stat.key);
                           if (!reactors) api.getMomentReactors(moment.id).then(setReactors).catch(() => {});
                         }}
-                        disabled={stat.count === 0 || stat.noReactors}
+                        disabled={stat.count === 0}
                         style={{
                           flex:1,padding:'8px 6px',borderRadius:10,
                           background: stat.count > 0 ? 'rgba(255,255,255,.04)' : 'transparent',
