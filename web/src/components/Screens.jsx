@@ -1471,6 +1471,10 @@ export function MyProfileScreen() {
   // Confirm dialog
   const [customConfirm, confirmModal] = useConfirm();
 
+  // Esc — закрывает попапы по очереди, потом уходит на главную ленту.
+  // Хук объявляем тут, а реальные state-ссылки подтягиваются ниже.
+  // Подключим useEffect после объявления состояний (см. ниже).
+
   // Archive popup
   const [archiveSelected, setArchiveSelected] = useState(null);
   const [archiveOpen, setArchiveOpen] = useState(false); // модалка со списком архивных моментов
@@ -1484,6 +1488,24 @@ export function MyProfileScreen() {
   const [savedLoaded,  setSavedLoaded]      = useState(false);
   const [savedOpen,    setSavedOpen]        = useState(false);
   const [savedSelected, setSavedSelected]  = useState(null);
+
+  // Esc: попап → редактирование → выход на ленту /main.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (document.activeElement?.isContentEditable) return;
+      if (savedSelected)  { setSavedSelected(null); return; }
+      if (archiveSelected){ setArchiveSelected(null); return; }
+      if (savedOpen)      { setSavedOpen(false); return; }
+      if (archiveOpen)    { setArchiveOpen(false); return; }
+      if (editing)        { setEditing(false); return; }
+      nav('/main');
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editing, archiveOpen, savedOpen, archiveSelected, savedSelected, nav]);
 
   function toggleSaved() {
     setSavedOpen(v => {
@@ -5562,6 +5584,20 @@ export function GroupSettingsScreen() {
   // Любой админ — создатель ИЛИ участник с is_admin=1
   const myMember = members.find(m => m.id === user?.id);
   const isAdmin = info.admin_id === user?.id || !!myMember?.is_admin;
+
+  // Esc — назад в чат группы. Если режим редактирования инфо — сначала
+  // выходим из него, чтобы не терять навигацию случайным нажатием.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (editing) { setEditing(false); setName(info.name || ''); setIcon(info.icon || '👥'); return; }
+      nav('/chat/' + convId);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editing, info.name, info.icon, convId, nav]);
   const isUrl = (s) => typeof s === 'string' && (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:') || s.startsWith('/'));
 
   useEffect(() => {
@@ -6967,10 +7003,18 @@ export function ChatScreen() {
         return;
       }
       if (searchMode)            { setSearchMode(false); setSearchQuery(''); setSearchResults(null); return; }
+      // Все попапы закрыты — Esc выходит на уровень выше, к списку чатов.
+      // Игнорируем когда фокус в инпуте, чтобы не «терять» текст случайным
+      // нажатием. Composer (contenteditable) обрабатываем отдельно — там
+      // Esc уже отменяет правку выше по списку.
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      if (document.activeElement?.isContentEditable) return;
+      nav('/chats');
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [lightbox, showMedia, msgMenu, reactionPicker, showEmoji, editingMsg, replyTo, imgPreviews, searchMode]);
+  }, [lightbox, showMedia, msgMenu, reactionPicker, showEmoji, editingMsg, replyTo, imgPreviews, searchMode, nav]);
 
   // Scroll to bottom on initial load or after send — Virtuoso's followOutput handles the rest
   useEffect(() => {

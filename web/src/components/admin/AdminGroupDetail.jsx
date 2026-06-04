@@ -20,6 +20,18 @@ export default function AdminGroupDetail() {
     api.adminGetGroup(id).then(setG).catch(e => setError(e.message));
   }, [id]);
 
+  // Esc — назад к списку групп.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      nav('/admin/groups');
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [nav]);
+
   if (error) return (
     <div style={{ padding: '28px 32px' }}>
       <Link to="/admin/groups" style={{ color: 'rgba(180,140,255,.85)', fontSize: 13 }}>← К списку групп</Link>

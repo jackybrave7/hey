@@ -126,6 +126,19 @@ export default function AdminAwo() {
     api.getContacts().then(setContacts).catch(() => {});
   }, [tenantId]);
 
+  // Esc — сначала закрыть «Руководство», иначе на список школ.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (showGuide) { setShowGuide(false); return; }
+      nav(basePath);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showGuide, basePath, nav]);
+
   async function saveSettings() {
     setSavingSettings(true);
     try {

@@ -51,6 +51,18 @@ export default function AdminUserDetail() {
 
   useEffect(() => { reload(); }, [id]);
 
+  // Esc — назад к списку пользователей.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'Escape') return;
+      const tag = (document.activeElement?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      nav('/admin/users');
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [nav]);
+
   async function handleResetPassword() {
     if (!await customConfirm('Сбросить пароль пользователю?')) return;
     try {
