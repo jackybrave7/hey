@@ -1,7 +1,15 @@
 // MomentCard.jsx
 import MoodEmoji from './MoodEmoji';
 import EmbeddedVideoPreview from './EmbeddedVideoPreview';
+import Icon from '../Icon';
 import { useSalesPressure } from '../../lib/publicSettings';
+
+// Карта реакции юзера → иконка для бейджа над превью момента.
+// Раньше показывали россыпь эмодзи (👁 ✨ 🤝) по тотал-счётчикам, что
+// читалось как «у меня 2 реакции» когда было видно несколько значков.
+// Теперь показываем ОДИН монохромный значок собственной реакции.
+const MY_RX_ICON = { see: 'eye', resonate: 'sparkle', talk: 'chat' };
+const MY_RX_LABEL = { see: 'Вижу', resonate: 'Резонирует', talk: 'Поговорить' };
 
 function fmtTime(ts) {
   if (!ts) return '';
@@ -256,11 +264,17 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
           </div>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
             <span style={{color:'rgba(255,255,255,.35)',fontSize:10}}>{fmtTime(moment.created_at)}</span>
-            <div style={{display:'flex',alignItems:'center',gap:4}}>
-              {moment.stats?.see      > 0 && <span style={{fontSize:12,lineHeight:1}}>👁</span>}
-              {moment.stats?.resonate > 0 && <span style={{fontSize:12,lineHeight:1}}>✨</span>}
-              {moment.stats?.talk     > 0 && <span style={{fontSize:12,lineHeight:1}}>🤝</span>}
-            </div>
+            {moment.myReaction && MY_RX_ICON[moment.myReaction] && (
+              <span title={MY_RX_LABEL[moment.myReaction] || ''}
+                style={{
+                  display:'inline-flex', alignItems:'center', gap: 4,
+                  color:'rgba(220,200,255,.95)', fontSize: 11, fontWeight: 600,
+                  background:'rgba(140,110,220,.22)', borderRadius: 50,
+                  padding:'2px 8px',
+                }}>
+                <Icon name={MY_RX_ICON[moment.myReaction]} size={12}/>
+              </span>
+            )}
           </div>
         </div>
       )}

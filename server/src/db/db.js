@@ -2069,6 +2069,18 @@ function getMomentFeed(userId, limit = 20, before = null) {
   ).all(...args, limit + 1);
   const hasMore = rows.length > limit;
   const items = _withStatsBatch(rows.slice(0, limit).map(_parseMoment));
+  // Прокидываем моих реакций на эти моменты одним запросом — клиент
+  // показывает на превью один значок собственной реакции вместо
+  // россыпи иконок с тотал-счётчиками.
+  if (items.length) {
+    const itemIds = items.map(m => m.id);
+    const myRx = db.prepare(
+      `SELECT moment_id, reaction FROM moment_reactions
+       WHERE user_id=? AND moment_id IN (${itemIds.map(() => '?').join(',')})`
+    ).all(userId, ...itemIds);
+    const myMap = Object.fromEntries(myRx.map(r => [r.moment_id, r.reaction]));
+    items.forEach(m => { m.myReaction = myMap[m.id] || null; });
+  }
   return { items, hasMore };
 }
 
