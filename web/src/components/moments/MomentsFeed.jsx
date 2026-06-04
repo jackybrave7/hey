@@ -1,5 +1,6 @@
 // MomentsFeed.jsx — главный экран Моментов
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api, socket } from '../../api';
 import MomentCard from './MomentCard';
 import MomentDetailPopup from './MomentDetailPopup';
@@ -13,6 +14,8 @@ import { useSalesPressure } from '../../lib/publicSettings';
 
 export default function MomentsFeed({ currentUser }) {
   const salesPressure = useSalesPressure();
+  const location = useLocation();
+  const nav = useNavigate();
   const [feed, setFeed]             = useState([]);
   const [myMoments, setMyMoments]   = useState([]);   // active own moments (array)
   const [loading, setLoading]       = useState(true);
@@ -34,6 +37,27 @@ export default function MomentsFeed({ currentUser }) {
   // Drag-to-reorder для своих моментов
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
+
+  // Auto-open моментa, если пришли по /moments/:id (redirect от MomentPage)
+  // или после deep-link через router.state.openMomentId. После первого
+  // открытия чистим state, чтобы при ручном закрытии попапа он не
+  // открывался обратно (Back в браузере оставлял бы state).
+  useEffect(() => {
+    const openId = location.state?.openMomentId;
+    if (!openId) return;
+    let alive = true;
+    api.getMoment(openId)
+      .then(m => {
+        if (!alive || !m) return;
+        setSelected({ moments: [m], index: 0 });
+      })
+      .catch(() => {})
+      .finally(() => {
+        // Стираем state, чтобы повторных авто-открытий не было.
+        if (alive) nav(location.pathname, { replace: true, state: null });
+      });
+    return () => { alive = false; };
+  }, [location.state?.openMomentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll-to-top — показываем кнопку когда юзер прокрутил ленту глубоко
   const [showScrollTop, setShowScrollTop] = useState(false);

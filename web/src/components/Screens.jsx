@@ -1,7 +1,7 @@
 // web/src/components/Screens.jsx
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, useSearchParams, Navigate } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
 import { uploadMedia, previewUrl, uploadAvatar, uploadGroupIcon, uploadAudioBlob, uploadFile } from '../lib/uploadMedia';
@@ -10244,10 +10244,21 @@ export function SettingsScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MomentPage — /moments/:id  (standalone page, opened via share link)
+// MomentPage — /moments/:id. Раньше показывал момент отдельной страницей,
+// что выглядело как «голая» карточка по центру (а раздел Моментов был
+// недоступен). Теперь сразу редиректит на /main, проталкивая id через
+// router state — MomentsFeed подхватывает и открывает попап момента
+// поверх обычной ленты.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function MomentPage() {
+  const { id } = useParams();
+  return <Navigate to="/main" state={{ openMomentId: id }} replace />;
+}
+
+// Старая реализация — оставлена под другим именем на случай если
+// придётся быстро откатить fallback. Не экспортируется.
+function MomentPageLegacy() {
   const { id } = useParams();
   const nav = useNavigate();
   const { user } = useAuth();

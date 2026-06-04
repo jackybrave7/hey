@@ -234,7 +234,8 @@
       "Bash(curl -s https://hey-messenger.ru/assets/index-BQqASZi3.js)",
       "Bash(ssh root@72.56.16.44 \"cd /app && git pull && cd web && npm run build && pm2 restart hey\")",
       "Bash(grep -n '^\\\\s*{[a-z][a-zA-Z]*\\\\.length}\\\\s*$\\\\|^\\\\s*{[a-z][a-zA-Z]*Count}\\\\s*$' web/src/components/Screens.jsx)",
-      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && pm2 restart hey\")"
+      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && pm2 restart hey\")",
+      "Bash(awk -F: '$1 > 10247')"
     ]
   }
 }
