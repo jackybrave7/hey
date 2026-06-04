@@ -10253,11 +10253,24 @@ export function SettingsScreen() {
 
 export function MomentPage() {
   const { id } = useParams();
-  return <Navigate to="/main" state={{ openMomentId: id }} replace />;
+  const { user, loading } = useAuth();
+  // Пока тянем /me, не делаем preliminary redirect — иначе залогиненный
+  // юзер случайно увидит публичную версию на доли секунды.
+  if (loading) return (
+    <div style={{ minHeight:'100vh', background:'var(--grad)', display:'flex',
+      alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,.4)' }}>
+      Загрузка…
+    </div>
+  );
+  // Залогиненные: открываем момент поверх ленты Моментов.
+  if (user) return <Navigate to="/main" state={{ openMomentId: id }} replace />;
+  // Анонимные: показываем standalone-страницу с моментом и CTA на
+  // регистрацию. Реакции и переход в чат отключены — заходи в HEY.
+  return <MomentPageLegacy key={id}/>;
 }
 
-// Старая реализация — оставлена под другим именем на случай если
-// придётся быстро откатить fallback. Не экспортируется.
+// Standalone-вьюер момента для незарегистрированных юзеров. Раньше
+// показывался всем, теперь — fallback под публичную ссылку.
 function MomentPageLegacy() {
   const { id } = useParams();
   const nav = useNavigate();
