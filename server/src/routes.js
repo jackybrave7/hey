@@ -723,6 +723,7 @@ module.exports = function makeRouter(db, broadcast) {
       'moment-video':  ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'],
       'moment-audio':  ['audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/webm'],
       'avatar':        ['image/jpeg', 'image/png', 'image/webp'],
+      'group-icon':    ['image/jpeg', 'image/png', 'image/webp'],
     };
     if (!allowed[category]?.includes(contentType))
       return res.status(400).json({ error: 'Unsupported type' });
@@ -738,6 +739,7 @@ module.exports = function makeRouter(db, broadcast) {
       'moment-video':  isSuper ? 50 * MB : 20 * MB,
       'moment-audio':  isSuper ? 30 * MB : 5 * MB,
       'avatar':        2 * MB,
+      'group-icon':    2 * MB,
     };
     const maxBytes = limits[category];
     if (typeof size === 'number' && size > maxBytes) {
@@ -759,6 +761,12 @@ module.exports = function makeRouter(db, broadcast) {
       'moment-video': `moments/${uuid()}/video.${ext}`,
       'moment-audio': `moments/${uuid()}/audio.${ext}`,
       'avatar':       `avatars/${req.user.id}.${ext}`,
+      // group-icon: уникальный ключ на каждую загрузку, чтобы икона
+      // одной группы не перетирала иконку другой. Раньше при правке
+      // группы клиент использовал category='avatar' — а её ключ
+      // стабилен по userId, и оба групповых icon начинали ссылаться
+      // на одну и ту же ячейку S3 (всегда последняя загрузка).
+      'group-icon':   `group-icons/${uuid()}.${ext}`,
     };
     try {
       const result = await storage.getPresignedUploadUrl(keyMap[category], contentType);
@@ -1169,9 +1177,28 @@ module.exports = function makeRouter(db, broadcast) {
       return res.status(400).json({ error: 'Приглашающий больше не админ группы' });
     }
     const memberCount = db.getGroupMembers(conv.id, false).length;
+    // Если запрос пришёл с Authorization — узнаём, состоит ли юзер
+    // уже в группе. Клиент использует это, чтобы перейти сразу в чат
+    // вместо показа landing-страницы. Эндпоинт остаётся публичным —
+    // отсутствие или невалидный токен просто = null.
+    let already_member = false;
+    let pending_member = false;
+    try {
+      const header = req.headers.authorization;
+      if (header?.startsWith('Bearer ')) {
+        const decoded = require('./auth').verifyToken(header.slice(7));
+        const meId = decoded?.id;
+        if (meId) {
+          if (db.isMember(conv.id, meId)) already_member = true;
+          else if (db.getInviterForPendingMember?.(conv.id, meId)) pending_member = true;
+        }
+      }
+    } catch { /* инвалидный токен — игнорируем, ответ публичный */ }
     res.json({
       group:   { id: conv.id, name: conv.name, icon: conv.icon, member_count: memberCount },
       inviter: { id: inviter.id, name: inviter.name, avatar: inviter.avatar },
+      already_member,
+      pending_member,
     });
   });
 

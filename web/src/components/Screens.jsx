@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { api, socket } from '../api';
-import { uploadMedia, previewUrl, uploadAvatar, uploadAudioBlob, uploadFile } from '../lib/uploadMedia';
+import { uploadMedia, previewUrl, uploadAvatar, uploadGroupIcon, uploadAudioBlob, uploadFile } from '../lib/uploadMedia';
 import { subscribeToPush, unsubscribeFromPush, isPushSupported } from '../lib/push';
 import SuperLimitPopup from './super/SuperLimitPopup';
 import { useAuth } from '../AuthContext';
@@ -5367,7 +5367,8 @@ export function GroupCreateScreen() {
     if (!file) return;
     setUploading(true);
     try {
-      const url = await uploadAvatar(file, { getPresignUrl: api.getPresignUrl });
+      // group-icon (а не avatar) — чтобы у каждой группы был свой S3-ключ
+      const url = await uploadGroupIcon(file, { getPresignUrl: api.getPresignUrl });
       setAvatarUrl(url);
     } catch(err) {
       heyToast(err.message || 'Не удалось загрузить аватар', 'error');
@@ -5611,7 +5612,11 @@ export function GroupSettingsScreen() {
     }
     setUploading(true);
     try {
-      const url = await uploadAvatar(file, { getPresignUrl: api.getPresignUrl });
+      // Используем уникальный per-upload ключ (group-icon), а не
+      // стабильный avatar/<userId> — иначе одна и та же ячейка S3
+      // делится между всеми группами юзера, и смена иконы в группе А
+      // молча меняет иконку в группе Б.
+      const url = await uploadGroupIcon(file, { getPresignUrl: api.getPresignUrl });
       setIcon(url);
     } catch (err) {
       heyToast('Не удалось загрузить: ' + (err.message || 'ошибка'), 'error');
@@ -5928,6 +5933,66 @@ export function GroupSettingsScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GroupInvitePreview — мини-карточка под текстом сообщения с
+// /gjoin/<token> ссылкой. Аватарка + название группы + кол-во
+// участников. Клик ведёт на тот же /gjoin (там логика «если уже
+// состоишь — сразу в чат»).
+// ─────────────────────────────────────────────────────────────────────────────
+function GroupInvitePreview({ data, isOut }) {
+  const nav = useNavigate();
+  const g = data?.group;
+  if (!g) return null;
+  const ic = g.icon || '';
+  const isImg = ic && (ic.startsWith('http') || ic.startsWith('/') || ic.startsWith('data:'));
+  // Извлекаем путь /gjoin/... из абсолютной ссылки, чтобы переход
+  // оставался в SPA-роутере (а не делал full reload).
+  function openInvite() {
+    try {
+      const u = new URL(data.url);
+      nav(u.pathname);
+    } catch { window.location.href = data.url; }
+  }
+  return (
+    <div onClick={openInvite}
+      style={{
+        marginBottom: 8, padding:'10px 12px', borderRadius: 12,
+        background: isOut ? 'rgba(255,255,255,.16)' : 'rgba(120,90,200,.10)',
+        border: '1px solid ' + (isOut ? 'rgba(255,255,255,.25)' : 'rgba(180,140,220,.30)'),
+        display:'flex', alignItems:'center', gap: 12,
+        cursor:'pointer', transition:'background .15s',
+      }}>
+      <div style={{
+        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+        background: isImg ? '#0a0518' : 'rgba(120,90,200,.45)',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize: 22, color:'white', fontWeight: 700,
+        overflow:'hidden', border:'1px solid rgba(255,255,255,.12)',
+      }}>
+        {isImg
+          ? <img src={ic} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+          : (ic || '👥')}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          color: isOut ? 'white' : '#2a2040', fontSize: 14, fontWeight: 700,
+          overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+        }}>
+          {g.name || 'Группа'}
+        </div>
+        <div style={{
+          color: isOut ? 'rgba(255,255,255,.7)' : 'rgba(50,30,90,.55)',
+          fontSize: 11, marginTop: 2,
+        }}>
+          👥 {g.member_count || 0} · Приглашение в группу
+        </div>
+      </div>
+      <span style={{ color: isOut ? 'rgba(255,255,255,.6)' : 'rgba(50,30,90,.45)',
+        fontSize: 18, flexShrink: 0 }}>›</span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MessageRow — memoized so hover/typing state changes don't re-render siblings
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -6199,7 +6264,10 @@ const MessageRow = memo(function MessageRow({
              с обложкой + плеером важнее самой ссылки. hideMeta скрывает
              нижний блок «↗ YouTube/Vimeo/…», который дублирует бейдж
              платформы на самой обложке. */}
-          {m.link_preview && (
+          {m.link_preview && m.link_preview.type === 'group_invite' && (
+            <GroupInvitePreview data={m.link_preview} isOut={isOut}/>
+          )}
+          {m.link_preview && m.link_preview.type !== 'group_invite' && (
             <div style={{marginBottom: m.text ? 8 : 0, width: 'min(100%, 360px)'}}>
               <EmbeddedVideoPreview data={m.link_preview} size="full" hideMeta={false}
                 onlyTitleMeta/>

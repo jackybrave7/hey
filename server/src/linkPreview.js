@@ -173,4 +173,17 @@ async function resolvePreviewFromText(text, db) {
   return data;
 }
 
-module.exports = { detectVideoUrl, resolvePreviewFromText, fetchByProvider };
+// Находим ссылку приглашения в группу (/gjoin/<token>) внутри текста
+// сообщения. Возвращаем { url, token } — клиент рендерит мини-карточку
+// с именем и аватаркой группы, чтобы тыкать по «сухому» URL не надо.
+const GJOIN_RE = /https?:\/\/[^\s<>"']+\/gjoin\/([A-Za-z0-9_\-.~]+)/g;
+function detectGroupInviteUrl(text) {
+  if (!text || typeof text !== 'string') return null;
+  GJOIN_RE.lastIndex = 0;
+  const m = GJOIN_RE.exec(text);
+  if (!m) return null;
+  const url = m[0].replace(/[.,;:!?)]$/, '');
+  return { url, token: m[1] };
+}
+
+module.exports = { detectVideoUrl, detectGroupInviteUrl, resolvePreviewFromText, fetchByProvider };

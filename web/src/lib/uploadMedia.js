@@ -183,3 +183,18 @@ export async function uploadAvatar(file, apiFns) {
   // Local fallback: return data URL (stored in SQLite as before)
   return blobToDataUrl(blob);
 }
+
+/**
+ * Upload a group icon. Внутри как `uploadAvatar`, но с другой category
+ * — на сервере у group-icon уникальный ключ на каждую загрузку, чтобы
+ * иконы разных групп не делили один S3-объект.
+ */
+export async function uploadGroupIcon(file, apiFns) {
+  const { blob, contentType } = await resizeToBlob(file, 512);
+  const presign = await apiFns.getPresignUrl('group-icon', contentType, blob.size);
+  if (presign.uploadUrl) {
+    await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});
+    return presign.publicUrl;
+  }
+  return blobToDataUrl(blob);
+}

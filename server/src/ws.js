@@ -1,7 +1,8 @@
 const { WebSocketServer } = require('ws');
 const { wsAuth } = require('./auth');
 const db = require('./db/db');
-const { detectVideoUrl, fetchByProvider } = require('./linkPreview');
+const { detectVideoUrl, detectGroupInviteUrl, fetchByProvider } = require('./linkPreview');
+const awo = require('./awo');
 
 const clients = new Map();
 
@@ -100,12 +101,40 @@ module.exports = function setupWS(server) {
           const videoHit    = trimmedText ? detectVideoUrl(trimmedText) : null;
           const cachedPreview = videoHit ? db.getLinkPreviewCached(videoHit.url) : null;
 
+          // Превью /gjoin/<token>: ссылка приглашения в группу. Решаем
+          // синхронно (HMAC + lookup в БД), без внешних fetch'ей. Если
+          // токен валиден и приглашающий ещё админ — кладём в link_preview
+          // объект { type: 'group_invite', group, inviter, url }.
+          let invitePreview = null;
+          if (!cachedPreview && trimmedText) {
+            const hit = detectGroupInviteUrl(trimmedText);
+            if (hit) {
+              try {
+                const data = awo.verifyGroupInvite(hit.token);
+                if (data) {
+                  const conv2 = db.getConversationById(data.groupId);
+                  if (conv2?.type === 'group' && db.isGroupAdmin(conv2.id, data.inviterId)) {
+                    const inv = db.findUserById(data.inviterId);
+                    const memberCount = db.getGroupMembers(conv2.id, false).length;
+                    invitePreview = {
+                      type: 'group_invite',
+                      url: hit.url,
+                      token: hit.token,
+                      group:   { id: conv2.id, name: conv2.name, icon: conv2.icon, member_count: memberCount },
+                      inviter: inv ? { id: inv.id, name: inv.name, avatar: inv.avatar } : null,
+                    };
+                  }
+                }
+              } catch { /* инвалидный токен — превью не вешаем */ }
+            }
+          }
+
           const saved = db.createMessage({
             conversationId, senderId: user.id,
             text: trimmedText,
             attachment: attachment || null,
             replyToId: replyToId || null,
-            linkPreview: cachedPreview || null,
+            linkPreview: cachedPreview || invitePreview || null,
           });
           const full = { ...saved, sender_name: user.name, tempId, conversationId };
           broadcast(members, { type: 'message:new', message: full });

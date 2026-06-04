@@ -33,9 +33,18 @@ export default function GroupJoinScreen() {
   useEffect(() => {
     if (!token) { setState('invalid'); setError('Нет токена'); return; }
     api.groupInvitePreview(token)
-      .then(r => { setInfo(r); setState('ok'); })
+      .then(r => {
+        // Если юзер уже состоит в этой группе — landing бессмысленен,
+        // ведём сразу в чат. Replace, чтобы кнопка «Назад» в браузере
+        // не возвращала на /gjoin.
+        if (r.already_member && r.group?.id) {
+          nav('/chat/' + r.group.id, { replace: true });
+          return;
+        }
+        setInfo(r); setState('ok');
+      })
       .catch(e => { setState('invalid'); setError(e.message); });
-  }, [token]);
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const wrap = {
     minHeight: '100vh', background: 'var(--grad, linear-gradient(135deg,#1a0d3a,#0e0820))',
