@@ -902,9 +902,9 @@ export default function MomentDetailPopup({
                     style={{background:'rgba(255,255,255,.06)',borderRadius:14,padding:'12px 16px',
                       display:'flex',gap:20,
                       cursor: salesPressure >= 2 ? 'pointer' : 'default'}}>
-                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>👁 {moment.views || 0}</span>
-                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>✨ {moment.stats?.resonate || 0}</span>
-                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14}}>🤝 {moment.stats?.talk || 0}</span>
+                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="eye"     size={14}/>{moment.views || 0}</span>
+                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="sparkle" size={14}/>{moment.stats?.resonate || 0}</span>
+                    <span style={{color:'rgba(255,255,255,.6)',fontSize:14,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="chat"    size={14}/>{moment.stats?.talk || 0}</span>
                     {salesPressure >= 2 && (
                       <span style={{marginLeft:'auto',color:'rgba(255,255,255,.25)',fontSize:12}}>кто? ›</span>
                     )}

@@ -2076,9 +2076,9 @@ export function MyProfileScreen() {
                           {active.text}
                         </div>
                         <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
-                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>👁 {active.views || 0}</span>
-                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>✨ {active.stats?.resonate || 0}</span>
-                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>🤝 {active.stats?.talk || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye"     size={12}/>{active.views || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="sparkle" size={12}/>{active.stats?.resonate || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="chat"    size={12}/>{active.stats?.talk || 0}</span>
                         </div>
                         <button onClick={async e => {
                           e.stopPropagation();
@@ -2145,9 +2145,9 @@ export function MyProfileScreen() {
                           {m.text}
                         </div>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:'auto'}}>
-                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>👁 {m.views || 0}</span>
-                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>✨ {m.stats?.resonate || 0}</span>
-                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>🤝 {m.stats?.talk || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye"     size={12}/>{m.views || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="sparkle" size={12}/>{m.stats?.resonate || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(255,255,255,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="chat"    size={12}/>{m.stats?.talk || 0}</span>
                         </div>
                         <div style={{color:'rgba(255,255,255,.3)',fontSize:11,
                           display:'flex',alignItems:'center',gap:4}}>
@@ -10463,9 +10463,9 @@ function MomentPageLegacy() {
             {isMine ? (
               <div style={{ background:'rgba(255,255,255,.06)', borderRadius:14, padding:'12px 16px',
                 display:'flex', gap:20 }}>
-                <span style={{ color:'rgba(255,255,255,.6)', fontSize:14 }}>👁 {moment.views || 0}</span>
-                <span style={{ color:'rgba(255,255,255,.6)', fontSize:14 }}>✨ {moment.stats?.resonate || 0} резонирует</span>
-                <span style={{ color:'rgba(255,255,255,.6)', fontSize:14 }}>🤝 {moment.stats?.talk || 0}</span>
+                <span style={{ color:'rgba(255,255,255,.6)', fontSize:14, display:'inline-flex', alignItems:'center', gap:6 }}><Icon name="eye"     size={14}/>{moment.views || 0}</span>
+                <span style={{ color:'rgba(255,255,255,.6)', fontSize:14, display:'inline-flex', alignItems:'center', gap:6 }}><Icon name="sparkle" size={14}/>{moment.stats?.resonate || 0} резонирует</span>
+                <span style={{ color:'rgba(255,255,255,.6)', fontSize:14, display:'inline-flex', alignItems:'center', gap:6 }}><Icon name="chat"    size={14}/>{moment.stats?.talk || 0}</span>
               </div>
             ) : user ? (
               <>

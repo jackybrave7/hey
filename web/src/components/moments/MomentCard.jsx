@@ -288,9 +288,9 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
           display:'flex',alignItems:'center',gap:8,
           fontSize:11,color:'rgba(255,255,255,.85)',
         }}>
-          {moment.views > 0          && <span>👁 {moment.views}</span>}
-          {moment.stats?.resonate > 0 && <span>✨ {moment.stats.resonate}</span>}
-          {moment.stats?.talk > 0     && <span>🤝 {moment.stats.talk}</span>}
+          {moment.views > 0          && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye"     size={12}/>{moment.views}</span>}
+          {moment.stats?.resonate > 0 && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="sparkle" size={12}/>{moment.stats.resonate}</span>}
+          {moment.stats?.talk > 0     && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="chat"    size={12}/>{moment.stats.talk}</span>}
         </div>
       )}
     </div>
