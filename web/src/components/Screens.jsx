@@ -2924,7 +2924,10 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
   }
 
   return (
-    <div style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,.55)',
+    // z-index выше MomentDetailPopup (z:700) и ReactorsModal (z:10000) —
+    // карточка контакта открывается из списка реакторов момента и должна
+    // быть ПОВЕРХ всего стэка. Раньше z:500 ставил её под попапом момента.
+    <div style={{position:'fixed',inset:0,zIndex:10500,background:'rgba(0,0,0,.55)',
       backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center'}}
       onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div style={{
@@ -5482,6 +5485,7 @@ export function GroupCreateScreen() {
   const [icon,     setIcon]     = useState('👥');
   const [avatarUrl,setAvatarUrl]= useState(null);   // если загружена кастомная — приоритет над emoji
   const [uploading,setUploading]= useState(false);
+  const [iconCropFile, setIconCropFile] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [search,   setSearch]   = useState('');
@@ -5494,13 +5498,26 @@ export function GroupCreateScreen() {
     setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
-  async function handleAvatar(e) {
+  function handleAvatar(e) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      heyToast('Только изображение', 'warning');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      heyToast('Картинка больше 10 МБ', 'warning');
+      return;
+    }
+    // Открываем тот же crop-modal что и у user-аватарки: поворот, зум.
+    setIconCropFile(file);
+  }
+
+  async function uploadCroppedAvatar(croppedFile) {
     setUploading(true);
     try {
-      // group-icon (а не avatar) — чтобы у каждой группы был свой S3-ключ
-      const url = await uploadGroupIcon(file, { getPresignUrl: api.getPresignUrl });
+      const url = await uploadGroupIcon(croppedFile, { getPresignUrl: api.getPresignUrl });
       setAvatarUrl(url);
     } catch(err) {
       heyToast(err.message || 'Не удалось загрузить аватар', 'error');
@@ -5583,6 +5600,16 @@ export function GroupCreateScreen() {
             <div style={{color:'rgba(255,255,255,.4)',fontSize:11}}>
               {avatarUrl ? 'Своя аватарка' : 'Выбери эмодзи ниже или загрузи фото'}
             </div>
+            {iconCropFile && (
+              <AvatarCropperModal
+                file={iconCropFile}
+                onCancel={() => setIconCropFile(null)}
+                onDone={async (_url, croppedFile) => {
+                  setIconCropFile(null);
+                  await uploadCroppedAvatar(croppedFile);
+                }}
+              />
+            )}
           </div>
 
           {/* Emoji-иконки (когда нет своей аватарки) */}
@@ -5690,6 +5717,10 @@ export function GroupSettingsScreen() {
   const [uploading, setUploading] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');    // поиск по контактам для добавления
   const avatarInputRef = useRef();
+  // Загрузка иконки группы через тот же crop-modal, что и у user-аватарки:
+  // поворот, зум, центровка. Раньше группа просто резалась и грузилась
+  // как есть — пользователь жаловался на отсутствие контролей.
+  const [iconCropFile, setIconCropFile] = useState(null);
 
   // Любой админ — создатель ИЛИ участник с is_admin=1
   const myMember = members.find(m => m.id === user?.id);
@@ -5744,7 +5775,7 @@ export function GroupSettingsScreen() {
     } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
   }
 
-  async function handleAvatarSelect(e) {
+  function handleAvatarSelect(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -5752,17 +5783,19 @@ export function GroupSettingsScreen() {
       heyToast('Только изображение', 'warning');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      heyToast('Картинка больше 5 МБ', 'warning');
+    if (file.size > 10 * 1024 * 1024) {
+      heyToast('Картинка больше 10 МБ', 'warning');
       return;
     }
+    // Не грузим сразу — открываем crop-окно. Финальная заливка идёт в
+    // onDone после того как пользователь повернул/обрезал.
+    setIconCropFile(file);
+  }
+
+  async function uploadCroppedIcon(croppedFile) {
     setUploading(true);
     try {
-      // Используем уникальный per-upload ключ (group-icon), а не
-      // стабильный avatar/<userId> — иначе одна и та же ячейка S3
-      // делится между всеми группами юзера, и смена иконы в группе А
-      // молча меняет иконку в группе Б.
-      const url = await uploadGroupIcon(file, { getPresignUrl: api.getPresignUrl });
+      const url = await uploadGroupIcon(croppedFile, { getPresignUrl: api.getPresignUrl });
       setIcon(url);
     } catch (err) {
       heyToast('Не удалось загрузить: ' + (err.message || 'ошибка'), 'error');
@@ -5879,6 +5912,16 @@ export function GroupSettingsScreen() {
               </div>
               <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp"
                 style={{display:'none'}} onChange={handleAvatarSelect}/>
+              {iconCropFile && (
+                <AvatarCropperModal
+                  file={iconCropFile}
+                  onCancel={() => setIconCropFile(null)}
+                  onDone={async (_url, croppedFile) => {
+                    setIconCropFile(null);
+                    await uploadCroppedIcon(croppedFile);
+                  }}
+                />
+              )}
             </div>
 
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
