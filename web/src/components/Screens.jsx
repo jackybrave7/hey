@@ -679,19 +679,44 @@ export function LoginScreen() {
 function validatePhone(raw) {
   const digits = raw.replace(/\D/g, '');
   if (digits.length < 10) return { ok: false, msg: 'Слишком короткий номер' };
-  if (digits.length > 12) return { ok: false, msg: 'Слишком длинный номер' };
-  return { ok: true, normalized: '+' + (digits.startsWith('8') ? '7' + digits.slice(1) : digits) };
+  if (digits.length > 15) return { ok: false, msg: 'Слишком длинный номер' };
+  // 11 цифр с лидирующей «8» — это российский формат, конвертируем в +7.
+  // В остальных случаях просто складываем «+» — поддерживаем международные
+  // номера (E.164: 10–15 цифр).
+  let normalized;
+  if (digits.length === 11 && digits.startsWith('8')) {
+    normalized = '+7' + digits.slice(1);
+  } else {
+    normalized = '+' + digits;
+  }
+  return { ok: true, normalized };
 }
 
 function formatPhoneInput(val) {
-  const d = val.replace(/\D/g, '').slice(0, 11);
-  if (!d) return '';
-  let r = '+7';
-  if (d.length > 1) r += ' (' + d.slice(1, 4);
-  if (d.length >= 4) r += ') ' + d.slice(4, 7);
-  if (d.length >= 7) r += '-' + d.slice(7, 9);
-  if (d.length >= 9) r += '-' + d.slice(9, 11);
-  return r;
+  // Раньше жёсткий шаблон «+7 (XXX) XXX-XX-XX» ломал редактирование
+  // (курсор прыгал внутри скобок/тире) и не давал ввести нероссийский
+  // номер. Теперь оставляем то, что ввёл пользователь, но санируем —
+  // допускаем только цифры, плюс в начале, пробел и тире.
+  let s = val.replace(/[^\d+\s\-()]/g, '');
+  // Один + и только в начале.
+  const hasLeadPlus = s.startsWith('+');
+  s = (hasLeadPlus ? '+' : '') + s.replace(/\+/g, '');
+  // Лимит: 15 цифр (E.164). Пробелы/тире/скобки не считаем.
+  const digitsCount = (s.match(/\d/g) || []).length;
+  if (digitsCount > 15) {
+    // Срезаем хвост, пока цифр не станет 15.
+    let trimmed = '';
+    let cnt = 0;
+    for (const ch of s) {
+      if (/\d/.test(ch)) {
+        if (cnt >= 15) continue;
+        cnt++;
+      }
+      trimmed += ch;
+    }
+    s = trimmed;
+  }
+  return s;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1055,6 +1080,10 @@ export function RegisterScreen() {
   const [err, setErr]           = useState('');
   const [loading, setLoading]   = useState(false);
   const [inviter, setInviter]   = useState(null);
+  // Шаг подтверждения номера: SMS у нас нет, поэтому перед фактической
+  // регистрацией показываем крупный поп-ап с номером и просим
+  // подтвердить — поменять потом будет нельзя.
+  const [confirmPhone, setConfirmPhone] = useState(null); // { display, normalized } | null
 
   const hasInvite = !!inviteCode || !!schoolInvite || !!groupInvite;
   // Пометка для UI: показать ученику, что данные предзаполнены из оплаты
@@ -1068,16 +1097,23 @@ export function RegisterScreen() {
       .catch(() => {});
   }, [inviteCode]);
 
-  async function handleRegister() {
+  // Первый шаг — валидация формы и открытие модалки с большим номером.
+  function startRegister() {
     setErr('');
     if (!name.trim()) { setErr('Введите имя'); return; }
     const pv = validatePhone(phone);
     if (!pv.ok) { setErr(pv.msg); return; }
     if (password.length < 8) { setErr('Пароль минимум 8 символов'); return; }
+    setConfirmPhone({ display: phone.trim() || pv.normalized, normalized: pv.normalized });
+  }
+
+  // Второй шаг — после подтверждения телефона реально регистрируем.
+  async function handleRegister() {
     setLoading(true);
+    setErr('');
     try {
       const res = await api.register({
-        name: name.trim(), phone: pv.normalized, password,
+        name: name.trim(), phone: confirmPhone.normalized, password,
         ...(inviteCode    ? { inviteUserId: inviteCode } : {}),
         ...(schoolInvite  ? { schoolInviteCode: schoolInvite.code, email: schoolInvite.email } : {}),
         ...(groupInvite   ? { groupInviteToken: groupInvite.token } : {}),
@@ -1087,7 +1123,10 @@ export function RegisterScreen() {
       if (groupInvite)  sessionStorage.removeItem('hey_group_invite');
       login(res.token, res.user);
       nav('/welcome', { state: { isNewUser: true, userName: name.trim() } });
-    } catch(e) { setErr(e.message); }
+    } catch(e) {
+      setErr(e.message);
+      setConfirmPhone(null); // вернёмся к форме, чтобы поправить
+    }
     setLoading(false);
   }
 
@@ -1165,7 +1204,8 @@ export function RegisterScreen() {
         <div style={{ animation: 'authFadeUp .6s ease-out .25s both' }}>
           <FloatingInput id="reg-name" label="Имя" value={name}
             onChange={e => setName(e.target.value)} autoComplete="name" />
-          <FloatingInput id="reg-phone" label="Телефон" type="tel" value={phone}
+          <FloatingInput id="reg-phone" label="Телефон (с кодом страны, например +49 …)" type="tel" value={phone}
+            inputMode="tel"
             onChange={e => setPhone(formatPhoneInput(e.target.value))} autoComplete="tel" />
           <PasswordInput id="reg-pwd" label="Придумай пароль" value={password}
             onChange={e => setPassword(e.target.value)}
@@ -1183,7 +1223,7 @@ export function RegisterScreen() {
             }}>{err}</div>
           )}
 
-          <button className="auth-btn-primary" onClick={handleRegister} disabled={loading}>
+          <button className="auth-btn-primary" onClick={startRegister} disabled={loading}>
             {loading ? 'Создаём…' : (inviteCode || schoolInvite) ? 'Принять приглашение' : 'Создать аккаунт'}
           </button>
 
@@ -1200,6 +1240,76 @@ export function RegisterScreen() {
         </div>
         )}
       </div>
+
+      {/* Confirm-phone modal: SMS у нас нет, поэтому показываем крупно
+          номер пользователя ещё раз и просим подтвердить — после этого
+          поменять его не получится без поддержки. */}
+      {confirmPhone && createPortal(
+        <div onMouseDown={(e) => { if (e.target === e.currentTarget && !loading) setConfirmPhone(null); }}
+          style={{ position:'fixed', inset:0, zIndex:10000,
+            background:'rgba(0,0,0,.7)', backdropFilter:'blur(12px)',
+            display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{
+            background:'rgba(22,15,50,.98)', borderRadius:22,
+            width:'min(94vw, 420px)', padding:'28px 26px 24px',
+            boxShadow:'0 20px 60px rgba(0,0,0,.55)',
+            border:'1px solid rgba(255,255,255,.12)',
+          }}>
+            <div style={{ textAlign:'center', marginBottom: 18 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📱</div>
+              <div style={{ color:'white', fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+                Подтверди свой номер
+              </div>
+              <div style={{ color:'rgba(255,255,255,.6)', fontSize: 13, lineHeight: 1.5 }}>
+                Это твой логин для входа. Изменить его потом нельзя — без поддержки и без потери прогресса.
+              </div>
+            </div>
+
+            <div style={{
+              background:'rgba(120,90,200,.18)', border:'1px solid rgba(180,140,220,.4)',
+              borderRadius: 16, padding:'20px 18px', marginBottom: 18, textAlign:'center',
+            }}>
+              <div style={{ color:'rgba(220,200,255,.7)', fontSize: 11,
+                textTransform:'uppercase', letterSpacing: .8, marginBottom: 6 }}>
+                Твой телефон
+              </div>
+              <div style={{
+                color:'white', fontSize: 26, fontWeight: 800, letterSpacing: .5,
+                wordBreak:'break-all', fontFamily:'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+              }}>
+                {confirmPhone.normalized}
+              </div>
+            </div>
+
+            {err && (
+              <div style={{
+                background:'rgba(220,60,60,.18)', border:'1px solid rgba(255,120,120,.35)',
+                borderRadius: 12, padding:'10px 14px', marginBottom: 14,
+                color:'white', fontSize: 13, textAlign:'center', lineHeight: 1.4,
+              }}>{err}</div>
+            )}
+
+            <div style={{ display:'flex', gap: 10 }}>
+              <button onClick={() => setConfirmPhone(null)} disabled={loading}
+                style={{ flex:1, padding:'13px', borderRadius:14,
+                  background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.14)',
+                  color:'rgba(255,255,255,.75)', fontSize: 14, fontWeight: 600,
+                  cursor: loading ? 'wait' : 'pointer', fontFamily:'inherit' }}>
+                Изменить
+              </button>
+              <button onClick={handleRegister} disabled={loading} autoFocus
+                style={{ flex: 1.4, padding:'13px', borderRadius:14,
+                  background:'rgba(140,110,220,.95)', border:'1px solid rgba(180,140,220,.4)',
+                  color:'white', fontSize: 14, fontWeight: 700,
+                  cursor: loading ? 'wait' : 'pointer', fontFamily:'inherit',
+                  opacity: loading ? .7 : 1 }}>
+                {loading ? 'Создаём…' : 'Всё верно — продолжить'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
