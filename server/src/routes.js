@@ -186,6 +186,19 @@ module.exports = function makeRouter(db, broadcast) {
 
     const user = db.createUser({ phone, name, password, birthday, avatar, email: finalEmail });
 
+    // Email из АВО-инвайта мы считаем уже подтверждённым (его привязал
+    // школьный бизнес-процесс, не самостоятельный пользователь).
+    // Самостоятельно введённые email'ы получают email_verified=0 и
+    // ждут клика по верификационной ссылке.
+    if (finalEmail) {
+      const verified = !!schoolInvite?.bound_email;
+      db.updateUser(user.id, { email_verified: verified ? 1 : 0 });
+      if (!verified) {
+        sendEmailVerification(user.id, finalEmail, name).catch(e =>
+          console.warn('[verify-email] send failed:', e.message));
+      }
+    }
+
     // Системный пользователь автоматически в контактах у нового юзера
     db.addSystemContactFor(user.id);
 
@@ -424,7 +437,22 @@ module.exports = function makeRouter(db, broadcast) {
     // прячет/показывает по этому полю карточку «АВО / Школы» в /me и
     // пускает в /integrations/awo даже тех, у кого business_status != approved.
     const tenantsAccessible = db.listTenantsForUser(user.id).length;
-    res.json({ ...safe, achievements, tenants_accessible: tenantsAccessible });
+    // Счётчики приглашённых считаем напрямую из referrals — поле
+    // users.invited_count за годы рассинхронизировалось из-за back-fill'ов,
+    // полагаться на него больше нельзя. invited_total — все кто
+    // зарегистрировался по нашей ссылке; invited_confirmed — те, кто
+    // дошёл до отправки первого сообщения (только они засчитываются
+    // в Super-бонус «3 друзей»).
+    const inv = db.getInvitedCounts(user.id);
+    res.json({
+      ...safe, achievements,
+      tenants_accessible: tenantsAccessible,
+      invited_total: inv.total,
+      invited_confirmed: inv.confirmed,
+      // Алиас для обратной совместимости со старым полем — теперь это
+      // confirmed, чтобы прогресс-бар «N/3 друзей» был честным.
+      invited_count: inv.confirmed,
+    });
   });
 
   r.patch('/me', requireAuth, (req, res) => {
@@ -446,6 +474,12 @@ module.exports = function makeRouter(db, broadcast) {
         }
       }
       updates.email = cleanedEmail;
+      // Email подтверждается отдельно по ссылке. При смене / очистке
+      // ставим verified=0. Если email не менялся — флаг не трогаем.
+      const currentUser = db.findUserById(req.user.id);
+      if ((currentUser?.email || null) !== cleanedEmail) {
+        updates.email_verified = 0;
+      }
     }
     if (bio !== undefined) {
       const cleanedBio = bio ? bio.slice(0, 200) : null;
@@ -469,10 +503,72 @@ module.exports = function makeRouter(db, broadcast) {
     }
     if (headline  !== undefined) updates.headline = headline ? headline.slice(0, 100) : null;
     const user = db.updateUser(req.user.id, updates);
+    // Если email сменился и теперь висит как unverified — шлём ссылку
+    // подтверждения в фоне. Не валим запрос, если SMTP лежит — юзер
+    // всё равно сохранил email; кнопка «отправить ещё раз» в профиле
+    // позволит дернуть письмо позже.
+    if (updates.email_verified === 0 && user.email) {
+      sendEmailVerification(user.id, user.email, user.name).catch(e =>
+        console.warn('[verify-email] send failed:', e.message));
+    }
     const { password, achievements: achRaw, ...safe } = user;
     safe.achievements = (() => { try { return JSON.parse(achRaw || '[]'); } catch { return []; } })();
     res.json(safe);
   });
+
+  // ── Email verification ───────────────────────────────────────────────
+  // Перевыслать ссылку подтверждения (для случаев когда первое письмо
+  // потерялось / попало в спам).
+  r.post('/me/email/resend-verification', requireAuth, async (req, res) => {
+    const u = db.findUserById(req.user.id);
+    if (!u?.email)          return res.status(400).json({ error: 'Email не указан' });
+    if (u.email_verified)   return res.status(400).json({ error: 'Email уже подтверждён' });
+    try {
+      await sendEmailVerification(u.id, u.email, u.name);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Не удалось отправить письмо: ' + e.message });
+    }
+  });
+
+  // Клик по ссылке из письма. token = JWT { uid, email, exp }.
+  r.get('/verify-email', async (req, res) => {
+    const token = req.query.token;
+    if (!token) return res.status(400).send('Нет токена');
+    let payload;
+    try { payload = authModule.verifyToken(String(token)); }
+    catch { return res.status(400).send('Ссылка недействительна или устарела'); }
+    if (!payload?.uid || !payload?.email || payload?.kind !== 'email-verify') {
+      return res.status(400).send('Ссылка некорректна');
+    }
+    const u = db.findUserById(payload.uid);
+    if (!u)                   return res.status(404).send('Пользователь не найден');
+    if (u.email !== payload.email) return res.status(409).send('Email был изменён, ссылка не актуальна');
+    if (!u.email_verified) {
+      db.updateUser(payload.uid, { email_verified: 1 });
+    }
+    // Редирект в профиль с маркером успешного подтверждения
+    res.redirect('/me?email_verified=1');
+  });
+
+  async function sendEmailVerification(userId, email, name) {
+    // 7 дней — длинный TTL, чтобы юзер успел кликнуть из спам-папки
+    const token = authModule.signToken({ uid: userId, email, kind: 'email-verify' });
+    const link = `${process.env.PUBLIC_ORIGIN || 'https://hey-messenger.ru'}/api/verify-email?token=${encodeURIComponent(token)}`;
+    const t = createTransporter();
+    if (!t) throw new Error('SMTP не настроен');
+    await t.sendMail({
+      from: `"HEY Messenger" <${process.env.SMTP_USER}>`,
+      to:   email,
+      subject: 'Подтвердите email для HEY',
+      text: `Привет, ${name || ''}!\n\nПодтверди email в HEY:\n${link}\n\nЕсли это не ты — просто проигнорируй письмо.`,
+      html: `<p>Привет, ${name || ''}!</p>
+<p>Подтверди email в HEY, нажав на ссылку:</p>
+<p><a href="${link}" style="background:#7858b0;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Подтвердить email</a></p>
+<p style="color:#888;font-size:12px">Если кнопка не работает — открой в браузере: ${link}</p>
+<p style="color:#888;font-size:12px">Если это не ты — просто проигнорируй письмо.</p>`,
+    });
+  }
 
   r.post('/me/password', requireAuth, (req, res) => {
     const { oldPassword, newPassword } = req.body;

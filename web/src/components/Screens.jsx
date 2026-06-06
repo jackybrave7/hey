@@ -332,6 +332,50 @@ function FieldLine({ value }) {
   );
 }
 
+// Бейдж «✉ Подтвердите email» с кнопкой повторной отправки. Показывается
+// под FieldLine в профиле, когда user.email_verified=0.
+function EmailVerifyHint() {
+  const [sending, setSending] = useState(false);
+  const [done, setDone]       = useState(false);
+  async function resend() {
+    if (sending) return;
+    setSending(true);
+    try {
+      await api.resendEmailVerification();
+      setDone(true);
+      setTimeout(() => setDone(false), 4000);
+    } catch (e) {
+      try { heyToast(e.message || 'Не удалось отправить', 'error'); } catch {}
+    }
+    setSending(false);
+  }
+  return (
+    <div style={{
+      marginTop: 6,
+      background:'rgba(255,200,80,.10)',
+      border:'1px solid rgba(255,200,80,.28)',
+      borderRadius: 10, padding:'8px 12px',
+      display:'flex', alignItems:'center', gap: 8, flexWrap:'wrap',
+      color:'rgba(255,210,150,.92)', fontSize: 12,
+    }}>
+      <span style={{ fontSize: 14 }}>✉</span>
+      <span style={{ flex: 1, minWidth: 120 }}>
+        {done ? 'Ссылка отправлена — проверь почту' : 'Подтвердите email — мы прислали ссылку'}
+      </span>
+      <button onClick={resend} disabled={sending || done}
+        style={{
+          background:'rgba(255,200,80,.18)', border:'1px solid rgba(255,200,80,.35)',
+          color:'rgba(255,220,160,.95)', borderRadius: 8,
+          padding:'4px 10px', fontSize: 11, fontWeight: 600,
+          cursor: sending || done ? 'default' : 'pointer', fontFamily:'inherit',
+          opacity: sending || done ? .6 : 1,
+        }}>
+        {sending ? '…' : (done ? '✓' : 'Отправить ещё раз')}
+      </button>
+    </div>
+  );
+}
+
 function fmtTime(ts) {
   if (!ts) return '';
   return new Date(ts * 1000).toLocaleTimeString('ru', { hour:'2-digit', minute:'2-digit' });
@@ -1935,7 +1979,14 @@ export function MyProfileScreen() {
                 Видишь только ты.
               </div>
             </div>
-          ) : (user?.email ? <FieldLine value={user.email}/> : null)}
+          ) : (user?.email ? (
+            <div>
+              <FieldLine value={user.email}/>
+              {!user.email_verified && (
+                <EmailVerifyHint/>
+              )}
+            </div>
+          ) : null)}
 
           {/* Дата рождения */}
           {editing ? (

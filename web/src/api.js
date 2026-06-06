@@ -72,6 +72,7 @@ export const api = {
   // Profile
   getMe:          ()     => req('GET', '/me'),
   updateMe:       (data) => req('PATCH', '/me', data),
+  resendEmailVerification: () => req('POST', '/me/email/resend-verification'),
   changePassword: (oldPassword, newPassword) => req('POST', '/me/password', { oldPassword, newPassword }),
   deleteAccount:    (password) => req('DELETE', '/me', { password }),
   getUserProfile:   (userId)  => req('GET', `/users/${userId}/profile`),

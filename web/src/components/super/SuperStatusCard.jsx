@@ -18,7 +18,14 @@ export default function SuperStatusCard({ user, onInvite }) {
   const isSuper         = !!user?.is_super;
   const bonusClaimed    = !!user?.super_bonus_claimed;
   const expiresAt       = user?.super_expires_at || null;
-  const invitedCount    = user?.invited_count ?? 0;
+  // invited_total — все зарегистрированные по моей ссылке;
+  // invited_confirmed — из них те кто написал первое сообщение
+  // (только они засчитываются в Super-бонус «3 друзей»).
+  // invited_count алиасит confirmed для обратной совместимости.
+  const invitedTotal     = user?.invited_total ?? user?.invited_count ?? 0;
+  const invitedConfirmed = user?.invited_confirmed ?? user?.invited_count ?? 0;
+  const invitedCount     = invitedConfirmed;
+  const remainingToSuper = Math.max(0, 3 - invitedConfirmed);
   // L1 (мягкий): прогресс-бар появляется только начиная с 2/3 — раньше юзер
   // не должен видеть «давай-давай», пока не близок к цели.
   // L2 (жёсткий): прогресс с 0/3.
@@ -120,19 +127,28 @@ export default function SuperStatusCard({ user, onInvite }) {
   }
 
   function ProgressBar() {
-    const filled = Math.min(invitedCount / 3, 1);
-    const almostDone = invitedCount === 2;
+    const filled = Math.min(invitedConfirmed / 3, 1);
+    const almostDone = invitedConfirmed === 2;
     return (
       <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
           <div style={{ color: 'rgba(255,255,255,.6)', fontSize: 12 }}>
-            Прогресс: {invitedCount} / 3 друзей
+            Прогресс: {invitedConfirmed} / 3 друзей
+            {invitedTotal > invitedConfirmed && (
+              <span style={{ color: 'rgba(255,255,255,.4)', marginLeft: 6 }}>
+                · ещё {invitedTotal - invitedConfirmed} зарегистрировались
+              </span>
+            )}
           </div>
-          {almostDone && (
+          {almostDone ? (
             <div style={{ color: '#ffa500', fontSize: 12, fontWeight: 600 }}>
               Остался 1 шаг!
             </div>
-          )}
+          ) : remainingToSuper > 0 ? (
+            <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, fontWeight: 600 }}>
+              Осталось: {remainingToSuper}
+            </div>
+          ) : null}
         </div>
         <div style={{
           height: 6, borderRadius: 3,
@@ -149,6 +165,11 @@ export default function SuperStatusCard({ user, onInvite }) {
             transition: 'width .3s ease',
           }} />
         </div>
+        {invitedTotal > invitedConfirmed && (
+          <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
+            Засчитываются те, кто после регистрации написал хотя бы одно сообщение в HEY.
+          </div>
+        )}
       </div>
     );
   }

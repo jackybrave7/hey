@@ -324,6 +324,12 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS waitlist (
 
 // ── Referral / Super bonus migrations ─────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN invited_count INTEGER DEFAULT 0'); } catch {}
+// email_verified: 0 пока юзер не подтвердил почту. Старые юзеры,
+// у кого email уже стоял на момент введения колонки — считаются
+// подтверждёнными (бэк-фил ниже). Для новых дополнений через PATCH /me
+// флаг сбрасывается, пока юзер не кликнет verify-ссылку.
+try { db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0'); } catch {}
+try { db.prepare("UPDATE users SET email_verified=1 WHERE email IS NOT NULL AND email_verified=0").run(); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN super_bonus_claimed INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN super_expires_at INTEGER'); } catch {}
 // Бизнес-доступ: можно запросить статус «бизнес-пользователь», админ
@@ -592,6 +598,14 @@ function getReferralCount(userId) {
   return db.prepare('SELECT COUNT(*) as c FROM referrals WHERE inviter_id=?').get(userId)?.c ?? 0;
 }
 
+// Возвращает { total, confirmed } — приглашённые этим юзером (зарегистрированы
+// по его ссылке) и из них подтвердившиеся (написали первое сообщение).
+function getInvitedCounts(userId) {
+  const total     = db.prepare('SELECT COUNT(*) as c FROM referrals WHERE inviter_id=?').get(userId)?.c ?? 0;
+  const confirmed = db.prepare('SELECT COUNT(*) as c FROM referrals WHERE inviter_id=? AND confirmed_at IS NOT NULL').get(userId)?.c ?? 0;
+  return { total, confirmed };
+}
+
 function findUserByInviteCode(code) {
   return db.prepare('SELECT * FROM users WHERE invite_code=?').get(code) || null;
 }
@@ -639,7 +653,7 @@ function normalizeAvatars(rows) {
 }
 
 function updateUser(id, fields) {
-  const allowed = ['name','phone','birthday','avatar','bio','headline','email','password','must_change_password'];
+  const allowed = ['name','phone','birthday','avatar','bio','headline','email','email_verified','password','must_change_password'];
   const sets = Object.keys(fields).filter(k => allowed.includes(k));
   if (!sets.length) return findUserById(id);
   const normalized = { ...fields };
@@ -2815,9 +2829,14 @@ function extendSuper(userId, months) {
 // приглашённый написал ПЕРВОЕ сообщение. До этого момента реферал болтается
 // как pending (есть запись в referrals с confirmed_at=NULL).
 function _grantReferralCredit(inviterId) {
-  db.prepare('UPDATE users SET invited_count = invited_count + 1 WHERE id=?').run(inviterId);
+  // Раньше доверяли invited_count из users — но back-fill в миграции
+  // считал ВСЕ referrals (включая pending), а инкремент тут добавлял ещё
+  // +1 на каждое подтверждение. Семантика разъехалась. Теперь считаем
+  // подтверждённых напрямую из referrals.confirmed_at и зеркалим в
+  // users.invited_count для legacy-кеша.
   const inviter = findUserById(inviterId);
-  const count = inviter.invited_count;
+  const count = getInvitedCounts(inviterId).confirmed;
+  db.prepare('UPDATE users SET invited_count=? WHERE id=?').run(count, inviterId);
   const result = { superGranted: false, newBadge: null, invitedCount: count };
 
   // 3-й приглашённый — разовый бонус 3 мес СУПЕР
@@ -3389,7 +3408,7 @@ module.exports = {
   setOnline, getPresence,
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes, updateContactNickname,
-  getReferralCount, findUserByInviteCode,
+  getReferralCount, getInvitedCounts, findUserByInviteCode,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   getTotalUnreadFor,
   // AWO integration
