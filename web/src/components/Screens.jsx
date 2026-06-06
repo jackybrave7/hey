@@ -4174,17 +4174,17 @@ export function ConversationsScreen() {
         {c.type === 'monolog' ? (
           <div style={{width:52,height:52,borderRadius:14,flexShrink:0,
             background:'linear-gradient(135deg,#5a4090,#8060c0)',
-            display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>
-            📝
+            display:'flex',alignItems:'center',justifyContent:'center',color:'white'}}>
+            <Icon name="edit" size={22}/>
           </div>
         ) : c.type === 'group' ? (
           <div style={{width:52,height:52,borderRadius:14,flexShrink:0,overflow:'hidden',
             background: (c.icon && (c.icon.startsWith('http') || c.icon.startsWith('/') || c.icon.startsWith('data:')))
               ? '#0a0518' : 'rgba(200,160,210,.35)',
-            display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>
+            display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,color:'white'}}>
             {(c.icon && (c.icon.startsWith('http') || c.icon.startsWith('/') || c.icon.startsWith('data:')))
               ? <img src={c.icon} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-              : (c.icon || '👥')}
+              : (c.icon || <Icon name="users" size={22}/>)}
           </div>
         ) : (
           <AvatarDisplay avatar={c.avatar} name={c.name} size={52}/>
@@ -4738,7 +4738,7 @@ function ArchiveListModal({ onClose, onUnarchive }) {
                 fontSize:16,color:'white',fontWeight:700}}>
                 {c.avatar && (c.avatar.startsWith('http') || c.avatar.startsWith('/') || c.avatar.startsWith('data:'))
                   ? <img src={c.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                  : (c.type === 'group' ? (c.icon || '👥') : (c.name?.[0]?.toUpperCase() || '?'))}
+                  : (c.type === 'group' ? (c.icon || <Icon name="users" size={18}/>) : (c.name?.[0]?.toUpperCase() || '?'))}
               </div>
               <div style={{flex:1,minWidth:0,cursor:'pointer'}}
                 onClick={() => { onClose(); nav('/chat/' + c.id); }}>
@@ -5118,10 +5118,11 @@ function ForwardModal({ messageId, onClose, onDone }) {
           )}
           {filtered.map(c => {
             const isSel = selected.has(c.id);
-            const icon = c.type === 'group' ? (c.icon || '👥')
-                       : c.type === 'monolog' ? '📝' : null;
-            const iconIsImg = typeof icon === 'string' &&
-              (icon.startsWith('http') || icon.startsWith('/') || icon.startsWith('data:'));
+            // Иконка: для группы — выбранный эмодзи/фото или дефолтный
+            // <Icon users>; для монолога — <Icon edit>.
+            const groupIcon = c.icon || null;
+            const iconIsImg = typeof groupIcon === 'string' &&
+              (groupIcon.startsWith('http') || groupIcon.startsWith('/') || groupIcon.startsWith('data:'));
             return (
               <div key={c.id} onClick={() => toggle(c.id)}
                 style={{display:'flex',alignItems:'center',gap:12,padding:'10px 18px',cursor:'pointer',
@@ -5130,14 +5131,16 @@ function ForwardModal({ messageId, onClose, onDone }) {
                 onMouseEnter={e => { if (!isSel) e.currentTarget.style.background='rgba(255,255,255,.05)'; }}
                 onMouseLeave={e => { if (!isSel) e.currentTarget.style.background='transparent'; }}>
                 <div style={{width:38,height:38,borderRadius: c.type==='group' ? 12 : '50%',
-                  overflow:'hidden',flexShrink:0,
+                  overflow:'hidden',flexShrink:0,color:'white',
                   background: iconIsImg ? '#0a0518' : 'rgba(140,100,200,.4)',
                   display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>
                   {c.type === 'direct'
                     ? <AvatarDisplay avatar={c.avatar} name={c.name} size={38}/>
-                    : iconIsImg
-                      ? <img src={icon} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                      : icon}
+                    : c.type === 'monolog'
+                      ? <Icon name="edit" size={18}/>
+                      : iconIsImg
+                        ? <img src={groupIcon} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                        : (groupIcon || <Icon name="users" size={18}/>)}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{color:'white',fontSize:14,fontWeight:600,
@@ -8145,8 +8148,8 @@ export function ChatScreen() {
           {partner.isMonolog ? (
             <div style={{width:36,height:36,borderRadius:'12px',flexShrink:0,
               background:'linear-gradient(135deg,#5a4090,#8060c0)',
-              display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>
-              📝
+              display:'flex',alignItems:'center',justifyContent:'center',color:'white'}}>
+              <Icon name="edit" size={18}/>
             </div>
           ) : partner.isGroup ? (() => {
             const ic = partner.icon || '';
@@ -8337,11 +8340,11 @@ export function ChatScreen() {
           }}>
             <div style={{
               display:'flex',alignItems:'center',justifyContent:'center',
-              width:56,height:56,borderRadius:'50%',
+              width:56,height:56,borderRadius:'50%',color:'white',
               background:'linear-gradient(135deg,#7c4ddc,#a78bfa)',
-              margin:'0 auto 14px',fontSize:28,
+              margin:'0 auto 14px',
               boxShadow:'0 6px 18px rgba(124,77,220,.4)',
-            }}>📝</div>
+            }}><Icon name="edit" size={26}/></div>
             <h2 style={{
               margin:0,color:'white',fontSize:18,fontWeight:800,
               textAlign:'center',marginBottom:8,
