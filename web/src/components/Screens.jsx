@@ -5564,7 +5564,8 @@ export function GroupCreateScreen() {
 
   async function create() {
     if (!name.trim()) { heyToast('Введите название группы', 'error'); return; }
-    if (selected.size === 0) { heyToast('Добавьте хотя бы одного участника', 'error'); return; }
+    // Участников можно не добавлять сразу — пустую группу создаст
+    // только создатель, а позже пригласит других через настройки.
     setSaving(true);
     try {
       // приоритет: кастомный аватар → emoji
@@ -5716,16 +5717,19 @@ export function GroupCreateScreen() {
           ))}
         </div>
 
-        {/* Кнопка создания */}
-        {selected.size > 0 && (
-          <div style={{padding:'12px 24px 24px',flexShrink:0,
-            background:'linear-gradient(0deg,rgba(20,12,42,.95),rgba(20,12,42,0))'}}>
-            <button className="pill" onClick={create} disabled={saving}
-              style={{width:'100%',opacity:saving?.7:1}}>
-              {saving ? 'Создание…' : `Создать группу (${selected.size + 1} участников)`}
-            </button>
-          </div>
-        )}
+        {/* Кнопка создания — доступна даже без выбранных участников
+            (создатель может пригласить позже из настроек группы). */}
+        <div style={{padding:'12px 24px 24px',flexShrink:0,
+          background:'linear-gradient(0deg,rgba(20,12,42,.95),rgba(20,12,42,0))'}}>
+          <button className="pill" onClick={create} disabled={saving || !name.trim()}
+            style={{width:'100%',opacity:(saving || !name.trim())?.7:1}}>
+            {saving
+              ? 'Создание…'
+              : selected.size > 0
+                ? `Создать группу (${selected.size + 1} участников)`
+                : 'Создать пустую группу'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -5975,6 +5979,45 @@ export function GroupSettingsScreen() {
           </div>
         )}
 
+        {/* Visibility toggle — только для создателя.
+            Раньше блок жил в самом низу под списком участников; перенесли
+            наверх по просьбе пользователя — это критичная настройка
+            приватности, она должна быть сразу видна. */}
+        {info.admin_id === user?.id && (
+          <div style={{marginBottom:18,padding:'14px 16px',borderRadius:14,
+            background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)'}}>
+            <div style={{color:'rgba(225,220,245,.85)',fontSize:12,fontWeight:700,
+              textTransform:'uppercase',letterSpacing:.6,marginBottom:8,
+              display:'flex',alignItems:'center',gap:6}}>
+              <Icon name="eye" size={14}/> Что видят новые участники
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {[
+                { v:'all', t:'Всю историю чата', d:'По умолчанию. Видят сообщения, которые были до их вступления.' },
+                { v:'since_joined', t:'Только с момента вступления', d:'Прошлые сообщения скрыты — закрытое сообщество.' },
+              ].map(o => (
+                <label key={o.v} style={{display:'flex',alignItems:'flex-start',gap:10,
+                  padding:'10px 12px',borderRadius:10,cursor:'pointer',
+                  background: info.history_visibility === o.v ? 'rgba(120,90,200,.18)' : 'rgba(255,255,255,.04)',
+                  border:'1px solid ' + (info.history_visibility === o.v ? 'rgba(180,140,220,.4)' : 'rgba(255,255,255,.08)'),
+                  transition:'all .12s',
+                }}>
+                  <input type="radio" name="hist-vis"
+                    checked={info.history_visibility === o.v}
+                    onChange={() => changeHistoryVisibility(o.v)}
+                    style={{marginTop:3,accentColor:'rgb(180,140,255)'}}/>
+                  <div style={{flex:1}}>
+                    <div style={{color:'white',fontSize:13,fontWeight:600}}>{o.t}</div>
+                    <div style={{color:'rgba(225,220,245,.65)',fontSize:11,marginTop:2,lineHeight:1.45}}>
+                      {o.d}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Members */}
         <div style={{color:'rgba(255,255,255,.5)',fontSize:13,marginBottom:10}}>Участники</div>
         {members.map(m => {
@@ -6050,41 +6093,6 @@ export function GroupSettingsScreen() {
           </div>
           );
         })}
-
-        {/* Visibility toggle — только для создателя */}
-        {info.admin_id === user?.id && (
-          <div style={{marginTop:20,padding:'14px 16px',borderRadius:14,
-            background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)'}}>
-            <div style={{color:'rgba(225,220,245,.85)',fontSize:12,fontWeight:700,
-              textTransform:'uppercase',letterSpacing:.6,marginBottom:8}}>
-              👁 Что видят новые участники
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {[
-                { v:'all', t:'Всю историю чата', d:'По умолчанию. Видят сообщения, которые были до их вступления.' },
-                { v:'since_joined', t:'Только с момента вступления', d:'Прошлые сообщения скрыты — закрытое сообщество.' },
-              ].map(o => (
-                <label key={o.v} style={{display:'flex',alignItems:'flex-start',gap:10,
-                  padding:'10px 12px',borderRadius:10,cursor:'pointer',
-                  background: info.history_visibility === o.v ? 'rgba(120,90,200,.18)' : 'rgba(255,255,255,.04)',
-                  border:'1px solid ' + (info.history_visibility === o.v ? 'rgba(180,140,220,.4)' : 'rgba(255,255,255,.08)'),
-                  transition:'all .12s',
-                }}>
-                  <input type="radio" name="hist-vis"
-                    checked={info.history_visibility === o.v}
-                    onChange={() => changeHistoryVisibility(o.v)}
-                    style={{marginTop:3,accentColor:'rgb(180,140,255)'}}/>
-                  <div style={{flex:1}}>
-                    <div style={{color:'white',fontSize:13,fontWeight:600}}>{o.t}</div>
-                    <div style={{color:'rgba(225,220,245,.65)',fontSize:11,marginTop:2,lineHeight:1.45}}>
-                      {o.d}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Add members (admin only) */}
         {isAdmin && nonMembers.length > 0 && (

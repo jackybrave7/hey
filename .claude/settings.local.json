@@ -236,7 +236,8 @@
       "Bash(grep -n '^\\\\s*{[a-z][a-zA-Z]*\\\\.length}\\\\s*$\\\\|^\\\\s*{[a-z][a-zA-Z]*Count}\\\\s*$' web/src/components/Screens.jsx)",
       "Bash(ssh root@72.56.16.44 \"cd /app && git pull && pm2 restart hey\")",
       "Bash(awk -F: '$1 > 10247')",
-      "Bash(grep -v \"icon='\\\\|icon: '\\\\|//\")"
+      "Bash(grep -v \"icon='\\\\|icon: '\\\\|//\")",
+      "Bash(grep -n \"members.map\\\\|Участники.*\\({\\\\\\\\|members.length}.*участ\" web/src/components/Screens.jsx)"
     ]
   }
 }

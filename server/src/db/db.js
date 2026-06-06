@@ -965,9 +965,42 @@ function getContactOwners(userId) {
 
 // ── Groups ─────────────────────────────────────────────────────────────────
 
+// Лимиты размера группы: 100 если ни создатель ни админы не Супер,
+// и 500 если хоть один Супер. Считаются active + pending — pending
+// тоже «занимают слот» в инвайтах.
+const GROUP_LIMIT_REGULAR = 100;
+const GROUP_LIMIT_SUPER   = 500;
+
+function groupMaxSize(convId) {
+  // Любой Super среди активных админов даёт повышенный лимит.
+  const row = db.prepare(
+    `SELECT 1 FROM members m
+     JOIN users u ON u.id = m.user_id
+     JOIN conversations c ON c.id = m.conversation_id
+     WHERE m.conversation_id = ? AND m.status='active'
+       AND (m.is_admin=1 OR c.admin_id = m.user_id)
+       AND u.is_super=1
+     LIMIT 1`
+  ).get(convId);
+  return row ? GROUP_LIMIT_SUPER : GROUP_LIMIT_REGULAR;
+}
+
+function groupMemberSlots(convId) {
+  // Считаем active + pending — pending уже занимают место.
+  return db.prepare(
+    "SELECT COUNT(*) AS c FROM members WHERE conversation_id=? AND status IN ('active','pending')"
+  ).get(convId).c;
+}
+
 function createGroup({ creatorId, name, icon, memberIds }) {
   const id = uuid(), t = now();
   const invitees = memberIds.filter(uid => uid !== creatorId);
+  // Проверяем лимит уже на этапе создания (1 создатель + N инвайтов).
+  const creator = findUserById(creatorId);
+  const max = creator?.is_super ? GROUP_LIMIT_SUPER : GROUP_LIMIT_REGULAR;
+  if (1 + invitees.length > max) {
+    throw new Error(`Лимит группы — ${max} участников`);
+  }
   db.transaction(() => {
     db.prepare(`INSERT INTO conversations (id,type,name,icon,admin_id,created_at) VALUES (?,?,?,?,?,?)`)
       .run(id, 'group', name, icon || null, creatorId, t);
@@ -998,6 +1031,10 @@ function addGroupMember(convId, requesterId, userId) {
   const existing = db.prepare('SELECT status FROM members WHERE conversation_id=? AND user_id=?')
     .get(convId, userId);
   if (existing) return { alreadyMember: true, status: existing.status };
+  // Лимит: 100 (или 500 если есть Супер среди админов).
+  if (groupMemberSlots(convId) >= groupMaxSize(convId)) {
+    throw new Error(`Лимит группы — ${groupMaxSize(convId)} участников`);
+  }
   db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at,status,invited_by)
      VALUES (?,?,?,'pending',?)`)
     .run(convId, userId, now(), requesterId);
@@ -1018,6 +1055,10 @@ function joinGroupViaInvite(convId, userId, invitedBy) {
     db.prepare(`UPDATE members SET status='active', joined_at=? WHERE conversation_id=? AND user_id=?`)
       .run(now(), convId, userId);
     return { alreadyActive: false, fromPending: true };
+  }
+  // Лимит размера группы.
+  if (groupMemberSlots(convId) >= groupMaxSize(convId)) {
+    throw new Error(`Лимит группы — ${groupMaxSize(convId)} участников`);
   }
   db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at,status,invited_by)
      VALUES (?,?,?,'active',?)`)
