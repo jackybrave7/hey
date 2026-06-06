@@ -556,7 +556,17 @@ module.exports = function makeRouter(db, broadcast) {
     const token = authModule.signToken({ uid: userId, email, kind: 'email-verify' });
     const link = `${process.env.PUBLIC_ORIGIN || 'https://hey-messenger.ru'}/api/verify-email?token=${encodeURIComponent(token)}`;
     const t = createTransporter();
-    if (!t) throw new Error('SMTP не настроен');
+    if (!t) {
+      // SMTP не настроен — записываем ссылку в feedback log, чтобы
+      // админ мог отправить её юзеру вручную. Это лучше чем терять
+      // верификацию совсем.
+      try {
+        fs.appendFileSync(FEEDBACK_LOG,
+          `\n[${new Date().toISOString()}] VERIFY-EMAIL fallback user=${userId} <${email}>\n  ${link}\n`);
+        console.warn('[verify-email] SMTP не настроен — ссылка для', email, 'сохранена в feedback.log');
+      } catch {}
+      throw new Error('Сервис рассылки писем не настроен. Свяжитесь с поддержкой.');
+    }
     await t.sendMail({
       from: `"HEY Messenger" <${process.env.SMTP_USER}>`,
       to:   email,
