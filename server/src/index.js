@@ -117,3 +117,8 @@ function runScheduledDispatcher() {
 }
 setTimeout(runScheduledDispatcher, 5 * 1000);
 setInterval(runScheduledDispatcher, 10 * 1000);
+
+// Telegram-бот восстановления пароля. Тихо ничего не делает если
+// TG_SUPPORT_BOT_TOKEN не задан в окружении.
+const { startBot } = require('./tgBot');
+startBot({ db }).catch(e => console.error('[tg-bot] fatal:', e.message));

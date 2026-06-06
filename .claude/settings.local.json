@@ -244,7 +244,9 @@
       "Bash(ssh root@72.56.16.44 'cd /app/server && for h in smtp.timeweb.ru smtp.timeweb.com mail.hosting.reg.ru; do *)",
       "Bash(grep -n \"/welcome\\\\\\\\|export function WelcomeScreen\\\\\\\\|<Route\" web/src/App.jsx)",
       "Bash(grep -n \"LoginScreen\\\\\\\\|RegisterScreen\\\\\\\\|WelcomeScreen\" web/src/App.jsx)",
-      "Bash(grep -n \"getSystemBroadcasts\\\\\\\\b\" server/src/db/db.js)"
+      "Bash(grep -n \"getSystemBroadcasts\\\\\\\\b\" server/src/db/db.js)",
+      "Bash(grep -n \"setupWS\\\\\\\\|setInterval\\\\\\\\|runScheduledDispatcher\" server/src/index.js)",
+      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && pm2 restart hey && sleep 2 && pm2 logs hey --lines 5 --nostream 2>&1 | grep -E 'tg-bot|long-poll'\")"
     ]
   }
 }
