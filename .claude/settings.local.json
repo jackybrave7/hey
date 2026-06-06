@@ -241,7 +241,9 @@
       "Bash(ssh root@72.56.16.44 'cd /app/server && node -e \" *)",
       "Bash(ssh root@72.56.16.44 'sed -i \"s/^SMTP_HOST=.*/SMTP_HOST=smtp.timeweb.ru/\" /app/.env *)",
       "Bash(ssh root@72.56.16.44 'cd /app/server && for u in \"noreply\" \"noreply@hey-messenger.ru\" \"noreply@timeweb.ru\" \"noreply@hey-messenger.com\"; do *)",
-      "Bash(ssh root@72.56.16.44 'cd /app/server && for h in smtp.timeweb.ru smtp.timeweb.com mail.hosting.reg.ru; do *)"
+      "Bash(ssh root@72.56.16.44 'cd /app/server && for h in smtp.timeweb.ru smtp.timeweb.com mail.hosting.reg.ru; do *)",
+      "Bash(grep -n \"/welcome\\\\\\\\|export function WelcomeScreen\\\\\\\\|<Route\" web/src/App.jsx)",
+      "Bash(grep -n \"LoginScreen\\\\\\\\|RegisterScreen\\\\\\\\|WelcomeScreen\" web/src/App.jsx)"
     ]
   }
 }

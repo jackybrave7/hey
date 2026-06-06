@@ -170,6 +170,28 @@ export function InviteBadge({ name, avatar }) {
 export function ForgotPasswordPopup({ onClose, tgUsername }) {
   injectCSS();
   const handle = tgUsername || 'hey_support';
+  const [email, setEmail]     = useState('');
+  const [busy, setBusy]       = useState(false);
+  const [sent, setSent]       = useState(false);
+  const [err, setErr]         = useState('');
+
+  async function submit() {
+    setErr('');
+    const v = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) {
+      setErr('Введи корректный email');
+      return;
+    }
+    setBusy(true);
+    try {
+      // Ленивый импорт api, чтобы AuthComponents не тащил циклическую зависимость
+      const { api } = await import('../../api');
+      await api.passwordResetRequest(v);
+      setSent(true);
+    } catch (e) { setErr(e.message || 'Не удалось отправить'); }
+    setBusy(false);
+  }
+
   return (
     <div
       style={{
@@ -197,28 +219,70 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
         <div style={{ color: 'white', fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 10 }}>
           Забыли пароль?
         </div>
+
+        {sent ? (
+          <div style={{
+            color: 'rgba(220,255,220,.92)', fontSize: 14, lineHeight: 1.6,
+            textAlign: 'center', marginBottom: 18,
+            background: 'rgba(60,170,110,.18)', border: '1px solid rgba(110,235,150,.35)',
+            borderRadius: 14, padding: '14px 16px',
+          }}>
+            ✓ Если такой email есть в системе, мы отправили на него ссылку для смены пароля.
+            Ссылка действительна 1 час.
+          </div>
+        ) : (
+          <>
+            <div style={{
+              color: 'rgba(255,255,255,.7)', fontSize: 13, lineHeight: 1.55,
+              textAlign: 'center', marginBottom: 16,
+            }}>
+              Если ты указал email в профиле — введи его здесь, и пришлём ссылку для сброса пароля.
+            </div>
+            <input value={email} onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submit()}
+              placeholder="you@example.com" autoFocus type="email"
+              style={{
+                width:'100%', boxSizing:'border-box', marginBottom: 12,
+                background:'rgba(0,0,0,.4)', border:'1px solid rgba(255,255,255,.18)',
+                borderRadius: 12, padding:'12px 14px', color:'white', fontSize: 14,
+                fontFamily: 'inherit', outline: 'none',
+              }}/>
+            {err && (
+              <div style={{ color:'rgba(255,140,140,.95)', fontSize: 12,
+                marginBottom: 10, textAlign:'center' }}>{err}</div>
+            )}
+            <button onClick={submit} disabled={busy}
+              style={{
+                width: '100%', padding: '13px', borderRadius: 14,
+                background: 'rgba(140,110,220,.95)', border: '1px solid rgba(180,140,220,.4)',
+                color: 'white', fontSize: 14, fontWeight: 700,
+                cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit',
+                opacity: busy ? .7 : 1, marginBottom: 14,
+              }}>
+              {busy ? 'Отправляем…' : 'Отправить ссылку на email'}
+            </button>
+          </>
+        )}
+
         <div style={{
-          color: 'rgba(255,255,255,.68)', fontSize: 14, lineHeight: 1.6,
-          textAlign: 'center', marginBottom: 22
+          textAlign: 'center', margin: '4px 0 10px',
+          color: 'rgba(255,255,255,.4)', fontSize: 12,
         }}>
-          Свяжись с администратором HEY — мы выпустим тебе новый пароль и поможем войти.
+          или
         </div>
         <a
           href={`https://t.me/${handle}`} target="_blank" rel="noreferrer"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
             background: '#229ED9', color: 'white', borderRadius: 16,
-            padding: 14, fontSize: 14, fontWeight: 600, textDecoration: 'none',
+            padding: 12, fontSize: 13, fontWeight: 600, textDecoration: 'none',
             transition: 'background .15s'
           }}
           onMouseEnter={e => e.currentTarget.style.background = '#1a8ac0'}
           onMouseLeave={e => e.currentTarget.style.background = '#229ED9'}
         >
-          <span style={{ fontSize: 18 }}>✈</span> Написать в Telegram
+          <span style={{ fontSize: 16 }}>✈</span> Написать в Telegram
         </a>
-        <div style={{ textAlign: 'center', marginTop: 14, color: 'rgba(255,255,255,.38)', fontSize: 11 }}>
-          Обычно отвечаем в течение часа
-        </div>
       </div>
     </div>
   );

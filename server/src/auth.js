@@ -6,8 +6,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'hey-secret-change-in-production';
 let _db = null;
 function init(db) { _db = db; }
 
-function signToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+function signToken(payload, opts) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d', ...(opts || {}) });
 }
 
 function verifyToken(token) {

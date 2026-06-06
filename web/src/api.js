@@ -172,6 +172,8 @@ export const api = {
 
   // Waitlist
   joinWaitlist:     (email)     => req('POST', '/waitlist', { email, source: 'register-page' }),
+  passwordResetRequest: (email)  => req('POST', '/password-reset/request', { email }),
+  passwordResetConfirm: (token, newPassword) => req('POST', '/password-reset/confirm', { token, newPassword }),
 
   // Reports
   createReport:     (data)      => req('POST', '/reports', data),

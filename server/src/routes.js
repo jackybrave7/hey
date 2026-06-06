@@ -580,6 +580,76 @@ module.exports = function makeRouter(db, broadcast) {
     });
   }
 
+  // ── Password reset via email ────────────────────────────────────────────
+  // POST /password-reset/request { email } — публичный.
+  //   • Ищем юзера по email. Если есть и не заблокирован — отправляем
+  //     письмо с reset-ссылкой. Если нет — возвращаем такой же 200,
+  //     чтобы не давать enumerate-возможность.
+  // POST /password-reset/confirm { token, newPassword } — публичный.
+  //   • Валидируем подписанный JWT (kind:'password-reset', TTL 1ч),
+  //     обновляем пароль и снимаем must_change_password.
+  async function sendPasswordReset(userId, email, name) {
+    const token = authModule.signToken({ uid: userId, email, kind: 'password-reset' }, { expiresIn: '1h' });
+    const link = `${process.env.PUBLIC_ORIGIN || 'https://hey-messenger.ru'}/password-reset?token=${encodeURIComponent(token)}`;
+    const t = createTransporter();
+    if (!t) {
+      console.warn('[password-reset] SMTP не настроен — ссылка для', email, ':', link);
+      throw new Error('Сервис рассылки писем не настроен');
+    }
+    await t.sendMail({
+      from: `"HEY Messenger" <${process.env.SMTP_USER}>`,
+      to:   email,
+      subject: 'Восстановление пароля HEY',
+      text: `Привет, ${name || ''}!\n\nКто-то запросил сброс пароля для аккаунта HEY с этим email.\nЕсли это ты — открой ссылку и задай новый пароль:\n${link}\n\nСсылка действительна 1 час. Если это не ты — просто проигнорируй письмо.`,
+      html: `<p>Привет, ${name || ''}!</p>
+<p>Кто-то запросил сброс пароля для аккаунта HEY с этим email.</p>
+<p>Если это ты — задай новый пароль:</p>
+<p><a href="${link}" style="background:#7858b0;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Задать новый пароль</a></p>
+<p style="color:#888;font-size:12px">Если кнопка не работает — открой в браузере: ${link}</p>
+<p style="color:#888;font-size:12px">Ссылка действительна 1 час. Если это не ты — просто проигнорируй письмо.</p>`,
+    });
+  }
+
+  r.post('/password-reset/request', async (req, res) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!awo.isValidEmail(email)) return res.status(400).json({ error: 'Неверный email' });
+    const user = db.findUserByEmail(email);
+    // Идемпотентный ответ — не выдаём enumerate-сигнал
+    if (!user || user.is_blocked || user.is_deleted) {
+      return res.json({ ok: true });
+    }
+    try {
+      await sendPasswordReset(user.id, email, user.name);
+      res.json({ ok: true });
+    } catch (e) {
+      console.error('[password-reset/request]', e.message);
+      res.status(500).json({ error: 'Не удалось отправить письмо' });
+    }
+  });
+
+  r.post('/password-reset/confirm', (req, res) => {
+    const { token, newPassword } = req.body || {};
+    if (!token) return res.status(400).json({ error: 'Нет токена' });
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Пароль минимум 8 символов' });
+    }
+    let payload;
+    try { payload = authModule.verifyToken(token); }
+    catch { return res.status(400).json({ error: 'Ссылка недействительна или устарела' }); }
+    if (payload?.kind !== 'password-reset' || !payload?.uid) {
+      return res.status(400).json({ error: 'Ссылка недействительна' });
+    }
+    const user = db.findUserById(payload.uid);
+    if (!user || user.is_blocked || user.is_deleted) {
+      return res.status(400).json({ error: 'Аккаунт недоступен' });
+    }
+    db.updateUser(payload.uid, {
+      password: bcrypt.hashSync(newPassword, 10),
+      must_change_password: 0,
+    });
+    res.json({ ok: true });
+  });
+
   r.post('/me/password', requireAuth, (req, res) => {
     const { oldPassword, newPassword } = req.body;
     if (!newPassword) return res.status(400).json({ error: 'Заполните все поля' });

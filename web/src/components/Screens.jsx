@@ -1487,6 +1487,85 @@ function InviteOnlyBlock({ onSwitchToLogin }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PasswordResetScreen — /password-reset?token=... — задать новый пароль
+// по ссылке из письма
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function PasswordResetScreen() {
+  const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+  const [pwd,   setPwd]   = useState('');
+  const [pwd2,  setPwd2]  = useState('');
+  const [busy,  setBusy]  = useState(false);
+  const [done,  setDone]  = useState(false);
+  const [err,   setErr]   = useState('');
+
+  async function submit() {
+    setErr('');
+    if (!token) { setErr('Нет токена в ссылке'); return; }
+    if (pwd.length < 8) { setErr('Пароль минимум 8 символов'); return; }
+    if (pwd !== pwd2)   { setErr('Пароли не совпадают'); return; }
+    setBusy(true);
+    try {
+      await api.passwordResetConfirm(token, pwd);
+      setDone(true);
+    } catch (e) { setErr(e.message || 'Ошибка'); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="screen" style={{
+      justifyContent:'center', alignItems:'center', padding:'40px 24px',
+    }}>
+      <div style={{ width:'100%', maxWidth: 380 }}>
+        <AuthBrand />
+        <div style={{ fontSize: 22, fontWeight: 700, textAlign:'center',
+          color:'white', marginBottom: 22 }}>
+          Новый пароль
+        </div>
+
+        {done ? (
+          <>
+            <div style={{
+              background:'rgba(60,170,110,.18)', border:'1px solid rgba(110,235,150,.35)',
+              borderRadius: 14, padding:'14px 16px', color:'rgba(220,255,220,.95)',
+              fontSize: 14, lineHeight: 1.6, textAlign:'center', marginBottom: 18,
+            }}>
+              ✓ Пароль обновлён. Можно войти с новым паролем.
+            </div>
+            <button className="auth-btn-primary" onClick={() => nav('/login')}>
+              Войти
+            </button>
+          </>
+        ) : (
+          <>
+            <PasswordInput id="rst-pwd"  label="Новый пароль"
+              value={pwd}  onChange={(e) => setPwd(e.target.value)}/>
+            <PasswordInput id="rst-pwd2" label="Повтори пароль"
+              value={pwd2} onChange={(e) => setPwd2(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submit()}/>
+            <div style={{ color:'rgba(255,255,255,.52)', fontSize:12, margin:'-4px 4px 18px' }}>
+              Минимум 8 символов. После смены войди со своим телефоном и новым паролем.
+            </div>
+            {err && (
+              <div style={{
+                background:'rgba(220,60,60,.18)', border:'1px solid rgba(255,120,120,.35)',
+                borderRadius: 12, padding:'10px 16px', marginBottom: 12,
+                color:'white', fontSize: 13, textAlign:'center', lineHeight: 1.4,
+              }}>{err}</div>
+            )}
+            <button className="auth-btn-primary" onClick={submit} disabled={busy}>
+              {busy ? 'Сохраняем…' : 'Установить пароль'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SuccessScreen (legacy — kept for backward compat)
 // ─────────────────────────────────────────────────────────────────────────────
 
