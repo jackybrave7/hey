@@ -9,6 +9,7 @@ import { useSalesPressure } from '../../lib/publicSettings';
 import SuperInfoScreen from '../super/SuperInfoScreen';
 import { AudioPlayer, openUserCard } from '../Screens';
 import Icon from '../Icon';
+import { HEY_EMOJI_SET, emojiUrl } from '../../lib/heyEmoji';
 
 function fmtDate(ts) {
   if (!ts) return '';
@@ -29,38 +30,75 @@ function trimUrlTail(url) {
   return u;
 }
 
+// Рендерит сразу и URL-ы (как кликабельные ссылки), и [name]-эмодзи
+// (как маленькие inline-картинки). Раньше эмодзи показывались сырыми
+// токенами «[winking]» в подписи момента — теперь так же красиво,
+// как в чате.
 export function TextWithLinks({ text, linkColor = 'rgba(180,140,255,.95)' }) {
   if (!text) return null;
-  const re = /https?:\/\/[^\s<>"']+/gi;
-  const parts = [];
+  const URL_RE   = /https?:\/\/[^\s<>"']+/gi;
+  const EMOJI_RE = /\[([a-z][a-z 0-9_-]*)\]/gi;
+
+  // Сначала разбиваем по URL-ам (как раньше), а в каждом не-URL куске
+  // дополнительно разбиваем по эмодзи-токенам. Так оба регэкспа не
+  // конкурируют между собой.
+  const urlChunks = [];
   let last = 0, m;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push({ t: text.slice(last, m.index), link: false });
+  while ((m = URL_RE.exec(text)) !== null) {
+    if (m.index > last) urlChunks.push({ t: text.slice(last, m.index), kind: 'text' });
     const cleanUrl = trimUrlTail(m[0]);
     const tail     = m[0].slice(cleanUrl.length);
-    parts.push({ t: cleanUrl, link: true });
-    if (tail) parts.push({ t: tail, link: false });
+    urlChunks.push({ t: cleanUrl, kind: 'link' });
+    if (tail) urlChunks.push({ t: tail, kind: 'text' });
     last = m.index + m[0].length;
   }
-  if (last < text.length) parts.push({ t: text.slice(last), link: false });
+  if (last < text.length) urlChunks.push({ t: text.slice(last), kind: 'text' });
 
-  // Сокращает URL для отображения: domain + /первые-несколько-симв… без https://
   function shortenUrl(url) {
     const stripped = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
     if (stripped.length <= 38) return stripped;
     return stripped.slice(0, 35) + '…';
   }
 
+  function splitEmoji(chunk) {
+    const out = [];
+    let i = 0, mm;
+    EMOJI_RE.lastIndex = 0;
+    while ((mm = EMOJI_RE.exec(chunk)) !== null) {
+      if (mm.index > i) out.push({ t: chunk.slice(i, mm.index), kind: 'text' });
+      const name = mm[1].toLowerCase();
+      if (HEY_EMOJI_SET.has(name)) out.push({ name, kind: 'emoji' });
+      else out.push({ t: mm[0], kind: 'text' }); // неизвестный — оставляем как было
+      i = mm.index + mm[0].length;
+    }
+    if (i < chunk.length) out.push({ t: chunk.slice(i), kind: 'text' });
+    return out;
+  }
+
+  const flat = [];
+  for (const c of urlChunks) {
+    if (c.kind === 'link') { flat.push(c); continue; }
+    flat.push(...splitEmoji(c.t));
+  }
+
   return (
     <>
-      {parts.map((p, i) => p.link ? (
-        <a key={i} href={p.t} target="_blank" rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
-          title={p.t}
-          style={{ color: linkColor, textDecoration:'underline', textUnderlineOffset:2, wordBreak:'break-all' }}>
-          {shortenUrl(p.t)}
-        </a>
-      ) : <span key={i}>{p.t}</span>)}
+      {flat.map((p, i) => {
+        if (p.kind === 'link') return (
+          <a key={i} href={p.t} target="_blank" rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            title={p.t}
+            style={{ color: linkColor, textDecoration:'underline', textUnderlineOffset:2, wordBreak:'break-all' }}>
+            {shortenUrl(p.t)}
+          </a>
+        );
+        if (p.kind === 'emoji') return (
+          <img key={i} src={emojiUrl(p.name)} alt={p.name} title={p.name}
+            style={{ width: 20, height: 20, display:'inline-block',
+              verticalAlign:'-4px', margin:'0 1px' }}/>
+        );
+        return <span key={i}>{p.t}</span>;
+      })}
     </>
   );
 }

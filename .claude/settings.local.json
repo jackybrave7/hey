@@ -246,7 +246,11 @@
       "Bash(grep -n \"LoginScreen\\\\\\\\|RegisterScreen\\\\\\\\|WelcomeScreen\" web/src/App.jsx)",
       "Bash(grep -n \"getSystemBroadcasts\\\\\\\\b\" server/src/db/db.js)",
       "Bash(grep -n \"setupWS\\\\\\\\|setInterval\\\\\\\\|runScheduledDispatcher\" server/src/index.js)",
-      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && pm2 restart hey && sleep 2 && pm2 logs hey --lines 5 --nostream 2>&1 | grep -E 'tg-bot|long-poll'\")"
+      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && pm2 restart hey && sleep 2 && pm2 logs hey --lines 5 --nostream 2>&1 | grep -E 'tg-bot|long-poll'\")",
+      "Bash(grep -n \"moment.text\\\\\\\\|moment\\\\\\\\.text\\\\\\\\|renderText\\\\\\\\|emoji\" web/src/components/moments/MomentDetailPopup.jsx)",
+      "Bash(grep -n \"function TextWithLinks\\\\\\\\|const TextWithLinks\\\\\\\\|export.*TextWithLinks\" web/src/components/moments/MomentDetailPopup.jsx)",
+      "Bash(grep -n \"^import\\\\\\\\|HEY_EMOJI_SET\\\\\\\\|emojiUrl\" web/src/components/moments/MomentDetailPopup.jsx)",
+      "Bash(grep -n \"moment.text\\\\\\\\|preview\" web/src/components/moments/MomentCard.jsx)"
     ]
   }
 }
