@@ -46,6 +46,9 @@ export default function AdminSystem() {
 function ManagePublished() {
   const [moments, setMoments]       = useState([]);
   const [broadcasts, setBroadcasts] = useState([]);
+  // Прочие сообщения от заведующего, не привязанные к рассылке
+  // (например тестовые/ручные сообщения админа в конкретный чат).
+  const [orphans, setOrphans]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [editingMomentId, setEditingMomentId] = useState(null);
   const [editingBroadcastId, setEditingBroadcastId] = useState(null);
@@ -58,14 +61,31 @@ function ManagePublished() {
   async function load() {
     setLoading(true);
     try {
-      const [ms, bs] = await Promise.all([
+      const [ms, bs, os] = await Promise.all([
         api.adminSystemListMoments(),
         api.adminSystemListBroadcasts(),
+        api.adminSystemListOrphans(),
       ]);
       setMoments(ms);
       setBroadcasts(bs);
+      setOrphans(os);
     } catch (e) { showMsg('Ошибка: ' + e.message); }
     setLoading(false);
+  }
+
+  async function deleteOrphan(m) {
+    const ok = await customConfirm(
+      <>
+        <div style={{fontWeight:600,marginBottom:8}}>Удалить сообщение?</div>
+        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:6}}>
+          Только у одного получателя {m.recipient_name ? `(${m.recipient_name})` : ''}.
+        </div>
+      </>,
+      { danger: true, confirmLabel: 'Удалить' }
+    );
+    if (!ok) return;
+    try { await api.adminSystemDeleteMessage(m.id); showMsg('✓ Удалено'); load(); }
+    catch (e) { showMsg('Ошибка: ' + e.message); }
   }
 
   useEffect(() => { load(); }, []);
@@ -174,6 +194,24 @@ function ManagePublished() {
           </Card>
         ))}
       </Section>
+
+      {/* Прочие сообщения (не рассылки) */}
+      {orphans.length > 0 && (
+        <Section title={`💌 Прямые сообщения от заведующего (${orphans.length})`}>
+          {orphans.map(m => (
+            <Card key={m.id}>
+              <Meta>
+                <span>{fmtDate(m.created_at)}</span>
+                <Badge>→ {m.recipient_name || m.recipient_phone || 'неизвестно'}</Badge>
+              </Meta>
+              <Text>{m.text || '(пустое сообщение)'}</Text>
+              <Actions>
+                <BtnDanger onClick={() => deleteOrphan(m)}>🗑 Удалить</BtnDanger>
+              </Actions>
+            </Card>
+          ))}
+        </Section>
+      )}
 
       {/* Рассылки */}
       <Section title={`💬 Рассылки сообщений (${broadcasts.length})`}>

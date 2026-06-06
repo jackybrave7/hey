@@ -1961,6 +1961,28 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getSystemBroadcasts({}));
   });
 
+  // Прочие сообщения от системного аккаунта без broadcast_id —
+  // те, что в админке под «Рассылками» не появлялись и потому не
+  // могли быть удалены через UI.
+  r.get('/admin/system/orphan-messages', requireAdmin, (req, res) => {
+    res.json(db.listOrphanSystemMessages({}));
+  });
+
+  r.delete('/admin/system/messages/:id', requireAdmin, (req, res) => {
+    try {
+      const deleted = db.deleteSystemMessage(req.params.id);
+      if (deleted === 0) return res.status(404).json({ error: 'Не найдено или не от заведующего' });
+      if (db.logAdminAction) db.logAdminAction({
+        adminId: req.user.id, action: 'system_message_delete',
+        reason: `messageId=${req.params.id}`,
+      });
+      res.json({ ok: true });
+    } catch (e) {
+      console.error('DELETE /admin/system/messages/:id', e);
+      res.status(500).json({ error: e.message || 'Internal error' });
+    }
+  });
+
   // Редактировать системный момент
   r.patch('/admin/system/moments/:id', requireAdmin, async (req, res) => {
     try {

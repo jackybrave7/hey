@@ -2504,6 +2504,36 @@ function deleteBroadcast(broadcastId) {
   return info.changes;
 }
 
+// «Прочие» прямые сообщения от системного аккаунта — те, что НЕ являются
+// частью рассылки (broadcast_id IS NULL). Например тестовые/ручные
+// сообщения админа конкретному юзеру. Они не показывались в админке
+// под «Рассылками» и из-за этого их нельзя было удалить из UI.
+function listOrphanSystemMessages({ limit = 100 } = {}) {
+  return db.prepare(
+    `SELECT m.id, m.conversation_id, m.text, m.created_at,
+            (SELECT user_id FROM members WHERE conversation_id = m.conversation_id
+                                          AND user_id != ? LIMIT 1) AS recipient_id,
+            (SELECT u.name FROM users u
+              WHERE u.id = (SELECT user_id FROM members
+                            WHERE conversation_id = m.conversation_id
+                              AND user_id != ? LIMIT 1)) AS recipient_name,
+            (SELECT u.phone FROM users u
+              WHERE u.id = (SELECT user_id FROM members
+                            WHERE conversation_id = m.conversation_id
+                              AND user_id != ? LIMIT 1)) AS recipient_phone
+     FROM messages m
+     WHERE m.sender_id = ? AND m.broadcast_id IS NULL
+     ORDER BY m.created_at DESC LIMIT ?`
+  ).all(SYSTEM_USER_ID, SYSTEM_USER_ID, SYSTEM_USER_ID, SYSTEM_USER_ID, limit);
+}
+
+function deleteSystemMessage(messageId) {
+  const info = db.prepare(
+    'DELETE FROM messages WHERE id=? AND sender_id=?'
+  ).run(messageId, SYSTEM_USER_ID);
+  return info.changes;
+}
+
 function editBroadcast(broadcastId, newText) {
   const t = now();
   const info = db.prepare(
@@ -3443,6 +3473,7 @@ module.exports = {
   addToWaitlist, getWaitlist,
   // System (HEY-заведующий)
   getSystemMoments, getSystemBroadcasts, deleteBroadcast, editBroadcast,
+  listOrphanSystemMessages, deleteSystemMessage,
   // Admin
   getAdminStats, getAdminUsers, getAdminUserById,
   getAdminGroups, getAdminGroupDetail,
