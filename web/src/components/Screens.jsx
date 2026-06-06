@@ -8233,26 +8233,34 @@ export function ChatScreen() {
       }
       const virtuosoIndex = curFirstItemIndex + flatIdx;
 
-      // Ждём пока React успеет отрендерить новый messages → Virtuoso
-      // переразложит итемы (нужно double-rAF + небольшой setTimeout —
-      // Virtuoso измеряет высоты в layout-эффектах, scrollToIndex до этого
-      // момента иногда «промахивается» и срабатывает только со второй
-      // попытки или вообще не срабатывает).
-      const doScroll = () => {
-        virtuosoRef.current?.scrollToIndex({
-          index: virtuosoIndex, align: 'center', behavior: 'smooth',
-        });
+      // Virtuoso измеряет высоты строк лениво — особенно для сообщений с
+      // картинками, видео-превью или ответами высоты «гуляют» по мере
+      // того, как контент догружается. Один scrollToIndex после rAF
+      // часто промахивается. Решаем серией попыток: моментальный
+      // прыжок с align:'start' (даёт Virtuoso сразу подгрузить
+      // нужный диапазон), потом несколько «center auto» с разными
+      // задержками — каждая следующая корректирует промах от
+      // догрузившейся высоты.
+      const flashOnce = () => {
         setFlashMsgId(targetId);
         setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
       };
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          doScroll();
-          // Подстраховка — повторная попытка через 250мс на случай если
-          // Virtuoso не успел измерить высоты подгруженных сообщений.
-          setTimeout(doScroll, 250);
+      const scrollAt = (delayMs, opts) => setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({ index: virtuosoIndex, ...opts });
+      }, delayMs);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        // 1) Сразу прыжок «как есть» — позволяет Virtuoso понять что
+        // нужно рендерить вокруг targetIndex и начать измерять высоты.
+        virtuosoRef.current?.scrollToIndex({
+          index: virtuosoIndex, align: 'center', behavior: 'auto',
         });
-      });
+        flashOnce();
+        // 2-4) Серия дозиров после того как изображения/реплаи успеют
+        // отрисоваться и переизмериться.
+        scrollAt(120, { align: 'center', behavior: 'auto' });
+        scrollAt(320, { align: 'center', behavior: 'auto' });
+        scrollAt(700, { align: 'center', behavior: 'auto' });
+      }));
     }
     window.addEventListener('hey:scroll-to-msg', onScrollTo);
     return () => window.removeEventListener('hey:scroll-to-msg', onScrollTo);
