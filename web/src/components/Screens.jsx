@@ -7179,8 +7179,30 @@ export function ChatScreen() {
       const older = await api.getMessages(convId, messages[0].created_at);
       if (!Array.isArray(older) || !older.length) { setHasMore(false); return; }
       if (older.length < 50) setHasMore(false);
-      setFirstItemIndex(prev => prev - older.length);
-      setMessages(prev => [...older, ...prev]);
+      // Считаем flat-items (msg + date-разделители) и сдвигаем
+      // firstItemIndex на реальный прирост, иначе Virtuoso уезжает
+      // на 1 за каждое новое появление дня.
+      const flatBefore = (() => {
+        let lastDay = null, n = 0;
+        for (const m of messages) {
+          const d = new Date(m.created_at * 1000).toDateString();
+          if (d !== lastDay) { n++; lastDay = d; }
+          n++;
+        }
+        return n;
+      })();
+      const merged = [...older, ...messages];
+      const flatAfter = (() => {
+        let lastDay = null, n = 0;
+        for (const m of merged) {
+          const d = new Date(m.created_at * 1000).toDateString();
+          if (d !== lastDay) { n++; lastDay = d; }
+          n++;
+        }
+        return n;
+      })();
+      setFirstItemIndex(prev => prev - (flatAfter - flatBefore));
+      setMessages(merged);
     } catch {}
     finally { setLoadingMore(false); }
   }
@@ -8080,6 +8102,18 @@ export function ChatScreen() {
       let curFirstItemIndex = firstItemIndex;
       const findArrayIdx = () => curMessages.findIndex(m => m.id === targetId);
 
+      // Подсчёт flat-items (msg + date) для произвольного массива messages —
+      // нужен чтобы корректно сдвигать firstItemIndex при prepend: Virtuoso
+      // видит больше итемов, чем длина messages (есть date-разделители).
+      function flatCount(arr) {
+        let lastDay = null, n = 0;
+        for (const m of arr) {
+          const day = new Date(m.created_at * 1000).toDateString();
+          if (day !== lastDay) { n++; lastDay = day; }
+          n++;
+        }
+        return n;
+      }
       if (findArrayIdx() < 0) {
         let attempts = 0;
         try { heyToast('Загружаем сообщения…', 'info'); } catch {}
@@ -8093,8 +8127,15 @@ export function ChatScreen() {
             setHasMore(false); curHasMore = false; break;
           }
           if (older.length < 50) curHasMore = false;
-          curFirstItemIndex = curFirstItemIndex - older.length;
-          curMessages = [...older, ...curMessages];
+          // Декрементим firstItemIndex на количество flat-items, которые
+          // реально появились сверху (т.е. длина flatItems нового массива
+          // минус длина flatItems старого). Раньше декрементили на
+          // older.length — но между днями вставляются date-разделители,
+          // и Virtuoso уходил в рассинхрон на ±1 за каждое прибавление дня.
+          const newMessages = [...older, ...curMessages];
+          const flatGrown   = flatCount(newMessages) - flatCount(curMessages);
+          curFirstItemIndex = curFirstItemIndex - flatGrown;
+          curMessages = newMessages;
           setFirstItemIndex(curFirstItemIndex);
           setMessages(curMessages);
           if (!curHasMore) setHasMore(false);
@@ -8106,11 +8147,35 @@ export function ChatScreen() {
         heyToast('Сообщение не найдено в истории', 'error');
         return;
       }
-      // Virtuoso-индекс = firstItemIndex + позиция-в-массиве. flatItems в нашей
-      // схеме совпадает с messages по индексам (typing — это последний extra
-      // item; для прокрутки к существующему сообщению совпадение по индексу
-      // гарантировано).
-      const virtuosoIndex = curFirstItemIndex + arrayIdx;
+      // Virtuoso рендерит flatItems (messages + date-разделители + typing),
+      // а не сам массив messages. Раньше использовали arrayIdx — но между
+      // разными днями вставляется date-итем, и индекс messages смещался
+      // на 1 за каждый день → скролл попадал «выше» нужного сообщения.
+      // Считаем позицию ВНУТРИ flatItems в момент скролла. Используем
+      // актуальный flatItems из замыкания useEffect — при подгрузке
+      // старых сообщений useEffect перерегистрируется и flatItems тут
+      // свежий. Если мы только что подгрузили — даём React 2 кадра
+      // отрендерить новые messages → пересобрать flatItems.
+      function flatIndexOf(id) {
+        // Считаем без зависимости от useMemo-flatItems снаружи — он
+        // мог не успеть пересобраться к моменту вызова. Реплицируем
+        // алгоритм flatItems на curMessages.
+        let lastDay = null;
+        let pos = 0;
+        for (const m of curMessages) {
+          const day = new Date(m.created_at * 1000).toDateString();
+          if (day !== lastDay) { pos++; lastDay = day; }
+          if (m.id === id) return pos;
+          pos++;
+        }
+        return -1;
+      }
+      const flatIdx = flatIndexOf(targetId);
+      if (flatIdx < 0) {
+        heyToast('Сообщение не найдено в истории', 'error');
+        return;
+      }
+      const virtuosoIndex = curFirstItemIndex + flatIdx;
 
       // Ждём пока React успеет отрендерить новый messages → Virtuoso
       // переразложит итемы (нужно double-rAF + небольшой setTimeout —
