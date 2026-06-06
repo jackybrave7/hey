@@ -4727,18 +4727,37 @@ function ArchiveListModal({ onClose, onUnarchive }) {
               </span>
             </div>
           )}
-          {list && list.length > 0 && list.map(c => (
+          {list && list.length > 0 && list.map(c => {
+            // Аватарка: для группы — иконка/фото; для direct — аватар
+            // партнёра (если он не удалён); для монолога — Icon edit.
+            const groupIc = c.icon || '';
+            const groupIcIsImg = c.type === 'group' && groupIc &&
+              (groupIc.startsWith('http') || groupIc.startsWith('/') || groupIc.startsWith('data:'));
+            const directAv = c.type === 'direct' && !c.partner_is_deleted ? c.avatar : null;
+            const directAvIsImg = directAv &&
+              (directAv.startsWith('http') || directAv.startsWith('/') || directAv.startsWith('data:'));
+            return (
             <div key={c.id} style={{
               display:'flex',alignItems:'center',gap:12,padding:'10px 8px',
               borderRadius:10,
             }}>
-              <div style={{width:40,height:40,borderRadius:'50%',overflow:'hidden',flexShrink:0,
+              <div style={{width:40,height:40,
+                borderRadius: c.type === 'group' ? 12 : '50%',
+                overflow:'hidden',flexShrink:0,
                 background:'rgba(120,90,200,.4)',
                 display:'flex',alignItems:'center',justifyContent:'center',
                 fontSize:16,color:'white',fontWeight:700}}>
-                {c.avatar && (c.avatar.startsWith('http') || c.avatar.startsWith('/') || c.avatar.startsWith('data:'))
-                  ? <img src={c.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                  : (c.type === 'group' ? (c.icon || <Icon name="users" size={18}/>) : (c.name?.[0]?.toUpperCase() || '?'))}
+                {c.type === 'monolog'
+                  ? <Icon name="edit" size={18}/>
+                  : c.type === 'group'
+                    ? (groupIcIsImg
+                        ? <img src={groupIc} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                        : (groupIc || <Icon name="users" size={18}/>))
+                    : directAvIsImg
+                      ? <img src={directAv} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                      : c.partner_is_deleted
+                        ? <Icon name="user" size={18}/>
+                        : (c.name?.[0]?.toUpperCase() || '?')}
               </div>
               <div style={{flex:1,minWidth:0,cursor:'pointer'}}
                 onClick={() => { onClose(); nav('/chat/' + c.id); }}>
@@ -4765,7 +4784,8 @@ function ArchiveListModal({ onClose, onUnarchive }) {
                 ✕
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       {confirmModal}
