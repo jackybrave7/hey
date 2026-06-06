@@ -6525,7 +6525,12 @@ const MessageRow = memo(function MessageRow({
           {m.text && (() => {
             const trimmed = m.text.trim();
             const single  = trimmed.match(/^\[([^\]]+)\]$/);
-            if (single && HEY_EMOJI_SET.has(single[1])) {
+            // Большой эмодзи (72px) — только если в сообщении нет никаких
+            // вложений и нет link-preview. Когда эмодзи подписывает фото/
+            // файл/видео-ссылку, он должен идти обычным инлайн-размером,
+            // а не перекрывать вложение.
+            const hasAttachment = !!m.attachment || !!m.link_preview;
+            if (single && HEY_EMOJI_SET.has(single[1]) && !hasAttachment) {
               return (
                 <div style={{padding:'4px 0', textAlign: isOut ? 'right' : 'left'}}>
                   <img src={emojiUrl(single[1])} alt={single[1]}
