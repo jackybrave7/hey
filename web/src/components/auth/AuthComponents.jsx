@@ -101,11 +101,12 @@ export function AuthBrand({ delay = 0 }) {
 }
 
 // ─── FloatingInput ────────────────────────────────────────────────────────────
-export function FloatingInput({ id, label, type = 'text', value, onChange, onKeyDown, autoComplete, inputMode }) {
+export function FloatingInput({ id, label, type = 'text', value, onChange, onKeyDown, autoComplete, inputMode, inputRef }) {
   injectCSS();
   return (
     <div className="auth-field">
       <input
+        ref={inputRef}
         className="auth-input"
         id={id} type={type} placeholder=" "
         value={value} onChange={onChange} onKeyDown={onKeyDown}

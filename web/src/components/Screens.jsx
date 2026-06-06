@@ -692,31 +692,36 @@ function validatePhone(raw) {
   return { ok: true, normalized };
 }
 
+// Визуальное форматирование телефона: «+CC group group group».
+// Алгоритм такой, что caret сохраняется при правке — onChange-обёртка
+// считает «сколько цифр до курсора было» и после reformat ставит
+// курсор после той же по счёту цифры.
+//   • +1, +7 — country code 1 цифра (US/CA/RU/KZ).
+//   • +20…+99 — 2 цифры по умолчанию.
+//   • После CC — пробел и группы по 3 цифры.
 function formatPhoneInput(val) {
-  // Раньше жёсткий шаблон «+7 (XXX) XXX-XX-XX» ломал редактирование
-  // (курсор прыгал внутри скобок/тире) и не давал ввести нероссийский
-  // номер. Теперь оставляем то, что ввёл пользователь, но санируем —
-  // допускаем только цифры, плюс в начале, пробел и тире.
-  let s = val.replace(/[^\d+\s\-()]/g, '');
-  // Один + и только в начале.
-  const hasLeadPlus = s.startsWith('+');
-  s = (hasLeadPlus ? '+' : '') + s.replace(/\+/g, '');
-  // Лимит: 15 цифр (E.164). Пробелы/тире/скобки не считаем.
-  const digitsCount = (s.match(/\d/g) || []).length;
-  if (digitsCount > 15) {
-    // Срезаем хвост, пока цифр не станет 15.
-    let trimmed = '';
-    let cnt = 0;
-    for (const ch of s) {
-      if (/\d/.test(ch)) {
-        if (cnt >= 15) continue;
-        cnt++;
-      }
-      trimmed += ch;
-    }
-    s = trimmed;
+  // Оставляем только цифры (и ведущий +). Лимит E.164 — 15 цифр.
+  const hasLeadPlus = (val || '').trimStart().startsWith('+');
+  const digits = (val || '').replace(/\D/g, '').slice(0, 15);
+  if (!digits) return hasLeadPlus ? '+' : '';
+  const first = digits[0];
+  const ccLen = (first === '1' || first === '7') ? 1 : Math.min(2, digits.length);
+  const cc   = digits.slice(0, ccLen);
+  const rest = digits.slice(ccLen);
+  const groups = [];
+  for (let i = 0; i < rest.length; i += 3) groups.push(rest.slice(i, i + 3));
+  return '+' + cc + (groups.length ? ' ' + groups.join(' ') : '');
+}
+
+// Утилита для caret-preserving onChange: считает позицию N-й цифры
+// в форматированной строке (вернёт позицию ПОСЛЕ этой цифры).
+function caretAfterNthDigit(str, n) {
+  let pos = 0, d = 0;
+  while (pos < str.length && d < n) {
+    if (/\d/.test(str[pos])) d++;
+    pos++;
   }
-  return s;
+  return pos;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1084,6 +1089,30 @@ export function RegisterScreen() {
   // регистрацией показываем крупный поп-ап с номером и просим
   // подтвердить — поменять потом будет нельзя.
   const [confirmPhone, setConfirmPhone] = useState(null); // { display, normalized } | null
+  // Ref на input телефона — нужен чтобы восстанавливать caret после
+  // реформата (иначе курсор «прыгает» в конец строки при правке).
+  const phoneInputRef = useRef(null);
+
+  function handlePhoneChange(e) {
+    const input = e.target;
+    const newVal = input.value;
+    const selStart = input.selectionStart ?? newVal.length;
+    // 1. Считаем сколько ЦИФР до курсора в новой (ещё неотформатированной) строке.
+    let digitsBefore = 0;
+    for (let i = 0; i < selStart; i++) {
+      if (/\d/.test(newVal[i])) digitsBefore++;
+    }
+    // 2. Реформатим.
+    const formatted = formatPhoneInput(newVal);
+    setPhone(formatted);
+    // 3. Восстанавливаем caret: позиция после N-й цифры в новой строке.
+    requestAnimationFrame(() => {
+      const el = phoneInputRef.current;
+      if (!el) return;
+      const caretPos = caretAfterNthDigit(formatted, digitsBefore);
+      try { el.setSelectionRange(caretPos, caretPos); } catch {}
+    });
+  }
 
   const hasInvite = !!inviteCode || !!schoolInvite || !!groupInvite;
   // Пометка для UI: показать ученику, что данные предзаполнены из оплаты
@@ -1205,8 +1234,8 @@ export function RegisterScreen() {
           <FloatingInput id="reg-name" label="Имя" value={name}
             onChange={e => setName(e.target.value)} autoComplete="name" />
           <FloatingInput id="reg-phone" label="Телефон (с кодом страны, например +49 …)" type="tel" value={phone}
-            inputMode="tel"
-            onChange={e => setPhone(formatPhoneInput(e.target.value))} autoComplete="tel" />
+            inputMode="tel" inputRef={phoneInputRef}
+            onChange={handlePhoneChange} autoComplete="tel" />
           <PasswordInput id="reg-pwd" label="Придумай пароль" value={password}
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleRegister()} />
