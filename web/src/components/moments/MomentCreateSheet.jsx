@@ -588,38 +588,10 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
             </div>
           )}
 
-          {/* Превью токенов как SVG — пользователь видит как момент будет
-             выглядеть в ленте, эмодзи в textarea остаётся в форме [name]. */}
-          {/[a-z][^\[\]]*\]/.test(text) && /\[/.test(text) && (() => {
-            const re = /\[([a-z][a-z0-9 ]*?)\]/gi;
-            const parts = [];
-            let last = 0, m;
-            while ((m = re.exec(text)) !== null) {
-              if (m.index > last) parts.push({ kind:'t', v: text.slice(last, m.index) });
-              parts.push({ kind:'e', v: m[1] });
-              last = m.index + m[0].length;
-            }
-            if (last < text.length) parts.push({ kind:'t', v: text.slice(last) });
-            const hasEmoji = parts.some(p => p.kind === 'e');
-            if (!hasEmoji) return null;
-            return (
-              <div style={{
-                background:'rgba(255,255,255,.04)', borderRadius:12,
-                border:'1px dashed rgba(255,255,255,.15)',
-                padding:'10px 14px', color:'rgba(255,255,255,.8)',
-                fontSize:14, lineHeight:1.6, whiteSpace:'pre-wrap',
-                display:'flex', flexWrap:'wrap', alignItems:'center', gap:2,
-              }}>
-                {parts.map((p, i) => p.kind === 't'
-                  ? <span key={i}>{p.v}</span>
-                  : <img key={i} src={emojiUrl(p.v)} alt={p.v}
-                      title={emojiLabel(p.v)}
-                      style={{width:22,height:22,display:'inline-block',verticalAlign:'middle',
-                        filter:'drop-shadow(1px 2px 1px rgba(0,0,0,.5))'}}/>
-                )}
-              </div>
-            );
-          })()}
+          {/* Раньше под полем рисовали отдельный preview с inline-SVG-эмодзи,
+              потому что textarea показывала их как «[name]». После перехода
+              на EmojiInput (contenteditable) сам инпут уже рендерит токены
+              картинками — preview стал дубликатом и убран. */}
 
           {/* Video URL detected feedback */}
           {detectedVideoUrl && (
