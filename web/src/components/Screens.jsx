@@ -3419,15 +3419,34 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                 </button>
                 {resolvedIsContact ? (
                   <button onClick={onRemoveContact}
-                    title="Убрать из контактов"
+                    title="Нажми, чтобы убрать из контактов"
                     style={{flex:1,padding:'12px 10px',background:'rgba(60,160,90,.32)',
                       border:'1px solid rgba(100,200,120,.45)',borderRadius:14,
                       color:'rgba(170,240,190,.95)',fontSize:14,fontWeight:600,cursor:'pointer',
                       transition:'background .15s',
-                      display:'flex',alignItems:'center',justifyContent:'center',gap:8,lineHeight:1.2}}
-                    onMouseEnter={e=>e.currentTarget.style.background='rgba(60,160,90,.5)'}
-                    onMouseLeave={e=>e.currentTarget.style.background='rgba(60,160,90,.32)'}>
+                      display:'flex',alignItems:'center',justifyContent:'center',gap:8,lineHeight:1.2,
+                      position:'relative'}}
+                    onMouseEnter={e=>{
+                      e.currentTarget.style.background='rgba(220,80,80,.35)';
+                      e.currentTarget.style.borderColor='rgba(240,140,140,.55)';
+                      e.currentTarget.style.color='rgba(255,210,210,.98)';
+                      const hint = e.currentTarget.querySelector('.rm-hint');
+                      if (hint) hint.style.opacity = '1';
+                    }}
+                    onMouseLeave={e=>{
+                      e.currentTarget.style.background='rgba(60,160,90,.32)';
+                      e.currentTarget.style.borderColor='rgba(100,200,120,.45)';
+                      e.currentTarget.style.color='rgba(170,240,190,.95)';
+                      const hint = e.currentTarget.querySelector('.rm-hint');
+                      if (hint) hint.style.opacity = '0';
+                    }}>
                     <Icon name="check" size={16}/>
+                    <span className="rm-hint" style={{
+                      position:'absolute',left:0,right:0,textAlign:'center',
+                      opacity:0, transition:'opacity .15s',
+                      fontSize:14,fontWeight:600,
+                      pointerEvents:'none',
+                    }}>Убрать из контактов</span>
                     <span>В контактах</span>
                   </button>
                 ) : (

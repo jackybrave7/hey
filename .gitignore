@@ -13,6 +13,7 @@ server/data/hey.db-wal
 server/data/hey.json
 server/data/uploads/
 server/data/feedback.log
+server/data/vapid.json
 
 # Environment (секреты — никогда не в git!)
 .env
