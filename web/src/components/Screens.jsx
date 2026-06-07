@@ -2412,6 +2412,25 @@ export function MyProfileScreen() {
               />
             )}
 
+            {/* Прямая ссылка на APK — для Android-пользователей, которые
+                хотят полноценное native-приложение (без бара в Опере,
+                нормальные push-уведомления через Chrome Custom Tabs).
+                Скрываем в standalone (уже установлено) и iOS (не относится). */}
+            {!isStandalone && /Android/i.test(navigator.userAgent) && (
+              <a href="/downloads/hey-messenger.apk" download
+                style={{ textDecoration:'none' }}>
+                <Card
+                  icon="🤖"
+                  iconBg="rgba(140,200,140,.28)"
+                  title="Скачать APK для Android"
+                  subtitle="Полноценное приложение, без бара в Опере"
+                  count={null}
+                  accent={true}
+                  onClick={() => {}}
+                />
+              </a>
+            )}
+
             {!!user?.is_admin && (
               <button onClick={() => nav('/admin')} style={{
                 display:'flex',alignItems:'center',justifyContent:'space-between',
