@@ -308,6 +308,21 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getWaitlist());
   });
 
+  // Помечаем заявку как уведомленную (когда админ написал юзеру). Делает
+  // её «не висящей» в бейдже сайдбара. POST { notified: true|false }
+  // — можно и снять отметку, если надо переписать.
+  r.post('/admin/waitlist/:id/notified', requireAdmin, (req, res) => {
+    const setOn = req.body?.notified !== false; // default true
+    if (setOn) db.markWaitlistNotified(req.params.id);
+    else       db.unmarkWaitlistNotified(req.params.id);
+    res.json({ ok: true });
+  });
+
+  r.delete('/admin/waitlist/:id', requireAdmin, (req, res) => {
+    db.deleteWaitlistEntry(req.params.id);
+    res.json({ ok: true });
+  });
+
   r.post('/login', rateLimit(10, 15 * 60 * 1000), (req, res) => {
     const { phone, password } = req.body;
     let user = db.findUserByPhone(phone);
@@ -1819,9 +1834,10 @@ module.exports = function makeRouter(db, broadcast) {
         ? db.listBusinessRequests('pending').length
         : 0;
       const openFeedbacks = db.countOpenFeedbacks ? db.countOpenFeedbacks() : 0;
-      res.json({ openReports, pendingBusiness, openFeedbacks });
+      const pendingWaitlist = db.countPendingWaitlist ? db.countPendingWaitlist() : 0;
+      res.json({ openReports, pendingBusiness, openFeedbacks, pendingWaitlist });
     } catch (e) {
-      res.json({ openReports: 0, pendingBusiness: 0, openFeedbacks: 0 });
+      res.json({ openReports: 0, pendingBusiness: 0, openFeedbacks: 0, pendingWaitlist: 0 });
     }
   });
 

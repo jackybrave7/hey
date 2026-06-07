@@ -236,6 +236,9 @@ export const api = {
   adminS3DeleteObject:     (key)           => req('DELETE', '/admin/s3/object', { key }),
   adminS3DeleteObjects:    (keys)          => req('POST',   '/admin/s3/objects/delete', { keys }),
   adminS3Sweep:            (minAgeHours)   => req('POST',   `/admin/system/s3-sweep${minAgeHours != null ? '?minAgeHours=' + minAgeHours : ''}`),
+  adminGetWaitlist:        ()              => req('GET',    '/admin/waitlist'),
+  adminWaitlistNotified:   (id, notified)  => req('POST',   `/admin/waitlist/${id}/notified`, { notified }),
+  adminWaitlistDelete:     (id)            => req('DELETE', `/admin/waitlist/${id}`),
 
   // AWO / Школьная интеграция
   joinValidate:            (email, course, sig, tenant) =>

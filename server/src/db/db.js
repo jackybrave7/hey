@@ -2832,6 +2832,25 @@ function getWaitlist({ limit = 500 } = {}) {
   ).all(limit);
 }
 
+// Бейдж в админ-сайдбаре — сколько ещё не уведомлённых заявок осталось.
+function countPendingWaitlist() {
+  return db.prepare(
+    'SELECT COUNT(*) AS c FROM waitlist WHERE notified_at IS NULL'
+  ).get()?.c ?? 0;
+}
+
+function markWaitlistNotified(id) {
+  db.prepare('UPDATE waitlist SET notified_at=? WHERE id=?').run(now(), id);
+}
+
+function unmarkWaitlistNotified(id) {
+  db.prepare('UPDATE waitlist SET notified_at=NULL WHERE id=?').run(id);
+}
+
+function deleteWaitlistEntry(id) {
+  db.prepare('DELETE FROM waitlist WHERE id=?').run(id);
+}
+
 function getAdminUsers({ search, filter } = {}) {
   let where = '1=1';
   const params = [];
@@ -3665,7 +3684,8 @@ module.exports = {
   createReport, getReports, resolveReport,
   createFeedback, getFeedbacks, resolveFeedback, countOpenFeedbacks,
   // Waitlist
-  addToWaitlist, getWaitlist,
+  addToWaitlist, getWaitlist, countPendingWaitlist,
+  markWaitlistNotified, unmarkWaitlistNotified, deleteWaitlistEntry,
   // System (HEY-заведующий)
   getSystemMoments, getSystemBroadcasts, deleteBroadcast, editBroadcast,
   listOrphanSystemMessages, deleteSystemMessage,

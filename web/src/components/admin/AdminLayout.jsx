@@ -16,6 +16,7 @@ const NAV = [
   { to: '/admin/moments', label: '✦ Моменты' },
   { to: '/admin/reports',   label: '🚩 Жалобы',         countKey: 'openReports' },
   { to: '/admin/feedbacks', label: '✉ Обращения',      countKey: 'openFeedbacks' },
+  { to: '/admin/waitlist',  label: '📨 Заявки на регистрацию', countKey: 'pendingWaitlist' },
   { to: '/admin/system',    label: '📢 HEY-заведующий' },
   { to: '/admin/s3',        label: '🗂 S3 галерея' },
   { to: '/admin/awo',     label: '🎓 АВО / Школы' },
@@ -32,7 +33,7 @@ export default function AdminLayout({ children }) {
   const nav      = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const [counts, setCounts]   = useState({ openReports: 0, pendingBusiness: 0, openFeedbacks: 0 });
+  const [counts, setCounts]   = useState({ openReports: 0, pendingBusiness: 0, openFeedbacks: 0, pendingWaitlist: 0 });
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT);
   const [drawerOpen, setDrawerOpen] = useState(false);
