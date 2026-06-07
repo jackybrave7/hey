@@ -3149,6 +3149,7 @@ export function GlobalUserCardMount() {
   // Открытие момента поверх карточки — закрытие возвращает в карточку
   const [openedMoments, setOpenedMoments] = useState(null); // { moments, index } | null
   const nav = useNavigate();
+  const location = useLocation();
   const { user: me } = useAuth();
   const [customConfirm, confirmModal] = useConfirm();
 
@@ -3163,6 +3164,16 @@ export function GlobalUserCardMount() {
     window.addEventListener('hey:open-user-card', onOpen);
     return () => window.removeEventListener('hey:open-user-card', onOpen);
   }, [me?.id]);
+
+  // При смене URL (например юзер из карточки нажал «Написать» → переход
+  // на /chat/:id) — закрываем весь стэк модалок. Карточка контакта
+  // остаётся открытой при просмотре моментов того же юзера (внутрь
+  // картинки/момента URL не меняется), но любая SPA-навигация на другой
+  // route должна свернуть карточку.
+  useEffect(() => {
+    setUserId(null);
+    setOpenedMoments(null);
+  }, [location.pathname]);
 
   if (!userId) return null;
   const fromContacts = contacts.find(c => c.id === userId);
