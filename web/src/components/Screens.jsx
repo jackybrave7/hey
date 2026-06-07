@@ -4226,7 +4226,6 @@ export function ContactsScreen() {
                 const c = await api.addContact({ userId: card.id });
                 setContacts(prev => prev.find(x => x.id === c.id) ? prev : [...prev, c]);
                 setQuery('');
-                setSearchResults(null);
                 setCard(null);
                 heyToast('✓ Добавлено в контакты', 'success');
               } catch (e) { heyToast(e.message || 'Не удалось добавить', 'error'); }
