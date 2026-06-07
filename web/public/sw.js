@@ -39,8 +39,12 @@ self.addEventListener('push', (event) => {
     if (hasFocused) return;
     await self.registration.showNotification(title, {
       body,
+      // icon — крупная цветная иконка в шторке уведомлений (рядом с текстом)
       icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      // badge — мелкая монохромная иконка в самой верхней статус-строке Android.
+      // Android требует белый силуэт на прозрачном фоне; цветную PNG он
+      // покажет квадратом. /badge-96.png — белая звезда HEY.
+      badge: '/badge-96.png',
       tag,
       data: { url, messageId: payload.messageId || null },
       vibrate: [80, 40, 80],
