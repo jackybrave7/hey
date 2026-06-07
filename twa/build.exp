@@ -1,0 +1,48 @@
+#!/usr/bin/expect -f
+# Автоматизированный init + build для @bubblewrap/cli.
+# Все ответы взяты из twa-manifest.json. Пароль keystore'а — захардкожен.
+set timeout 1200
+set keypass "HeyTwa-2026-AABBccdd-keystore"
+
+# ── init ────────────────────────────────────────────────────────────────────
+spawn bubblewrap init --manifest=https://hey-messenger.ru/manifest.webmanifest --skipPwaValidation
+expect {
+  -re "Domain.*" { send "\r"; exp_continue }
+  -re "Name of the application.*" { send "\r"; exp_continue }
+  -re "Name to be shown on the launcher.*" { send "\r"; exp_continue }
+  -re "Application ID.*" { send "ru.hey_messenger.twa\r"; exp_continue }
+  -re "Starting version code.*" { send "1\r"; exp_continue }
+  -re "Display mode.*" { send "\r"; exp_continue }
+  -re "Orientation.*" { send "\r"; exp_continue }
+  -re "Status bar colou?r.*" { send "\r"; exp_continue }
+  -re "Splash screen colou?r.*" { send "\r"; exp_continue }
+  -re "URL to an image that.*launcher.*" { send "\r"; exp_continue }
+  -re "Maskable.*Yes/No.*" { send "y\r"; exp_continue }
+  -re "URL to a maskable.*" { send "\r"; exp_continue }
+  -re "monochrome.*Yes/No.*" { send "n\r"; exp_continue }
+  -re "shortcuts.*Yes/No.*" { send "n\r"; exp_continue }
+  -re "include the source.*Yes/No.*" { send "n\r"; exp_continue }
+  -re "request geolocation.*Yes/No.*" { send "n\r"; exp_continue }
+  -re "request the play billing.*Yes/No.*" { send "n\r"; exp_continue }
+  -re "Notifications enabled.*Yes/No.*" { send "y\r"; exp_continue }
+  -re "key store location.*" { send "./android.keystore\r"; exp_continue }
+  -re "key name.*" { send "hey\r"; exp_continue }
+  -re "country code.*" { send "RU\r"; exp_continue }
+  -re "Organization.*" { send "HEY\r"; exp_continue }
+  -re "Organizational unit.*" { send "HEY\r"; exp_continue }
+  -re "Common Name.*" { send "HEY Messenger\r"; exp_continue }
+  -re "Password for the Key Store.*" { send "$keypass\r"; exp_continue }
+  -re "Password for the Key.*" { send "$keypass\r"; exp_continue }
+  -re "regenerate.*Y/n" { send "y\r"; exp_continue }
+  -re "create a signing key.*Yes/No" { send "n\r"; exp_continue }
+  eof
+}
+
+# ── build ───────────────────────────────────────────────────────────────────
+spawn bubblewrap build --skipPwaValidation
+expect {
+  -re "regenerate.*Y/n" { send "n\r"; exp_continue }
+  -re "Password for the Key Store.*" { send "$keypass\r"; exp_continue }
+  -re "Password for the Key.*" { send "$keypass\r"; exp_continue }
+  eof
+}
