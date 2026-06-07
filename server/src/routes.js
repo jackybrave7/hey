@@ -2359,7 +2359,7 @@ module.exports = function makeRouter(db, broadcast) {
     const policy = db.getSetting('delete_policy', 'soft');
     const explicit = req.body?.hard;
     const hard = explicit === undefined ? policy === 'hard' : !!explicit;
-    db.adminDeleteMoment(req.params.id, req.user.id, req.body?.reason, { hard });
+    db.adminDeleteMoment(req.params.id, req.user.id, req.body?.reason, { hard, storage });
     if (hard) {
       try { await storage.deleteByPrefix(`moments/${req.params.id}/`); }
       catch (e) { console.error('[hard-delete moment S3]', e.message); }

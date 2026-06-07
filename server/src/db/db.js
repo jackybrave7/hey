@@ -2928,7 +2928,8 @@ function getAdminMoments({ status, userId } = {}) {
   if (status && status !== 'all') { where += ' AND m.status=?'; params.push(status); }
   if (userId) { where += ' AND m.user_id=?'; params.push(userId); }
   const rows = db.prepare(
-    `SELECT m.*, u.name AS author_name, u.phone AS author_phone, u.is_super AS author_is_super
+    `SELECT m.*, u.name AS author_name, u.phone AS author_phone,
+            u.is_super AS author_is_super, u.is_deleted AS author_is_deleted
      FROM moments m JOIN users u ON u.id=m.user_id
      WHERE ${where}
      ORDER BY m.created_at DESC LIMIT 200`
@@ -2938,6 +2939,9 @@ function getAdminMoments({ status, userId } = {}) {
 
 function adminDeleteMoment(momentId, adminId, reason, opts = {}) {
   const hard = !!opts.hard;
+  const storage = opts.storage || null;
+  // Перед удалением — забираем media_url для последующего S3-cleanup
+  const prevRow = hard ? db.prepare('SELECT media_url FROM moments WHERE id=?').get(momentId) : null;
   db.transaction(() => {
     db.prepare('DELETE FROM moment_reactions WHERE moment_id=?').run(momentId);
     db.prepare('DELETE FROM moment_views WHERE moment_id=?').run(momentId);
@@ -2953,6 +2957,21 @@ function adminDeleteMoment(momentId, adminId, reason, opts = {}) {
        WHERE target_type='moment' AND target_id=? AND status='open'`
     ).run(now(), adminId, momentId);
   })();
+  // S3-cleanup для hard-delete: убираем весь префикс moments/{id}/ (cover,
+  // video, audio, thumbnails) + точечный media_url ключ если он вне префикса.
+  if (hard && storage) {
+    (async () => {
+      try { await storage.deleteByPrefix(`moments/${momentId}/`); } catch (e) {
+        console.warn('[s3-moment-prefix]', momentId, e.message);
+      }
+      const k = _s3KeyFromUrl(prevRow?.media_url);
+      if (k && !k.startsWith(`moments/${momentId}/`)) {
+        try { await storage.deleteFile(k); } catch (e) {
+          console.warn('[s3-moment-media]', k, e.message);
+        }
+      }
+    })();
+  }
   logAdminAction({
     adminId,
     action: hard ? 'hard_delete_moment' : 'delete_moment',

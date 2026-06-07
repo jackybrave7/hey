@@ -237,6 +237,12 @@ export default function AdminMoments() {
                     ) : (
                       <div style={{ color: 'white', fontWeight: 600 }}>{m.author_name}</div>
                     )}
+                    {m.author_is_deleted ? (
+                      <div style={{ color: 'rgba(255,180,140,.85)', fontSize: 11, fontWeight: 600,
+                        marginTop: 2 }} title="Аккаунт автора удалён">
+                        🪦 автор удалён
+                      </div>
+                    ) : null}
                     <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11 }}>{m.author_phone}</div>
                   </td>
                   <td style={{ ...cell, maxWidth: 260 }}>
