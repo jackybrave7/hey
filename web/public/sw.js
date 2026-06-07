@@ -10,6 +10,15 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Chrome требует наличие fetch-handler'а для пометки SW как «installable»
+// (т.е. чтобы появилась подсказка «Add to Home Screen» в Android Chrome).
+// Кеширование делать не хотим — staleness в чате критична. Просто отдаём
+// сетевой ответ как есть, без перехвата. Если сеть упала — браузер сам
+// покажет свою offline-страницу.
+self.addEventListener('fetch', (event) => {
+  // ничего не делаем — событие обработано, респонс из сети идёт сам
+});
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try { payload = event.data ? event.data.json() : {}; } catch {}

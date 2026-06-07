@@ -1866,6 +1866,37 @@ export function MyProfileScreen() {
   // Invite link
   const [inviteCopied, setInviteCopied] = useState(false);
 
+  // PWA install — слушаем beforeinstallprompt. На Android Chrome/Edge/Opera
+  // событие приходит когда сайт удовлетворяет критериям installable (есть
+  // manifest, service worker с fetch-handler'ом, HTTPS). Сохраняем prompt,
+  // показываем карточку «Установить как приложение».
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  useEffect(() => {
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true);
+    const handler = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    const installed = () => { setInstallPrompt(null); setIsStandalone(true); };
+    window.addEventListener('appinstalled', installed);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installed);
+    };
+  }, []);
+  async function handleInstall() {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      heyToast('✓ Устанавливаем…', 'success');
+      setInstallPrompt(null);
+    }
+  }
+
   // Confirm dialog
   const [customConfirm, confirmModal] = useConfirm();
 
@@ -2362,6 +2393,22 @@ export function MyProfileScreen() {
                     setTimeout(() => setInviteCopied(false), 2500);
                   });
                 }}
+              />
+            )}
+
+            {/* Install PWA — карточка появляется только если браузер сам
+                поднял beforeinstallprompt (Android Chrome/Edge/Opera/Samsung).
+                В iOS Safari prompt не приходит — там устанавливают через
+                «Поделиться → На главный экран», поэтому скрываем. */}
+            {installPrompt && !isStandalone && (
+              <Card
+                icon="📱"
+                iconBg="rgba(140,200,140,.28)"
+                title="Установить как приложение"
+                subtitle="Иконка на главный экран, без бара браузера"
+                count={null}
+                accent={true}
+                onClick={handleInstall}
               />
             )}
 

@@ -2,26 +2,56 @@
   "name": "HEY Messenger",
   "short_name": "HEY",
   "description": "Мессенджер для близкого круга. Чаты, моменты, голосовые.",
-  "start_url": "/",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#1a0a30",
   "theme_color": "#5a2d96",
   "lang": "ru",
+  "dir": "ltr",
   "categories": ["social", "communication"],
+  "prefer_related_applications": false,
   "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    },
     {
       "src": "/favicon.svg",
       "type": "image/svg+xml",
       "sizes": "any",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Чаты",
+      "short_name": "Чаты",
+      "url": "/main?source=pwa",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "src": "/apple-touch-icon.svg",
-      "type": "image/svg+xml",
-      "sizes": "180x180",
-      "purpose": "any maskable"
+      "name": "Моменты",
+      "short_name": "Моменты",
+      "url": "/moments?source=pwa",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

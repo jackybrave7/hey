@@ -60,7 +60,17 @@ function useNotifications() {
     });
   }, [nav]);
 
-  // 2) Web-Push через Service Worker (вкладка закрыта / телефон в локе).
+  // 2) Регистрируем SW ASAP — это критерий «installable» для Android Chrome
+  //    (без зарегистрированного SW не появится prompt установки PWA). Раньше
+  //    регистрация была лениво в push.js — только когда юзер подписывается
+  //    на уведомления.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .catch(e => console.warn('[sw] register failed:', e.message));
+  }, []);
+
+  // 3) Web-Push через Service Worker (вкладка закрыта / телефон в локе).
   //    SW шлёт postMessage `hey:navigate` с url. Принимаем и SPA-переходим
   //    — без перезагрузки.
   useEffect(() => {
