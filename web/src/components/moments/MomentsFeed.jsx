@@ -166,6 +166,20 @@ export default function MomentsFeed({ currentUser }) {
         setMyMoments(prev => prev.filter(m => m.id !== momentId));
         if (selected?.moments.some(m => m.id === momentId)) setSelected(null);
       }),
+      // Реакция — дёргаем актуальный момент и обновляем счётчики во всех
+      // местах где он сейчас отображается (лента, мои моменты, открытый
+      // popup). Без этого автор видел свой момент со старыми счётчиками
+      // пока не перезагрузит страницу.
+      socket.on('moment:reaction', ({ momentId }) => {
+        api.getMoment(momentId).then(fresh => {
+          if (!fresh) return;
+          setFeed(prev => prev.map(m => m.id === momentId ? { ...m, ...fresh } : m));
+          setMyMoments(prev => prev.map(m => m.id === momentId ? { ...m, ...fresh } : m));
+          setSelected(prev => prev && prev.moments
+            ? { ...prev, moments: prev.moments.map(m => m.id === momentId ? { ...m, ...fresh } : m) }
+            : prev);
+        }).catch(() => {});
+      }),
     ];
     return () => unsubs.forEach(u => u());
   }, [currentUser?.id, selected?.id]);

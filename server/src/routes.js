@@ -1775,14 +1775,30 @@ module.exports = function makeRouter(db, broadcast) {
 
     db.upsertMomentReaction(req.params.id, req.user.id, reaction);
 
-    // Notify author
-    broadcast([m.user_id], { type: 'moment:reaction', momentId: req.params.id, userId: req.user.id, reaction });
+    // Notify author + сам реагирующий (у него может быть второе устройство /
+    // вторая вкладка — там реакция должна тоже подсветиться).
+    broadcast([m.user_id, req.user.id], {
+      type: 'moment:reaction',
+      momentId: req.params.id,
+      userId: req.user.id,
+      reaction,
+      action: 'set',
+    });
 
     res.json({ ok: true });
   });
 
   r.delete('/moments/:id/react', requireAuth, (req, res) => {
+    const m = db.getMomentById(req.params.id);
     db.deleteMomentReaction(req.params.id, req.user.id);
+    if (m) {
+      broadcast([m.user_id, req.user.id], {
+        type: 'moment:reaction',
+        momentId: req.params.id,
+        userId: req.user.id,
+        action: 'unset',
+      });
+    }
     res.json({ ok: true });
   });
 

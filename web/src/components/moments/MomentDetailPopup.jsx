@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../api';
+import { api, socket } from '../../api';
 import MoodEmoji from './MoodEmoji';
 import EmbeddedVideoPreview from './EmbeddedVideoPreview';
 import { useSalesPressure } from '../../lib/publicSettings';
@@ -556,6 +556,25 @@ export default function MomentDetailPopup({
       api.getMomentReactors(m.id).then(setReactors).catch(() => {});
     }
   }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // WS-подписка: реакция от кого-то на текущий открытый момент → подтянуть
+  // свежие счётчики. Без этого автор смотрит свой момент и не видит как
+  // кто-то поставил «резонирует» — пока не закроет/откроет.
+  useEffect(() => {
+    if (!moment?.id) return;
+    const off = socket.on('moment:reaction', ({ momentId }) => {
+      if (momentId !== moment.id) return;
+      api.getMoment(momentId).then(fresh => {
+        if (fresh) setMoment(prev => prev?.id === fresh.id ? { ...prev, ...fresh } : prev);
+      }).catch(() => {});
+      // Список реакторов (для авторов в Super) тоже актуализируем.
+      const mine = moment.user_id === currentUser?.id;
+      if (mine && moment.author_is_super) {
+        api.getMomentReactors(moment.id).then(setReactors).catch(() => {});
+      }
+    });
+    return () => off();
+  }, [moment?.id, moment?.user_id, moment?.author_is_super, currentUser?.id]);
 
   const goPrev = useCallback(() => { if (canPrev) setIdx(i => i - 1); }, [canPrev]);
   const goNext = useCallback(() => { if (canNext) setIdx(i => i + 1); }, [canNext]);
