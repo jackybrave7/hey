@@ -2032,6 +2032,22 @@ module.exports = function makeRouter(db, broadcast) {
     }
   });
 
+  // Пакетное удаление. Принимает { keys: [...] }. Идёт последовательно,
+  // чтобы не упереться в rate-limit S3-провайдера; собирает per-key
+  // ok/error для отчёта в UI.
+  r.post('/admin/s3/objects/delete', requireAdmin, async (req, res) => {
+    const keys = Array.isArray(req.body?.keys) ? req.body.keys.filter(k => typeof k === 'string' && k) : [];
+    if (!keys.length) return res.status(400).json({ error: 'keys required' });
+    if (keys.length > 1000) return res.status(400).json({ error: 'максимум 1000 ключей за раз' });
+    let deleted = 0, errors = 0;
+    const failed = [];
+    for (const k of keys) {
+      try { await storage.deleteFile(k); deleted++; }
+      catch (e) { errors++; failed.push({ key: k, error: e.message }); }
+    }
+    res.json({ requested: keys.length, deleted, errors, failed });
+  });
+
   r.post('/admin/system/s3-sweep', requireAdmin, async (req, res) => {
     try {
       const minAgeHours = parseInt(req.query.minAgeHours);

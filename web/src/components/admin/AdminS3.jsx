@@ -43,7 +43,9 @@ export default function AdminS3() {
   const [onlyOrphans, setOnlyOrphans] = useState(false);
   const [preview, setPreview]   = useState(null); // объект, открытый в просмотре
   const [busy, setBusy]         = useState(false);
+  const [selected, setSelected] = useState(() => new Set()); // ключи выбранных
   const [customConfirm, confirmModal] = useConfirm();
+  const selectMode = selected.size > 0;
 
   async function load() {
     setLoading(true);
@@ -89,7 +91,52 @@ export default function AdminS3() {
     try {
       await api.adminS3DeleteObject(item.key);
       setItems(prev => prev.filter(x => x.key !== item.key));
+      setSelected(prev => { const n = new Set(prev); n.delete(item.key); return n; });
       setPreview(null);
+    } catch (e) { alert('Ошибка: ' + e.message); }
+    setBusy(false);
+  }
+
+  function toggle(key) {
+    setSelected(prev => {
+      const n = new Set(prev);
+      n.has(key) ? n.delete(key) : n.add(key);
+      return n;
+    });
+  }
+  function selectAllVisible() {
+    setSelected(prev => {
+      const n = new Set(prev);
+      for (const x of filtered) n.add(x.key);
+      return n;
+    });
+  }
+  function clearSelection() { setSelected(new Set()); }
+
+  async function deleteSelected() {
+    const keys = [...selected];
+    if (!keys.length) return;
+    // Подсчёт сирот среди выбранных — чтоб admin видел сколько живых снесёт.
+    let liveCount = 0;
+    for (const k of keys) {
+      const it = items.find(x => x.key === k);
+      if (it && !it.isOrphan) liveCount++;
+    }
+    const hint = liveCount > 0
+      ? `${keys.length} объектов · из них ${liveCount} живых (есть ссылки в БД — превью у юзеров сломается!)`
+      : `${keys.length} объектов · все сироты`;
+    if (!await customConfirm(
+      'Удалить выбранные объекты с S3?',
+      { hint, danger: true, confirmLabel: `Удалить ${keys.length}` }
+    )) return;
+    setBusy(true);
+    try {
+      const r = await api.adminS3DeleteObjects(keys);
+      const deletedSet = new Set(keys.filter(k => !r.failed?.some(f => f.key === k)));
+      setItems(prev => prev.filter(x => !deletedSet.has(x.key)));
+      setSelected(new Set());
+      if (r.errors > 0) alert(`Удалено ${r.deleted}, ошибок ${r.errors}. Подробности в консоли.`);
+      if (r.failed?.length) console.warn('[s3-bulk] failed:', r.failed);
     } catch (e) { alert('Ошибка: ' + e.message); }
     setBusy(false);
   }
@@ -135,6 +182,27 @@ export default function AdminS3() {
         момент или аватар не ссылается; такие чистит ночной sweep (или ты прямо здесь).
       </p>
 
+      {/* Bulk selection toolbar — рисуется когда что-то выбрано */}
+      {selectMode && (
+        <div style={{
+          display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
+          padding:'10px 14px', borderRadius:12, marginBottom:14,
+          background:'rgba(120,90,200,.18)',
+          border:'1px solid rgba(180,140,220,.35)',
+        }}>
+          <span style={{ color:'white', fontSize:14, fontWeight:600 }}>
+            Выбрано: {selected.size}
+          </span>
+          <button onClick={selectAllVisible} style={btnStyle()}>
+            Выбрать всё видимое ({filtered.length})
+          </button>
+          <button onClick={clearSelection} style={btnStyle()}>Снять выделение</button>
+          <button onClick={deleteSelected} disabled={busy} style={{ ...btnStyle('danger'), marginLeft:'auto' }}>
+            🗑 Удалить выбранные ({selected.size})
+          </button>
+        </div>
+      )}
+
       {/* Categories */}
       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: 14 }}>
         {CATEGORIES.map(c => (
@@ -166,7 +234,11 @@ export default function AdminS3() {
           gap: 10,
         }}>
           {filtered.map(item => (
-            <Tile key={item.key} item={item} onClick={() => setPreview(item)} />
+            <Tile key={item.key} item={item}
+              selected={selected.has(item.key)}
+              selectMode={selectMode}
+              onToggleSelect={() => toggle(item.key)}
+              onClick={() => selectMode ? toggle(item.key) : setPreview(item)} />
           ))}
         </div>
       )}
@@ -196,16 +268,32 @@ function tabStyle(active) {
   };
 }
 
-function Tile({ item, onClick }) {
+function Tile({ item, onClick, selected, selectMode, onToggleSelect }) {
   const [imgErr, setImgErr] = useState(false);
   const isImg = item.kind === 'image' && !imgErr;
   return (
     <div onClick={onClick} style={{
       position:'relative', borderRadius:12, overflow:'hidden',
-      background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.07)',
+      background: selected ? 'rgba(120,90,200,.25)' : 'rgba(255,255,255,.04)',
+      border: '2px solid ' + (selected ? 'rgba(180,140,220,.85)' : 'rgba(255,255,255,.07)'),
       cursor:'pointer', aspectRatio:'1/1', display:'flex',
       flexDirection:'column', justifyContent:'flex-end',
+      transition: 'border-color .12s, background .12s',
     }}>
+      {/* Чекбокс выбора: всегда виден когда есть выделение, иначе при ховере */}
+      <div onClick={e => { e.stopPropagation(); onToggleSelect?.(); }}
+        title={selected ? 'Снять' : 'Выбрать'}
+        style={{
+          position:'absolute', top:6, right:6, zIndex:2,
+          width:24, height:24, borderRadius:'50%',
+          background: selected ? 'rgba(180,140,220,.95)' : 'rgba(0,0,0,.5)',
+          border: '1.5px solid ' + (selected ? 'white' : 'rgba(255,255,255,.55)'),
+          color:'white', fontSize:14, fontWeight:800,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          cursor:'pointer',
+          opacity: selectMode || selected ? 1 : .55,
+          transition:'opacity .12s',
+        }}>{selected ? '✓' : ''}</div>
       {isImg && (
         <img src={item.url} alt="" loading="lazy" onError={() => setImgErr(true)}
           style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover' }}/>
