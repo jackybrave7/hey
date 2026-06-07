@@ -1,5 +1,5 @@
 // MomentsFeed.jsx — главный экран Моментов
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, socket } from '../../api';
 import MomentCard from './MomentCard';
@@ -34,9 +34,19 @@ export default function MomentsFeed({ currentUser }) {
   const [toast, setToast]           = useState('');
   const [showSuperInfo, setShowSuperInfo] = useState(false);
 
-  // Drag-to-reorder для своих моментов
+  // Drag-to-reorder для своих моментов.
+  // Реализовано через Pointer Events + долгий тап для тача — нативный
+  // HTML5 DnD на Android не работает вообще, плюс <img> поднимает свой
+  // контекст-меню на long-press. Pointer events работают и для мыши, и
+  // для пальца; для тача требуем 400мс hold чтобы отделить от вертикального
+  // скролла и от обычного тапа-открытия момента.
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
+  const dragRef = useRef({
+    pointerId: null, startX: 0, startY: 0, holdTimer: null,
+    armed: false, // long-press уже сработал → нужно сместить чтобы инициировать drag
+    dragging: false,
+  });
 
   // Auto-open моментa, если пришли по /moments/:id (redirect от MomentPage)
   // или после deep-link через router.state.openMomentId. После первого
@@ -67,39 +77,108 @@ export default function MomentsFeed({ currentUser }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  function onDragStart(e, idx) {
-    setDragIdx(idx);
-    e.dataTransfer.effectAllowed = 'move';
-    try { e.dataTransfer.setData('text/plain', String(idx)); } catch {}
+  // Поиск индекса тайла под текущими координатами через elementFromPoint.
+  // Каждый тайл несёт data-momentslot=idx — это надёжнее чем хитро ловить
+  // event.target (там может оказаться <img> или вложенный текст).
+  function slotIdxAt(x, y) {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return -1;
+    const slot = el.closest('[data-momentslot]');
+    if (!slot) return -1;
+    const v = parseInt(slot.getAttribute('data-momentslot'));
+    return Number.isFinite(v) ? v : -1;
   }
-  function onDragOver(e, idx) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (idx !== overIdx) setOverIdx(idx);
+
+  function onPointerDown(e, idx) {
+    // Только основная кнопка мыши / пальцем
+    if (e.button !== undefined && e.button !== 0) return;
+    const isTouch = e.pointerType === 'touch';
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX, startY: e.clientY,
+      holdTimer: null, armed: !isTouch, // мышью — сразу armed; тачем — после hold
+      dragging: false, fromIdx: idx,
+    };
+    // Захватываем pointer, чтобы получать move/up даже если палец уехал с тайла
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    if (isTouch) {
+      // Долгий тап (400мс) — переводим в armed-режим, дальше move инициирует drag
+      dragRef.current.holdTimer = setTimeout(() => {
+        const ref = dragRef.current;
+        if (ref.pointerId === e.pointerId) {
+          ref.armed = true;
+          // Лёгкая вибрация-сигнал «можно тащить»
+          try { navigator.vibrate?.(15); } catch {}
+          // Подсветим что готовы тащить
+          setDragIdx(ref.fromIdx);
+        }
+      }, 400);
+    }
   }
-  function onDragEnd() {
+
+  function onPointerMove(e) {
+    const ref = dragRef.current;
+    if (ref.pointerId !== e.pointerId) return;
+    const dx = e.clientX - ref.startX;
+    const dy = e.clientY - ref.startY;
+    // До инициации drag (на тач — до long-press, на мышь — после порога 5px)
+    if (!ref.dragging) {
+      if (!ref.armed) {
+        // Если палец заметно двинулся ДО long-press — это скролл, отменяем hold
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+          clearTimeout(ref.holdTimer);
+          ref.holdTimer = null;
+          ref.pointerId = null;
+        }
+        return;
+      }
+      // armed — проверим есть ли движение, чтобы начать
+      if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+      ref.dragging = true;
+      setDragIdx(ref.fromIdx);
+    }
+    // Drag активен — определяем над каким слотом находимся
+    const idx = slotIdxAt(e.clientX, e.clientY);
+    if (idx >= 0 && idx !== overIdx) setOverIdx(idx);
+  }
+
+  async function onPointerUp(e) {
+    const ref = dragRef.current;
+    if (ref.pointerId !== e.pointerId) return;
+    clearTimeout(ref.holdTimer);
+    const fromIdx = ref.fromIdx;
+    const wasDragging = ref.dragging;
+    const toIdx = wasDragging ? slotIdxAt(e.clientX, e.clientY) : -1;
+    dragRef.current = { pointerId: null, holdTimer: null, armed: false, dragging: false };
     setDragIdx(null);
     setOverIdx(null);
-  }
-  async function onDrop(e, toIdx) {
-    e.preventDefault();
-    const fromIdx = dragIdx;
-    setDragIdx(null);
-    setOverIdx(null);
-    if (fromIdx == null || fromIdx === toIdx) return;
-    // Локально перестраиваем сразу — оптимистичное обновление
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+
+    if (wasDragging) {
+      // Гасим click который браузер пошлёт сразу после pointerup —
+      // иначе после перетаскивания откроется детальный popup момента.
+      dragRef.current.suppressClickUntil = Date.now() + 300;
+    }
+    if (!wasDragging || toIdx < 0 || toIdx === fromIdx) return;
     const next = [...myMoments];
     const [moved] = next.splice(fromIdx, 1);
     next.splice(toIdx, 0, moved);
     setMyMoments(next);
-    // Серверу шлём новый порядок ID
     try {
       await api.reorderMoments(next.map(m => m.id));
     } catch(err) {
-      // Откат при ошибке
       setMyMoments(myMoments);
       showToast('Не удалось сохранить порядок');
     }
+  }
+
+  function onPointerCancel(e) {
+    const ref = dragRef.current;
+    if (ref.pointerId !== e.pointerId) return;
+    clearTimeout(ref.holdTimer);
+    dragRef.current = { pointerId: null, holdTimer: null, armed: false, dragging: false };
+    setDragIdx(null);
+    setOverIdx(null);
   }
 
   const isSuper = !!(currentUser?.is_super);
@@ -282,22 +361,38 @@ export default function MomentsFeed({ currentUser }) {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 }}>
               {myMoments.map((m, idx) => (
                 <div key={m.id}
-                  draggable
-                  onDragStart={e => onDragStart(e, idx)}
-                  onDragOver={e => onDragOver(e, idx)}
-                  onDrop={e => onDrop(e, idx)}
-                  onDragEnd={onDragEnd}
+                  data-momentslot={idx}
+                  onPointerDown={e => onPointerDown(e, idx)}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerCancel}
+                  // На <img> внутри MomentCard Android поднимает контекст-меню
+                  // через long-press. Блокируем нативный callout + selection,
+                  // плюс touch-action:none — иначе long-press съест браузер
+                  // раньше нашего таймера.
+                  onContextMenu={e => e.preventDefault()}
                   style={{
                     cursor: dragIdx !== null ? 'grabbing' : 'grab',
                     opacity: dragIdx === idx ? 0.4 : 1,
                     transform: overIdx === idx && dragIdx !== null && dragIdx !== idx
                       ? 'scale(1.05)' : 'scale(1)',
                     transition: 'transform .15s, opacity .15s',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                    WebkitUserDrag: 'none',
                   }}>
                   <MomentCard
                     moment={m}
                     isMine={true}
-                    onClick={() => setSelected({ moments: myMoments, index: idx })}
+                    onClick={() => {
+                      // Если только что отпустили drag — давим click, иначе
+                      // popup откроется сразу после перетаскивания.
+                      if (dragRef.current.suppressClickUntil
+                          && Date.now() < dragRef.current.suppressClickUntil) return;
+                      setSelected({ moments: myMoments, index: idx });
+                    }}
                   />
                 </div>
               ))}
