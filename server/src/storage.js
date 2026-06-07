@@ -186,4 +186,46 @@ async function getPresignedUploadUrl(key, contentType, expiresIn = 300) {
   };
 }
 
-module.exports = { uploadFile, uploadImage, deleteFile, deleteByPrefix, getReadUrl, getPresignedUploadUrl, MODE };
+// ── listKeysByPrefix ─────────────────────────────────────────────────────────
+// Возвращает [{ key, lastModified, size }] по префиксу. Для local — обходит
+// директорию рекурсивно. Используется ночной задачей-«сборщиком сирот».
+async function listKeysByPrefix(prefix) {
+  if (MODE === 's3') {
+    const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
+    const out = [];
+    let token;
+    do {
+      const list = await getS3().send(new ListObjectsV2Command({
+        Bucket: BUCKET(), Prefix: prefix, ContinuationToken: token,
+      }));
+      for (const o of (list.Contents || [])) {
+        out.push({ key: o.Key, lastModified: o.LastModified, size: o.Size });
+      }
+      token = list.NextContinuationToken;
+    } while (token);
+    return out;
+  }
+  // local
+  const baseDir = path.join(UPLOADS_DIR, prefix.replace(/\//g, path.sep));
+  const out = [];
+  function walk(dir, rel) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+    catch { return; }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      const r = rel ? rel + '/' + e.name : e.name;
+      if (e.isDirectory()) walk(full, r);
+      else {
+        try {
+          const st = fs.statSync(full);
+          out.push({ key: prefix + r, lastModified: st.mtime, size: st.size });
+        } catch {}
+      }
+    }
+  }
+  walk(baseDir, '');
+  return out;
+}
+
+module.exports = { uploadFile, uploadImage, deleteFile, deleteByPrefix, listKeysByPrefix, getReadUrl, getPresignedUploadUrl, MODE };

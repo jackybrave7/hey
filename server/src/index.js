@@ -131,3 +131,18 @@ setInterval(runScheduledDispatcher, 10 * 1000);
 // TG_SUPPORT_BOT_TOKEN не задан в окружении.
 const { startBot } = require('./tgBot');
 startBot({ db }).catch(e => console.error('[tg-bot] fatal:', e.message));
+
+// S3-«сборщик сирот». Раз в сутки листает S3 по префиксам chat/, moments/,
+// group-icons/ и удаляет объекты, на которые в БД больше никто не ссылается
+// + которым больше 24 часов (защита от гонки с in-progress загрузкой).
+// Запускаем со сдвигом 10 минут после старта, чтобы не нагружать boot.
+async function runOrphanSweep() {
+  try {
+    const r = await db.sweepOrphanS3Media(storage);
+    console.log('[s3-sweep]', JSON.stringify(r));
+  } catch (e) {
+    console.error('[s3-sweep] failed:', e.message);
+  }
+}
+setTimeout(runOrphanSweep, 10 * 60 * 1000);              // через 10 минут после старта
+setInterval(runOrphanSweep, 24 * 60 * 60 * 1000);        // далее раз в сутки

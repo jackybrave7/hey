@@ -1955,6 +1955,21 @@ module.exports = function makeRouter(db, broadcast) {
     }
   });
 
+  // Ручной запуск S3-«сборщика сирот». Полезно когда не хочется ждать
+  // 24-часового тика после правки данных в БД.
+  r.post('/admin/system/s3-sweep', requireAdmin, async (req, res) => {
+    try {
+      const minAgeHours = parseInt(req.query.minAgeHours);
+      const r2 = await db.sweepOrphanS3Media(storage, {
+        minAgeMs: Number.isFinite(minAgeHours) ? minAgeHours * 3600 * 1000 : undefined,
+      });
+      res.json(r2);
+    } catch (e) {
+      console.error('POST /admin/system/s3-sweep error:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ── HEY-заведующий: чтение моментов и рассылок (admin only) ────────────
   r.get('/admin/system/moments', requireAdmin, (req, res) => {
     const status = req.query.status || 'all';

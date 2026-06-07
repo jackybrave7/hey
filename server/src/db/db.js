@@ -2039,6 +2039,87 @@ function _cleanupS3Keys(storage, keys, excludeMessageId) {
   })();
 }
 
+// Универсальная конвертация URL → S3-key. Возвращает null если URL не
+// принадлежит нашему S3 (data URL, /uploads/, что-то постороннее).
+function _s3KeyFromUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  if (url.startsWith('data:') || url.startsWith('/uploads/')) return null;
+  const base = (process.env.S3_PUBLIC_URL_BASE || 'https://s3.twcstorage.ru/heymessenger').replace(/\/$/, '');
+  if (url.startsWith(base + '/')) return url.slice(base.length + 1).split('?')[0];
+  const m = url.match(/\/(chat\/(?:audio\/|files\/)?[^?#]+|moments\/[^?#]+|avatars\/[^?#]+|group-icons\/[^?#]+)/);
+  return m ? m[1] : null;
+}
+
+// Собирает Set всех S3-ключей, на которые ссылается живая БД (сообщения,
+// моменты, аватарки, иконы групп). Используется sweepOrphanS3Media.
+function collectLiveS3Keys() {
+  const live = new Set();
+  const add = k => { if (k) live.add(k); };
+  // messages.attachment
+  const msgs = db.prepare(
+    `SELECT attachment FROM messages WHERE attachment IS NOT NULL`
+  ).all();
+  for (const r of msgs) for (const k of _attachmentS3Keys(r.attachment)) add(k);
+  // moments.media_url + moments/{id}/* префикс (если момент жив — весь префикс трогать нельзя)
+  const moms = db.prepare(`SELECT id, media_url FROM moments WHERE status != 'hard_deleted' OR status IS NULL`).all();
+  for (const m of moms) {
+    add(_s3KeyFromUrl(m.media_url));
+    // Защитим весь префикс момента — добавим маркер. sweep будет
+    // пропускать ключи, начинающиеся на любой живой префикс моментов.
+    if (m.id) live.add('moments/' + m.id + '/__live_prefix__');
+  }
+  // users.avatar
+  const us = db.prepare(`SELECT avatar FROM users WHERE avatar IS NOT NULL`).all();
+  for (const u of us) add(_s3KeyFromUrl(u.avatar));
+  // conversations.icon (group icons)
+  try {
+    const cs = db.prepare(`SELECT icon FROM conversations WHERE icon IS NOT NULL`).all();
+    for (const c of cs) add(_s3KeyFromUrl(c.icon));
+  } catch {} // icon column может отсутствовать в очень старых БД
+  return live;
+}
+
+// Ночная задача-«сборщик сирот»: листает S3 по префиксам, сравнивает с
+// БД, удаляет всё что не используется + старше minAgeMs (по умолчанию
+// 24 часа — защита от гонки с in-progress загрузкой, у которой ключ
+// уже на S3, но строка-сообщение в БД ещё не создана).
+async function sweepOrphanS3Media(storage, opts = {}) {
+  if (!storage || typeof storage.listKeysByPrefix !== 'function') {
+    return { skipped: true, reason: 'storage not available' };
+  }
+  const minAgeMs = opts.minAgeMs ?? 24 * 60 * 60 * 1000;
+  const prefixes = opts.prefixes || ['chat/', 'moments/', 'group-icons/'];
+  const cutoff = Date.now() - minAgeMs;
+  const live = collectLiveS3Keys();
+  // Префиксы живых моментов — защита для thumbnail'ов/доп. файлов внутри moments/{id}/
+  const liveMomentPrefixes = [];
+  for (const k of live) {
+    if (k.startsWith('moments/') && k.endsWith('/__live_prefix__')) {
+      liveMomentPrefixes.push(k.slice(0, -'__live_prefix__'.length));
+    }
+  }
+  let scanned = 0, deleted = 0, skippedYoung = 0, skippedLive = 0, errors = 0;
+  for (const prefix of prefixes) {
+    let objects;
+    try { objects = await storage.listKeysByPrefix(prefix); }
+    catch (e) { errors++; console.warn('[sweep] list', prefix, e.message); continue; }
+    for (const obj of objects) {
+      scanned++;
+      const k = obj.key;
+      if (live.has(k)) { skippedLive++; continue; }
+      // Защита моментов: если ключ лежит в префиксе живого момента — не трогаем
+      if (liveMomentPrefixes.some(p => k.startsWith(p))) { skippedLive++; continue; }
+      const mtime = obj.lastModified ? new Date(obj.lastModified).getTime() : 0;
+      if (mtime > cutoff) { skippedYoung++; continue; }
+      try {
+        await storage.deleteFile(k);
+        deleted++;
+      } catch (e) { errors++; console.warn('[sweep] del', k, e.message); }
+    }
+  }
+  return { scanned, deleted, skippedYoung, skippedLive, errors };
+}
+
 function deleteMessage(id, storage) {
   // Достаём аттач ДО удаления — нужны ключи для последующего S3-cleanup.
   const row = db.prepare('SELECT attachment FROM messages WHERE id=?').get(id);
@@ -3499,6 +3580,7 @@ module.exports = {
   SCHOOL_USER_ID,
   createUser, findUserByPhone, findUserById, updateUser, deleteUserAccount, hardDeleteUserAccount,
   tryRestoreFromGrace, expireDeletionGrace, getDeletionGraceInfo,
+  collectLiveS3Keys, sweepOrphanS3Media,
   getContacts, addContact, removeContact, addSystemContactFor, getContactOwners, getContactIds,
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,
