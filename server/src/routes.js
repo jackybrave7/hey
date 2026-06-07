@@ -1957,6 +1957,81 @@ module.exports = function makeRouter(db, broadcast) {
 
   // Ручной запуск S3-«сборщика сирот». Полезно когда не хочется ждать
   // 24-часового тика после правки данных в БД.
+  // Список всех объектов на S3 для админ-галереи. Каждому ключу проставляем
+  // флаг orphan (на него не ссылается ни одно живое сообщение/момент/аватар).
+  // Возвращаем url (публичный, через S3_PUBLIC_URL_BASE) — для админа этого
+  // достаточно, presign не нужен.
+  r.get('/admin/s3/list', requireAdmin, async (req, res) => {
+    try {
+      const prefixes = ['chat/', 'moments/', 'avatars/', 'group-icons/'];
+      const base = (process.env.S3_PUBLIC_URL_BASE || 'https://s3.twcstorage.ru/heymessenger').replace(/\/$/, '');
+      const live = db.collectLiveS3Keys();
+      // Префиксы живых моментов — чтобы не помечать всё внутри moments/{id}/ как orphan
+      const liveMomentPrefixes = [];
+      for (const k of live) {
+        if (k.startsWith('moments/') && k.endsWith('/__live_prefix__')) {
+          liveMomentPrefixes.push(k.slice(0, -'__live_prefix__'.length));
+        }
+      }
+      const out = [];
+      function kindFromKey(k) {
+        const ext = (k.split('.').pop() || '').toLowerCase();
+        if (['webp','jpg','jpeg','png','gif','heic','svg'].includes(ext)) return 'image';
+        if (['mp4','mov','webm','mkv','m4v'].includes(ext)) return 'video';
+        if (['mp3','ogg','m4a','wav','webm','opus'].includes(ext)) return 'audio';
+        return 'file';
+      }
+      function categoryFromKey(k) {
+        if (k.startsWith('chat/audio/'))   return 'chat-audio';
+        if (k.startsWith('chat/files/'))   return 'chat-file';
+        if (k.startsWith('chat/'))         return 'chat-image';
+        if (k.startsWith('moments/'))      return 'moment';
+        if (k.startsWith('avatars/'))      return 'avatar';
+        if (k.startsWith('group-icons/'))  return 'group-icon';
+        return 'other';
+      }
+      for (const p of prefixes) {
+        let objs;
+        try { objs = await storage.listKeysByPrefix(p); }
+        catch (e) { console.warn('[s3-list]', p, e.message); continue; }
+        for (const o of objs) {
+          const isOrphan = !live.has(o.key)
+            && !liveMomentPrefixes.some(lp => o.key.startsWith(lp));
+          out.push({
+            key:          o.key,
+            size:         o.size || 0,
+            lastModified: o.lastModified,
+            url:          `${base}/${o.key}`,
+            kind:         kindFromKey(o.key),
+            category:     categoryFromKey(o.key),
+            isOrphan,
+          });
+        }
+      }
+      // Сортировка: свежие сверху
+      out.sort((a, b) => new Date(b.lastModified || 0) - new Date(a.lastModified || 0));
+      res.json({ items: out, totalSize: out.reduce((s, x) => s + x.size, 0) });
+    } catch (e) {
+      console.error('GET /admin/s3/list error:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Удалить один объект по ключу (для разовых ручных правок). Без проверки
+  // ссылок — админ берёт ответственность сам. Если в БД есть живое
+  // сообщение/момент/аватар на этот ключ — превью у юзера сломается.
+  r.delete('/admin/s3/object', requireAdmin, async (req, res) => {
+    const key = req.body?.key || req.query?.key;
+    if (!key) return res.status(400).json({ error: 'key required' });
+    try {
+      await storage.deleteFile(key);
+      res.json({ ok: true, key });
+    } catch (e) {
+      console.error('DELETE /admin/s3/object error:', e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   r.post('/admin/system/s3-sweep', requireAdmin, async (req, res) => {
     try {
       const minAgeHours = parseInt(req.query.minAgeHours);

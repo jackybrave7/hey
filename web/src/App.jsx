@@ -23,6 +23,7 @@ import AdminUserDetail from './components/admin/AdminUserDetail';
 import AdminMoments from './components/admin/AdminMoments';
 import AdminLogs from './components/admin/AdminLogs';
 import AdminSystem from './components/admin/AdminSystem';
+import AdminS3 from './components/admin/AdminS3';
 import AdminReports from './components/admin/AdminReports';
 import AdminFeedbacks from './components/admin/AdminFeedbacks';
 import AdminSettings from './components/admin/AdminSettings';
@@ -405,6 +406,11 @@ export default function App() {
           <Route path="/admin/system" element={
             <RequireAdmin>
               <AdminLayout><AdminSystem/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/s3" element={
+            <RequireAdmin>
+              <AdminLayout><AdminS3/></AdminLayout>
             </RequireAdmin>
           }/>
           <Route path="/admin/reports" element={

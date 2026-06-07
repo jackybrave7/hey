@@ -232,6 +232,9 @@ export const api = {
   },
   adminDeleteMoment:       (id, reason, hard) => req('DELETE', `/admin/moments/${id}`, { reason, hard }),
   adminGetLogs:            (limit)         => req('GET',    `/admin/logs${limit ? '?limit=' + limit : ''}`),
+  adminS3List:             ()              => req('GET',    '/admin/s3/list'),
+  adminS3DeleteObject:     (key)           => req('DELETE', '/admin/s3/object', { key }),
+  adminS3Sweep:            (minAgeHours)   => req('POST',   `/admin/system/s3-sweep${minAgeHours != null ? '?minAgeHours=' + minAgeHours : ''}`),
 
   // AWO / Школьная интеграция
   joinValidate:            (email, course, sig, tenant) =>

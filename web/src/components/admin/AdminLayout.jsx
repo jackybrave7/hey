@@ -17,6 +17,7 @@ const NAV = [
   { to: '/admin/reports',   label: '🚩 Жалобы',         countKey: 'openReports' },
   { to: '/admin/feedbacks', label: '✉ Обращения',      countKey: 'openFeedbacks' },
   { to: '/admin/system',    label: '📢 HEY-заведующий' },
+  { to: '/admin/s3',        label: '🗂 S3 галерея' },
   { to: '/admin/awo',     label: '🎓 АВО / Школы' },
   { to: '/admin/business-requests', label: '💼 Бизнес-заявки', countKey: 'pendingBusiness' },
   { to: '/admin/test-users', label: '🧪 Тестовые юзеры' },

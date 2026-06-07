@@ -261,7 +261,10 @@
       "Bash(curl -s \"https://hey-messenger.ru/for-schools?nocache=$\\(date +%s\\)\")",
       "Bash(curl -s \"https://hey-messenger.ru/for-schools?_=$\\(date +%s\\)\")",
       "Bash(curl -sI \"https://hey-messenger.ru/for-schools?_=$\\(date +%s\\)\")",
-      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && \\(cd web && npm run build\\) && pm2 restart hey\")"
+      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && \\(cd web && npm run build\\) && pm2 restart hey\")",
+      "Bash(curl -sI \"https://s3.twcstorage.ru/heymessenger/\")",
+      "Bash(ssh root@72.56.16.44 'cd /app/server && sqlite3 data/hey.db \"SELECT attachment FROM messages WHERE attachment LIKE \\\\\"%chat/%\\\\\" LIMIT 1;\"')",
+      "Bash(curl -sI -o /dev/null -w \"code=%{http_code}\\\\nct=%{content_type}\\\\ntotal=%{time_total}\\\\nsize=%{size_download}\\\\n\" \"https://s3.twcstorage.ru/heymessenger/chat/$\\(ssh root@72.56.16.44 'cd /app/server && sqlite3 data/hey.db \"SELECT attachment FROM messages WHERE attachment LIKE \\\\\"%chat/%\\\\\" LIMIT 1;\"')"
     ]
   }
 }
