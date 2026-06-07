@@ -1039,7 +1039,7 @@ module.exports = function makeRouter(db, broadcast) {
     if (!m) return res.status(404).json({ error: 'Not found' });
     if (m.sender_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Not a member' });
-    db.deleteMessage(req.params.msgId);
+    db.deleteMessage(req.params.msgId, storage);
     broadcast(db.getConversationMembers(req.params.id), {
       type: 'message:deleted', messageId: req.params.msgId, conversationId: req.params.id
     });
@@ -1048,7 +1048,7 @@ module.exports = function makeRouter(db, broadcast) {
 
   r.delete('/conversations/:id', requireAuth, (req, res) => {
     try {
-      const { memberIds, type } = db.deleteConversation(req.params.id, req.user.id);
+      const { memberIds, type } = db.deleteConversation(req.params.id, req.user.id, storage);
       broadcast(memberIds, { type: 'conversation:deleted', conversationId: req.params.id, convType: type });
       res.json({ ok: true });
     } catch (e) {

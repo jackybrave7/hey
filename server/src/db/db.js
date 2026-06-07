@@ -1284,7 +1284,7 @@ function acceptRequest(convId, acceptorId) {
 //   · direct  — любой участник
 //   · group   — только админ группы
 //   · monolog — нельзя (self-chat)
-function deleteConversation(convId, userId) {
+function deleteConversation(convId, userId, storage) {
   const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(convId);
   if (!conv) throw new Error('Чат не найден');
   if (conv.type === 'monolog') throw new Error('Монолог удалить нельзя');
@@ -1297,6 +1297,13 @@ function deleteConversation(convId, userId) {
   // Список участников нужен ДО удаления — для broadcast уведомления
   const memberIds = db.prepare('SELECT user_id FROM members WHERE conversation_id=?')
     .all(convId).map(r => r.user_id);
+  // Собираем все S3-ключи аттачей ДО удаления сообщений — после транзакции
+  // строк уже не будет, чтобы перечислить.
+  const attRows = db.prepare(
+    `SELECT attachment FROM messages WHERE conversation_id=? AND attachment IS NOT NULL`
+  ).all(convId);
+  const allKeys = new Set();
+  for (const r of attRows) for (const k of _attachmentS3Keys(r.attachment)) allKeys.add(k);
   db.transaction(() => {
     // Реакции на сообщения этого чата
     db.prepare(`DELETE FROM reactions WHERE message_id IN
@@ -1306,6 +1313,9 @@ function deleteConversation(convId, userId) {
     db.prepare('DELETE FROM pinned_conversations WHERE conv_id=?').run(convId);
     db.prepare('DELETE FROM conversations WHERE id=?').run(convId);
   })();
+  // После транзакции — фоновый S3-cleanup (с проверкой что ключ не
+  // используется живыми сообщениями в других чатах: форвард, копия).
+  _cleanupS3Keys(storage, [...allKeys], null);
   return { memberIds, type: conv.type };
 }
 
@@ -1976,12 +1986,69 @@ function editMessage(id, text) {
   return _parseMsg(db.prepare('SELECT * FROM messages WHERE id=?').get(id));
 }
 
-function deleteMessage(id) {
+// Парсит JSON-аттач и возвращает все S3-ключи, на которые он ссылается.
+// На клиенте chat-image/moment-* кладут { url, key }; chat-audio/chat-file —
+// только { url }; для них ключ восстанавливаем из URL (PUBLIC_BASE + key).
+function _attachmentS3Keys(attachmentJson) {
+  if (!attachmentJson) return [];
+  let a;
+  try { a = JSON.parse(attachmentJson); } catch { return []; }
+  if (!a || typeof a !== 'object') return [];
+  const keys = new Set();
+  const push = k => { if (k && typeof k === 'string') keys.add(k); };
+  push(a.key); push(a.thumbKey); push(a.thumb_key);
+  // Восстановление key из URL
+  const base = (process.env.S3_PUBLIC_URL_BASE || 'https://s3.twcstorage.ru/heymessenger').replace(/\/$/, '');
+  const fromUrl = (u) => {
+    if (!u || typeof u !== 'string') return;
+    if (u.startsWith('data:') || u.startsWith('/uploads/')) return;
+    if (u.startsWith(base + '/')) { push(u.slice(base.length + 1).split('?')[0]); return; }
+    // Fallback: вытаскиваем по известным префиксам категорий
+    const m = u.match(/\/(chat\/(?:audio\/|files\/)?[^?#]+|moments\/[^?#]+|avatars\/[^?#]+|group-icons\/[^?#]+)/);
+    if (m) push(m[1]);
+  };
+  fromUrl(a.url);
+  fromUrl(a.thumb_url);
+  fromUrl(a.thumbUrl);
+  return [...keys];
+}
+
+// Проверяет, есть ли в БД ещё живые сообщения, ссылающиеся на тот же S3-ключ
+// (форвард/копия). LIKE по JSON — медленно, но удалений мало.
+function _isS3KeyStillReferenced(key, excludeMessageId) {
+  if (!key) return false;
+  const needle = '%' + JSON.stringify(key).slice(1, -1) + '%'; // экранирует кавычки
+  const row = db.prepare(
+    `SELECT 1 FROM messages WHERE id != ? AND attachment LIKE ? LIMIT 1`
+  ).get(excludeMessageId || '', needle);
+  return !!row;
+}
+
+function _cleanupS3Keys(storage, keys, excludeMessageId) {
+  if (!storage || !keys || !keys.length) return;
+  // Fire-and-forget: не блокируем респонс.
+  (async () => {
+    for (const k of keys) {
+      try {
+        if (_isS3KeyStillReferenced(k, excludeMessageId)) continue;
+        await storage.deleteFile(k);
+      } catch (e) {
+        console.warn('[s3-cleanup]', k, e.message);
+      }
+    }
+  })();
+}
+
+function deleteMessage(id, storage) {
+  // Достаём аттач ДО удаления — нужны ключи для последующего S3-cleanup.
+  const row = db.prepare('SELECT attachment FROM messages WHERE id=?').get(id);
+  const keys = row ? _attachmentS3Keys(row.attachment) : [];
   // Если это закреплённое сообщение — снять закрепление (и общий пин группы,
   // и личные пины в direct-чатах).
   db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE pinned_message_id=?').run(id);
   db.prepare('DELETE FROM personal_message_pins WHERE message_id=?').run(id);
   db.prepare('DELETE FROM messages WHERE id=?').run(id);
+  _cleanupS3Keys(storage, keys, id);
 }
 
 // ── Calls ──────────────────────────────────────────────────────────────────
