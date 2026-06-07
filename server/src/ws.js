@@ -183,20 +183,24 @@ module.exports = function setupWS(server) {
             }
           } catch (e) { console.error('[REFERRAL_CONFIRM]', e.message); }
 
-          // Mark delivered for recipients who are online + push для оффлайн
-          const offlineRecipients = [];
+          // Push шлём ВСЕМ получателям (кроме отправителя). Service Worker
+          // на клиенте сам решит показать или нет: если приложение в фокусе
+          // — игнорирует push (юзер увидел через WS), если в фоне/закрыто —
+          // показывает уведомление. Раньше push шёл только оффлайн-юзерам
+          // (без WS-коннекта), но в TWA приложение в фоне держит WS живым,
+          // поэтому push никогда не доходил — юзер пропускал сообщения.
+          const pushRecipients = [];
           members.forEach(uid => {
             if (uid === user.id) return;
             if (clients.has(uid)) {
               db.updateMessageStatus(saved.id, 'delivered');
               broadcast([user.id], { type: 'message:status', id: saved.id, status: 'delivered' });
-            } else {
-              offlineRecipients.push(uid);
             }
+            pushRecipients.push(uid);
           });
 
-          // Web Push для оффлайн участников
-          if (offlineRecipients.length) {
+          // Web Push — всегда, SW на клиенте сам подавит дубли
+          if (pushRecipients.length) {
             const push = require('./push');
             const conv = db.getConversationById(conversationId);
             const isGroup = conv?.type === 'group';
@@ -220,7 +224,7 @@ module.exports = function setupWS(server) {
               tag: `msg:${conversationId}`,
               messageId: saved.id,
             };
-            offlineRecipients.forEach(async uid => {
+            pushRecipients.forEach(async uid => {
               const subs = db.getPushSubscriptions(uid);
               if (!subs.length) return;
               const gone = await push.sendPushToUser(subs, payload);

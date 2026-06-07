@@ -27,16 +27,25 @@ self.addEventListener('push', (event) => {
   const url   = payload.url   || '/';
   const tag   = payload.tag   || 'hey-msg';
 
-  event.waitUntil(
-    self.registration.showNotification(title, {
+  event.waitUntil((async () => {
+    // Подавляем дубль уведомления, если приложение сейчас открыто и в фокусе:
+    // юзер уже видит сообщение через WS, второе системное notification только
+    // мешает. Если ни одного focused-клиента нет (PWA свернут / TWA в фоне /
+    // приложение закрыто) — показываем как обычно.
+    const clientsList = await self.clients.matchAll({
+      type: 'window', includeUncontrolled: true,
+    });
+    const hasFocused = clientsList.some(c => c.visibilityState === 'visible' && c.focused);
+    if (hasFocused) return;
+    await self.registration.showNotification(title, {
       body,
-      icon: '/apple-touch-icon.svg',
-      badge: '/favicon.svg',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
       tag,
       data: { url, messageId: payload.messageId || null },
       vibrate: [80, 40, 80],
-    })
-  );
+    });
+  })());
 });
 
 self.addEventListener('notificationclick', (event) => {
