@@ -1552,24 +1552,11 @@ function InviteOnlyBlock({ onSwitchToLogin }) {
         </div>
       </div>
 
-      {/* Школам — переход на отдельный лендинг с условиями интеграции */}
-      <a href="/for-schools"
-        style={{
-          display:'flex', alignItems:'center', gap: 10,
-          background:'rgba(255,255,255,.05)',
-          border:'1px solid rgba(200,170,255,.18)',
-          borderRadius: 14, padding:'12px 14px', marginBottom: 18,
-          color:'rgba(235,225,255,.92)', fontSize: 13, lineHeight: 1.4,
-          textDecoration:'none', transition:'background .15s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.09)'}
-        onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,.05)'}>
-        <span style={{ fontSize: 18, flexShrink: 0 }}>🎓</span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          У вас онлайн-школа на АвтоВебОфис? <strong style={{ color:'white' }}>Подключайте бесплатно — ученики попадают в чаты автоматически.</strong>
-        </span>
-        <span style={{ color:'rgba(200,170,255,.7)', fontSize: 18, flexShrink: 0 }}>›</span>
-      </a>
+      {/* Блок «У вас онлайн-школа на АвтоВебОфис?» временно скрыт:
+          через for-schools-лендинг любой посетитель попадал на /register
+          (с invite=system_hey_official), обходя ограничение «только по
+          приглашению». Вернуть, когда будет отдельная гейтированная
+          форма заявки на школьную интеграцию. */}
 
       {/* Waitlist */}
       {!done ? (
