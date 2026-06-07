@@ -1,0 +1,21 @@
+# Подпись держим вне git
+android.keystore
+*.keystore
+keystore-passwords.txt
+twa-pass.txt
+
+# Bubblewrap output
+app-release-signed.apk
+app-release-bundle.aab
+app/build/
+build/
+.gradle/
+
+# Тяжёлые папки, которые init создаёт
+app/
+gradle/
+gradlew
+gradlew.bat
+build.gradle
+settings.gradle
+gradle.properties

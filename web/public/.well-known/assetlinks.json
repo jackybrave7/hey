@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ru.hey_messenger.twa",
+      "sha256_cert_fingerprints": [
+        "DC:98:1E:14:8E:9B:44:44:CA:20:8F:D7:3D:AE:B6:A1:78:C7:8D:5A:76:F9:4B:B8:7F:E1:5F:8E:E6:5A:81:06"
+      ]
+    }
+  }
+]

@@ -15,6 +15,20 @@ server/data/uploads/
 server/data/feedback.log
 server/data/vapid.json
 
+# TWA подписной keystore — не коммитим
+twa/android.keystore
+twa/*.keystore
+twa/app/
+twa/build/
+twa/.gradle/
+twa/gradle/
+twa/gradlew*
+twa/build.gradle
+twa/settings.gradle
+twa/gradle.properties
+twa/app-release-*.apk
+twa/app-release-*.aab
+
 # Environment (секреты — никогда не в git!)
 .env
 .env.local
