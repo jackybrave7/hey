@@ -201,7 +201,7 @@ export function ConfirmModal({ message, hint, requireWord, promptInput, promptPl
   };
 
   return (
-    <div style={{position:'fixed',inset:0,zIndex:1000,
+    <div style={{position:'fixed',inset:0,zIndex:12000,
       background:'rgba(0,0,0,.52)',backdropFilter:'blur(8px)',
       display:'flex',alignItems:'center',justifyContent:'center'}}
       onMouseDown={e => { if (e.target === e.currentTarget) onCancel(); }}>
@@ -3156,6 +3156,8 @@ export function GlobalUserCardMount() {
         initialIndex={openedMoments.index}
         currentUser={me}
         onClose={() => setOpenedMoments(null)}
+        zIndex={11000} /* выше ContactCardModal (z:10500) — иначе попап
+                          уезжает под открывшую его карточку */
       />
     )}
   </>);

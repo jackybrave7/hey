@@ -511,6 +511,9 @@ export default function MomentDetailPopup({
   onDelete,       // (moment) => void
   onRestore,
   onMomentUpdated, // (freshMoment) => void — родитель синкает свой список
+  zIndex,          // override — когда поп-ап открывается поверх другой модалки
+                   // (например ContactCardModal на z:10500), родитель передаёт
+                   // более высокий z, чтобы попап не уехал под ту модалку.
 }) {
   const nav = useNavigate();
   const salesPressure = useSalesPressure();
@@ -670,7 +673,7 @@ export default function MomentDetailPopup({
     <>
     <div
       style={{
-        position:'fixed',inset:0,zIndex:700,
+        position:'fixed',inset:0,zIndex: zIndex || 700,
         background:'rgba(0,0,0,.72)',backdropFilter:'blur(16px)',
         display:'flex',alignItems:'center',justifyContent:'center',
         padding:'20px',
