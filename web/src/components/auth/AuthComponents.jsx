@@ -169,7 +169,9 @@ export function InviteBadge({ name, avatar }) {
 // ─── ForgotPasswordPopup ──────────────────────────────────────────────────────
 export function ForgotPasswordPopup({ onClose, tgUsername }) {
   injectCSS();
-  const handle = tgUsername || 'hey_support';
+  // Бот восстановления пароля. Юзер шлёт /start → делится контактом →
+  // бот выдаёт разовый пароль. См. server/src/tgBot.js
+  const handle = tgUsername || 'hey_messenger_support_bot';
   const [email, setEmail]     = useState('');
   const [busy, setBusy]       = useState(false);
   const [sent, setSent]       = useState(false);
@@ -281,8 +283,12 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
           onMouseEnter={e => e.currentTarget.style.background = '#1a8ac0'}
           onMouseLeave={e => e.currentTarget.style.background = '#229ED9'}
         >
-          <span style={{ fontSize: 16 }}>✈</span> Написать в Telegram
+          <span style={{ fontSize: 16 }}>✈</span> Восстановить через Telegram-бота
         </a>
+        <div style={{ textAlign:'center', marginTop: 8,
+          color:'rgba(255,255,255,.45)', fontSize: 11, lineHeight: 1.5 }}>
+          Бот попросит поделиться номером и сразу выдаст разовый пароль.
+        </div>
       </div>
     </div>
   );

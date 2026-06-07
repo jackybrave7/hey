@@ -387,6 +387,19 @@ function fmtDate(ts) {
   return d.toLocaleDateString('ru', { day:'numeric', month:'long', year:'numeric' });
 }
 
+// Короткая дата + время для каталога медиа: «5 июн, 18:42»
+// или «5 июн 2025, 18:42» если год не текущий.
+function fmtDateTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts * 1000);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const opts = sameYear
+    ? { day:'numeric', month:'short' }
+    : { day:'numeric', month:'short', year:'numeric' };
+  return d.toLocaleDateString('ru', opts) +
+    ', ' + d.toLocaleTimeString('ru', { hour:'2-digit', minute:'2-digit' });
+}
+
 // Короткая форма «был X назад» для шапки чата
 function fmtLastSeenShort(ts) {
   if (!ts) return '';
@@ -709,7 +722,7 @@ export function LoginScreen() {
       {showForgot && (
         <ForgotPasswordPopup
           onClose={() => setShowForgot(false)}
-          tgUsername={window.__HEY_TG_SUPPORT__ || 'hey_support'}
+          tgUsername={window.__HEY_TG_SUPPORT__ || 'hey_messenger_support_bot'}
         />
       )}
     </div>
@@ -985,13 +998,16 @@ function AvatarCropperModal({ file, onCancel, onDone }) {
   const dispW = (rotated ? imgSize.h : imgSize.w) * total;
   const dispH = (rotated ? imgSize.w : imgSize.h) * total;
 
-  return (
+  // createPortal — чтобы overlay вышел за любую возможную stacking-context
+  // ловушку (родительский filter/transform/will-change в форме профиля),
+  // из-за которой position:fixed раньше «прятался» под формой.
+  return createPortal(
     <div onClick={onCancel}
-      style={{ position:'fixed', inset:0, zIndex:2200,
-        background:'rgba(10,5,25,.92)', backdropFilter:'blur(16px)',
+      style={{ position:'fixed', inset:0, zIndex:10000,
+        background:'rgba(5,2,15,.96)', backdropFilter:'blur(16px)',
         display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
       <div onClick={e => e.stopPropagation()}
-        style={{ background:'rgba(38,28,68,.98)', borderRadius:22, padding:'24px 22px 18px',
+        style={{ background:'rgba(38,28,68,.99)', borderRadius:22, padding:'24px 22px 18px',
           width:'100%', maxWidth:360, boxShadow:'0 30px 80px rgba(0,0,0,.7)',
           border:'1px solid rgba(255,255,255,.1)' }}>
         <div style={{ color:'white', fontSize:17, fontWeight:700, textAlign:'center', marginBottom:14 }}>
@@ -1094,7 +1110,8 @@ function AvatarCropperModal({ file, onCancel, onDone }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -5501,7 +5518,7 @@ function MediaViewerModal({ convId, onClose }) {
                             {a.name || 'Файл'}
                           </div>
                           <div style={{color:'rgba(225,220,245,.7)',fontSize:11,marginTop:2}}>
-                            {fmtSize(a.size)}{m.sender_name ? ` · ${m.sender_name}` : ''} · {fmtTime(m.created_at)}
+                            {fmtSize(a.size)}{m.sender_name ? ` · ${m.sender_name}` : ''} · {fmtDateTime(m.created_at)}
                           </div>
                         </div>
                         <a href={a.url} target="_blank" rel="noreferrer" download={a.name}
@@ -5530,7 +5547,7 @@ function MediaViewerModal({ convId, onClose }) {
                       <AudioPlayer url={m.attachment.url} duration={m.attachment.duration} isOut={false} wide/>
                       <div style={{display:'flex',alignItems:'center',marginTop:8,gap:8}}>
                         <div style={{flex:1,color:'rgba(225,220,245,.7)',fontSize:12}}>
-                          {m.sender_name || ''} · {fmtTime(m.created_at)}
+                          {m.sender_name || ''} · {fmtDateTime(m.created_at)}
                         </div>
                         <button onClick={() => goToMessage(m.message_id || m.id)}
                           title="Перейти к сообщению"
@@ -5557,7 +5574,7 @@ function MediaViewerModal({ convId, onClose }) {
                     </a>
                     <div style={{display:'flex',alignItems:'center',marginTop:4,gap:8}}>
                       <div style={{flex:1,color:'rgba(225,220,245,.7)',fontSize:12}}>
-                        {l.sender} · {fmtTime(l.time)}
+                        {l.sender} · {fmtDateTime(l.time)}
                       </div>
                       {l.message_id && (
                         <button onClick={() => goToMessage(l.message_id)}
@@ -8286,33 +8303,36 @@ export function ChatScreen() {
   }, [messages, hasMore, convId]);
 
   // Эффект-скролл: запускается при изменении flatItems или явном
-  // scrollTick. Делает серию scrollToIndex, чтобы добить промах от
-  // измерения высот картинок/embed-видео.
+  // scrollTick. react-virtuoso v4: scrollToIndex({ index }) интерпретирует
+  // index как ПОЗИЦИЮ В МАССИВЕ data (а не «виртуальный» индекс с
+  // учётом firstItemIndex). Поэтому передаём чистый idx — раньше мы
+  // прибавляли firstItemIndex и получали либо out-of-range клампинг,
+  // либо промах на длину prepend-сдвига.
   useEffect(() => {
     const target = pendingScrollTargetRef.current;
     if (!target) return;
-    // Ищем в АКТУАЛЬНОМ flatItems — он уже учитывает все prepend'ы и
-    // подгрузки, потому что React сюда заехал после commit.
     const idx = flatItems.findIndex(it => it.type === 'msg' && it.id === target.id);
-    if (idx < 0) return; // ещё не подгружено — следующий тик доберёт
-    const virtuosoIndex = firstItemIndex + idx;
+    if (idx < 0) return; // не подгружено — следующий тик доберёт
     const targetId = target.id;
     pendingScrollTargetRef.current = null;
 
     setFlashMsgId(targetId);
     setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
 
-    const scroll = (opts) => virtuosoRef.current?.scrollToIndex({ index: virtuosoIndex, ...opts });
+    const scroll = (opts) => virtuosoRef.current?.scrollToIndex({ index: idx, ...opts });
     requestAnimationFrame(() => requestAnimationFrame(() => {
+      // Сразу — instant, чтобы Virtuoso смонтировал нужные ряды и
+      // начал измерять их высоту.
       scroll({ align: 'center', behavior: 'auto' });
-      // Каждая дозированная попытка корректирует промах от поздно
-      // догрузившегося изображения/реплая.
-      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 150);
-      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 400);
-      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 900);
+      // Серия дозиров — картинки/embed-видео отрисовываются с
+      // задержкой и меняют layout, попутно «уезжая» от исходной
+      // позиции. Подстраиваемся.
+      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 120);
+      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 350);
+      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 800);
       setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 1500);
     }));
-  }, [flatItems, firstItemIndex, scrollTick]);
+  }, [flatItems, scrollTick]);
 
   // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
   const handleOpenMenu  = useCallback((e, m) => openMsgMenu(e, m), []);
