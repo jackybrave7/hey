@@ -2377,7 +2377,9 @@ export function MyProfileScreen() {
               iconBg="rgba(255,200,120,.22)"
               title="Поговорить"
               subtitle="Закладки, что меня зацепило"
-              count={savedCount}
+              // count=0 → не показываем число (как у архива). Раньше
+              // юзеру светилась пустая «0» если ничего не сохранено.
+              count={savedCount || null}
               onClick={() => { if (!savedOpen) toggleSaved(); else setSavedOpen(true); }}
             />
             {!superHasInviteCta && (
@@ -3091,8 +3093,13 @@ function BioWithLinks({ text }) {
         <a key={i} href={p.t} target="_blank" rel="noopener noreferrer"
           onClick={e => e.stopPropagation()}
           style={{
-            color:'rgba(180,140,255,.95)', textDecoration:'underline',
-            textUnderlineOffset:2, wordBreak:'break-all',
+            // Светло-голубой с лёгким underline — даёт высокий контраст
+            // и на тёмно-фиолетовом фоне профиля, и на тёмных плашках чата,
+            // и на bio-карточке. Bold чтобы ссылка не растворялась в текст.
+            color:'rgba(180,210,255,1)', textDecoration:'underline',
+            textDecorationColor:'rgba(180,210,255,.55)',
+            textUnderlineOffset:2, textDecorationThickness:1,
+            fontWeight:600, wordBreak:'break-all',
           }}>
           {p.t.replace(/^https?:\/\//,'')}
         </a>
