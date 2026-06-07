@@ -594,6 +594,20 @@ function createUser({ phone, name, password, birthday, avatar, inviteCode, email
   return user;
 }
 
+// Создаёт строку referrals (inviter → invitee) + проставляет referral_by
+// на invitee, если он ещё не задан. Идемпотентно (UNIQUE/INSERT OR IGNORE).
+// Используется когда /register получает inviteUserId (UUID приглашающего),
+// а не invite_code — createUser в таком случае реферал не создаёт.
+function markReferralFromInviter(inviterId, inviteeId) {
+  if (!inviterId || !inviteeId || inviterId === inviteeId) return;
+  db.transaction(() => {
+    db.prepare('INSERT OR IGNORE INTO referrals (inviter_id,invitee_id,created_at) VALUES (?,?,?)')
+      .run(inviterId, inviteeId, now());
+    db.prepare('UPDATE users SET referral_by=? WHERE id=? AND (referral_by IS NULL OR referral_by="")')
+      .run(inviterId, inviteeId);
+  })();
+}
+
 function getReferralCount(userId) {
   return db.prepare('SELECT COUNT(*) as c FROM referrals WHERE inviter_id=?').get(userId)?.c ?? 0;
 }
@@ -3438,7 +3452,7 @@ module.exports = {
   setOnline, getPresence,
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes, updateContactNickname,
-  getReferralCount, getInvitedCounts, findUserByInviteCode,
+  getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   getTotalUnreadFor,
   // AWO integration

@@ -846,8 +846,17 @@ function formatPhoneInput(val) {
   const ccLen = (first === '1' || first === '7') ? 1 : Math.min(2, digits.length);
   const cc   = digits.slice(0, ccLen);
   const rest = digits.slice(ccLen);
+  // Группировка: последние 4 цифры разбиваем 2+2, остальное — тройками с начала.
+  // Пример +7 999 111 11 11 вместо +7 999 111 111 1.
   const groups = [];
-  for (let i = 0; i < rest.length; i += 3) groups.push(rest.slice(i, i + 3));
+  if (rest.length <= 4) {
+    if (rest.length > 0) groups.push(rest);
+  } else {
+    const head = rest.slice(0, rest.length - 4);
+    const tail = rest.slice(-4);
+    for (let i = 0; i < head.length; i += 3) groups.push(head.slice(i, i + 3));
+    groups.push(tail.slice(0, 2), tail.slice(2, 4));
+  }
   return '+' + cc + (groups.length ? ' ' + groups.join(' ') : '');
 }
 
@@ -1297,6 +1306,9 @@ export function RegisterScreen() {
       // Чистим sessionStorage после успеха
       if (schoolInvite) sessionStorage.removeItem('hey_school_invite');
       if (groupInvite)  sessionStorage.removeItem('hey_group_invite');
+      // Новый аккаунт на этом устройстве — старый флаг «тур видел»
+      // от предыдущего юзера сбрасываем, чтобы презентация показалась снова.
+      localStorage.removeItem('hey_tour_seen');
       login(res.token, res.user);
       nav('/welcome', { state: { isNewUser: true, userName: name.trim() } });
     } catch(e) {

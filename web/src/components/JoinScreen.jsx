@@ -14,6 +14,7 @@ export default function JoinScreen() {
   const email  = params.get('email') || '';
   const course = params.get('course') || '';
   const sig    = params.get('sig') || '';
+  const tenant = params.get('tenant') || '';
 
   useEffect(() => {
     if (!email) {
@@ -21,7 +22,7 @@ export default function JoinScreen() {
       setError('Ссылка неполная — нет email');
       return;
     }
-    api.joinValidate(email, course, sig)
+    api.joinValidate(email, course, sig, tenant)
       .then(r => {
         setInfo(r);
         if (r.alreadyRegistered) setState('already');
@@ -31,7 +32,7 @@ export default function JoinScreen() {
         setState('invalid');
         setError(e.message);
       });
-  }, [email, course, sig]);
+  }, [email, course, sig, tenant]);
 
   const wrap = {
     minHeight: '100vh', background: 'var(--grad, linear-gradient(135deg,#1a0d3a,#0e0820))',

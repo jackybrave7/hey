@@ -234,8 +234,8 @@ export const api = {
   adminGetLogs:            (limit)         => req('GET',    `/admin/logs${limit ? '?limit=' + limit : ''}`),
 
   // AWO / Школьная интеграция
-  joinValidate:            (email, course, sig) =>
-    req('GET', `/join/validate?email=${encodeURIComponent(email)}&course=${encodeURIComponent(course||'')}&sig=${encodeURIComponent(sig)}`),
+  joinValidate:            (email, course, sig, tenant) =>
+    req('GET', `/join/validate?email=${encodeURIComponent(email)}&course=${encodeURIComponent(course||'')}&sig=${encodeURIComponent(sig)}${tenant?'&tenant='+encodeURIComponent(tenant):''}`),
   // Все awo-ручки принимают опциональный tenantId (если не передан → дефолтный)
   adminGetAwoSettings:     (tenantId)       => req('GET',    `/admin/awo/settings${tenantId?'?tenantId='+encodeURIComponent(tenantId):''}`),
   adminSetAwoSettings:     (data, tenantId) => req('PUT',    `/admin/awo/settings${tenantId?'?tenantId='+encodeURIComponent(tenantId):''}`, data),

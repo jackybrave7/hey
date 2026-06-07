@@ -211,10 +211,14 @@ module.exports = function makeRouter(db, broadcast) {
       if (inviter && !inviter.is_blocked) {
         try { db.addContact(user.id, inviter.id, null); } catch {}
         try { db.addContact(inviter.id, user.id, null); } catch {}
-        // Реферальная запись создалась в createUser (referral_by + referrals row).
-        // Сам зачёт inviter'у произойдёт когда новый юзер напишет первое сообщение
-        // (см. ws.js → confirmReferralIfPending). Так требует спека:
-        // «должны зарегистрироваться И написать хотя бы 1 сообщение».
+        // Реферальная запись. createUser её создаёт только когда передан
+        // invite_code (буквенный), а через /register?invite=USER_ID мы
+        // передаём UUID приглашающего — поэтому пишем referral здесь
+        // напрямую. Сам зачёт (invited_confirmed++) произойдёт когда
+        // новый юзер напишет первое сообщение (ws.js → confirmReferralIfPending).
+        try {
+          db.markReferralFromInviter(inviter.id, user.id);
+        } catch (e) { console.warn('[referral] insert failed:', e.message); }
       }
     }
 

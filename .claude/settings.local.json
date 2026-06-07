@@ -257,7 +257,11 @@
       "Bash(curl -sI https://hey-messenger.ru/for-schools)",
       "Bash(curl -s https://hey-messenger.ru/for-schools)",
       "Bash(curl -sI https://hey-messenger.ru/for-schools.html)",
-      "Bash(curl -s https://hey-messenger.ru/for-schools.html)"
+      "Bash(curl -s https://hey-messenger.ru/for-schools.html)",
+      "Bash(curl -s \"https://hey-messenger.ru/for-schools?nocache=$\\(date +%s\\)\")",
+      "Bash(curl -s \"https://hey-messenger.ru/for-schools?_=$\\(date +%s\\)\")",
+      "Bash(curl -sI \"https://hey-messenger.ru/for-schools?_=$\\(date +%s\\)\")",
+      "Bash(ssh root@72.56.16.44 \"cd /app && git pull && \\(cd web && npm run build\\) && pm2 restart hey\")"
     ]
   }
 }
