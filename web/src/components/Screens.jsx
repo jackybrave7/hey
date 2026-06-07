@@ -324,10 +324,16 @@ export function useConfirm() {
 }
 
 function FieldLine({ value }) {
+  // Чуть жирнее значение + более явная подчёркивающая линия — чтобы строки
+  // контактов читались как «данные», а не сливались с фоном профиля.
   return (
     <div>
-      <div style={{color:'white',fontSize:17,paddingBottom:4}}>{value}</div>
-      <div className="divider"/>
+      <div style={{
+        color:'white', fontSize:17, fontWeight:500, paddingBottom:5,
+        letterSpacing:.1,
+      }}>{value}</div>
+      <div style={{ height:1, width:'100%',
+        background:'rgba(190,160,220,.42)' }}/>
     </div>
   );
 }
@@ -2161,8 +2167,9 @@ export function MyProfileScreen() {
         </div>
       )}
 
-      {/* Avatar + fields */}
-      <div style={{display:'flex',gap:22,padding:'0 26px',alignItems:'flex-start'}}>
+      {/* Avatar + fields. Сверху отступ 28px чтобы между sticky-header'ом
+          «Профиль» и аватаркой был воздух — иначе шапка липнет к фото. */}
+      <div style={{display:'flex',gap:22,padding:'28px 26px 0',alignItems:'flex-start'}}>
         <AvatarPicker avatar={avatar} onChange={(url, file) => { setAvatar(url); setAvatarFile(file); }} size={130} disabled={!editing}/>
 
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:16,paddingTop:8}}>
@@ -2287,9 +2294,17 @@ export function MyProfileScreen() {
             </div>
           );
         })() : user?.bio ? (
+          // Bio выделяем отдельной плашкой — не самой яркой, но достаточной
+          // чтобы взгляд считывал её как «карточку описания», а не сливался
+          // с фоном профиля. Тонкая левая полоса добавляет акцент.
           <div style={{
-            color:'rgba(255,255,255,.88)', fontSize:14, lineHeight:1.6,
+            color:'rgba(255,255,255,.94)', fontSize:14.5, lineHeight:1.6,
             wordBreak:'break-word', whiteSpace:'pre-wrap',
+            background:'rgba(255,255,255,.055)',
+            border:'1px solid rgba(255,255,255,.10)',
+            borderLeft:'3px solid rgba(180,140,255,.55)',
+            borderRadius:12,
+            padding:'12px 16px',
           }}>
             <BioWithLinks text={user.bio}/>
           </div>
