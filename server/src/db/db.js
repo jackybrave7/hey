@@ -723,13 +723,17 @@ function getSchoolAccount(tenantId) {
 // ── Contacts ───────────────────────────────────────────────────────────────
 
 function getContacts(ownerId) {
+  // HEY-заведующий — служебный контакт, добавляется автоматически каждому
+  // юзеру. В UI-списке контактов его не показываем (доступ к чату — из
+  // списка чатов или из публикаций); юзер не должен иметь возможность
+  // его «удалить» или путаться рядом с реальными контактами.
   const rows = db.prepare(
     `SELECT u.*, c.nickname, c.notes, p.online, p.last_seen
      FROM contacts c
      JOIN users u ON u.id = c.contact_id
      LEFT JOIN presence p ON p.user_id = c.contact_id
-     WHERE c.owner_id = ?`
-  ).all(ownerId);
+     WHERE c.owner_id = ? AND c.contact_id != ?`
+  ).all(ownerId, SYSTEM_USER_ID);
   return normalizeAvatars(
     rows.map(({ password, ...r }) => ({ ...r, online: !!r.online, is_deleted: !!r.is_deleted }))
   );
@@ -1293,6 +1297,15 @@ function deleteConversation(convId, userId, storage) {
   }
   if (!isMember(convId, userId)) {
     throw new Error('Вы не участник этого чата');
+  }
+  // Direct-чат с HEY-заведующим удалить нельзя — это служебный канал.
+  if (conv.type === 'direct') {
+    const partner = db.prepare(
+      `SELECT user_id FROM members WHERE conversation_id=? AND user_id != ? LIMIT 1`
+    ).get(convId, userId);
+    if (partner && partner.user_id === SYSTEM_USER_ID) {
+      throw new Error('Чат с HEY-заведующим удалить нельзя');
+    }
   }
   // Список участников нужен ДО удаления — для broadcast уведомления
   const memberIds = db.prepare('SELECT user_id FROM members WHERE conversation_id=?')
