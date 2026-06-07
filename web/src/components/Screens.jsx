@@ -756,10 +756,91 @@ function validatePhone(raw) {
 //   • +1, +7 — country code 1 цифра (US/CA/RU/KZ).
 //   • +20…+99 — 2 цифры по умолчанию.
 //   • После CC — пробел и группы по 3 цифры.
+// Максимум цифр в номере по country-code. Если CC неизвестен —
+// fallback на 15 (предел E.164). Список покрывает самые ходовые
+// направления, чтобы пользователь физически не мог напечатать
+// «лишние» цифры.
+const PHONE_MAX_BY_CC = {
+  '1':  11,  // US / Canada
+  '7':  11,  // RU / KZ
+  '20': 12,  // EG
+  '27': 11,  // ZA
+  '30': 12,  // GR
+  '31': 11,  // NL
+  '32': 11,  // BE
+  '33': 11,  // FR
+  '34': 11,  // ES
+  '36': 11,  // HU
+  '39': 12,  // IT
+  '40': 11,  // RO
+  '41': 11,  // CH
+  '43': 12,  // AT
+  '44': 12,  // UK
+  '45': 10,  // DK
+  '46': 11,  // SE
+  '47': 10,  // NO
+  '48': 11,  // PL
+  '49': 13,  // DE
+  '51': 11,  // PE
+  '52': 12,  // MX
+  '53': 10,  // CU
+  '54': 12,  // AR
+  '55': 13,  // BR
+  '56': 11,  // CL
+  '57': 12,  // CO
+  '58': 12,  // VE
+  '60': 12,  // MY
+  '61': 11,  // AU
+  '62': 13,  // ID
+  '63': 12,  // PH
+  '64': 11,  // NZ
+  '65': 10,  // SG
+  '66': 11,  // TH
+  '81': 12,  // JP
+  '82': 12,  // KR
+  '84': 12,  // VN
+  '86': 13,  // CN
+  '90': 12,  // TR
+  '91': 12,  // IN
+  '92': 12,  // PK
+  '93': 11,  // AF
+  '94': 11,  // LK
+  '95': 11,  // MM
+  '98': 12,  // IR
+  '371': 11, // LV
+  '372': 11, // EE
+  '375': 12, // BY
+  '380': 12, // UA
+  '381': 12, // RS
+  '420': 12, // CZ
+  '421': 12, // SK
+  '972': 12, // IL
+  '994': 12, // AZ
+  '995': 12, // GE
+  '996': 12, // KG
+  '998': 12, // UZ
+};
+
+function maxDigitsForCC(digits) {
+  // Пытаемся подобрать самый длинный матч из 1/2/3 цифр.
+  for (const len of [3, 2, 1]) {
+    const cc = digits.slice(0, len);
+    if (PHONE_MAX_BY_CC[cc]) return PHONE_MAX_BY_CC[cc];
+  }
+  return 15;
+}
+
 function formatPhoneInput(val) {
-  // Оставляем только цифры (и ведущий +). Лимит E.164 — 15 цифр.
+  // Оставляем только цифры (и ведущий +). Лимит — по стране, дефолт 15
+  // (E.164). +7 / +1 → 11 цифр; +49 → 13 и т.д. — список выше.
   const hasLeadPlus = (val || '').trimStart().startsWith('+');
-  const digits = (val || '').replace(/\D/g, '').slice(0, 15);
+  let digits = (val || '').replace(/\D/g, '');
+  if (digits.length) {
+    const cap = maxDigitsForCC(digits);
+    digits = digits.slice(0, cap);
+  } else {
+    digits = digits.slice(0, 15);
+  }
   if (!digits) return hasLeadPlus ? '+' : '';
   const first = digits[0];
   const ccLen = (first === '1' || first === '7') ? 1 : Math.min(2, digits.length);
@@ -1141,7 +1222,12 @@ export function RegisterScreen() {
   });
 
   const [name, setName]         = useState(() => schoolInvite?.prefillName || '');
-  const [phone, setPhone]       = useState(() => schoolInvite?.prefillPhone || '');
+  // Префилл: предзаполненный из АВО prefillPhone (после оплаты)
+  // — приоритет; иначе ставим «+7 » по умолчанию (большинство юзеров
+  // из РФ). Сразу прогоняем через formatPhoneInput чтобы RF-номер
+  // из АВО уже лёг как +7 9XX XXX XX XX.
+  const [phone, setPhone]       = useState(() =>
+    schoolInvite?.prefillPhone ? formatPhoneInput(schoolInvite.prefillPhone) : '+7 ');
   const [password, setPassword] = useState('');
   const [err, setErr]           = useState('');
   const [loading, setLoading]   = useState(false);
@@ -1367,7 +1453,9 @@ export function RegisterScreen() {
                 color:'white', fontSize: 26, fontWeight: 800, letterSpacing: .5,
                 wordBreak:'break-all', fontFamily:'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
               }}>
-                {confirmPhone.normalized}
+                {/* Форматированный «+7 999 111 11 11» вместо +799911111111
+                    — глазами проверять группы цифр гораздо удобнее. */}
+                {formatPhoneInput(confirmPhone.normalized)}
               </div>
             </div>
 

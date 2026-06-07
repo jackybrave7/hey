@@ -252,7 +252,8 @@
       "Bash(grep -n \"^import\\\\\\\\|HEY_EMOJI_SET\\\\\\\\|emojiUrl\" web/src/components/moments/MomentDetailPopup.jsx)",
       "Bash(grep -n \"moment.text\\\\\\\\|preview\" web/src/components/moments/MomentCard.jsx)",
       "Bash(grep -n \"Превью\\\\\\\\|renderText\\\\\\\\|preview\\\\\\\\|renderPreviewWithEmoji\\\\\\\\|Так выглядит\\\\\\\\|выгляд\" web/src/components/moments/MomentCreateSheet.jsx)",
-      "Bash(grep -n \"выгляд\\\\\\\\|emojiUrl\\\\\\\\|{HEY_EMOJI\\\\\\\\|text\\\\\\\\.replace\\\\\\\\|leftAndPasteEmoji\" web/src/components/moments/MomentCreateSheet.jsx)"
+      "Bash(grep -n \"выгляд\\\\\\\\|emojiUrl\\\\\\\\|{HEY_EMOJI\\\\\\\\|text\\\\\\\\.replace\\\\\\\\|leftAndPasteEmoji\" web/src/components/moments/MomentCreateSheet.jsx)",
+      "Bash(grep -n \"confirmPhone\\\\\\\\|Подтверди свой номер\\\\\\\\|normalized\" web/src/components/Screens.jsx)"
     ]
   }
 }
