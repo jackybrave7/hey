@@ -46,6 +46,10 @@ if (process.env.NODE_ENV === 'production') {
   // extensions:['html'] позволяет статически отдавать /for-schools без .html
   // — нужно для SEO-страницы /for-schools.html, которая лежит в web/public/.
   app.use(express.static(dist, { extensions: ['html'] }));
+  // Явный alias на случай если extensions-резолв в текущей версии
+  // express.static не срабатывает раньше SPA-fallback ниже.
+  app.get('/for-schools', (req, res) =>
+    res.sendFile(path.join(dist, 'for-schools.html')));
   // SPA-fallback. Если запрошенный путь — известная статика на диске,
   // express.static выше уже отдал её. Сюда попадают только клиентские
   // роуты React-приложения → отдаём index.html.
