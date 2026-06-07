@@ -81,10 +81,10 @@ export default function AdminWaitlist() {
         <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, margin: 0 }}>
           📨 Заявки на открытие регистрации
         </h1>
-        <div style={{ color:'rgba(255,255,255,.5)', fontSize: 13 }}>
+        <div style={{ color:'rgba(255,255,255,.75)', fontSize: 13, fontWeight:500 }}>
           {counts.all.toLocaleString('ru')} всего
           {counts.pending > 0 && (
-            <span style={{ color:'rgba(255,180,140,.85)' }}>
+            <span style={{ color:'rgba(255,200,160,1)', fontWeight:700 }}>
               {' · '}необработанных: {counts.pending}
             </span>
           )}
@@ -99,7 +99,8 @@ export default function AdminWaitlist() {
         </div>
       </div>
 
-      <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 13, marginTop: 0, marginBottom: 18 }}>
+      <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 13, marginTop: 0, marginBottom: 18,
+        lineHeight: 1.5 }}>
         Юзеры, оставившие email на экране «Только по приглашению». Когда
         напишешь им — нажми «✓ Уведомлён», чтобы убрать из счётчика.
       </p>
@@ -141,7 +142,8 @@ export default function AdminWaitlist() {
         <div style={{ overflowX:'auto' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, color:'white' }}>
             <thead>
-              <tr style={{ color:'rgba(225,220,245,.82)', borderBottom:'1px solid rgba(255,255,255,.1)' }}>
+              <tr style={{ color:'rgba(235,230,255,1)', borderBottom:'1px solid rgba(255,255,255,.18)',
+                fontSize:12, textTransform:'uppercase', letterSpacing:.4 }}>
                 <th style={th}>Email</th>
                 <th style={th}>Источник</th>
                 <th style={th}>Когда</th>
@@ -151,23 +153,48 @@ export default function AdminWaitlist() {
             </thead>
             <tbody>
               {filtered.map(it => (
-                <tr key={it.id} style={{ borderBottom:'1px solid rgba(255,255,255,.05)' }}>
+                <tr key={it.id} style={{ borderBottom:'1px solid rgba(255,255,255,.1)' }}>
                   <td style={td}>
                     <a href={`mailto:${it.email}`}
-                      style={{ color:'rgba(180,150,250,.95)', textDecoration:'none' }}
-                      onMouseEnter={e=>e.currentTarget.style.textDecoration='underline'}
-                      onMouseLeave={e=>e.currentTarget.style.textDecoration='none'}>
+                      style={{ color:'rgba(200,180,255,1)', fontWeight:600,
+                        textDecoration:'underline',
+                        textDecorationColor:'rgba(200,180,255,.4)',
+                        textUnderlineOffset:2 }}
+                      onMouseEnter={e=>e.currentTarget.style.color='white'}
+                      onMouseLeave={e=>e.currentTarget.style.color='rgba(200,180,255,1)'}>
                       {it.email}
                     </a>
                   </td>
-                  <td style={{ ...td, color:'rgba(255,255,255,.55)', fontSize:12 }}>
-                    {it.source || '—'}
+                  <td style={td}>
+                    {it.source ? (
+                      <span style={{
+                        display:'inline-block', padding:'2px 8px', borderRadius:6,
+                        background:'rgba(120,90,200,.22)',
+                        border:'1px solid rgba(180,140,255,.25)',
+                        color:'rgba(220,210,255,.95)', fontSize:11, fontWeight:600,
+                        letterSpacing:.2,
+                      }}>{it.source}</span>
+                    ) : <span style={{ color:'rgba(255,255,255,.4)' }}>—</span>}
                   </td>
-                  <td style={{ ...td, color:'rgba(255,255,255,.65)' }}>{fmtDate(it.created_at)}</td>
+                  <td style={{ ...td, color:'rgba(255,255,255,.9)', fontWeight:500 }}>
+                    {fmtDate(it.created_at)}
+                  </td>
                   <td style={td}>
                     {it.notified_at
-                      ? <span style={{ color:'rgba(120,220,150,.95)' }}>✓ {fmtDate(it.notified_at)}</span>
-                      : <span style={{ color:'rgba(255,180,140,.7)' }}>нет</span>}
+                      ? <span style={{
+                          display:'inline-flex', alignItems:'center', gap:6,
+                          padding:'2px 10px', borderRadius:6,
+                          background:'rgba(70,180,110,.22)',
+                          border:'1px solid rgba(120,220,150,.4)',
+                          color:'rgba(170,250,200,1)', fontWeight:600, fontSize:12,
+                        }}>✓ {fmtDate(it.notified_at)}</span>
+                      : <span style={{
+                          display:'inline-block', padding:'2px 10px', borderRadius:6,
+                          background:'rgba(220,140,80,.18)',
+                          border:'1px solid rgba(255,180,120,.4)',
+                          color:'rgba(255,210,170,1)', fontWeight:700, fontSize:12,
+                          letterSpacing:.3,
+                        }}>НЕТ</span>}
                   </td>
                   <td style={{ ...td, textAlign:'right', whiteSpace:'nowrap' }}>
                     <button disabled={busy[it.id]} onClick={() => toggleNotified(it)} style={smallBtn()}>

@@ -11,6 +11,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Volume2,
   VolumeX, Camera, Edit3, Smile, Heart, Flag, Filter, Download, Upload,
   RefreshCw, Loader, Calendar, Clock, MapPin, Home, User, Hash,
+  Bookmark, BookmarkPlus, Inbox, Box,
 } from 'lucide-react';
 
 const MAP = {
@@ -74,6 +75,10 @@ const MAP = {
   home: Home,
   user: User, profile: User,
   hash: Hash, tag: Hash,
+  bookmark: Bookmark, saved: Bookmark, talk: Bookmark,
+  'bookmark-plus': BookmarkPlus,
+  inbox: Inbox, waitlist: Inbox,
+  box: Box, archive_box: Box,
 };
 
 export default function Icon({ name, size = 20, stroke = 1.75, color, style, className, ...rest }) {

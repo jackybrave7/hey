@@ -2346,7 +2346,7 @@ export function MyProfileScreen() {
               flexShrink: 0, width: 44, height: 44, borderRadius: 12,
               background: iconBg || 'rgba(120,90,200,.25)',
               display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize: 22,
+              fontSize: 22, color:'rgba(220,200,255,.92)',
             }}>{icon}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color:'white', fontSize: 15, fontWeight: 700 }}>{title}</div>
@@ -2365,7 +2365,7 @@ export function MyProfileScreen() {
         return (
           <div style={{ padding:'18px 26px 0', display:'flex', flexDirection:'column', gap: 12 }}>
             <Card
-              icon="📦"
+              icon={<Icon name="archive" size={22}/>}
               iconBg="rgba(255,200,150,.18)"
               title="Архив моих моментов"
               subtitle="Прошлые работы и публикации"
@@ -2373,7 +2373,7 @@ export function MyProfileScreen() {
               onClick={() => setArchiveOpen(true)}
             />
             <Card
-              icon="🤝"
+              icon={<Icon name="bookmark" size={22}/>}
               iconBg="rgba(255,200,120,.22)"
               title="Поговорить"
               subtitle="Закладки, что меня зацепило"
@@ -2384,7 +2384,7 @@ export function MyProfileScreen() {
             />
             {!superHasInviteCta && (
               <Card
-                icon="🔗"
+                icon={<Icon name="link" size={22}/>}
                 iconBg="rgba(180,140,255,.28)"
                 title={inviteCopied ? '✓ Ссылка скопирована' : 'Пригласить друга'}
                 subtitle="Поделиться ссылкой на HEY"
@@ -2406,7 +2406,7 @@ export function MyProfileScreen() {
                 «Поделиться → На главный экран», поэтому скрываем. */}
             {installPrompt && !isStandalone && (
               <Card
-                icon="📱"
+                icon={<Icon name="download" size={22}/>}
                 iconBg="rgba(140,200,140,.28)"
                 title="Установить как приложение"
                 subtitle="Иконка на главный экран, без бара браузера"
@@ -2424,7 +2424,7 @@ export function MyProfileScreen() {
               <a href="/downloads/hey-messenger.apk" download
                 style={{ textDecoration:'none' }}>
                 <Card
-                  icon="🤖"
+                  icon={<Icon name="download" size={22}/>}
                   iconBg="rgba(140,200,140,.28)"
                   title="Скачать APK для Android"
                   subtitle="Полноценное приложение, без бара в Опере"
@@ -2741,7 +2741,7 @@ export function MyProfileScreen() {
           }}>
             <div style={{ padding:'16px 20px 12px', display:'flex', alignItems:'center', gap:10,
               borderBottom:'1px solid rgba(255,255,255,.08)', flexShrink:0 }}>
-              <span style={{ fontSize: 22 }}>🤝</span>
+              <Icon name="bookmark" size={22} style={{ color:'rgba(220,200,255,.9)' }}/>
               <div style={{ flex: 1 }}>
                 <div style={{ color:'white', fontSize: 17, fontWeight: 700 }}>Поговорить</div>
                 <div style={{ color:'rgba(255,255,255,.45)', fontSize: 12, marginTop: 1 }}>
@@ -2761,13 +2761,20 @@ export function MyProfileScreen() {
                   color:'rgba(255,255,255,.3)', fontSize: 14 }}>Загрузка…</div>
               ) : savedMoments.length === 0 ? (
                 <div style={{ background:'rgba(255,255,255,.04)', borderRadius: 16,
-                  padding:'30px 20px', textAlign:'center', border:'2px dashed rgba(255,255,255,.1)' }}>
-                  <div style={{ fontSize: 32, marginBottom: 10, opacity: .6 }}>🤝</div>
-                  <div style={{ color:'rgba(255,255,255,.6)', fontSize: 14, fontWeight: 600 }}>
+                  padding:'30px 20px', textAlign:'center', border:'2px dashed rgba(255,255,255,.12)' }}>
+                  <div style={{ marginBottom: 12, display:'flex', justifyContent:'center',
+                    color:'rgba(220,200,255,.5)' }}>
+                    <Icon name="bookmark" size={36} stroke={1.5}/>
+                  </div>
+                  <div style={{ color:'rgba(255,255,255,.8)', fontSize: 14, fontWeight: 600 }}>
                     Пока пусто
                   </div>
-                  <div style={{ color:'rgba(255,255,255,.35)', fontSize: 12, marginTop: 6 }}>
-                    Отмечай моменты реакцией 🤝 — они появятся здесь
+                  <div style={{ color:'rgba(255,255,255,.5)', fontSize: 12, marginTop: 6,
+                    display:'inline-flex', alignItems:'center', gap:4, justifyContent:'center' }}>
+                    Отмечай моменты иконкой{' '}
+                    <Icon name="bookmark" size={13} stroke={1.8}
+                      style={{ color:'rgba(220,200,255,.75)', verticalAlign:'middle' }}/>
+                    {' '}— они появятся здесь
                   </div>
                 </div>
               ) : (
