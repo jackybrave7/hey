@@ -694,7 +694,11 @@ export default function AdminAwo() {
         )}
       </div>
 
-      {/* Лог webhook'ов */}
+      {/* Лог webhook'ов — внутренняя кухня (raw payload от АВО, причина
+          ignore, привязка к курсу). Полезен только владельцу, который
+          отлаживает интеграцию. Со-админ работает на уровне маппингов
+          и /join-ссылок — сырой webhook-лог его только путает. */}
+      {isOwner && (
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, margin: 0 }}>
@@ -735,6 +739,7 @@ export default function AdminAwo() {
           </div>
         )}
       </div>
+      )}
       {confirmModal}
       {showGuide && <AwoGuide onClose={() => setShowGuide(false)}/>}
     </div>
