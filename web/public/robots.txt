@@ -2,6 +2,7 @@ User-agent: *
 Allow: /$
 Allow: /register
 Allow: /login
+Allow: /for-schools
 Disallow: /chat/
 Disallow: /groups/
 Disallow: /contacts

@@ -43,7 +43,12 @@ app.use('/api', makeRouter(db, broadcast));
 // Serve built frontend in production (after API routes)
 if (process.env.NODE_ENV === 'production') {
   const dist = path.join(__dirname, '../../web/dist');
-  app.use(express.static(dist));
+  // extensions:['html'] позволяет статически отдавать /for-schools без .html
+  // — нужно для SEO-страницы /for-schools.html, которая лежит в web/public/.
+  app.use(express.static(dist, { extensions: ['html'] }));
+  // SPA-fallback. Если запрошенный путь — известная статика на диске,
+  // express.static выше уже отдал её. Сюда попадают только клиентские
+  // роуты React-приложения → отдаём index.html.
   app.get('*', (req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
 
