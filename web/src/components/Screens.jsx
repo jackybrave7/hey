@@ -3238,6 +3238,43 @@ export function GlobalUserCardMount() {
   </>);
 }
 
+// Кнопка «✓ В контактах» — кликабельная плашка для удаления контакта.
+// На ховер плавно сменяется на красную «Убрать из контактов»: вместо
+// абсолютного оверлея (где обе подписи накладывались друг на друга и
+// проступали одна сквозь другую) — два слоя fixed-position, текущий
+// уходит в opacity:0, новый поднимается. Чистая cross-fade без артефактов.
+function RemoveContactButton({ onClick }) {
+  const [hover, setHover] = useState(false);
+  const bg     = hover ? 'rgba(220,80,80,.35)'   : 'rgba(60,160,90,.32)';
+  const border = hover ? 'rgba(240,140,140,.55)' : 'rgba(100,200,120,.45)';
+  const color  = hover ? 'rgba(255,210,210,.98)' : 'rgba(170,240,190,.95)';
+  const layer = {
+    position:'absolute', inset:0,
+    display:'flex', alignItems:'center', justifyContent:'center',
+    gap:8, transition:'opacity .15s', pointerEvents:'none', lineHeight:1.2,
+  };
+  return (
+    <button onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title="Нажми, чтобы убрать из контактов"
+      style={{
+        flex:1, padding:'12px 10px', borderRadius:14,
+        background:bg, border:`1px solid ${border}`, color,
+        fontSize:14, fontWeight:600, cursor:'pointer',
+        transition:'background .15s, border-color .15s, color .15s',
+        position:'relative', minHeight:46,
+      }}>
+      <span style={{ ...layer, opacity: hover ? 0 : 1 }}>
+        <Icon name="check" size={16}/><span>В контактах</span>
+      </span>
+      <span style={{ ...layer, opacity: hover ? 1 : 0 }}>
+        <span>Убрать из контактов</span>
+      </span>
+    </button>
+  );
+}
+
 function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
   onAddContact, onRemoveContact, onBlock, onUnblock, onNotesChange, onOpenMoment }) {
   const [notes, setNotes]         = useState(contact.notes || '');
@@ -3493,37 +3530,7 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
                   <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7}}><Icon name="chat" size={16}/> Написать</span>
                 </button>
                 {resolvedIsContact ? (
-                  <button onClick={onRemoveContact}
-                    title="Нажми, чтобы убрать из контактов"
-                    style={{flex:1,padding:'12px 10px',background:'rgba(60,160,90,.32)',
-                      border:'1px solid rgba(100,200,120,.45)',borderRadius:14,
-                      color:'rgba(170,240,190,.95)',fontSize:14,fontWeight:600,cursor:'pointer',
-                      transition:'background .15s',
-                      display:'flex',alignItems:'center',justifyContent:'center',gap:8,lineHeight:1.2,
-                      position:'relative'}}
-                    onMouseEnter={e=>{
-                      e.currentTarget.style.background='rgba(220,80,80,.35)';
-                      e.currentTarget.style.borderColor='rgba(240,140,140,.55)';
-                      e.currentTarget.style.color='rgba(255,210,210,.98)';
-                      const hint = e.currentTarget.querySelector('.rm-hint');
-                      if (hint) hint.style.opacity = '1';
-                    }}
-                    onMouseLeave={e=>{
-                      e.currentTarget.style.background='rgba(60,160,90,.32)';
-                      e.currentTarget.style.borderColor='rgba(100,200,120,.45)';
-                      e.currentTarget.style.color='rgba(170,240,190,.95)';
-                      const hint = e.currentTarget.querySelector('.rm-hint');
-                      if (hint) hint.style.opacity = '0';
-                    }}>
-                    <Icon name="check" size={16}/>
-                    <span className="rm-hint" style={{
-                      position:'absolute',left:0,right:0,textAlign:'center',
-                      opacity:0, transition:'opacity .15s',
-                      fontSize:14,fontWeight:600,
-                      pointerEvents:'none',
-                    }}>Убрать из контактов</span>
-                    <span>В контактах</span>
-                  </button>
+                  <RemoveContactButton onClick={onRemoveContact}/>
                 ) : (
                   <button onClick={handleAdd} disabled={adding}
                     style={{flex:1,padding:'12px 10px',
