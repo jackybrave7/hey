@@ -848,7 +848,7 @@ module.exports = function makeRouter(db, broadcast) {
   r.post('/conversations/:id/pin', requireAuth, (req, res) => {
     if (!db.isMember(req.params.id, req.user.id))
       return res.status(403).json({ error: 'Forbidden' });
-    const limit = req.user.is_super ? 10 : 5;
+    const limit = req.user.is_super ? 15 : 5;
     const count = db.getPinnedCount(req.user.id);
     if (count >= limit)
       return res.status(409).json({ error: `Можно закрепить не более ${limit} чатов` });
