@@ -7313,6 +7313,12 @@ export function ChatScreen() {
   // нормальный режим — чтобы не мозолить глаза при коротких сообщениях.
   const [composerExpanded, setComposerExpanded] = useState(false);
   const [composerOverflow, setComposerOverflow] = useState(false);
+  // Drag&drop из Проводника/Finder поверх экрана чата — пока курсор
+  // волочёт файл, рисуем большой полупрозрачный оверлей-зону «отпусти».
+  // Счётчик dragDepth нужен потому что dragenter/leave стреляют на
+  // каждом дочернем элементе — простой boolean мигает.
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
   const [typing,      setTyping]      = useState(null);
   const [partner,     setPartner]     = useState({ name:'Диалог', online:false, id:null, isGroup:false, icon:null, admin_id:null, avatar:null, isDeleted:false });
   const [editingMsg,  setEditingMsg]  = useState(null);
@@ -7990,9 +7996,13 @@ export function ChatScreen() {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
     if (!files.length) return;
+    await addFilesToComposer(files);
+  }
 
-    // Разделяем: изображения → в preview-бар (галерея до 10),
-    //            прочие файлы → в filePreview (один файл, отправляется один сообщением)
+  // Общий обработчик для input-выбора и drag&drop из Проводника/Finder.
+  // Разделяет: изображения → в preview-бар (галерея до 10), прочие
+  // (видео/аудио/документы) → в filePreview (один файл, одно сообщение).
+  async function addFilesToComposer(files) {
     const images = files.filter(f => f.type.startsWith('image/'));
     const others = files.filter(f => !f.type.startsWith('image/'));
 
@@ -8589,8 +8599,43 @@ export function ChatScreen() {
   }, [convId]);
   const handleSetRxnPicker = useCallback((fn) => setReactionPicker(fn), []);
 
+  // Drag&drop файлов из Проводника/Finder в чат. Используем счётчик
+  // dragDepth — браузер триггерит dragenter/leave на каждом дочернем
+  // узле, поэтому простой boolean мигал бы.
+  function onDragEnter(e) {
+    // Принимаем только реальные файлы (не внутренний drag по странице,
+    // например при перетягивании моментов).
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    if (dragDepthRef.current === 1) setIsDragOver(true);
+  }
+  function onDragOverChat(e) {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+  function onDragLeaveChat(e) {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragOver(false);
+  }
+  function onDropChat(e) {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length) addFilesToComposer(files);
+  }
+
   return (
-    <div style={{
+    <div
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOverChat}
+      onDragLeave={onDragLeaveChat}
+      onDrop={onDropChat}
+      style={{
       // 100dvw/dvh учитывают мобильную клавиатуру и адресную полоску;
       // overflow:hidden + maxWidth:100vw — последняя страховка, чтобы
       // длинная цитата в reply-banner не могла породить горизонтальный
@@ -8600,6 +8645,24 @@ export function ChatScreen() {
       display:'flex', flexDirection:'column', overflow:'hidden',
       background:'var(--grad)', boxSizing:'border-box',
     }}>
+      {isDragOver && (
+        <div style={{
+          position:'absolute', inset: 16, zIndex: 9000,
+          background:'rgba(120,90,200,.28)', backdropFilter:'blur(6px)',
+          border:'2px dashed rgba(220,200,255,.85)',
+          borderRadius: 22, pointerEvents:'none',
+          display:'flex', flexDirection:'column',
+          alignItems:'center', justifyContent:'center', gap: 14,
+          color:'white', fontSize: 18, fontWeight: 700,
+          textShadow:'0 2px 6px rgba(0,0,0,.4)',
+        }}>
+          <Icon name="upload" size={56} stroke={1.5}/>
+          <div>Отпусти, чтобы прикрепить</div>
+          <div style={{ fontSize: 13, fontWeight: 500, opacity:.85 }}>
+            картинки, видео, аудио или документ
+          </div>
+        </div>
+      )}
       {/* TopBar — клик на аватар/имя собеседника открывает его профиль */}
       <div className="topbar">
         <div className="topbar-inner">
