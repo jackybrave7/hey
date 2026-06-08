@@ -154,12 +154,14 @@ export default function MomentsFeed({ currentUser }) {
     setOverIdx(null);
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
 
-    if (wasDragging) {
-      // Гасим click который браузер пошлёт сразу после pointerup —
-      // иначе после перетаскивания откроется детальный popup момента.
-      dragRef.current.suppressClickUntil = Date.now() + 300;
+    // Если это был обычный тап (без drag) — открываем момент. setPointerCapture
+    // ломает синтетический click-event у MomentCard, поэтому отдельно на
+    // onClick тайла полагаться нельзя, поднимаем открытие сюда.
+    if (!wasDragging) {
+      setSelected({ moments: myMoments, index: fromIdx });
+      return;
     }
-    if (!wasDragging || toIdx < 0 || toIdx === fromIdx) return;
+    if (toIdx < 0 || toIdx === fromIdx) return;
     const next = [...myMoments];
     const [moved] = next.splice(fromIdx, 1);
     next.splice(toIdx, 0, moved);
@@ -386,13 +388,12 @@ export default function MomentsFeed({ currentUser }) {
                   <MomentCard
                     moment={m}
                     isMine={true}
-                    onClick={() => {
-                      // Если только что отпустили drag — давим click, иначе
-                      // popup откроется сразу после перетаскивания.
-                      if (dragRef.current.suppressClickUntil
-                          && Date.now() < dragRef.current.suppressClickUntil) return;
-                      setSelected({ moments: myMoments, index: idx });
-                    }}
+                    // Открытие момента инициируется из onPointerUp обёртки
+                    // (см. выше): setPointerCapture не даёт нормальному
+                    // synthetic click сработать на MomentCard, поэтому
+                    // тут пустышка-noop. Без неё MomentCard ругается на
+                    // отсутствующий handler.
+                    onClick={() => {}}
                   />
                 </div>
               ))}
