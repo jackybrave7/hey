@@ -118,13 +118,24 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
       {/* Media or mood emoji */}
       {hasMedia ? (
         moment.media_type === 'image' ? (
-          <img src={moment.media_url} alt=""
+          // draggable=false + pointerEvents:none — у <img> на Android-Chrome/Opera
+          // long-press запускает свой контекст «Сохранить картинку», а сам тап
+          // иногда уходит в image-viewer вместо нашего onClick. Отключаем все
+          // нативные жесты на самой картинке, события идут только через
+          // карточку-обёртку (которая открывает MomentDetailPopup).
+          <img src={moment.media_url} alt="" draggable={false}
+            onContextMenu={e => e.preventDefault()}
             style={{width:'100%',height:'100%',objectFit:'cover',
-              objectPosition: moment.media_position || '50% 50%',display:'block'}}/>
+              objectPosition: moment.media_position || '50% 50%',display:'block',
+              pointerEvents:'none', userSelect:'none',
+              WebkitUserSelect:'none', WebkitTouchCallout:'none',
+              WebkitUserDrag:'none'}}/>
         ) : moment.media_type === 'video' ? (
           <>
-            <video src={moment.media_url} muted
-              style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+            <video src={moment.media_url} muted playsInline preload="metadata"
+              onContextMenu={e => e.preventDefault()}
+              style={{width:'100%',height:'100%',objectFit:'cover',display:'block',
+                pointerEvents:'none', WebkitTouchCallout:'none'}}/>
             {/* Center play button */}
             <div style={{
               position:'absolute',top:'50%',left:'50%',

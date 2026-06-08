@@ -34,18 +34,23 @@ export default function MomentsFeed({ currentUser }) {
   const [toast, setToast]           = useState('');
   const [showSuperInfo, setShowSuperInfo] = useState(false);
 
-  // Drag-to-reorder для своих моментов.
-  // Реализовано через Pointer Events + долгий тап для тача — нативный
-  // HTML5 DnD на Android не работает вообще, плюс <img> поднимает свой
-  // контекст-меню на long-press. Pointer events работают и для мыши, и
-  // для пальца; для тача требуем 400мс hold чтобы отделить от вертикального
-  // скролла и от обычного тапа-открытия момента.
+  // Drag-to-reorder для своих моментов. Логика:
+  //   • короткий тап / клик → onClick тайла открывает MomentDetailPopup
+  //     (работает нативно — ниже мы НЕ ставим setPointerCapture до тех
+  //     пор пока long-press не сработал);
+  //   • удержание 400мс на тайле → вибрация, показ подсказки «Перетащи
+  //     на нужное место», входим в reorder-режим (setPointerCapture
+  //     поднимается только сейчас), дальше pointermove тащит, pointerup
+  //     применяет порядок.
+  // На <img>/<video> внутри MomentCard отключены user-drag, touch-callout
+  // и contextmenu — иначе Android открывает «Сохранить картинку».
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
+  const [reorderHint, setReorderHint] = useState(false);
   const dragRef = useRef({
     pointerId: null, startX: 0, startY: 0, holdTimer: null,
-    armed: false, // long-press уже сработал → нужно сместить чтобы инициировать drag
-    dragging: false,
+    armed: false, dragging: false, fromIdx: -1, targetEl: null,
+    suppressClickUntil: 0,
   });
 
   // Auto-open моментa, если пришли по /moments/:id (redirect от MomentPage)
@@ -90,30 +95,27 @@ export default function MomentsFeed({ currentUser }) {
   }
 
   function onPointerDown(e, idx) {
-    // Только основная кнопка мыши / пальцем
     if (e.button !== undefined && e.button !== 0) return;
-    const isTouch = e.pointerType === 'touch';
-    dragRef.current = {
-      pointerId: e.pointerId,
-      startX: e.clientX, startY: e.clientY,
-      holdTimer: null, armed: !isTouch, // мышью — сразу armed; тачем — после hold
-      dragging: false, fromIdx: idx,
-    };
-    // Захватываем pointer, чтобы получать move/up даже если палец уехал с тайла
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
-    if (isTouch) {
-      // Долгий тап (400мс) — переводим в armed-режим, дальше move инициирует drag
-      dragRef.current.holdTimer = setTimeout(() => {
-        const ref = dragRef.current;
-        if (ref.pointerId === e.pointerId) {
-          ref.armed = true;
-          // Лёгкая вибрация-сигнал «можно тащить»
-          try { navigator.vibrate?.(15); } catch {}
-          // Подсветим что готовы тащить
-          setDragIdx(ref.fromIdx);
-        }
-      }, 400);
-    }
+    const ref = dragRef.current;
+    ref.pointerId = e.pointerId;
+    ref.startX    = e.clientX;
+    ref.startY    = e.clientY;
+    ref.fromIdx   = idx;
+    ref.armed     = false;
+    ref.dragging  = false;
+    ref.targetEl  = e.currentTarget;
+    clearTimeout(ref.holdTimer);
+    // Long-press: 400мс удержания → входим в reorder. До этого момента
+    // мы НЕ ставим setPointerCapture, чтобы native click не сломался.
+    ref.holdTimer = setTimeout(() => {
+      if (ref.pointerId !== e.pointerId) return;
+      ref.armed    = true;
+      ref.dragging = true;
+      try { navigator.vibrate?.(15); } catch {}
+      try { ref.targetEl?.setPointerCapture(e.pointerId); } catch {}
+      setDragIdx(idx);
+      setReorderHint(true);
+    }, 400);
   }
 
   function onPointerMove(e) {
@@ -121,23 +123,16 @@ export default function MomentsFeed({ currentUser }) {
     if (ref.pointerId !== e.pointerId) return;
     const dx = e.clientX - ref.startX;
     const dy = e.clientY - ref.startY;
-    // До инициации drag (на тач — до long-press, на мышь — после порога 5px)
-    if (!ref.dragging) {
-      if (!ref.armed) {
-        // Если палец заметно двинулся ДО long-press — это скролл, отменяем hold
-        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-          clearTimeout(ref.holdTimer);
-          ref.holdTimer = null;
-          ref.pointerId = null;
-        }
-        return;
+    if (!ref.armed) {
+      // Заметное движение до long-press = намерение скролла. Отменяем
+      // hold и отпускаем pointer чтобы не мешать прокрутке.
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        clearTimeout(ref.holdTimer);
+        ref.pointerId = null;
       }
-      // armed — проверим есть ли движение, чтобы начать
-      if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-      ref.dragging = true;
-      setDragIdx(ref.fromIdx);
+      return;
     }
-    // Drag активен — определяем над каким слотом находимся
+    // В режиме reorder — обновляем over-индекс
     const idx = slotIdxAt(e.clientX, e.clientY);
     if (idx >= 0 && idx !== overIdx) setOverIdx(idx);
   }
@@ -146,41 +141,54 @@ export default function MomentsFeed({ currentUser }) {
     const ref = dragRef.current;
     if (ref.pointerId !== e.pointerId) return;
     clearTimeout(ref.holdTimer);
-    const fromIdx = ref.fromIdx;
     const wasDragging = ref.dragging;
+    const fromIdx = ref.fromIdx;
+    const targetEl = ref.targetEl;
     const toIdx = wasDragging ? slotIdxAt(e.clientX, e.clientY) : -1;
-    dragRef.current = { pointerId: null, holdTimer: null, armed: false, dragging: false };
+    ref.pointerId = null;
+    ref.armed = false;
+    ref.dragging = false;
     setDragIdx(null);
     setOverIdx(null);
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
-
-    // Если это был обычный тап (без drag) — открываем момент. setPointerCapture
-    // ломает синтетический click-event у MomentCard, поэтому отдельно на
-    // onClick тайла полагаться нельзя, поднимаем открытие сюда.
-    if (!wasDragging) {
-      setSelected({ moments: myMoments, index: fromIdx });
-      return;
+    setReorderHint(false);
+    if (wasDragging) {
+      try { targetEl?.releasePointerCapture(e.pointerId); } catch {}
+      // Синтетический click пойдёт сразу после pointerup — давим его,
+      // иначе после drop у нас откроется MomentDetailPopup.
+      ref.suppressClickUntil = Date.now() + 300;
+      if (toIdx >= 0 && toIdx !== fromIdx) {
+        const next = [...myMoments];
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+        setMyMoments(next);
+        try { await api.reorderMoments(next.map(m => m.id)); }
+        catch { setMyMoments(myMoments); showToast('Не удалось сохранить порядок'); }
+      }
     }
-    if (toIdx < 0 || toIdx === fromIdx) return;
-    const next = [...myMoments];
-    const [moved] = next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, moved);
-    setMyMoments(next);
-    try {
-      await api.reorderMoments(next.map(m => m.id));
-    } catch(err) {
-      setMyMoments(myMoments);
-      showToast('Не удалось сохранить порядок');
-    }
+    // НЕ был drag — нативный onClick сработает дальше и откроет момент.
   }
 
   function onPointerCancel(e) {
     const ref = dragRef.current;
     if (ref.pointerId !== e.pointerId) return;
     clearTimeout(ref.holdTimer);
-    dragRef.current = { pointerId: null, holdTimer: null, armed: false, dragging: false };
+    const wasDragging = ref.dragging;
+    const targetEl = ref.targetEl;
+    ref.pointerId = null;
+    ref.armed = false;
+    ref.dragging = false;
     setDragIdx(null);
     setOverIdx(null);
+    setReorderHint(false);
+    if (wasDragging) {
+      try { targetEl?.releasePointerCapture(e.pointerId); } catch {}
+    }
+  }
+
+  function onTileClick(idx) {
+    const ref = dragRef.current;
+    if (ref.suppressClickUntil && Date.now() < ref.suppressClickUntil) return;
+    setSelected({ moments: myMoments, index: idx });
   }
 
   const isSuper = !!(currentUser?.is_super);
@@ -368,18 +376,18 @@ export default function MomentsFeed({ currentUser }) {
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
                   onPointerCancel={onPointerCancel}
-                  // На <img> внутри MomentCard Android поднимает контекст-меню
-                  // через long-press. Блокируем нативный callout + selection,
-                  // плюс touch-action:none — иначе long-press съест браузер
-                  // раньше нашего таймера.
                   onContextMenu={e => e.preventDefault()}
                   style={{
-                    cursor: dragIdx !== null ? 'grabbing' : 'grab',
+                    cursor: dragIdx !== null ? 'grabbing' : 'pointer',
                     opacity: dragIdx === idx ? 0.4 : 1,
                     transform: overIdx === idx && dragIdx !== null && dragIdx !== idx
                       ? 'scale(1.05)' : 'scale(1)',
                     transition: 'transform .15s, opacity .15s',
-                    touchAction: 'none',
+                    // touch-action:none нужен ТОЛЬКО когда мы реально тащим,
+                    // иначе он съест возможность вертикально проскроллить
+                    // ленту с моих моментов. В non-drag режиме pan-y
+                    // оставляем браузеру.
+                    touchAction: dragIdx === idx ? 'none' : 'pan-y',
                     userSelect: 'none',
                     WebkitUserSelect: 'none',
                     WebkitTouchCallout: 'none',
@@ -388,12 +396,7 @@ export default function MomentsFeed({ currentUser }) {
                   <MomentCard
                     moment={m}
                     isMine={true}
-                    // Открытие момента инициируется из onPointerUp обёртки
-                    // (см. выше): setPointerCapture не даёт нормальному
-                    // synthetic click сработать на MomentCard, поэтому
-                    // тут пустышка-noop. Без неё MomentCard ругается на
-                    // отсутствующий handler.
-                    onClick={() => {}}
+                    onClick={() => onTileClick(idx)}
                   />
                 </div>
               ))}
@@ -614,6 +617,24 @@ export default function MomentsFeed({ currentUser }) {
           boxShadow: '0 4px 20px rgba(0,0,0,.4)',
         }}>
           {toast}
+        </div>
+      )}
+
+      {/* Подсказка-плашка во время reorder. Появляется сразу после long-press,
+          исчезает на отпускании. Подсказывает что нужно делать дальше. */}
+      {reorderHint && (
+        <div style={{
+          position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(120,90,200,.94)', backdropFilter: 'blur(16px)',
+          border: '1px solid rgba(220,200,255,.5)',
+          borderRadius: 50, padding: '10px 22px',
+          color: 'white', fontSize: 14, fontWeight: 700,
+          zIndex: 1100, whiteSpace: 'nowrap',
+          boxShadow: '0 8px 28px rgba(80,40,160,.55)',
+          pointerEvents: 'none',
+          letterSpacing: .2,
+        }}>
+          ↔ Перетащи на нужное место
         </div>
       )}
 
