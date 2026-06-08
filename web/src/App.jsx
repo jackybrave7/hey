@@ -43,11 +43,23 @@ import { PublicSettingsProvider } from './lib/publicSettings';
 
 function useNotifications() {
   const nav = useNavigate();
+  const { user: me } = useAuth();
   // 1) Inline-Notification (вкладка открыта, но не в фокусе) — клик
   //    фокусирует окно и SPA-навигирует в чат с сообщением.
   useEffect(() => {
     return socket.on('message:new', ({ message }) => {
-      if (Notification?.permission !== 'granted' || document.hasFocus()) return;
+      if (Notification?.permission !== 'granted') return;
+      // Сервер шлёт message:new ВСЕМ участникам чата (включая отправителя
+      // — для синхронизации delivered/read). Не показываем нотификацию
+      // на собственные сообщения.
+      if (me?.id && message?.sender_id === me.id) return;
+      // document.hasFocus() в Опере (и иногда в Firefox/Safari) врёт —
+      // возвращает false даже на активной вкладке. Двойная проверка
+      // через visibilityState + hasFocus + наличие видимых клиентов SW.
+      const isVisible = document.visibilityState === 'visible';
+      const isFocused = (typeof document.hasFocus === 'function')
+        ? document.hasFocus() : true;
+      if (isVisible && isFocused) return;
       const n = new Notification(message.sender_name || 'HEY', {
         body: message.text || '📎 Изображение',
         tag: message.conversationId,
@@ -59,7 +71,7 @@ function useNotifications() {
         n.close();
       };
     });
-  }, [nav]);
+  }, [nav, me?.id]);
 
   // 2) Регистрируем SW ASAP — это критерий «installable» для Android Chrome
   //    (без зарегистрированного SW не появится prompt установки PWA). Раньше

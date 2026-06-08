@@ -32,11 +32,16 @@ self.addEventListener('push', (event) => {
     // юзер уже видит сообщение через WS, второе системное notification только
     // мешает. Если ни одного focused-клиента нет (PWA свернут / TWA в фоне /
     // приложение закрыто) — показываем как обычно.
+    //
+    // Opera Android (и часть других браузеров) врут на c.focused — всегда
+    // false. Поэтому проверяем не только focused, но и visibilityState:
+    // если есть хоть один visible-клиент того же origin, считаем что юзер
+    // видит приложение и push не нужен.
     const clientsList = await self.clients.matchAll({
       type: 'window', includeUncontrolled: true,
     });
-    const hasFocused = clientsList.some(c => c.visibilityState === 'visible' && c.focused);
-    if (hasFocused) return;
+    const hasVisible = clientsList.some(c => c.visibilityState === 'visible');
+    if (hasVisible) return;
     await self.registration.showNotification(title, {
       body,
       // icon — крупная цветная иконка в шторке уведомлений (рядом с текстом)

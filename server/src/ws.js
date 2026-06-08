@@ -223,6 +223,12 @@ module.exports = function setupWS(server) {
               url: `/chat/${conversationId}?msg=${saved.id}`,
               tag: `msg:${conversationId}`,
               messageId: saved.id,
+              // senderId — для SW: если у получателя есть несколько
+              // устройств, на устройстве самого отправителя мы не должны
+              // показывать notification (отправитель видит сообщение сразу
+              // через WS на той же сессии). SW сравнивает с user.id,
+              // переданным в clientsList.
+              senderId: user.id,
             };
             pushRecipients.forEach(async uid => {
               const subs = db.getPushSubscriptions(uid);
