@@ -79,7 +79,11 @@ function useNotifications() {
   //    на уведомления.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    // updateViaCache:'none' — браузер тянет /sw.js без HTTP-кеша и в
+    // отдельной вкладке тоже обновляется. Без этого Opera/Samsung держат
+    // старую версию SW до 24ч → юзер не получает свежих fix'ов до push.
+    navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+      .then(reg => reg.update().catch(() => {}))
       .catch(e => console.warn('[sw] register failed:', e.message));
   }, []);
 

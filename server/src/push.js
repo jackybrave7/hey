@@ -35,9 +35,30 @@ function getPublicKey() { return VAPID.publicKey; }
 
 // Отправка push одному получателю. Возвращает true если ОК, false если 410/404
 // (subscription мертва — её нужно удалить).
+//
+// Опции отправки:
+//   urgency:'high' — RFC 8030 / Web Push Protocol. Без этого FCM/Mozilla
+//     могут батчить пуши на устройствах в Doze-режиме до десятков минут.
+//     'high' = реалтайм-доставка (как мессенджер).
+//   TTL: 86400 (24ч) — если устройство офлайн дольше суток, пуш сжигается
+//     (старое сообщение всё равно потеряло актуальность).
+//   topic — позволяет push-сервису заменять предыдущий неполученный пуш
+//     по той же теме. По convId — если за время оффлайна пришло 5 сообщений
+//     в одном чате, на устройство приедет один последний, а не 5 устаревших.
 async function sendPush(subscription, payload) {
   try {
-    await webpush.sendNotification(subscription, JSON.stringify(payload));
+    const opts = {
+      TTL: 86400,
+      urgency: 'high',
+    };
+    // tag в payload приходит в формате "msg:<convId>" — используем как topic
+    // для деудуп-а на стороне push-сервиса (FCM/AutoPush).
+    if (payload?.tag && typeof payload.tag === 'string' && payload.tag.length <= 32) {
+      // Web Push Topic: только base64url-safe символы, максимум 32 байта
+      const topic = payload.tag.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 32);
+      if (topic) opts.topic = topic;
+    }
+    await webpush.sendNotification(subscription, JSON.stringify(payload), opts);
     return { ok: true };
   } catch (err) {
     const code = err.statusCode || 0;

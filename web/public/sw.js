@@ -34,14 +34,13 @@ self.addEventListener('push', (event) => {
     // приложение закрыто) — показываем как обычно.
     //
     // Opera Android (и часть других браузеров) врут на c.focused — всегда
-    // false. Поэтому проверяем не только focused, но и visibilityState:
-    // если есть хоть один visible-клиент того же origin, считаем что юзер
-    // видит приложение и push не нужен.
+    // false. Поэтому проверяем не только focused, но и visibilityState.
     const clientsList = await self.clients.matchAll({
       type: 'window', includeUncontrolled: true,
     });
     const hasVisible = clientsList.some(c => c.visibilityState === 'visible');
     if (hasVisible) return;
+
     await self.registration.showNotification(title, {
       body,
       // icon — крупная цветная иконка в шторке уведомлений (рядом с текстом)
@@ -51,6 +50,15 @@ self.addEventListener('push', (event) => {
       // покажет квадратом. /badge-96.png — белая звезда HEY.
       badge: '/badge-96.png',
       tag,
+      // renotify:true — Android даёт системный звук/вибрацию даже когда
+      // уведомление по тому же tag уже висит. Без этого второе сообщение
+      // в том же чате приходит «тихо», юзер пропускает.
+      renotify: true,
+      requireInteraction: false,
+      // silent должно быть явно false на Opera/Samsung — некоторые версии
+      // по умолчанию считают push silent если поле не указано.
+      silent: false,
+      timestamp: Date.now(),
       data: { url, messageId: payload.messageId || null },
       vibrate: [80, 40, 80],
     });
