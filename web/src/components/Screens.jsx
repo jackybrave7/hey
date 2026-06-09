@@ -6650,28 +6650,6 @@ const MessageRow = memo(function MessageRow({
   // на пузыре. Повторный тап скрывает. Right-click / long-press
   // продолжает открывать контекст-меню (onContextMenu).
   const [tappedReveal, setTappedReveal] = useState(false);
-  // Grace-таймер: smile-кнопка живёт ВНЕ хит-зоны пузыря, поэтому
-  // обычный onMouseLeave пузыря убивает её до того как мышь до неё
-  // дотянется. Даём 200мс на переход — за это время мышь успевает
-  // войти в кнопку (там собственные mouseEnter/Leave продлят жизнь).
-  const hideTimerRef = useRef(null);
-  function armHover() {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-    setIsHovered(true);
-  }
-  function scheduleHide() {
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => {
-      setIsHovered(false);
-      hideTimerRef.current = null;
-    }, 220);
-  }
-  useEffect(() => () => {
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-  }, []);
   const showReactBtn = !isOut && (isHovered || tappedReveal);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
 
@@ -6685,8 +6663,8 @@ const MessageRow = memo(function MessageRow({
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
         marginBottom: hasReactions ? 8 : 2}}
-      onMouseEnter={armHover}
-      onMouseLeave={scheduleHide}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
