@@ -6554,11 +6554,19 @@ export function GroupSettingsScreen() {
           </>
         )}
 
-        {/* Leave */}
+        {/* Leave — деструктивное действие. Полупрозрачные красные кнопки на
+            фиолетовом фоне читались как «выключено»; делаем явный red-solid
+            пузырь, чтобы было ясно что кнопка активна и опасна. */}
         <button onClick={leaveGroup}
-          style={{marginTop:32,width:'100%',padding:'12px 0',background:'rgba(220,60,60,.2)',
-            border:'1px solid rgba(220,60,60,.3)',borderRadius:16,color:'rgba(255,120,120,.9)',
-            fontSize:15,cursor:'pointer'}}>
+          style={{marginTop:32,width:'100%',padding:'14px 0',
+            background:'rgba(220,60,60,.85)',
+            border:'1px solid rgba(255,120,120,.6)',
+            borderRadius:16,color:'white',
+            fontSize:15,fontWeight:700,cursor:'pointer',
+            boxShadow:'0 4px 14px rgba(140,30,30,.35)',
+            transition:'background .15s, transform .12s'}}
+          onMouseEnter={e=>{ e.currentTarget.style.background='rgba(235,80,80,.95)'; }}
+          onMouseLeave={e=>{ e.currentTarget.style.background='rgba(220,60,60,.85)'; }}>
           Покинуть группу
         </button>
       </div>
