@@ -6650,6 +6650,28 @@ const MessageRow = memo(function MessageRow({
   // на пузыре. Повторный тап скрывает. Right-click / long-press
   // продолжает открывать контекст-меню (onContextMenu).
   const [tappedReveal, setTappedReveal] = useState(false);
+  // Grace-таймер: smile-кнопка живёт ВНЕ хит-зоны пузыря, поэтому
+  // обычный onMouseLeave пузыря убивает её до того как мышь до неё
+  // дотянется. Даём 200мс на переход — за это время мышь успевает
+  // войти в кнопку (там собственные mouseEnter/Leave продлят жизнь).
+  const hideTimerRef = useRef(null);
+  function armHover() {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    setIsHovered(true);
+  }
+  function scheduleHide() {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      setIsHovered(false);
+      hideTimerRef.current = null;
+    }, 220);
+  }
+  useEffect(() => () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+  }, []);
   const showReactBtn = !isOut && (isHovered || tappedReveal);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
 
@@ -6658,8 +6680,8 @@ const MessageRow = memo(function MessageRow({
       style={{display:'flex', alignItems:'flex-end', gap:4,
         justifyContent: isOut ? 'flex-end':'flex-start',
         marginBottom: hasReactions ? 8 : 2}}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={armHover}
+      onMouseLeave={scheduleHide}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
@@ -6977,12 +6999,18 @@ const MessageRow = memo(function MessageRow({
               onSetReactionPicker(p => p?.msgId === m.id ? null
                 : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });
             }}
+            // Hover на самой кнопке отменяет grace-таймер и продлевает
+            // жизнь — без этого мышь, выходя из пузыря в сторону кнопки,
+            // не доходила бы до неё: кнопка живёт в position:absolute вне
+            // хит-зоны пузыря, обычный mouseleave пузыря её убивал.
+            onMouseEnter={armHover}
+            onMouseLeave={scheduleHide}
             className="hey-react-btn"
             title="Реакция"
             style={{
               position:'absolute',
               left: '100%', bottom: 4, marginLeft: 6,
-              width: 28, height: 28, borderRadius: '50%',
+              width: 32, height: 32, borderRadius: '50%',
               background: 'rgba(60,40,100,.92)',
               border: '1px solid rgba(160,130,210,.6)',
               padding: 0,
@@ -6993,7 +7021,7 @@ const MessageRow = memo(function MessageRow({
               zIndex: 2,
             }}>
             <img src="/emoji/smiling.svg" alt=""
-              style={{ width:16, height:16, pointerEvents:'none',
+              style={{ width:18, height:18, pointerEvents:'none',
                 filter:'drop-shadow(1px 1px 1px rgba(0,0,0,.4))' }}/>
           </button>
         )}
