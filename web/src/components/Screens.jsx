@@ -6679,6 +6679,11 @@ const MessageRow = memo(function MessageRow({
     <div
       style={{display:'flex', alignItems:'flex-end', gap:4,
         justifyContent: isOut ? 'flex-end':'flex-start',
+        // width:100% + minWidth:0 — критично для мобилы: без width row
+        // принимает natural-content-width и не знает где «правый край»,
+        // поэтому 36-px смайл-слот вылезает за экран. С width:100% row
+        // знает рамки и flex-shrink правильно ужимает пузырь.
+        width:'100%', minWidth:0, boxSizing:'border-box',
         marginBottom: hasReactions ? 8 : 2}}
       onMouseEnter={armHover}
       onMouseLeave={scheduleHide}
