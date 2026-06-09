@@ -2222,12 +2222,23 @@ function toggleReaction(messageId, userId, emoji) {
     .run(messageId, userId, emoji);
 }
 
+// Структура: { emoji: [{ id, name, avatar }, …] }.
+// Avatar нормализуется через avatarPayload (data: → /api/avatars/<id>).
+function _reactorInfo(userRow) {
+  const av = avatarPayload(userRow.id, userRow.avatar);
+  return { id: userRow.id, name: userRow.name, avatar: av };
+}
+
 function getMessageReactions(messageId) {
-  const rows = db.prepare('SELECT emoji, user_id FROM reactions WHERE message_id=?').all(messageId);
+  const rows = db.prepare(
+    `SELECT r.emoji, u.id, u.name, u.avatar
+     FROM reactions r JOIN users u ON u.id = r.user_id
+     WHERE r.message_id=? ORDER BY r.created_at ASC`
+  ).all(messageId);
   const grouped = {};
   rows.forEach(r => {
     if (!grouped[r.emoji]) grouped[r.emoji] = [];
-    grouped[r.emoji].push(r.user_id);
+    grouped[r.emoji].push(_reactorInfo(r));
   });
   return grouped;
 }
@@ -2236,13 +2247,15 @@ function getReactionsForMessages(messageIds) {
   if (!messageIds.length) return {};
   const ph = messageIds.map(() => '?').join(',');
   const rows = db.prepare(
-    `SELECT message_id, emoji, user_id FROM reactions WHERE message_id IN (${ph})`
+    `SELECT r.message_id, r.emoji, u.id, u.name, u.avatar
+     FROM reactions r JOIN users u ON u.id = r.user_id
+     WHERE r.message_id IN (${ph}) ORDER BY r.created_at ASC`
   ).all(...messageIds);
   const result = {};
   rows.forEach(r => {
     if (!result[r.message_id]) result[r.message_id] = {};
     if (!result[r.message_id][r.emoji]) result[r.message_id][r.emoji] = [];
-    result[r.message_id][r.emoji].push(r.user_id);
+    result[r.message_id][r.emoji].push(_reactorInfo(r));
   });
   return result;
 }

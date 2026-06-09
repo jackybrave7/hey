@@ -6682,6 +6682,7 @@ const MessageRow = memo(function MessageRow({
 
       <div style={{display:'flex', flexDirection:'column',
         alignItems: isOut ? 'flex-end' : 'flex-start',
+        position:'relative', // для абсолютной smile-кнопки внутри
         // Жёсткий пиксельный cap (без CSS min() — на случай нестандартного
         // поведения flex-min-content). Достаточно для всех нормальных
         // viewport'ов, на узких мобилках всё равно ограничится width родителя.
@@ -6964,54 +6965,102 @@ const MessageRow = memo(function MessageRow({
           </div>
         </div>
 
-        {/* Smile-кнопка вызова picker'а реакций. Появляется снизу слева
-            под пузырём: на десктопе при ховере, на тач — после тапа по
-            пузырю. Не занимает место когда скрыта — conditional render. */}
+        {/* Smile-кнопка вызова picker'а реакций. Position:absolute справа
+            от пузыря — НЕ занимает место в layout'е, поэтому при появлении
+            аватарка и соседние строки не «прыгают». На десктопе появляется
+            на hover, на тач — по тапу по пузырю. */}
         {showReactBtn && (
           <button
             onClick={(e) => {
               e.stopPropagation();
               const rect = e.currentTarget.getBoundingClientRect();
               onSetReactionPicker(p => p?.msgId === m.id ? null
-                : { msgId: m.id, x: rect.left, y: rect.bottom + 4 });
+                : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });
             }}
             className="hey-react-btn"
+            title="Реакция"
             style={{
-              alignSelf: 'flex-start',
-              marginTop: 4, marginLeft: 4,
-              background: 'rgba(100,78,148,.55)',
-              border: '1px solid rgba(160,130,210,.55)',
-              borderRadius: 14, height: 24, padding: '0 8px',
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              cursor: 'pointer', color: 'white', fontSize: 12, fontWeight: 600,
-              boxShadow: '0 2px 8px rgba(0,0,0,.25)',
+              position:'absolute',
+              left: '100%', bottom: 4, marginLeft: 6,
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'rgba(60,40,100,.92)',
+              border: '1px solid rgba(160,130,210,.6)',
+              padding: 0,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(0,0,0,.4)',
               animation: 'heyReactBtnIn .15s ease-out',
+              zIndex: 2,
             }}>
             <img src="/emoji/smiling.svg" alt=""
-              style={{ width:14, height:14, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,.4))' }}/>
-            <span>Реакция</span>
+              style={{ width:16, height:16, pointerEvents:'none',
+                filter:'drop-shadow(1px 1px 1px rgba(0,0,0,.4))' }}/>
           </button>
         )}
 
-        {/* Reaction chips */}
+        {/* Reaction chips. Логика отображения:
+            • Single reactor — показываем только эмодзи (для группы рядом
+              мини-аватар автора реакции, для direct/monolog даже его не
+              надо — собеседник известен).
+            • В группе с несколькими reactor'ами — стек до 3 мини-аватарок
+              + «+N» если больше.
+            • В direct с несколькими — только цифра-счётчик.
+            Реакторы теперь приходят как [{id,name,avatar},...] вместо
+            массива user_id (сервер делает JOIN). */}
         {hasReactions && (
           <div style={{display:'flex', flexWrap:'wrap', gap:4, marginTop:5}}>
-            {Object.entries(m.reactions).map(([emoji, userIds]) => {
-              const iReacted = userIds.includes(currentUserId);
+            {Object.entries(m.reactions).map(([emoji, reactors]) => {
+              // Бэк-compat: если сервер ещё прислал массив строк (старый
+              // формат) — конвертим на лету в объекты-заглушки.
+              const list = (reactors || []).map(r =>
+                typeof r === 'string' ? { id: r, name: '', avatar: null } : r);
+              const iReacted = list.some(r => r.id === currentUserId);
+              const total = list.length;
+              const showAvatars = isGroup && total >= 1;
+              const visible = showAvatars ? list.slice(0, 3) : [];
+              const extra = showAvatars ? Math.max(0, total - visible.length) : 0;
               return (
                 <button key={emoji} onClick={() => onToggleReaction(m.id, emoji)}
-                  title={emoji}
+                  title={emoji + (total > 1 ? ` · ${total}` : '')}
                   style={{
                     background: iReacted ? 'rgba(130,100,190,.6)' : 'rgba(255,255,255,.18)',
                     border: iReacted ? '1px solid rgba(170,130,220,.75)' : '1px solid rgba(255,255,255,.12)',
-                    borderRadius:14, padding:'2px 8px', cursor:'pointer',
-                    display:'flex', alignItems:'center', gap:4, fontSize:12,
-                    color:'white', transition:'background .15s'
+                    borderRadius:14, padding:'2px 6px 2px 6px', cursor:'pointer',
+                    display:'flex', alignItems:'center', gap:5, fontSize:12,
+                    color:'white', transition:'background .15s',
                   }}>
                   <img src={emojiUrl(emoji)} alt={emoji}
                     style={{width:16, height:16,
                       filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
-                  <span style={{fontWeight:600}}>{userIds.length}</span>
+                  {showAvatars ? (
+                    <span style={{display:'inline-flex', alignItems:'center'}}>
+                      {visible.map((r, i) => (
+                        <span key={r.id}
+                          style={{
+                            marginLeft: i === 0 ? 0 : -6,
+                            border: '1.5px solid rgba(80,55,135,1)',
+                            borderRadius: '50%',
+                            width: 18, height: 18, overflow:'hidden',
+                            background:'rgba(255,255,255,.15)',
+                            display:'inline-flex', alignItems:'center', justifyContent:'center',
+                            fontSize: 9, fontWeight: 700,
+                          }}>
+                          {r.avatar && (typeof r.avatar === 'string'
+                            && (r.avatar.startsWith('http') || r.avatar.startsWith('/')))
+                            ? <img src={r.avatar} alt=""
+                                style={{width:'100%', height:'100%', objectFit:'cover'}}/>
+                            : <span>{(r.name || '?').charAt(0).toUpperCase()}</span>}
+                        </span>
+                      ))}
+                      {extra > 0 && (
+                        <span style={{marginLeft: 3, fontWeight:700, fontSize:11}}>
+                          +{extra}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    total > 1 && <span style={{fontWeight:600}}>{total}</span>
+                  )}
                 </button>
               );
             })}
@@ -9765,16 +9814,24 @@ export function ChatScreen() {
           разворачивает в сетку чтобы видеть все эмодзи разом. */}
       {reactionPicker && (() => {
         const expanded = !!reactionPicker.expanded;
-        const PICKER_H = 56;
+        // Высота в expanded ≈ 4 ряда по 40px + padding'и; в pill — 52px.
+        const PICKER_H = expanded ? 220 : 52;
         const vw = window.innerWidth;
+        const vh = window.innerHeight;
         const PICKER_W = Math.min(vw - 16, 420);
+        // x: центрируем picker по точке клика, но клампим по краям viewport.
         const x = Math.min(Math.max(reactionPicker.x - PICKER_W / 2, 8), vw - PICKER_W - 8);
-        const y = reactionPicker.y - PICKER_H - 12 < 8
-          ? reactionPicker.y + 36
-          : reactionPicker.y - PICKER_H - 12;
+        // y: ставим picker НАД smile-кнопкой если влезает (rect.top - PICKER_H - 8),
+        // иначе ПОД (rect.top + 32). reactionPicker.y = rect.top.
+        const above = reactionPicker.y - PICKER_H - 8;
+        const below = reactionPicker.y + 36;
+        const y = above >= 8
+          ? above
+          : Math.min(below, vh - PICKER_H - 8);
         const pickerMsg = messages.find(m => m.id === reactionPicker.msgId);
         const myReaction = pickerMsg?.reactions
-          ? Object.entries(pickerMsg.reactions).find(([, uids]) => uids.includes(user?.id))?.[0]
+          ? Object.entries(pickerMsg.reactions).find(([, list]) =>
+              (list || []).some(r => (typeof r === 'string' ? r : r.id) === user?.id))?.[0]
           : null;
 
         const Item = (name) => {
