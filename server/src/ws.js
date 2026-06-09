@@ -136,7 +136,18 @@ module.exports = function setupWS(server) {
             replyToId: replyToId || null,
             linkPreview: cachedPreview || invitePreview || null,
           });
-          const full = { ...saved, sender_name: user.name, tempId, conversationId };
+          // В группе клиенту нужны имя и мини-аватарка отправителя — иначе
+          // пузырь приходящего сообщения у всех остальных будет «безымянный»
+          // до перезагрузки чата (там getMessages join'ит users.avatar).
+          const senderAvatar = user.avatar && user.avatar.startsWith('data:image/')
+            ? `/api/avatars/${user.id}`
+            : (user.avatar || null);
+          const full = {
+            ...saved,
+            sender_name: user.name,
+            sender_avatar: senderAvatar,
+            tempId, conversationId,
+          };
           broadcast(members, { type: 'message:new', message: full });
 
           // Async-fetch для cache-miss. Не блокирует отправку сообщения.

@@ -6649,6 +6649,23 @@ const MessageRow = memo(function MessageRow({
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
+      {/* Аватар отправителя — только в группах для входящих сообщений.
+          Кликается → открывает карточку контакта. В direct-чатах аватар
+          собеседника висит в шапке, дублировать на каждом пузыре излишне. */}
+      {isGroup && !isOut && (
+        <div
+          onClick={(e) => { e.stopPropagation(); openUserCard(m.sender_id); }}
+          title={m.sender_name || 'Открыть профиль'}
+          style={{ flexShrink:0, marginBottom:6, cursor:'pointer' }}>
+          <AvatarDisplay
+            avatar={m.sender_avatar}
+            name={m.sender_name}
+            size={28}
+            fontSize={12}
+          />
+        </div>
+      )}
+
       {/* Reaction button — left side for incoming */}
       {!isOut && (
         <button
