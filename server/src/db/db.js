@@ -2230,10 +2230,13 @@ function _reactorInfo(userRow) {
 }
 
 function getMessageReactions(messageId) {
+  // У reactions нет created_at — порядок задаём через rowid (SQLite
+  // системный, монотонно растёт при INSERT). Это и есть порядок
+  // добавления реакций.
   const rows = db.prepare(
     `SELECT r.emoji, u.id, u.name, u.avatar
      FROM reactions r JOIN users u ON u.id = r.user_id
-     WHERE r.message_id=? ORDER BY r.created_at ASC`
+     WHERE r.message_id=? ORDER BY r.rowid ASC`
   ).all(messageId);
   const grouped = {};
   rows.forEach(r => {
@@ -2249,7 +2252,7 @@ function getReactionsForMessages(messageIds) {
   const rows = db.prepare(
     `SELECT r.message_id, r.emoji, u.id, u.name, u.avatar
      FROM reactions r JOIN users u ON u.id = r.user_id
-     WHERE r.message_id IN (${ph}) ORDER BY r.created_at ASC`
+     WHERE r.message_id IN (${ph}) ORDER BY r.rowid ASC`
   ).all(...messageIds);
   const result = {};
   rows.forEach(r => {
