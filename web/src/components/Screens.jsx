@@ -7011,9 +7011,12 @@ const MessageRow = memo(function MessageRow({
           <div style={{display:'flex', flexWrap:'wrap', gap:4, marginTop:5}}>
             {Object.entries(m.reactions).map(([emoji, reactors]) => {
               // Бэк-compat: если сервер ещё прислал массив строк (старый
-              // формат) — конвертим на лету в объекты-заглушки.
-              const list = (reactors || []).map(r =>
-                typeof r === 'string' ? { id: r, name: '', avatar: null } : r);
+              // формат) — конвертим на лету в объекты-заглушки. Дополнительно
+              // фильтруем null/undefined элементы, чтобы JSX не упал на r.id.
+              const list = (reactors || [])
+                .filter(r => r != null)
+                .map(r => typeof r === 'string' ? { id: r, name: '', avatar: null } : r);
+              if (!list.length) return null;
               const iReacted = list.some(r => r.id === currentUserId);
               const total = list.length;
               const showAvatars = isGroup && total >= 1;
@@ -7059,7 +7062,7 @@ const MessageRow = memo(function MessageRow({
                       )}
                     </span>
                   ) : (
-                    total > 1 && <span style={{fontWeight:600}}>{total}</span>
+                    total > 1 ? <span style={{fontWeight:600}}>{total}</span> : null
                   )}
                 </button>
               );
