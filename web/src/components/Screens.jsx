@@ -6704,7 +6704,6 @@ const MessageRow = memo(function MessageRow({
 
       <div style={{display:'flex', flexDirection:'column',
         alignItems: isOut ? 'flex-end' : 'flex-start',
-        position:'relative', // для абсолютной smile-кнопки внутри
         // Жёсткий пиксельный cap (без CSS min() — на случай нестандартного
         // поведения flex-min-content). Достаточно для всех нормальных
         // viewport'ов, на узких мобилках всё равно ограничится width родителя.
@@ -6987,45 +6986,6 @@ const MessageRow = memo(function MessageRow({
           </div>
         </div>
 
-        {/* Smile-кнопка вызова picker'а реакций. Position:absolute справа
-            от пузыря — НЕ занимает место в layout'е, поэтому при появлении
-            аватарка и соседние строки не «прыгают». На десктопе появляется
-            на hover, на тач — по тапу по пузырю. */}
-        {showReactBtn && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              const rect = e.currentTarget.getBoundingClientRect();
-              onSetReactionPicker(p => p?.msgId === m.id ? null
-                : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });
-            }}
-            // Hover на самой кнопке отменяет grace-таймер и продлевает
-            // жизнь — без этого мышь, выходя из пузыря в сторону кнопки,
-            // не доходила бы до неё: кнопка живёт в position:absolute вне
-            // хит-зоны пузыря, обычный mouseleave пузыря её убивал.
-            onMouseEnter={armHover}
-            onMouseLeave={scheduleHide}
-            className="hey-react-btn"
-            title="Реакция"
-            style={{
-              position:'absolute',
-              left: '100%', bottom: 4, marginLeft: 6,
-              width: 32, height: 32, borderRadius: '50%',
-              background: 'rgba(60,40,100,.92)',
-              border: '1px solid rgba(160,130,210,.6)',
-              padding: 0,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 2px 10px rgba(0,0,0,.4)',
-              animation: 'heyReactBtnIn .15s ease-out',
-              zIndex: 2,
-            }}>
-            <img src="/emoji/smiling.svg" alt=""
-              style={{ width:18, height:18, pointerEvents:'none',
-                filter:'drop-shadow(1px 1px 1px rgba(0,0,0,.4))' }}/>
-          </button>
-        )}
-
         {/* Reaction chips. Логика отображения:
             • Single reactor — показываем только эмодзи (для группы рядом
               мини-аватар автора реакции, для direct/monolog даже его не
@@ -7098,6 +7058,45 @@ const MessageRow = memo(function MessageRow({
           </div>
         )}
       </div>
+
+      {/* Зарезервированный 36-px слот для smile-кнопки реакции (только
+          для входящих). Слот существует ВСЕГДА — поэтому хит-зона row'а
+          включает кнопку, и при ховере она не «мерцает» когда мышь
+          переходит из пузыря в саму кнопку. layout shift тоже отсутствует,
+          потому что слот зарезервирован независимо от состояния hover.
+          На исходящих не рисуем — ставить реакцию на свои бессмысленно. */}
+      {!isOut && (
+        <div style={{
+          width: 36, flexShrink: 0, alignSelf: 'flex-end',
+          marginBottom: 4, display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          {showReactBtn && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
+                onSetReactionPicker(p => p?.msgId === m.id ? null
+                  : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });
+              }}
+              className="hey-react-btn"
+              title="Реакция"
+              style={{
+                width: 32, height: 32, borderRadius:'50%',
+                background:'rgba(60,40,100,.92)',
+                border:'1px solid rgba(160,130,210,.6)',
+                padding: 0,
+                display:'inline-flex', alignItems:'center', justifyContent:'center',
+                cursor:'pointer',
+                boxShadow:'0 2px 10px rgba(0,0,0,.4)',
+                animation:'heyReactBtnIn .15s ease-out',
+              }}>
+              <img src="/emoji/smiling.svg" alt=""
+                style={{ width:18, height:18, pointerEvents:'none',
+                  filter:'drop-shadow(1px 1px 1px rgba(0,0,0,.4))' }}/>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Reaction button — right side for outgoing */}
       {isOut && (
