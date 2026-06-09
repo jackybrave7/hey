@@ -6646,6 +6646,11 @@ const MessageRow = memo(function MessageRow({
   statusIcon, renderText,
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  // На тач-устройствах ховера нет — открываем «smile»-кнопку по тапу
+  // на пузыре. Повторный тап скрывает. Right-click / long-press
+  // продолжает открывать контекст-меню (onContextMenu).
+  const [tappedReveal, setTappedReveal] = useState(false);
+  const showReactBtn = !isOut && (isHovered || tappedReveal);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
 
   return (
@@ -6674,23 +6679,6 @@ const MessageRow = memo(function MessageRow({
         </div>
       )}
 
-      {/* Reaction button — left side for incoming */}
-      {!isOut && (
-        <button
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            onSetReactionPicker(p => p?.msgId === m.id ? null : { msgId: m.id, x: rect.right + 6, y: rect.top });
-          }}
-          className="hey-react-btn"
-          data-hovered={isHovered ? 'y' : 'n'}
-          style={{background: isHovered ? 'rgba(100,78,148,.55)' : 'transparent',
-            border:'none', borderRadius:'50%', width:28, height:28, cursor:'pointer',
-            flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-            padding:4, transition:'background .15s, opacity .15s', marginBottom:6}}>
-          <img src="/emoji/smiling.svg" alt="react"
-            style={{width:16, height:16, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
-        </button>
-      )}
 
       <div style={{display:'flex', flexDirection:'column',
         alignItems: isOut ? 'flex-end' : 'flex-start',
@@ -6701,6 +6689,18 @@ const MessageRow = memo(function MessageRow({
         <div
           key={isFlashing ? 'flash-' + m.id : m.id}
           className={isFlashing ? 'hey-flash' : ''}
+          onClick={(e) => {
+            // Тап по пузырю на мобилке открывает «smile»-кнопку для реакции.
+            // На десктопе hover уже работает — двойного действия не будет
+            // потому что на десктопе isHovered=true и кнопка и так видна.
+            // Селект текста и клик по ссылкам не ломаем: игнорируем клики
+            // если внутри пузыря выделен текст или клик пришёл с <a>.
+            if (isOut) return;
+            const sel = window.getSelection?.();
+            if (sel && sel.toString().length > 0) return;
+            if (e.target.closest && e.target.closest('a,button,img[role="button"]')) return;
+            setTappedReveal(v => !v);
+          }}
           style={{
             background: editingMsgId === m.id
               ? 'rgba(160,120,210,.85)'
@@ -6715,13 +6715,13 @@ const MessageRow = memo(function MessageRow({
             maxWidth: '100%',
             minWidth: 0,
             wordBreak: 'break-word',
+            cursor: !isOut ? 'pointer' : 'default',
           }}>
           {isGroup && !isOut && (
             <div
               onClick={(e) => { e.stopPropagation(); openUserCard(m.sender_id); }}
               style={{fontSize:12,fontWeight:700,color:'rgba(180,130,255,1)',marginBottom:4,
-                cursor:'pointer',textDecoration:'underline',textDecorationColor:'rgba(180,130,255,.5)',
-                textUnderlineOffset:2,display:'inline-block',
+                cursor:'pointer',display:'inline-block',
                 textShadow:'0 1px 2px rgba(0,0,0,.25)'}}>
               {m.sender_name}
             </div>
@@ -6963,6 +6963,35 @@ const MessageRow = memo(function MessageRow({
             {isOut && statusIcon(m.status)}
           </div>
         </div>
+
+        {/* Smile-кнопка вызова picker'а реакций. Появляется снизу слева
+            под пузырём: на десктопе при ховере, на тач — после тапа по
+            пузырю. Не занимает место когда скрыта — conditional render. */}
+        {showReactBtn && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              onSetReactionPicker(p => p?.msgId === m.id ? null
+                : { msgId: m.id, x: rect.left, y: rect.bottom + 4 });
+            }}
+            className="hey-react-btn"
+            style={{
+              alignSelf: 'flex-start',
+              marginTop: 4, marginLeft: 4,
+              background: 'rgba(100,78,148,.55)',
+              border: '1px solid rgba(160,130,210,.55)',
+              borderRadius: 14, height: 24, padding: '0 8px',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              cursor: 'pointer', color: 'white', fontSize: 12, fontWeight: 600,
+              boxShadow: '0 2px 8px rgba(0,0,0,.25)',
+              animation: 'heyReactBtnIn .15s ease-out',
+            }}>
+            <img src="/emoji/smiling.svg" alt=""
+              style={{ width:14, height:14, filter:'drop-shadow(1px 1px 1px rgba(0,0,0,.4))' }}/>
+            <span>Реакция</span>
+          </button>
+        )}
 
         {/* Reaction chips */}
         {hasReactions && (

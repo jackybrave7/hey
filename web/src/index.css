@@ -145,6 +145,12 @@ html, body, #root {
 /* Spin (used as inline animation references) */
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+/* Маленькая «smile»-кнопка реакции, появляющаяся под пузырём сообщения. */
+@keyframes heyReactBtnIn {
+  from { opacity: 0; transform: translateY(-4px) scale(.92); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);   }
+}
+
 /* ── Reaction glow ────────────────────────────────────────────────────────
    Используется на пузыре сообщения и кнопках реакций в момент-попапе. */
 @keyframes hey-reaction-glow {
