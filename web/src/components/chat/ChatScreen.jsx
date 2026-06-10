@@ -27,6 +27,18 @@ import { fileTypeIcon, AttachmentPreview } from '../../lib/fileTypeIcon';
 
 const HEY_EMOJI = HEY_EMOJI_LIST;
 
+// Fingerprint for Virtuoso keys + memo — must change when reactions change.
+function rxKey(reactions) {
+  if (!reactions || !Object.keys(reactions).length) return '0';
+  return Object.keys(reactions).sort().map(emoji => {
+    const ids = (reactions[emoji] || [])
+      .map(r => (typeof r === 'string' ? r : r?.id))
+      .filter(Boolean)
+      .join(',');
+    return `${emoji}:${ids}`;
+  }).join('|');
+}
+
 export function ChatScreen() {
   const nav = useNavigate();
   const location = useLocation();
@@ -175,14 +187,15 @@ export function ChatScreen() {
     return () => clearTimeout(t);
   }, [text, convId, editingMsg]);
 
-  // Close reaction picker on outside click
+  // Закрытие пикера реакций — bubble-phase click (не capture: иначе
+  // document-listener успевает размонтировать пикер до onClick на эмодзи).
   useEffect(() => {
     if (!reactionPicker) return;
     const close = (e) => {
-      if (!e.target.closest('[data-reaction-picker]')) setReactionPicker(null);
+      if (!e.target.closest('[data-reaction-picker], [data-react-btn]')) setReactionPicker(null);
     };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
   }, [reactionPicker]);
 
   // Close emoji keyboard on outside click (тап в любое место кроме самой
@@ -495,9 +508,9 @@ export function ChatScreen() {
           : p);
       }
     });
-    const u9 = socket.on('reaction:update', ({ messageId, reactions }) => {
+    const u9 = socket.on('reaction:update', ({ messageId, conversationId: cid, reactions }) => {
+      if (cid && cid !== convId) return;
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, reactions } : m));
-      // Подсветка сообщения на секунду
       setFlashMsgId(messageId);
       setTimeout(() => setFlashMsgId(curr => curr === messageId ? null : curr), 1000);
     });
@@ -565,8 +578,16 @@ export function ChatScreen() {
   // дальше включается scroll и показываются шевроны раскрытия. В expanded
   // режиме высоту задаём отдельно из render-ветки (там min(60vh, 480px)).
   const NORMAL_MAX = 140;
-  const composerLineCount = text ? text.split('\n').length : 1;
-  const composerStacked = composerLineCount >= 3;
+  const composerLines = (() => {
+    const lines = text ? text.split('\n') : [''];
+    while (lines.length > 1 && lines[lines.length - 1] === '' && lines[lines.length - 2] === '') {
+      lines.pop();
+    }
+    return lines;
+  })();
+  // Вертикально — только когда реально начали набирать 3-ю строку (не пустой курсор на ней)
+  const composerStacked = composerLines.length >= 3
+    && (composerLines[2].length > 0 || composerLines.length > 3);
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -1065,10 +1086,38 @@ export function ChatScreen() {
     textareaRef.current?.focus();
   }
 
-  function toggleReaction(msgId, emoji) {
-    socket.send('reaction:toggle', { messageId: msgId, conversationId: convId, emoji });
+  const toggleReaction = useCallback((msgId, emoji) => {
+    if (!user?.id || !convId || !msgId || !emoji) return;
+    const uid = user.id;
+    setMessages(prev => prev.map(m => {
+      if (m.id !== msgId) return m;
+      const reactions = { ...(m.reactions || {}) };
+      const hadThis = (reactions[emoji] || []).some(
+        r => (typeof r === 'string' ? r : r.id) === uid
+      );
+      for (const [e, arr] of Object.entries(reactions)) {
+        const filtered = (arr || []).filter(r => (typeof r === 'string' ? r : r.id) !== uid);
+        if (filtered.length) reactions[e] = filtered;
+        else delete reactions[e];
+      }
+      if (!hadThis) {
+        reactions[emoji] = [...(reactions[emoji] || []), {
+          id: uid, name: user.name, avatar: user.avatar || null,
+        }];
+      }
+      return { ...m, reactions };
+    }));
     setReactionPicker(null);
-  }
+    api.toggleReaction(convId, msgId, emoji)
+      .then(res => {
+        if (res?.reactions) {
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, reactions: res.reactions } : m));
+        }
+      })
+      .catch(() => {
+        socket.send('reaction:toggle', { messageId: msgId, conversationId: convId, emoji });
+      });
+  }, [convId, user]);
 
   const statusIcon = (s) => {
     if (s === 'read')      return <span style={{opacity:1,color:'rgba(160,230,255,1)'}}>✓✓</span>;
@@ -1351,10 +1400,7 @@ export function ChatScreen() {
       setLightbox({ urls: [src], index: 0 });
     }
   }, []);
-  const handleToggleRxn = useCallback((msgId, emoji) => {
-    socket.send('reaction:toggle', { messageId: msgId, conversationId: convId, emoji });
-    setReactionPicker(null);
-  }, [convId]);
+  const handleToggleRxn = toggleReaction;
   const handleSetRxnPicker = useCallback((fn) => setReactionPicker(fn), []);
 
   // Drag&drop файлов из Проводника/Finder в чат. Используем счётчик
@@ -1678,6 +1724,9 @@ export function ChatScreen() {
           style={{ flex: 1, overscrollBehavior: 'contain' }}
           firstItemIndex={firstItemIndex}
           data={flatItems}
+          computeItemKey={(_index, item) => (
+            item.type === 'msg' ? `${item.id}#${rxKey(item.reactions)}` : item.id
+          )}
           initialTopMostItemIndex={Math.max(0, flatItems.length - 1)}
           startReached={loadOlder}
           atBottomStateChange={bottom => { atBottomRef.current = bottom; setShowScrollDown(!bottom); }}
@@ -1757,8 +1806,9 @@ export function ChatScreen() {
                 </div>
               );
             }
-            // Regular message
-            const isOut = item.sender_id === user?.id;
+            // Regular message — strip Virtuoso `type` tag before passing to row
+            const { type: _t, ...msg } = item;
+            const isOut = msg.sender_id === user?.id;
             return (
               // width:100% + boxSizing — критично: иначе Virtuoso-item
               // не передаёт детям полную ширину контейнера, и `margin:0 auto`
@@ -1766,13 +1816,13 @@ export function ChatScreen() {
               <div style={{maxWidth:680, width:'100%', margin:'0 auto',
                 padding:'0 16px', boxSizing:'border-box'}}>
                 <MessageRow
-                  m={item}
+                  m={msg}
                   isOut={isOut}
                   isGroup={partner.isGroup}
                   editingMsgId={editingMsg?.id}
                   reactionPickerMsgId={reactionPicker?.msgId}
                   currentUserId={user?.id}
-                  isFlashing={flashMsgId === item.id}
+                  isFlashing={flashMsgId === msg.id}
                   onOpenMenu={handleOpenMenu}
                   onLightbox={handleLightbox}
                   onToggleReaction={handleToggleRxn}
@@ -2504,8 +2554,27 @@ export function ChatScreen() {
 
         const Item = (name) => {
           const isActive = myReaction === name;
+          let handledPointerDown = false;
+          const select = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleReaction(reactionPicker.msgId, name);
+          };
           return (
-            <button key={name} onClick={() => toggleReaction(reactionPicker.msgId, name)}
+            <button key={name}
+              onPointerDown={(e) => {
+                handledPointerDown = true;
+                select(e);
+              }}
+              onClick={(e) => {
+                if (handledPointerDown) {
+                  handledPointerDown = false;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return;
+                }
+                select(e);
+              }}
               title={emojiLabel(name)}
               style={{
                 background: isActive ? 'rgba(95, 64, 128,.55)' : 'none',
@@ -2525,6 +2594,8 @@ export function ChatScreen() {
 
         return (
           <div data-reaction-picker
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             style={{position:'fixed', left:x, top:y, zIndex:300,
               width: PICKER_W,
               background:'rgba(48,38,78,.97)', backdropFilter:'blur(16px)',

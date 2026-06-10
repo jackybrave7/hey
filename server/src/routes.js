@@ -1075,6 +1075,21 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(tombstone);
   });
 
+  r.post('/conversations/:id/messages/:msgId/reactions', requireAuth, (req, res) => {
+    const { emoji } = req.body || {};
+    if (!emoji || typeof emoji !== 'string') return res.status(400).json({ error: 'Нужен emoji' });
+    if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Not a member' });
+    const m = db.getMessageById(req.params.msgId);
+    if (!m || m.conversation_id !== req.params.id) return res.status(404).json({ error: 'Not found' });
+    if (Number(m.is_deleted) === 1) return res.status(400).json({ error: 'Сообщение удалено' });
+    db.toggleReaction(req.params.msgId, req.user.id, emoji);
+    const reactions = db.getMessageReactions(req.params.msgId);
+    broadcast(db.getConversationMembers(req.params.id), {
+      type: 'reaction:update', messageId: req.params.msgId, conversationId: req.params.id, reactions,
+    });
+    res.json({ reactions });
+  });
+
   r.delete('/conversations/:id', requireAuth, (req, res) => {
     try {
       const { memberIds, type } = db.deleteConversation(req.params.id, req.user.id, storage);

@@ -26,16 +26,9 @@ button, input, textarea, select { font-family: inherit; }
 }
 .hey-emoji-input { caret-color: var(--white); }
 
-/* Кнопка реакции рядом с сообщением.
-   На устройствах с hover (десктоп) — появляется только при наведении.
-   На сенсорных (планшеты/смартфоны) — всегда видна с пониженной opacity,
-   иначе на reply-сообщениях и картинках до реакций физически не дотянуться. */
-.hey-react-btn { opacity: 0; pointer-events: none; }
-.hey-react-btn[data-hovered="y"] { opacity: 1; pointer-events: auto; }
-@media (hover: none) {
-  .hey-react-btn { opacity: .55; pointer-events: auto; }
-  .hey-react-btn:active { opacity: 1; }
-}
+/* Кнопка реакции: видимость через inline-style в MessageRow (showReactBtn).
+   Не блокируем pointer-events глобально — иначе кнопка некликабельна на десктопе. */
+.hey-react-btn[data-hovered="y"] { opacity: 1 !important; pointer-events: auto !important; }
 
 @keyframes fadeIn {
   from { opacity: 0; }

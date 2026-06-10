@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import Icon from '../Icon';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
 import { AudioPlayer } from './AudioPlayer';
@@ -12,6 +12,17 @@ import { fileTypeIcon, AttachmentPreview } from '../../lib/fileTypeIcon';
 import { mediaUrl } from '../../lib/mediaUrl';
 import { renderPreviewWithEmoji } from './chatRender';
 
+function rxSig(reactions) {
+  if (!reactions || !Object.keys(reactions).length) return '0';
+  return Object.keys(reactions).sort().map(emoji => {
+    const ids = (reactions[emoji] || [])
+      .map(r => (typeof r === 'string' ? r : r?.id))
+      .filter(Boolean)
+      .join(',');
+    return `${emoji}:${ids}`;
+  }).join('|');
+}
+
 const MessageRow = memo(function MessageRow({
   m, isOut, isGroup, editingMsgId, reactionPickerMsgId,
   partnerName, currentUserId, isFlashing,
@@ -19,15 +30,46 @@ const MessageRow = memo(function MessageRow({
   statusIcon, renderText,
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  // На тач-устройствах ховера нет — открываем «smile»-кнопку по тапу
-  // на пузыре. Повторный тап скрывает. Right-click / long-press
-  // продолжает открывать контекст-меню (onContextMenu).
+  const hoverOffTimer = useRef(null);
+  // На touch/WebView ховера нет, поэтому кнопку реакции держим видимой.
+  // На десктопе показываем её по hover; tap по пузырю остаётся запасным
+  // способом открыть кнопку. Right-click / long-press открывает меню.
   const [tappedReveal, setTappedReveal] = useState(false);
-  const showReactBtn = !isOut && !m.is_deleted && (isHovered || tappedReveal);
+  const isDeleted = Number(m.is_deleted) === 1;
+  const canHover = typeof window !== 'undefined'
+    && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+  const showReactBtn = !isOut && !isDeleted
+    && (!canHover || isHovered || tappedReveal || reactionPickerMsgId === m.id);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
   const deletedLabel = isOut
     ? 'Вы удалили сообщение'
     : `${m.sender_name || 'Участник'} удалил(а) сообщение`;
+
+  useEffect(() => () => {
+    if (hoverOffTimer.current) clearTimeout(hoverOffTimer.current);
+  }, []);
+
+  const keepHovered = () => {
+    if (hoverOffTimer.current) {
+      clearTimeout(hoverOffTimer.current);
+      hoverOffTimer.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const releaseHovered = (e) => {
+    const row = e.currentTarget;
+    const next = e.relatedTarget;
+    if (next && row.contains(next)) return;
+    const rect = row.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    const stillInside = Number.isFinite(x) && Number.isFinite(y)
+      && x >= rect.left - 8 && x <= rect.right + 8
+      && y >= rect.top - 8 && y <= rect.bottom + 8;
+    if (stillInside) return;
+    hoverOffTimer.current = setTimeout(() => setIsHovered(false), 120);
+  };
 
   return (
     <div
@@ -39,8 +81,9 @@ const MessageRow = memo(function MessageRow({
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
         marginBottom: hasReactions ? 8 : 2}}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={keepHovered}
+      onMouseMove={keepHovered}
+      onMouseLeave={releaseHovered}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
@@ -98,7 +141,7 @@ const MessageRow = memo(function MessageRow({
             wordBreak: 'break-word',
             cursor: !isOut ? 'pointer' : 'default',
           }}>
-          {isGroup && !isOut && !m.is_deleted && (
+          {isGroup && !isOut && !isDeleted && (
             <div
               onClick={(e) => { e.stopPropagation(); openUserCard(m.sender_id); }}
               style={{fontSize:12,fontWeight:700,color:'rgba(180,130,255,1)',marginBottom:4,
@@ -107,7 +150,7 @@ const MessageRow = memo(function MessageRow({
               {m.sender_name}
             </div>
           )}
-          {m.is_deleted ? (
+          {isDeleted ? (
             <div style={{
               fontSize: 13, fontStyle: 'italic', lineHeight: 1.45,
               color: isOut ? 'rgba(249,240,240,.55)' : 'rgba(80,60,120,.55)',
@@ -402,9 +445,8 @@ const MessageRow = memo(function MessageRow({
                             display:'inline-flex', alignItems:'center', justifyContent:'center',
                             fontSize: 9, fontWeight: 700,
                           }}>
-                          {r.avatar && (typeof r.avatar === 'string'
-                            && (r.avatar.startsWith('http') || r.avatar.startsWith('/')))
-                            ? <img src={r.avatar} alt=""
+                          {r.avatar && typeof r.avatar === 'string'
+                            ? <img src={mediaUrl(r.avatar)} alt=""
                                 style={{width:'100%', height:'100%', objectFit:'cover'}}/>
                             : <span>{(r.name || '?').charAt(0).toUpperCase()}</span>}
                         </span>
@@ -431,34 +473,37 @@ const MessageRow = memo(function MessageRow({
           переходит из пузыря в саму кнопку. layout shift тоже отсутствует,
           потому что слот зарезервирован независимо от состояния hover.
           На исходящих не рисуем — ставить реакцию на свои бессмысленно. */}
-      {!isOut && (
+      {!isOut && !isDeleted && (
         <div style={{
           width: 36, flexShrink: 0, alignSelf: 'flex-end',
           marginBottom: 4, display:'flex', alignItems:'center', justifyContent:'center',
         }}>
-          {showReactBtn && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const rect = e.currentTarget.getBoundingClientRect();
-                onSetReactionPicker(p => p?.msgId === m.id ? null
-                  : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });
-              }}
-              className="hey-react-btn"
-              title="Реакция"
-              style={{
-                width: 32, height: 32, borderRadius:'50%',
-                background:'rgba(60,40,100,.92)',
-                border:'1px solid rgba(160,130,210,.6)',
-                padding: 0,
-                display:'inline-flex', alignItems:'center', justifyContent:'center',
-                cursor:'pointer',
-                boxShadow:'0 2px 10px rgba(0,0,0,.4)',
-                animation:'heyReactBtnIn .15s ease-out',
-              }}>
-              <Icon name="smile" size={18} />
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              onSetReactionPicker(p => p?.msgId === m.id ? null
+                : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });
+            }}
+            className="hey-react-btn"
+            data-react-btn
+            data-hovered={showReactBtn ? 'y' : 'n'}
+            title="Реакция"
+            style={{
+              width: 32, height: 32, borderRadius:'50%',
+              background:'rgba(60,40,100,.92)',
+              border:'1px solid rgba(160,130,210,.6)',
+              padding: 0,
+              display:'inline-flex', alignItems:'center', justifyContent:'center',
+              cursor: showReactBtn ? 'pointer' : 'default',
+              boxShadow:'0 2px 10px rgba(0,0,0,.4)',
+              opacity: showReactBtn ? 1 : 0,
+              pointerEvents: showReactBtn ? 'auto' : 'none',
+              transition: 'opacity .15s',
+              animation: showReactBtn ? 'heyReactBtnIn .15s ease-out' : 'none',
+            }}>
+            <Icon name="smile" size={18} />
+          </button>
         </div>
       )}
 
@@ -468,8 +513,15 @@ const MessageRow = memo(function MessageRow({
     </div>
   );
 }, (prev, next) =>
-  prev.m === next.m &&
+  prev.m.id === next.m.id &&
+  rxSig(prev.m.reactions) === rxSig(next.m.reactions) &&
+  prev.m.is_deleted === next.m.is_deleted &&
+  prev.m.text === next.m.text &&
+  prev.m.status === next.m.status &&
+  prev.isOut === next.isOut &&
+  prev.isFlashing === next.isFlashing &&
   prev.editingMsgId === next.editingMsgId &&
-  prev.reactionPickerMsgId === next.reactionPickerMsgId
+  prev.reactionPickerMsgId === next.reactionPickerMsgId &&
+  prev.currentUserId === next.currentUserId
 );
 export default MessageRow;

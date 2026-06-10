@@ -299,6 +299,9 @@ module.exports = function setupWS(server) {
           const { messageId, conversationId, emoji } = msg;
           if (!messageId || !conversationId || !emoji) return;
           if (!db.isMember(conversationId, user.id)) return;
+          const m = db.getMessageById(messageId);
+          if (!m || m.conversation_id !== conversationId) return;
+          if (Number(m.is_deleted) === 1) return;
           db.toggleReaction(messageId, user.id, emoji);
           const reactions = db.getMessageReactions(messageId);
           broadcast(db.getConversationMembers(conversationId), {

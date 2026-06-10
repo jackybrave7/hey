@@ -66,7 +66,9 @@ function serialize(el) {
       s += '\n';
     } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
       if (s.length > 0 && !s.endsWith('\n')) s += '\n';
-      s += serializeInline(node);
+      const inner = serializeInline(node);
+      // Пустая строка (<div><br></div>) — разделитель div уже дал \n, не дублируем
+      if (inner !== '\n') s += inner;
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       s += serializeInline(node);
     }
