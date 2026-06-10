@@ -24,9 +24,9 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
 
 const { mediaProxyHandler, streamMedia } = require('./mediaProxy');
-// GET /media/* — legacy route; canonical client URLs use /api/media/*.
+// GET /media/* — canonical media route.
 app.get('/media/*', mediaProxyHandler);
-// /api/media/* → тот же стрим; /api/* в проде гарантированно проксируется в Node.
+// Legacy /api/media/* → тот же стрим.
 app.get('/api/media/*', (req, res) => {
   const key = req.path.replace(/^\/api\/media\//, '');
   streamMedia(key, res).catch(e => {

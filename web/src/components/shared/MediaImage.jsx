@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { mediaFallbackUrl, mediaUrl } from '../../lib/mediaUrl';
+import { mediaFallbackUrls, mediaUrl } from '../../lib/mediaUrl';
 
 export function MediaImage({ src, alt = '', style, ...props }) {
   const primary = mediaUrl(src);
-  const fallback = mediaFallbackUrl(src);
+  const fallbacks = mediaFallbackUrls(src);
   const [current, setCurrent] = useState(primary);
+  const [fallbackIndex, setFallbackIndex] = useState(0);
 
   useEffect(() => {
     setCurrent(primary);
+    setFallbackIndex(0);
   }, [primary]);
 
   return (
@@ -19,8 +21,10 @@ export function MediaImage({ src, alt = '', style, ...props }) {
       decoding={props.decoding || 'async'}
       style={style}
       onError={(e) => {
-        if (fallback && current !== fallback) {
-          setCurrent(fallback);
+        const next = fallbacks[fallbackIndex];
+        if (next) {
+          setFallbackIndex(fallbackIndex + 1);
+          setCurrent(next);
           return;
         }
         props.onError?.(e);

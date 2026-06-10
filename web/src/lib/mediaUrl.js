@@ -1,7 +1,6 @@
-// Переписывает S3/legacy URL в guaranteed Node-proxy /api/media/…
-// В проде nginx стабильно проксирует /api/* в Node, а /media/* может попасть в SPA.
-const API_MEDIA = '/api/media/';
-const LEGACY_MEDIA = '/media/';
+// Переписывает S3/legacy URL в same-origin /media/…
+const API_MEDIA = '/media/';
+const LEGACY_MEDIA = '/api/media/';
 
 const MEDIA_KEYS = new Set([
   'url', 'media_url', 'avatar', 'icon', 'attachment_url', 'publicUrl',
@@ -42,6 +41,16 @@ export function mediaFallbackUrl(url) {
   const key = s3KeyFromUrl(url);
   if (!key) return null;
   return `https://s3.twcstorage.ru/heymessenger/${key}`;
+}
+
+export function mediaFallbackUrls(url) {
+  const key = s3KeyFromUrl(url);
+  if (!key) return [];
+  const apiProxy = absolutize(LEGACY_MEDIA + key);
+  const directS3 = `https://s3.twcstorage.ru/heymessenger/${key}`;
+  return [apiProxy, directS3].filter((candidate, index, arr) => (
+    candidate && arr.indexOf(candidate) === index && candidate !== mediaUrl(url)
+  ));
 }
 
 function absolutize(path) {

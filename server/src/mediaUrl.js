@@ -1,12 +1,11 @@
-// mediaUrl.js — переписывает прямые S3-URL в same-origin /api/media/…
+// mediaUrl.js — переписывает прямые S3-URL в same-origin /media/…
 // Android PWA/TWA часто не грузит s3.twcstorage.ru (Data Saver, лишний TLS).
-// В проде nginx стабильно проксирует /api/* в Node; /media/* может попасть в SPA.
 
 const PUBLIC_BASE = () =>
   (process.env.S3_PUBLIC_URL_BASE || 'https://s3.twcstorage.ru/heymessenger').replace(/\/$/, '');
 
-const API_MEDIA = '/api/media/';
-const LEGACY_MEDIA = '/media/';
+const API_MEDIA = '/media/';
+const LEGACY_MEDIA = '/api/media/';
 
 function s3KeyFromUrl(url) {
   if (!url || typeof url !== 'string') return null;

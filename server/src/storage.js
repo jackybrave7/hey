@@ -182,8 +182,8 @@ async function getPresignedUploadUrl(key, contentType, expiresIn = 300) {
     uploadUrl,
     headers: noAcl ? {} : { 'x-amz-acl': 'public-read' },
     key,
-    // Same-origin через Node proxy. В проде /api/* гарантированно проксируется nginx.
-    publicUrl: `/api/media/${key}`,
+    // Same-origin через media proxy.
+    publicUrl: `/media/${key}`,
   };
 }
 
