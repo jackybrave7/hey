@@ -24,9 +24,9 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
 
 const { mediaProxyHandler, streamMedia } = require('./mediaProxy');
-// GET /media/* — nginx в проде проксирует на S3; без nginx (dev, vite proxy) — Node стримит
+// GET /media/* — legacy route; canonical client URLs use /api/media/*.
 app.get('/media/*', mediaProxyHandler);
-// Legacy /api/media/* → тот же стрим (без 301 — иначе SPA/vite отдаёт HTML)
+// /api/media/* → тот же стрим; /api/* в проде гарантированно проксируется в Node.
 app.get('/api/media/*', (req, res) => {
   const key = req.path.replace(/^\/api\/media\//, '');
   streamMedia(key, res).catch(e => {

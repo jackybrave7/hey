@@ -1,4 +1,4 @@
-// Стрим медиа с S3 / локального uploads для GET /media/*
+// Стрим медиа с S3 / локального uploads для GET /media/* и /api/media/*
 const path = require('path');
 const storage = require('./storage');
 const { PUBLIC_BASE } = require('./mediaUrl');
@@ -13,8 +13,13 @@ async function streamMedia(key, res) {
     return res.sendFile(localPath, err => { if (err) res.status(404).end(); });
   }
 
-  // public-read бакет — прямой URL надёжнее presigned fetch с Node (давал 502)
-  const upstream = await fetch(`${PUBLIC_BASE()}/${key}`);
+  // Сначала пробуем public URL. Если ACL провайдером игнорируется или бакет
+  // приватный, используем presigned read URL через S3 API.
+  let upstream = await fetch(`${PUBLIC_BASE()}/${key}`);
+  if (!upstream.ok && typeof storage.getReadUrl === 'function') {
+    const signedUrl = await storage.getReadUrl(key, 300);
+    upstream = await fetch(signedUrl);
+  }
   if (!upstream.ok) return res.status(upstream.status).end();
   res.set('Cache-Control', 'public, max-age=86400, immutable');
   const ct = upstream.headers.get('content-type');

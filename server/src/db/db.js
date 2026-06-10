@@ -641,7 +641,7 @@ const { toPublicMediaUrl, rewriteAttachment } = require('../mediaUrl');
 function avatarPayload(userId, rawAvatar) {
   if (!rawAvatar) return null;
   if (rawAvatar.startsWith('data:image/')) return `/api/avatars/${userId}`;
-  return toPublicMediaUrl(rawAvatar); // S3 → /media/…; emoji/буква без изменений
+  return toPublicMediaUrl(rawAvatar); // S3 → /api/media/…; emoji/буква без изменений
 }
 
 // Универсальный post-process: проходит по строке/массиву строк и заменяет тяжёлые

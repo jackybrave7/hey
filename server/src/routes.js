@@ -420,7 +420,7 @@ module.exports = function makeRouter(db, broadcast) {
       res.set('Cache-Control', 'public, max-age=60'); // короткий кеш — может появиться позже
       return res.send(px);
     }
-    // S3 / http — через same-origin /media/ (Android PWA не грузит прямой S3)
+    // S3 / http — через same-origin /api/media/ (Android PWA не грузит прямой S3)
     if (/^https?:\/\//i.test(av)) {
       const { toPublicMediaUrl } = require('./mediaUrl');
       const target = toPublicMediaUrl(av);
