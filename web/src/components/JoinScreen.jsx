@@ -42,8 +42,8 @@ export default function JoinScreen() {
   // полупрозрачно-белую карточку и опускает контраст текста.
   const card = {
     maxWidth: 440, width: '100%', background: 'rgba(20,12,40,.72)',
-    border: '1px solid rgba(255,255,255,.14)', borderRadius: 18, padding: '32px 28px',
-    color: 'white', textAlign: 'center', backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(249,240,240,.14)', borderRadius: 18, padding: '32px 28px',
+    color:'#F9F0F0', textAlign: 'center', backdropFilter: 'blur(20px)',
     boxShadow: '0 20px 60px rgba(0,0,0,.35)',
   };
   const mutedText = { color: 'rgba(230,225,250,.85)' };
@@ -89,12 +89,12 @@ export default function JoinScreen() {
           <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Ты уже в HEY</h1>
           <p style={{ ...mutedText, fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
-            Аккаунт с email <strong style={{color:'white'}}>{email}</strong> уже зарегистрирован.<br/>
+            Аккаунт с email <strong style={{color:'#F9F0F0'}}>{email}</strong> уже зарегистрирован.<br/>
             Просто войди — школа и курс уже привязаны.
           </p>
           <button onClick={() => nav('/login')} style={{
             padding: '12px 24px', borderRadius: 12, border: 'none',
-            background: 'rgba(140,110,220,.6)', color: 'white', fontSize: 14, fontWeight: 700,
+            background: 'rgba(140,110,220,.6)', color:'#F9F0F0', fontSize: 14, fontWeight: 700,
             cursor: 'pointer',
           }}>Войти в HEY</button>
         </div>
@@ -117,13 +117,13 @@ export default function JoinScreen() {
         )}
         <p style={{ ...mutedText, fontSize: 14, marginBottom: 22, lineHeight: 1.55 }}>
           HEY — мессенджер где собирается сообщество учеников.<br/>
-          Регистрация займёт минуту — email <strong style={{color:'white'}}>{email}</strong> уже подставлен.
+          Регистрация займёт минуту — email <strong style={{color:'#F9F0F0'}}>{email}</strong> уже подставлен.
         </p>
         <button onClick={continueToRegister} style={{
           padding: '14px 28px', borderRadius: 12, border: 'none',
-          background: 'rgba(140,110,220,.9)', color: 'white', fontSize: 15, fontWeight: 700,
+          background: 'rgba(140,110,220,.9)', color:'#F9F0F0', fontSize: 15, fontWeight: 700,
           cursor: 'pointer', width: '100%',
-          boxShadow: '0 6px 18px rgba(120,90,200,.4)',
+          boxShadow: '0 6px 18px rgba(95, 64, 128,.4)',
         }}>
           Продолжить регистрацию →
         </button>

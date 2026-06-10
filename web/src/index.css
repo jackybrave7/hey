@@ -21,10 +21,10 @@ button, input, textarea, select { font-family: inherit; }
    нет нативного placeholder. */
 .hey-emoji-input:empty::before {
   content: attr(data-placeholder);
-  color: rgba(255,255,255,.45);
+  color: rgba(var(--white-rgb), .45);
   pointer-events: none;
 }
-.hey-emoji-input { caret-color: white; }
+.hey-emoji-input { caret-color: var(--white); }
 
 /* Кнопка реакции рядом с сообщением.
    На устройствах с hover (десктоп) — появляется только при наведении.
@@ -43,17 +43,20 @@ button, input, textarea, select { font-family: inherit; }
 }
 
 :root {
-  --grad: linear-gradient(180deg, #5C4F94 0%, #D0A8A8 66%, #5C4F94 100%);
-  --topbar: rgba(74, 63, 130, 0.72);
-  --accent: rgba(92, 79, 148, 0.72);
-  --accent2: rgba(92, 79, 148, 0.42);
-  --bubble-in: rgba(255,255,255,0.90);
-  --bubble-out: rgba(92, 70, 148, 0.72);
-  --white: #fff;
-  --white70: rgba(255,255,255,0.70);
-  --white50: rgba(255,255,255,0.50);
-  --white30: rgba(255,255,255,0.30);
-  --white20: rgba(255,255,255,0.20);
+  --primary: #5F4080;
+  --primary-rgb: 95, 64, 128;
+  --grad: linear-gradient(180deg, var(--primary) 0%, #D0A8A8 66%, var(--primary) 100%);
+  --topbar: rgba(var(--primary-rgb), 0.72);
+  --accent: rgba(var(--primary-rgb), 0.72);
+  --accent2: rgba(var(--primary-rgb), 0.42);
+  --bubble-in: rgba(var(--white-rgb), 0.90);
+  --bubble-out: rgba(var(--primary-rgb), 0.72);
+  --white: #F9F0F0;
+  --white-rgb: 249, 240, 240;
+  --white70: rgba(var(--white-rgb), 0.70);
+  --white50: rgba(var(--white-rgb), 0.50);
+  --white30: rgba(var(--white-rgb), 0.30);
+  --white20: rgba(var(--white-rgb), 0.20);
   --text-in: #2a2040;
   --online: #2ecc71;
   --danger: #e74c3c;
@@ -95,7 +98,7 @@ html, body, #root {
   letter-spacing: .3px;
 }
 .topbar-dots { display: flex; gap: 5px; }
-.topbar-dot { width: 8px; height: 8px; background: white; border-radius: 50%; }
+.topbar-dot { width: 8px; height: 8px; background: var(--white); border-radius: 50%; }
 .back-btn {
   background: none; border: none; color: var(--white70);
   font-size: 28px; cursor: pointer; padding: 0 8px 0 0; line-height: 1;
@@ -103,24 +106,24 @@ html, body, #root {
 
 /* Pill button */
 .pill {
-  background: rgba(97, 26, 94, 0.26);
+  background: rgba(var(--primary-rgb), 0.26);
   border: none; border-radius: 26px;
   padding: 0 28px;
   height: 48px;
-  color: white; font-size: 13pt; font-family: 'Comfortaa', sans-serif; font-weight: 700;
+  color: var(--white); font-size: 13pt; font-family: 'Comfortaa', sans-serif; font-weight: 700;
   cursor: pointer; transition: background .2s;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.pill:hover { background: rgba(97, 26, 94, 0.42); }
+.pill:hover { background: rgba(var(--primary-rgb), 0.42); }
 
 /* Glass input */
 .glass-input {
   width: 100%;
-  background: rgba(148,128,172,.38);
+  background: rgba(var(--primary-rgb), .38);
   border: 1.5px solid var(--white70);
   border-radius: 32px;
   padding: 14px 22px;
-  font-size: 15px; color: white; font-family: inherit;
+  font-size: 15px; color: var(--white); font-family: inherit;
   outline: none;
 }
 .glass-input::placeholder { color: var(--white50); }
@@ -130,7 +133,7 @@ html, body, #root {
   background: none; border: none;
   border-bottom: 1.5px solid var(--white50);
   padding: 6px 0;
-  font-size: 15px; color: white; font-family: inherit;
+  font-size: 15px; color: var(--white); font-family: inherit;
   outline: none; width: 100%;
 }
 .ul-input::placeholder { color: var(--white50); }
@@ -172,7 +175,7 @@ html, body, #root {
   background: var(--accent2);
   border-radius: 12px;
   padding: 8px 12px;
-  color: white; font-size: 15px; font-weight: 500;
+  color: var(--white); font-size: 15px; font-weight: 500;
   min-width: 48px; text-align: center;
 }
 
@@ -206,4 +209,75 @@ html, body, #root {
 @keyframes hey-audio-wave-bar {
   0%, 100% { height: 12px; opacity: 0.55; }
   50%      { height: 44px; opacity: 1;    }
+}
+
+/* ── Chat context menu (209×178, #F9F0F0) ─────────────────────────────── */
+.chat-context-menu-trigger {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 209px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  background: #F9F0F0;
+  border-radius: 12px;
+  padding: 15px;
+  box-sizing: border-box;
+  box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.chat-context-menu-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.chat-context-menu-entry + .chat-context-menu-entry {
+  margin-top: 14px;
+}
+.chat-context-menu-sep {
+  height: 1.5px;
+  width: 180px;
+  max-width: 100%;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: rgba(132, 109, 155, 0.45);
+}
+.chat-context-menu-item {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: inherit;
+  font-size: 13pt;
+  font-weight: 700;
+  color: #2a2040;
+  text-align: left;
+  line-height: 1.2;
+}
+.chat-context-menu-item.is-danger { color: #8b3048; }
+.chat-context-menu-item:hover { opacity: 0.72; }
+.chat-context-menu-icon {
+  width: 15px;
+  height: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }

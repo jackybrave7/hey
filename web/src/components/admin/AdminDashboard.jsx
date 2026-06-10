@@ -6,23 +6,23 @@ import { api } from '../../api';
 function StatCard({ label, value, sub, accent, link }) {
   const content = (
     <>
-      <div style={{ color: 'rgba(255,255,255,.6)', fontSize: 12, fontWeight: 600,
+      <div style={{ color: 'rgba(249,240,240,.6)', fontSize: 12, fontWeight: 600,
         textTransform: 'uppercase', letterSpacing: .8, marginBottom: 8 }}>
         {label}
       </div>
       <div style={{
-        color: accent || 'white', fontSize: 36, fontWeight: 800, lineHeight: 1,
+        color: accent || '#F9F0F0', fontSize: 36, fontWeight: 800, lineHeight: 1,
       }}>
         {value ?? '—'}
       </div>
       {sub && (
-        <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12, marginTop: 6 }}>{sub}</div>
+        <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 12, marginTop: 6 }}>{sub}</div>
       )}
     </>
   );
   const style = {
-    background: 'rgba(255,255,255,.05)',
-    border: '1px solid rgba(255,255,255,.09)',
+    background: 'rgba(249,240,240,.05)',
+    border: '1px solid rgba(249,240,240,.09)',
     borderRadius: 16,
     padding: '20px 24px',
     display: 'block', textDecoration: 'none',
@@ -30,8 +30,8 @@ function StatCard({ label, value, sub, accent, link }) {
   };
   if (link) return (
     <Link to={link} style={{ ...style, cursor: 'pointer' }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.05)'; e.currentTarget.style.transform = 'none'; }}>
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(249,240,240,.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(249,240,240,.05)'; e.currentTarget.style.transform = 'none'; }}>
       {content}
     </Link>
   );
@@ -50,10 +50,10 @@ export default function AdminDashboard() {
 
   return (
     <div style={{ padding: '28px 32px' }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         📊 Дашборд
       </h1>
-      <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14, marginBottom: 28 }}>
+      <p style={{ color: 'rgba(249,240,240,.4)', fontSize: 14, marginBottom: 28 }}>
         Общая статистика системы
       </p>
 
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
       )}
 
       {!stats && !error && (
-        <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 14 }}>Загрузка…</div>
+        <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 14 }}>Загрузка…</div>
       )}
     </div>
   );

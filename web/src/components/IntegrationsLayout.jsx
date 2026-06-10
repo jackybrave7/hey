@@ -13,7 +13,7 @@ export default function IntegrationsLayout({ children, title = 'Мои инте�
       <div style={{
         position: 'sticky', top: 0, zIndex: 10,
         background: 'rgba(14,8,32,.95)', backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,.08)',
+        borderBottom: '1px solid rgba(249,240,240,.08)',
       }}>
         <div style={{
           maxWidth: 960, margin: '0 auto',
@@ -22,15 +22,15 @@ export default function IntegrationsLayout({ children, title = 'Мои инте�
         }}>
           <button onClick={() => nav('/me')}
             style={{
-              background: 'rgba(255,255,255,.08)',
-              border: '1px solid rgba(255,255,255,.14)',
+              background: 'rgba(249,240,240,.08)',
+              border: '1px solid rgba(249,240,240,.14)',
               color: 'rgba(225,220,245,.95)',
               borderRadius: 10, padding: '6px 12px',
               fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
             }}>
             ‹ К профилю
           </button>
-          <div style={{ color: 'white', fontSize: 16, fontWeight: 700 }}>
+          <div style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700 }}>
             {title}
           </div>
         </div>

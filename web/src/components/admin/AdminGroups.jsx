@@ -51,12 +51,12 @@ export default function AdminGroups() {
     return sortDir === 'asc' ? va - vb : vb - va;
   }), [groups, sortBy, sortDir]);
 
-  const cell  = { padding: '12px 16px', color: 'rgba(255,255,255,.8)', fontSize: 13, borderBottom: '1px solid rgba(255,255,255,.06)' };
-  const hcell = { ...cell, color: 'rgba(255,255,255,.4)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .8 };
+  const cell  = { padding: '12px 16px', color: 'rgba(249,240,240,.8)', fontSize: 13, borderBottom: '1px solid rgba(249,240,240,.06)' };
+  const hcell = { ...cell, color: 'rgba(249,240,240,.4)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .8 };
 
   return (
     <div style={{ padding: '28px 32px' }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 20 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 20 }}>
         🫂 Группы
       </h1>
 
@@ -67,8 +67,8 @@ export default function AdminGroups() {
           placeholder="Поиск по названию…"
           style={{
             flex: 1, minWidth: 220,
-            background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)',
-            borderRadius: 10, padding: '9px 14px', color: 'white', fontSize: 14,
+            background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.14)',
+            borderRadius: 10, padding: '9px 14px', color:'#F9F0F0', fontSize: 14,
             fontFamily: 'inherit', outline: 'none',
           }}
         />
@@ -82,10 +82,10 @@ export default function AdminGroups() {
       )}
 
       {loading ? (
-        <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 14 }}>Загрузка…</div>
+        <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 14 }}>Загрузка…</div>
       ) : (
-        <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 14, overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,.08)' }}>
+        <div style={{ background: 'rgba(249,240,240,.04)', borderRadius: 14, overflow: 'hidden',
+          border: '1px solid rgba(249,240,240,.08)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -99,7 +99,7 @@ export default function AdminGroups() {
             </thead>
             <tbody>
               {sorted.length === 0 && (
-                <tr><td colSpan={6} style={{...cell, textAlign:'center', color:'rgba(255,255,255,.3)'}}>Пусто</td></tr>
+                <tr><td colSpan={6} style={{...cell, textAlign:'center', color:'rgba(249,240,240,.3)'}}>Пусто</td></tr>
               )}
               {sorted.map(g => {
                 const ic = g.icon || '';
@@ -108,32 +108,32 @@ export default function AdminGroups() {
                   <tr key={g.id}
                     onClick={() => nav(`/admin/groups/${g.id}`)}
                     style={{ cursor:'pointer' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.04)'}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(249,240,240,.04)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <td style={cell}>
                       <div style={{ display:'flex', alignItems:'center', gap: 10 }}>
                         <div style={{
                           width: 36, height: 36, borderRadius: 10,
-                          background: isImg ? '#0a0518' : 'rgba(120,90,200,.4)',
+                          background: isImg ? '#0a0518' : 'rgba(95, 64, 128,.4)',
                           display:'flex', alignItems:'center', justifyContent:'center',
-                          fontSize: 16, color:'white', fontWeight: 700,
-                          border:'1px solid rgba(255,255,255,.1)', overflow:'hidden', flexShrink:0,
+                          fontSize: 16, color:'#F9F0F0', fontWeight: 700,
+                          border:'1px solid rgba(249,240,240,.1)', overflow:'hidden', flexShrink:0,
                         }}>
                           {isImg
                             ? <img src={ic} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                             : (ic || '👥')}
                         </div>
                         <div style={{minWidth:0}}>
-                          <div style={{color:'white', fontWeight:600, overflow:'hidden',
+                          <div style={{color:'#F9F0F0', fontWeight:600, overflow:'hidden',
                             textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{g.name || '— без названия —'}</div>
-                          <div style={{color:'rgba(255,255,255,.35)', fontSize: 11}}>
+                          <div style={{color:'rgba(249,240,240,.35)', fontSize: 11}}>
                             {g.history_visibility === 'since_joined' ? '🔒 история скрыта' : 'история видна'}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td style={cell}>
-                      <strong style={{color:'white'}}>{g.members_count}</strong>
+                      <strong style={{color:'#F9F0F0'}}>{g.members_count}</strong>
                       {g.pending_count > 0 && (
                         <span style={{color:'rgba(255,200,120,.85)', marginLeft: 6}}>+{g.pending_count} 🕓</span>
                       )}
@@ -150,7 +150,7 @@ export default function AdminGroups() {
         </div>
       )}
 
-      <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 12, marginTop: 12 }}>
+      <div style={{ color: 'rgba(249,240,240,.3)', fontSize: 12, marginTop: 12 }}>
         {groups.length} групп
       </div>
     </div>

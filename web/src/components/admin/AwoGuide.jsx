@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 const cardStyle = {
   background: 'rgba(20,12,40,.65)',
-  border: '1px solid rgba(255,255,255,.12)',
+  border: '1px solid rgba(249,240,240,.12)',
   borderRadius: 14,
   padding: '20px 22px',
   marginBottom: 18,
@@ -20,7 +20,7 @@ const blockCodeStyle = {
   color: 'rgba(200,220,255,1)', fontSize: 12, lineHeight: 1.6,
   fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
   whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-  border: '1px solid rgba(255,255,255,.08)',
+  border: '1px solid rgba(249,240,240,.08)',
 };
 
 const SECTIONS = [
@@ -44,7 +44,7 @@ const SECTIONS = [
     title: '🏫 Шаг 1: создание школы',
     content: () => (
       <>
-        <p>На главной странице раздела нажми <strong style={{color:'white'}}>«+ Создать школу»</strong>,
+        <p>На главной странице раздела нажми <strong style={{color:'#F9F0F0'}}>«+ Создать школу»</strong>,
           введи название (например «Театр-лаборатория LIBERTAD»). После создания ты попадёшь на страницу
           её настроек и увидишь сгенерированные:</p>
         <ul style={{ paddingLeft: 20, lineHeight: 1.7 }}>
@@ -78,7 +78,7 @@ const SECTIONS = [
     title: '💬 Шаг 3: создать чат курса',
     content: () => (
       <>
-        <p>В HEY на странице чатов нажми три точки → <strong style={{color:'white'}}>«Новая группа»</strong>.
+        <p>В HEY на странице чатов нажми три точки → <strong style={{color:'#F9F0F0'}}>«Новая группа»</strong>.
           Назови чат именем курса (или короче — как удобно). Стань его админом (это происходит автоматически
           при создании).</p>
         <p style={{color:'rgba(225,220,245,.7)',fontSize:13}}>
@@ -92,13 +92,13 @@ const SECTIONS = [
     title: '🔗 Шаг 4: маппинг курс ↔ чат',
     content: () => (
       <>
-        <p>В настройках школы найди блок <strong style={{color:'white'}}>«Курс → групповой чат»</strong>:</p>
+        <p>В настройках школы найди блок <strong style={{color:'#F9F0F0'}}>«Курс → групповой чат»</strong>:</p>
         <ol style={{ paddingLeft: 20, lineHeight: 1.7 }}>
           <li>В поле «Название курса в АВО» введи точное название товара/курса из АВО</li>
           <li>Выбери из выпадающего списка чат, в который надо добавлять учеников</li>
           <li>Жми «Добавить»</li>
         </ol>
-        <p><strong style={{color:'white'}}>Подстрочный матч:</strong> можно указать ЧАСТЬ названия. Например:</p>
+        <p><strong style={{color:'#F9F0F0'}}>Подстрочный матч:</strong> можно указать ЧАСТЬ названия. Например:</p>
         <div style={blockCodeStyle}>Маппинг: «поток 5 (участник)»
 Подходит под «Зум-актёрский курс — поток 5 (участник)»
 И под «Театр-актёрский — поток 5 (участник)»</div>
@@ -111,7 +111,7 @@ const SECTIONS = [
     title: '🎓 Шаг 5: официальный аккаунт школы',
     content: () => (
       <>
-        <p>В блоке <strong style={{color:'white'}}>«Официальный аккаунт школы»</strong> привяжи себя
+        <p>В блоке <strong style={{color:'#F9F0F0'}}>«Официальный аккаунт школы»</strong> привяжи себя
           (для бизнес-пользователей доступно только это):</p>
         <ul style={{ paddingLeft: 20, lineHeight: 1.7 }}>
           <li>Введи в поиске свой телефон или часть имени</li>
@@ -130,7 +130,7 @@ const SECTIONS = [
     title: '🚫 Шаг 6: стоп-слова для доступа к чату',
     content: () => (
       <>
-        <p>В настройках школы есть поле <strong style={{color:'white'}}>«Стоп-слова»</strong> (по умолчанию:{' '}
+        <p>В настройках школы есть поле <strong style={{color:'#F9F0F0'}}>«Стоп-слова»</strong> (по умолчанию:{' '}
           <span style={codeStyle}>слушатель, запись</span>). Если в названии купленного курса есть хоть одно
           из этих слов — ученик получит школьный инвайт и зарегистрируется в HEY, но в чат курса попадать
           не будет.</p>
@@ -143,7 +143,7 @@ const SECTIONS = [
     title: '🧪 Шаг 7: тестирование',
     content: () => (
       <>
-        <p>В блоке <strong style={{color:'white'}}>«Тестовый режим»</strong> можно ограничиться одним курсом,
+        <p>В блоке <strong style={{color:'#F9F0F0'}}>«Тестовый режим»</strong> можно ограничиться одним курсом,
           чтобы безопасно проверить интеграцию без риска для боевых учеников:</p>
         <ol style={{ paddingLeft: 20, lineHeight: 1.7 }}>
           <li>Включи «Тестовый режим»</li>
@@ -181,13 +181,13 @@ const SECTIONS = [
     title: '❓ Частые вопросы',
     content: () => (
       <>
-        <p><strong style={{color:'white'}}>Что если ученик уже зарегистрирован в HEY?</strong><br/>
+        <p><strong style={{color:'#F9F0F0'}}>Что если ученик уже зарегистрирован в HEY?</strong><br/>
           При новой оплате он молча добавится в чат курса и получит сообщение «🎓 X присоединился к курсу».
           Дублирующего инвайта не будет — система находит его по email.</p>
-        <p><strong style={{color:'white'}}>Можно ли использовать одну АВО для двух школ HEY?</strong><br/>
+        <p><strong style={{color:'#F9F0F0'}}>Можно ли использовать одну АВО для двух школ HEY?</strong><br/>
           Каждая школа имеет свой webhook URL. Если хочешь две — создай две школы, в АВО настрой два
           бизнес-процесса для разных вебхуков.</p>
-        <p><strong style={{color:'white'}}>Webhook не приходит — что делать?</strong></p>
+        <p><strong style={{color:'#F9F0F0'}}>Webhook не приходит — что делать?</strong></p>
         <ul style={{ paddingLeft: 20, lineHeight: 1.7 }}>
           <li>Проверь блок «Последние webhook'ы» в настройках школы — есть ли вообще запись?</li>
           <li>Если нет — проверь логи бизнес-процесса в АВО (правильный ли URL? правильный ли токен в URL?)</li>
@@ -196,10 +196,10 @@ const SECTIONS = [
           <li>Если статус <span style={codeStyle}>no_chat_mapping</span> — не задан маппинг этого курса
             на чат</li>
         </ul>
-        <p><strong style={{color:'white'}}>Как пересоздать токен (если утёк)?</strong><br/>
+        <p><strong style={{color:'#F9F0F0'}}>Как пересоздать токен (если утёк)?</strong><br/>
           В блоке «Webhook URL» под URL'ом есть ссылка «Пересоздать токен». Старый сразу перестаёт работать —
           не забудь обновить URL в АВО.</p>
-        <p><strong style={{color:'white'}}>Ученик возвращает деньги — что делать?</strong><br/>
+        <p><strong style={{color:'#F9F0F0'}}>Ученик возвращает деньги — что делать?</strong><br/>
           Пока эту ветку обрабатываем только частично — статус «возврат» (id_account_status=6) логируется,
           но из чата не убираем автоматически. Удали вручную через настройки группы.</p>
       </>
@@ -222,21 +222,21 @@ export default function AwoGuide({ onClose }) {
       <div style={{
         width:'min(94vw, 720px)',
         background:'rgba(22,15,50,.98)',
-        borderRadius:18, border:'1px solid rgba(255,255,255,.14)',
+        borderRadius:18, border:'1px solid rgba(249,240,240,.14)',
         margin:'40px 0 60px', display:'flex', flexDirection:'column',
         boxShadow:'0 24px 70px rgba(0,0,0,.55)',
       }}>
         {/* Header */}
         <div style={{
-          padding:'18px 22px', borderBottom:'1px solid rgba(255,255,255,.1)',
+          padding:'18px 22px', borderBottom:'1px solid rgba(249,240,240,.1)',
           display:'flex', alignItems:'center', gap:12,
           position:'sticky', top:0, background:'rgba(22,15,50,.98)', borderTopLeftRadius:18, borderTopRightRadius:18,
         }}>
-          <div style={{flex:1, color:'white', fontSize:17, fontWeight:800}}>
+          <div style={{flex:1, color:'#F9F0F0', fontSize:17, fontWeight:800}}>
             📖 Руководство по интеграции с АВО
           </div>
           <button onClick={onClose}
-            style={{ background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.18)',
+            style={{ background:'rgba(249,240,240,.08)', border:'1px solid rgba(249,240,240,.18)',
               color:'rgba(225,220,245,.95)', borderRadius:10, padding:'6px 12px',
               fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
             Закрыть
@@ -253,7 +253,7 @@ export default function AwoGuide({ onClose }) {
                   style={{
                     width:'100%', background:'none', border:'none',
                     display:'flex', alignItems:'center', gap:10,
-                    color:'white', fontSize:14, fontWeight:700, padding:0,
+                    color:'#F9F0F0', fontSize:14, fontWeight:700, padding:0,
                     cursor:'pointer', fontFamily:'inherit', textAlign:'left',
                   }}>
                   <span style={{flex:1}}>{s.title}</span>

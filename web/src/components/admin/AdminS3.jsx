@@ -4,7 +4,7 @@
 // тех ключей, на которые в БД больше никто не ссылается.
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 
 function formatBytes(n) {
   if (!n) return '0 B';
@@ -158,10 +158,10 @@ export default function AdminS3() {
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1400 }}>
       <div style={{ display:'flex', alignItems:'baseline', gap:16, flexWrap:'wrap', marginBottom: 8 }}>
-        <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, margin: 0 }}>
+        <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, margin: 0 }}>
           🗂 S3 галерея
         </h1>
-        <div style={{ color:'rgba(255,255,255,.45)', fontSize: 13 }}>
+        <div style={{ color:'rgba(249,240,240,.45)', fontSize: 13 }}>
           {items.length.toLocaleString('ru')} объектов · {formatBytes(counts._size)}
           {counts.orphan > 0 && (
             <span style={{ color:'rgba(255,180,140,.85)' }}>
@@ -177,7 +177,7 @@ export default function AdminS3() {
         </div>
       </div>
 
-      <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 13, marginTop: 0, marginBottom: 18 }}>
+      <p style={{ color: 'rgba(249,240,240,.45)', fontSize: 13, marginTop: 0, marginBottom: 18 }}>
         Все объекты в S3-бакете. «Сирота» — ключ, на который ни одно живое сообщение,
         момент или аватар не ссылается; такие чистит ночной sweep (или ты прямо здесь).
       </p>
@@ -187,10 +187,10 @@ export default function AdminS3() {
         <div style={{
           display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
           padding:'10px 14px', borderRadius:12, marginBottom:14,
-          background:'rgba(120,90,200,.18)',
+          background:'rgba(95, 64, 128,.18)',
           border:'1px solid rgba(180,140,220,.35)',
         }}>
-          <span style={{ color:'white', fontSize:14, fontWeight:600 }}>
+          <span style={{ color:'#F9F0F0', fontSize:14, fontWeight:600 }}>
             Выбрано: {selected.size}
           </span>
           <button onClick={selectAllVisible} style={btnStyle()}>
@@ -212,7 +212,7 @@ export default function AdminS3() {
           </button>
         ))}
         <label style={{ display:'inline-flex', alignItems:'center', gap:6, marginLeft:'auto',
-          color:'rgba(255,255,255,.75)', fontSize:13, cursor:'pointer' }}>
+          color:'rgba(249,240,240,.75)', fontSize:13, cursor:'pointer' }}>
           <input type="checkbox" checked={onlyOrphans} onChange={e => setOnlyOrphans(e.target.checked)}/>
           Только сироты
         </label>
@@ -224,9 +224,9 @@ export default function AdminS3() {
       )}
 
       {loading ? (
-        <div style={{ color:'rgba(255,255,255,.5)', padding: 40, textAlign:'center' }}>Загрузка…</div>
+        <div style={{ color:'rgba(249,240,240,.5)', padding: 40, textAlign:'center' }}>Загрузка…</div>
       ) : !filtered.length ? (
-        <div style={{ color:'rgba(255,255,255,.5)', padding: 40, textAlign:'center' }}>Ничего нет.</div>
+        <div style={{ color:'rgba(249,240,240,.5)', padding: 40, textAlign:'center' }}>Ничего нет.</div>
       ) : (
         <div style={{
           display:'grid',
@@ -253,18 +253,18 @@ export default function AdminS3() {
 }
 
 function btnStyle(variant) {
-  const bg = variant === 'danger' ? 'rgba(220,80,80,.7)' : 'rgba(120,90,200,.6)';
+  const bg = variant === 'danger' ? 'rgba(220,80,80,.7)' : 'rgba(95, 64, 128,.6)';
   return {
     padding:'9px 14px', borderRadius:10, fontSize:13, fontWeight:600,
-    cursor:'pointer', border:'none', color:'white', background: bg,
+    cursor:'pointer', border:'none', color:'#F9F0F0', background: bg,
   };
 }
 function tabStyle(active) {
   return {
     padding:'8px 12px', borderRadius:9, fontSize:13, fontWeight:600,
     cursor:'pointer', border:'none',
-    background: active ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.06)',
-    color: active ? 'white' : 'rgba(255,255,255,.65)',
+    background: active ? 'rgba(95, 64, 128,.7)' : 'rgba(249,240,240,.06)',
+    color: active ? '#F9F0F0' : 'rgba(249,240,240,.65)',
   };
 }
 
@@ -274,8 +274,8 @@ function Tile({ item, onClick, selected, selectMode, onToggleSelect }) {
   return (
     <div onClick={onClick} style={{
       position:'relative', borderRadius:12, overflow:'hidden',
-      background: selected ? 'rgba(120,90,200,.25)' : 'rgba(255,255,255,.04)',
-      border: '2px solid ' + (selected ? 'rgba(180,140,220,.85)' : 'rgba(255,255,255,.07)'),
+      background: selected ? 'rgba(95, 64, 128,.25)' : 'rgba(249,240,240,.04)',
+      border: '2px solid ' + (selected ? 'rgba(180,140,220,.85)' : 'rgba(249,240,240,.07)'),
       cursor:'pointer', aspectRatio:'1/1', display:'flex',
       flexDirection:'column', justifyContent:'flex-end',
       transition: 'border-color .12s, background .12s',
@@ -287,8 +287,8 @@ function Tile({ item, onClick, selected, selectMode, onToggleSelect }) {
           position:'absolute', top:6, right:6, zIndex:2,
           width:24, height:24, borderRadius:'50%',
           background: selected ? 'rgba(180,140,220,.95)' : 'rgba(0,0,0,.5)',
-          border: '1.5px solid ' + (selected ? 'white' : 'rgba(255,255,255,.55)'),
-          color:'white', fontSize:14, fontWeight:800,
+          border: '1.5px solid ' + (selected ? '#F9F0F0' : 'rgba(249,240,240,.55)'),
+          color:'#F9F0F0', fontSize:14, fontWeight:800,
           display:'flex', alignItems:'center', justifyContent:'center',
           cursor:'pointer',
           opacity: selectMode || selected ? 1 : .55,
@@ -308,7 +308,7 @@ function Tile({ item, onClick, selected, selectMode, onToggleSelect }) {
       {item.isOrphan && (
         <div style={{ position:'absolute', top:6, left:6,
           padding:'2px 7px', borderRadius:6,
-          background:'rgba(220,140,80,.92)', color:'white',
+          background:'rgba(220,140,80,.92)', color:'#F9F0F0',
           fontSize:10, fontWeight:700, letterSpacing:.3 }}>
           СИРОТА
         </div>
@@ -317,7 +317,7 @@ function Tile({ item, onClick, selected, selectMode, onToggleSelect }) {
       <div style={{
         position:'relative', padding:'6px 8px',
         background:'linear-gradient(transparent, rgba(0,0,0,.78))',
-        color:'rgba(255,255,255,.92)', fontSize:11, lineHeight:1.3,
+        color:'rgba(249,240,240,.92)', fontSize:11, lineHeight:1.3,
         textShadow:'0 1px 2px rgba(0,0,0,.6)',
       }}>
         <div style={{ whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
@@ -341,24 +341,24 @@ function PreviewModal({ item, onClose, onDelete, busy }) {
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background:'rgba(20,12,40,.98)', borderRadius:14,
-        border:'1px solid rgba(255,255,255,.1)',
+        border:'1px solid rgba(249,240,240,.1)',
         maxWidth: 900, width:'100%', maxHeight:'92vh',
         display:'flex', flexDirection:'column', overflow:'hidden',
       }}>
-        <div style={{ padding:'14px 18px', borderBottom:'1px solid rgba(255,255,255,.08)',
+        <div style={{ padding:'14px 18px', borderBottom:'1px solid rgba(249,240,240,.08)',
           display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ color:'white', fontSize:14, fontWeight:600,
+            <div style={{ color:'#F9F0F0', fontSize:14, fontWeight:600,
               whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
               {item.key}
             </div>
-            <div style={{ color:'rgba(255,255,255,.5)', fontSize:12, marginTop:2 }}>
+            <div style={{ color:'rgba(249,240,240,.5)', fontSize:12, marginTop:2 }}>
               {formatBytes(item.size)} · {new Date(item.lastModified).toLocaleString('ru')}
               {item.isOrphan && <span style={{ color:'rgba(255,180,140,.9)' }}> · сирота</span>}
             </div>
           </div>
-          <button onClick={onClose} style={{ background:'rgba(255,255,255,.08)',
-            border:'none', borderRadius:8, color:'white', width:32, height:32,
+          <button onClick={onClose} style={{ background:'rgba(249,240,240,.08)',
+            border:'none', borderRadius:8, color:'#F9F0F0', width:32, height:32,
             fontSize:18, cursor:'pointer' }}>×</button>
         </div>
         <div style={{ flex:1, overflow:'auto', display:'flex',
@@ -375,14 +375,14 @@ function PreviewModal({ item, onClose, onDelete, busy }) {
             <audio src={item.url} controls style={{ width:'100%' }}/>
           )}
           {item.kind === 'file' && (
-            <div style={{ color:'rgba(255,255,255,.7)', textAlign:'center' }}>
+            <div style={{ color:'rgba(249,240,240,.7)', textAlign:'center' }}>
               <div style={{ fontSize:60 }}>📄</div>
               <a href={item.url} target="_blank" rel="noreferrer"
                 style={{ color:'rgba(180,140,220,1)' }}>Открыть в новой вкладке</a>
             </div>
           )}
         </div>
-        <div style={{ padding:'12px 18px', borderTop:'1px solid rgba(255,255,255,.08)',
+        <div style={{ padding:'12px 18px', borderTop:'1px solid rgba(249,240,240,.08)',
           display:'flex', gap:10, justifyContent:'space-between', flexWrap:'wrap' }}>
           <a href={item.url} target="_blank" rel="noreferrer"
             style={{ color:'rgba(180,140,220,1)', fontSize:13, alignSelf:'center' }}>

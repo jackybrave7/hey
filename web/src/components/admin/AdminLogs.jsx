@@ -1,6 +1,7 @@
 // AdminLogs.jsx — admin action logs
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
+import Icon from '../Icon';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -9,11 +10,11 @@ function fmtDate(ts) {
 }
 
 const ACTION_LABELS = {
-  block_user:           { label: '🚫 Блокировка',          color: 'rgba(255,100,80,.8)' },
+  block_user:           { label: 'Блокировка',            icon: 'ban',  color: 'rgba(255,100,80,.8)' },
   unblock_user:         { label: '✓ Разблокировка',        color: 'rgba(100,220,140,.8)' },
   make_admin:           { label: '👑 Назначен admin',      color: 'rgba(200,160,80,.8)' },
   revoke_admin:         { label: '👑 Снят admin',          color: 'rgba(200,160,80,.6)' },
-  reset_password:       { label: '🔑 Сброс пароля',        color: 'rgba(180,140,255,.8)' },
+  reset_password:       { label: 'Сброс пароля',          icon: 'lock', color: 'rgba(180,140,255,.8)' },
   delete_moment:        { label: '🗑 Удалён момент',       color: 'rgba(255,140,100,.8)' },
   delete_user:          { label: '🗑 Удалён пользователь', color: 'rgba(255,80,80,.95)' },
   system_moment_create: { label: '📢 Момент HEY-зав.',     color: 'rgba(120,200,255,.9)' },
@@ -34,17 +35,17 @@ export default function AdminLogs() {
       .finally(() => setLoading(false));
   }, []);
 
-  const cell = { padding: '11px 16px', color: 'rgba(255,255,255,.75)', fontSize: 13,
-    borderBottom: '1px solid rgba(255,255,255,.06)', verticalAlign: 'middle' };
-  const hcell = { ...cell, color: 'rgba(255,255,255,.4)', fontSize: 11, fontWeight: 700,
+  const cell = { padding: '11px 16px', color: 'rgba(249,240,240,.75)', fontSize: 13,
+    borderBottom: '1px solid rgba(249,240,240,.06)', verticalAlign: 'middle' };
+  const hcell = { ...cell, color: 'rgba(249,240,240,.4)', fontSize: 11, fontWeight: 700,
     textTransform: 'uppercase', letterSpacing: .8 };
 
   return (
     <div style={{ padding: '28px 32px' }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         📋 Логи администратора
       </h1>
-      <p style={{ color: 'rgba(255,255,255,.4)', fontSize: 14, marginBottom: 16 }}>
+      <p style={{ color: 'rgba(249,240,240,.4)', fontSize: 14, marginBottom: 16 }}>
         Последние 200 действий
       </p>
 
@@ -53,14 +54,14 @@ export default function AdminLogs() {
           placeholder="Поиск по администратору, цели, причине…"
           style={{
             flex: 1, minWidth: 220,
-            background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)',
-            borderRadius: 10, padding: '9px 14px', color: 'white', fontSize: 14,
+            background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.14)',
+            borderRadius: 10, padding: '9px 14px', color:'#F9F0F0', fontSize: 14,
             fontFamily: 'inherit', outline: 'none',
           }}/>
         <select value={actionFilter} onChange={e => setActionFilter(e.target.value)}
           style={{
-            background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)',
-            borderRadius: 10, padding: '9px 14px', color: 'white', fontSize: 13,
+            background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.14)',
+            borderRadius: 10, padding: '9px 14px', color:'#F9F0F0', fontSize: 13,
             fontFamily: 'inherit', outline: 'none', cursor: 'pointer',
           }}>
           <option value="" style={{background:'#1a0e36'}}>Все действия</option>
@@ -78,10 +79,10 @@ export default function AdminLogs() {
       )}
 
       {loading ? (
-        <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 14 }}>Загрузка…</div>
+        <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 14 }}>Загрузка…</div>
       ) : (
-        <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 14, overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,.08)' }}>
+        <div style={{ background: 'rgba(249,240,240,.04)', borderRadius: 14, overflow: 'hidden',
+          border: '1px solid rgba(249,240,240,.08)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -106,7 +107,7 @@ export default function AdminLogs() {
                   );
                 });
                 if (filtered.length === 0) return (
-                  <tr><td colSpan={5} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                  <tr><td colSpan={5} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
                     {q || actionFilter ? 'Ничего не найдено' : 'Логов нет'}
                   </td></tr>
                 );
@@ -123,20 +124,23 @@ export default function AdminLogs() {
                   (l.reason || '').toLowerCase().includes(q)
                 );
               }).map(log => {
-                const info = ACTION_LABELS[log.action] || { label: log.action, color: 'rgba(255,255,255,.5)' };
+                const info = ACTION_LABELS[log.action] || { label: log.action, color: 'rgba(249,240,240,.5)' };
                 return (
                   <tr key={log.id}>
                     <td style={{ ...cell, whiteSpace: 'nowrap' }}>{fmtDate(log.created_at)}</td>
                     <td style={cell}>
-                      <span style={{ color: info.color, fontWeight: 600 }}>{info.label}</span>
+                      <span style={{ color: info.color, fontWeight: 600, display:'inline-flex', alignItems:'center', gap:6 }}>
+                        {info.icon && <Icon name={info.icon} size={14} />}
+                        {info.label}
+                      </span>
                     </td>
                     <td style={cell}>{log.admin_name || log.admin_id}</td>
                     <td style={cell}>
                       {log.target_user_name && (
-                        <div style={{ color: 'rgba(255,255,255,.75)' }}>{log.target_user_name}</div>
+                        <div style={{ color: 'rgba(249,240,240,.75)' }}>{log.target_user_name}</div>
                       )}
                       {log.target_moment_text && (
-                        <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 12,
+                        <div style={{ color: 'rgba(249,240,240,.45)', fontSize: 12,
                           overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical', maxWidth: 200 }}>
                           «{log.target_moment_text}»
@@ -144,7 +148,7 @@ export default function AdminLogs() {
                       )}
                       {!log.target_user_name && !log.target_moment_text && '—'}
                     </td>
-                    <td style={{ ...cell, color: 'rgba(255,255,255,.45)', fontSize: 12 }}>
+                    <td style={{ ...cell, color: 'rgba(249,240,240,.45)', fontSize: 12 }}>
                       {log.reason || '—'}
                     </td>
                   </tr>

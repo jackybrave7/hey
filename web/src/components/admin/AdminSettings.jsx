@@ -33,15 +33,15 @@ export default function AdminSettings() {
 
   const card = {
     background:'rgba(20,12,40,.65)',
-    border:'1px solid rgba(255,255,255,.14)',
+    border:'1px solid rgba(249,240,240,.14)',
     borderRadius:14, padding:'18px 20px',
     boxShadow:'0 4px 14px rgba(0,0,0,.15)',
   };
   const optionBase = {
     display:'flex', alignItems:'flex-start', gap:10,
     padding:'12px 14px', borderRadius:10, cursor:'pointer',
-    border:'1px solid rgba(255,255,255,.12)',
-    background:'rgba(255,255,255,.04)',
+    border:'1px solid rgba(249,240,240,.12)',
+    background:'rgba(249,240,240,.04)',
     transition:'background .15s, border-color .15s',
   };
   const selected = {
@@ -51,7 +51,7 @@ export default function AdminSettings() {
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 760 }}>
-      <h1 style={{ color:'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         ⚙ Настройки
       </h1>
       <p style={{ color:'rgba(225,220,245,.85)', fontSize: 14, marginTop: 0, marginBottom: 24 }}>
@@ -60,7 +60,7 @@ export default function AdminSettings() {
 
       {/* Политика удаления */}
       <div style={card}>
-        <div style={{ color:'white', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+        <div style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
           🗑 Политика удаления
         </div>
         <div style={{ color:'rgba(225,220,245,.7)', fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
@@ -77,7 +77,7 @@ export default function AdminSettings() {
               onChange={() => update({ delete_policy: 'soft' })}
               style={{ marginTop: 3, accentColor:'#a884e0' }}/>
             <div>
-              <div style={{ color:'white', fontWeight:600, fontSize: 14 }}>
+              <div style={{ color:'#F9F0F0', fontWeight:600, fontSize: 14 }}>
                 Мягкое (по умолчанию)
               </div>
               <div style={{ color:'rgba(225,220,245,.65)', fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
@@ -95,7 +95,7 @@ export default function AdminSettings() {
               onChange={() => update({ delete_policy: 'hard' })}
               style={{ marginTop: 3, accentColor:'#a884e0' }}/>
             <div>
-              <div style={{ color:'white', fontWeight:600, fontSize: 14 }}>
+              <div style={{ color:'#F9F0F0', fontWeight:600, fontSize: 14 }}>
                 Полное (физическое)
               </div>
               <div style={{ color:'rgba(225,220,245,.65)', fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
@@ -111,7 +111,7 @@ export default function AdminSettings() {
 
       {/* Уровень нажима продаж */}
       <div style={{ ...card, marginTop: 16 }}>
-        <div style={{ color:'white', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+        <div style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
           💰 Уровень нажима продаж
         </div>
         <div style={{ color:'rgba(225,220,245,.7)', fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
@@ -126,7 +126,7 @@ export default function AdminSettings() {
               onChange={() => update({ sales_pressure_level: 1 })}
               style={{ marginTop: 3, accentColor:'#a884e0' }}/>
             <div>
-              <div style={{ color:'white', fontWeight:600, fontSize: 14 }}>
+              <div style={{ color:'#F9F0F0', fontWeight:600, fontSize: 14 }}>
                 Мягкий (по умолчанию)
               </div>
               <div style={{ color:'rgba(225,220,245,.65)', fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
@@ -145,7 +145,7 @@ export default function AdminSettings() {
               onChange={() => update({ sales_pressure_level: 2 })}
               style={{ marginTop: 3, accentColor:'#a884e0' }}/>
             <div>
-              <div style={{ color:'white', fontWeight:600, fontSize: 14 }}>
+              <div style={{ color:'#F9F0F0', fontWeight:600, fontSize: 14 }}>
                 Жёсткий
               </div>
               <div style={{ color:'rgba(225,220,245,.65)', fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
@@ -159,8 +159,8 @@ export default function AdminSettings() {
 
       {toast && (
         <div style={{ position:'fixed', bottom:32, left:'50%', transform:'translateX(-50%)',
-          background:'rgba(22,15,50,.97)', border:'1px solid rgba(255,255,255,.15)',
-          borderRadius:50, padding:'10px 20px', color:'white', fontSize:14, fontWeight:600,
+          background:'rgba(22,15,50,.97)', border:'1px solid rgba(249,240,240,.15)',
+          borderRadius:50, padding:'10px 20px', color:'#F9F0F0', fontSize:14, fontWeight:600,
           zIndex:1000, whiteSpace:'nowrap', boxShadow:'0 4px 20px rgba(0,0,0,.5)' }}>
           {toast}
         </div>

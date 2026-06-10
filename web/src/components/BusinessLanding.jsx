@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
-import { heyToast, useConfirm } from './Screens';
+import { heyToast } from './shared/Toast';
+import { useConfirm } from './shared/Confirm';
 
 const card = {
   background: 'rgba(20,12,40,.65)',
-  border: '1px solid rgba(255,255,255,.12)',
+  border: '1px solid rgba(249,240,240,.12)',
   borderRadius: 16,
   padding: '20px 22px',
   marginBottom: 16,
@@ -92,17 +93,17 @@ export default function BusinessLanding() {
       <div style={{
         position:'sticky', top:0, zIndex:10,
         background:'rgba(14,8,32,.95)', backdropFilter:'blur(20px)',
-        borderBottom:'1px solid rgba(255,255,255,.08)',
+        borderBottom:'1px solid rgba(249,240,240,.08)',
       }}>
         <div style={{ maxWidth:780, margin:'0 auto', padding:'14px 24px',
           display:'flex', alignItems:'center', gap:12 }}>
           <button onClick={() => nav('/me')}
             style={{
-              background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.14)',
+              background:'rgba(249,240,240,.08)', border:'1px solid rgba(249,240,240,.14)',
               color:'rgba(225,220,245,.95)', borderRadius:10, padding:'6px 12px',
               fontSize:13, cursor:'pointer', fontFamily:'inherit',
             }}>‹ К профилю</button>
-          <div style={{ color:'white', fontSize:16, fontWeight:700 }}>HEY для бизнеса</div>
+          <div style={{ color:'#F9F0F0', fontSize:16, fontWeight:700 }}>HEY для бизнеса</div>
         </div>
       </div>
 
@@ -111,7 +112,7 @@ export default function BusinessLanding() {
         {/* Hero */}
         <div style={{ marginBottom:28, textAlign:'center' }}>
           <div style={{ fontSize:46, marginBottom:8 }}>🎓</div>
-          <h1 style={{ color:'white', fontSize:30, fontWeight:800, margin:'0 0 10px', letterSpacing:-.4 }}>
+          <h1 style={{ color:'#F9F0F0', fontSize:30, fontWeight:800, margin:'0 0 10px', letterSpacing:-.4 }}>
             Подключи свою школу к HEY
           </h1>
           <p style={{ color:'rgba(225,220,245,.85)', fontSize:15, lineHeight:1.6, margin:0 }}>
@@ -126,7 +127,7 @@ export default function BusinessLanding() {
           {FEATURES.map((f,i) => (
             <div key={i} style={card}>
               <div style={{ fontSize:26, marginBottom:6 }}>{f.icon}</div>
-              <div style={{ color:'white', fontSize:15, fontWeight:700, marginBottom:5 }}>{f.title}</div>
+              <div style={{ color:'#F9F0F0', fontSize:15, fontWeight:700, marginBottom:5 }}>{f.title}</div>
               <div style={{ color:'rgba(225,220,245,.78)', fontSize:13, lineHeight:1.5 }}>{f.text}</div>
             </div>
           ))}
@@ -143,11 +144,11 @@ export default function BusinessLanding() {
               <div style={{
                 width:30, height:30, borderRadius:'50%', flexShrink:0,
                 background:'linear-gradient(135deg,#6b46c1,#a78bfa)',
-                color:'white', fontSize:14, fontWeight:700,
+                color:'#F9F0F0', fontSize:14, fontWeight:700,
                 display:'flex', alignItems:'center', justifyContent:'center',
               }}>{n}</div>
               <div style={{ flex:1 }}>
-                <div style={{ color:'white', fontSize:14, fontWeight:700, marginBottom:2 }}>{t}</div>
+                <div style={{ color:'#F9F0F0', fontSize:14, fontWeight:700, marginBottom:2 }}>{t}</div>
                 <div style={{ color:'rgba(225,220,245,.78)', fontSize:13, lineHeight:1.5 }}>{d}</div>
               </div>
             </div>
@@ -156,11 +157,11 @@ export default function BusinessLanding() {
 
         {/* Limits */}
         <div style={{
-          background:'rgba(120,90,200,.12)', border:'1px solid rgba(180,140,220,.3)',
+          background:'rgba(95, 64, 128,.12)', border:'1px solid rgba(180,140,220,.3)',
           borderRadius:14, padding:'14px 18px', marginBottom:24,
           color:'rgba(225,220,245,.85)', fontSize:13, lineHeight:1.6,
         }}>
-          <strong style={{ color:'white' }}>Ограничения для бизнес-пользователей:</strong>
+          <strong style={{ color:'#F9F0F0' }}>Ограничения для бизнес-пользователей:</strong>
           <ul style={{ margin:'8px 0 0', paddingLeft:20 }}>
             <li>До 3 школ на один HEY-аккаунт</li>
             <li>В качестве официального аккаунта школы можно привязать только себя</li>
@@ -181,9 +182,9 @@ export default function BusinessLanding() {
             <button onClick={() => nav('/integrations/awo')}
               style={{
                 padding:'12px 26px', borderRadius:12, border:'none',
-                background:'rgba(140,110,220,.9)', color:'white',
+                background:'rgba(140,110,220,.9)', color:'#F9F0F0',
                 fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
-                boxShadow:'0 4px 14px rgba(120,90,200,.35)',
+                boxShadow:'0 4px 14px rgba(95, 64, 128,.35)',
               }}>
               Открыть «Мои школы» →
             </button>
@@ -202,7 +203,7 @@ export default function BusinessLanding() {
             <button onClick={cancelRequest}
               style={{
                 padding:'8px 18px', borderRadius:10,
-                background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.18)',
+                background:'rgba(249,240,240,.06)', border:'1px solid rgba(249,240,240,.18)',
                 color:'rgba(225,220,245,.9)', fontSize:13, fontWeight:600, cursor:'pointer',
                 fontFamily:'inherit',
               }}>Отозвать заявку</button>
@@ -223,7 +224,7 @@ export default function BusinessLanding() {
             <button onClick={() => setShowForm(true)}
               style={{
                 padding:'10px 22px', borderRadius:12, border:'none',
-                background:'rgba(140,110,220,.85)', color:'white',
+                background:'rgba(140,110,220,.85)', color:'#F9F0F0',
                 fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
               }}>Подать заявку заново</button>
           </div>
@@ -232,9 +233,9 @@ export default function BusinessLanding() {
             <button onClick={() => setShowForm(true)}
               style={{
                 padding:'14px 36px', borderRadius:14, border:'none',
-                background:'rgba(140,110,220,.9)', color:'white',
+                background:'rgba(140,110,220,.9)', color:'#F9F0F0',
                 fontSize:16, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
-                boxShadow:'0 6px 20px rgba(120,90,200,.4)',
+                boxShadow:'0 6px 20px rgba(95, 64, 128,.4)',
               }}>
               Подать заявку на бизнес-доступ
             </button>
@@ -251,11 +252,11 @@ export default function BusinessLanding() {
         }} onMouseDown={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
           <div style={{
             background:'rgba(22,15,50,.98)', borderRadius:18,
-            border:'1px solid rgba(255,255,255,.14)',
+            border:'1px solid rgba(249,240,240,.14)',
             width:'min(94vw, 460px)', padding:'24px 26px',
             boxShadow:'0 20px 60px rgba(0,0,0,.55)',
           }}>
-            <h2 style={{ margin:0, color:'white', fontSize:18, fontWeight:800, marginBottom:12 }}>
+            <h2 style={{ margin:0, color:'#F9F0F0', fontSize:18, fontWeight:800, marginBottom:12 }}>
               🎓 Заявка на бизнес-доступ
             </h2>
             <p style={{ color:'rgba(225,220,245,.85)', fontSize:13, lineHeight:1.55, marginTop:0, marginBottom:14 }}>
@@ -265,8 +266,8 @@ export default function BusinessLanding() {
               placeholder="Например: онлайн-школа театра LIBERTAD, 200 учеников, продажи через АвтоВебОфис"
               rows={4} style={{
                 width:'100%', boxSizing:'border-box',
-                background:'rgba(0,0,0,.4)', border:'1px solid rgba(255,255,255,.18)',
-                borderRadius:10, padding:'10px 12px', color:'white', fontSize:13,
+                background:'rgba(0,0,0,.4)', border:'1px solid rgba(249,240,240,.18)',
+                borderRadius:10, padding:'10px 12px', color:'#F9F0F0', fontSize:13,
                 fontFamily:'inherit', outline:'none', resize:'vertical', lineHeight:1.5,
               }}/>
             <div style={{ color:'rgba(225,220,245,.55)', fontSize:11, marginTop:4, textAlign:'right' }}>
@@ -276,16 +277,16 @@ export default function BusinessLanding() {
               <button onClick={() => setShowForm(false)} disabled={submitting}
                 style={{
                   flex:1, padding:'11px', borderRadius:12,
-                  border:'1px solid rgba(255,255,255,.18)',
-                  background:'rgba(255,255,255,.06)', color:'rgba(225,220,245,.9)',
+                  border:'1px solid rgba(249,240,240,.18)',
+                  background:'rgba(249,240,240,.06)', color:'rgba(225,220,245,.9)',
                   fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
                 }}>Отмена</button>
               <button onClick={submitRequest} disabled={submitting}
                 style={{
                   flex:1, padding:'11px', borderRadius:12, border:'none',
-                  background:'rgba(140,110,220,.9)', color:'white',
+                  background:'rgba(140,110,220,.9)', color:'#F9F0F0',
                   fontSize:14, fontWeight:700, cursor: submitting ? 'wait' : 'pointer',
-                  fontFamily:'inherit', boxShadow:'0 4px 14px rgba(120,90,200,.35)',
+                  fontFamily:'inherit', boxShadow:'0 4px 14px rgba(95, 64, 128,.35)',
                 }}>{submitting ? '…' : 'Отправить'}</button>
             </div>
           </div>

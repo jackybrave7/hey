@@ -64,7 +64,7 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
         borderRadius: isCard ? 8 : 14,
         overflow: 'hidden',
         background: '#0d0820',
-        border: '1px solid rgba(255,255,255,.1)',
+        border: '1px solid rgba(249,240,240,.1)',
         userSelect: 'none',
         flexShrink: 0,
       }}
@@ -88,8 +88,8 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
           }}>
             <button onClick={stop}
               style={{
-                background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)',
-                borderRadius: 20, padding: '4px 12px', color: 'rgba(255,255,255,.7)',
+                background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.15)',
+                borderRadius: 20, padding: '4px 12px', color: 'rgba(249,240,240,.7)',
                 fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
               }}>
               ✕ Закрыть плеер
@@ -126,7 +126,7 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
               <div style={{
                 position:'absolute', top:'50%', left:'50%',
                 transform:'translate(-50%,-50%) translateY(-30px)',
-                fontSize: isCard ? 32 : 56, opacity:.25, color:'white',
+                fontSize: isCard ? 32 : 56, opacity:.25, color:'#F9F0F0',
                 pointerEvents:'none',
               }}>🎬</div>
             )}
@@ -138,10 +138,10 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
               transform: 'translate(-50%,-50%)',
               width: isCard ? 40 : 56, height: isCard ? 40 : 56,
               borderRadius: '50%',
-              background: 'rgba(255,255,255,.18)', backdropFilter: 'blur(6px)',
-              border: '2px solid rgba(255,255,255,.55)',
+              background: 'rgba(249,240,240,.18)', backdropFilter: 'blur(6px)',
+              border: '2px solid rgba(249,240,240,.55)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: isCard ? 16 : 22, color: 'white',
+              fontSize: isCard ? 16 : 22, color:'#F9F0F0',
               boxShadow: '0 4px 20px rgba(0,0,0,.5)',
               transition: 'transform .15s, background .15s',
             }}>▶</div>
@@ -164,7 +164,7 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
             }}>
               {data.title && (
                 <div onClick={play} style={{
-                  color: 'rgba(255,255,255,.9)', fontSize: 13, fontWeight: 600,
+                  color: 'rgba(249,240,240,.9)', fontSize: 13, fontWeight: 600,
                   lineHeight: 1.4, cursor: 'pointer',
                   overflow: 'hidden', display: '-webkit-box',
                   WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -173,10 +173,10 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   {data.author && (
-                    <span style={{ color: 'rgba(255,255,255,.45)', fontSize: 11 }}>{data.author}</span>
+                    <span style={{ color: 'rgba(249,240,240,.45)', fontSize: 11 }}>{data.author}</span>
                   )}
                   {data.duration_seconds && (
-                    <span style={{ color: 'rgba(255,255,255,.35)', fontSize: 11 }}>
+                    <span style={{ color: 'rgba(249,240,240,.35)', fontSize: 11 }}>
                       {fmtDuration(data.duration_seconds)}
                     </span>
                   )}

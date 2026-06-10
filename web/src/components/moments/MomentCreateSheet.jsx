@@ -6,6 +6,7 @@ import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 import MoodEmoji from './MoodEmoji';
 import { HEY_EMOJI, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
 import EmojiInput from '../EmojiInput';
+import Icon from '../Icon';
 
 // Набор настроений для ручного выбора (когда нет медиа)
 const MOOD_OPTIONS = [
@@ -209,7 +210,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
     borderRadius:24,width:'min(100%,520px)',
     maxHeight:'90vh',display:'flex',flexDirection:'column',
     boxShadow:'0 8px 48px rgba(0,0,0,.6)',
-    border:'1px solid rgba(255,255,255,.1)',
+    border:'1px solid rgba(249,240,240,.1)',
     overflow:'hidden',
   };
 
@@ -218,12 +219,12 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
       <div style={sheet}>
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',padding:'12px 20px 14px',
-          borderBottom:'1px solid rgba(255,255,255,.08)'}}>
-          <span style={{color:'white',fontSize:17,fontWeight:700,flex:1}}>
+          borderBottom:'1px solid rgba(249,240,240,.08)'}}>
+          <span style={{color:'#F9F0F0',fontSize:17,fontWeight:700,flex:1}}>
             {isEdit ? '✎ Редактировать момент' : '✦ Новый момент'}
           </span>
           <button onClick={onClose} style={{background:'none',border:'none',
-            color:'rgba(255,255,255,.4)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
+            color:'rgba(249,240,240,.4)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
         </div>
 
         <div style={{flex:1,overflowY:'auto',padding:'18px 20px',display:'flex',flexDirection:'column',gap:18}}>
@@ -275,7 +276,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                           position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
                           background:'rgba(0,0,0,.65)',backdropFilter:'blur(6px)',
                           borderRadius:20,padding:'5px 14px',
-                          color:'rgba(255,255,255,.95)',fontSize:11,fontWeight:600,whiteSpace:'nowrap',
+                          color:'rgba(249,240,240,.95)',fontSize:11,fontWeight:600,whiteSpace:'nowrap',
                           pointerEvents:'none',
                         }}>{dragHint}</div>
                       </div>
@@ -341,7 +342,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                             position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
                             background:'rgba(0,0,0,.65)',backdropFilter:'blur(6px)',
                             borderRadius:20,padding:'5px 14px',
-                            color:'rgba(255,255,255,.95)',fontSize:11,fontWeight:600,whiteSpace:'nowrap',
+                            color:'rgba(249,240,240,.95)',fontSize:11,fontWeight:600,whiteSpace:'nowrap',
                             pointerEvents:'none',
                           }}>{dragHint}</div>
                         )}
@@ -362,7 +363,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                       position:'absolute',inset:0,
                       background:'rgba(10,5,25,.65)',backdropFilter:'blur(4px)',
                       display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-                      gap:8,color:'white',fontSize:13,fontWeight:600,
+                      gap:8,color:'#F9F0F0',fontSize:13,fontWeight:600,
                     }}>
                       <div style={{fontSize:24,animation:'spin 1s linear infinite'}}>⏳</div>
                       Загрузка…
@@ -372,7 +373,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                     <button onClick={removeMedia} style={{
                       position:'absolute',top:8,right:8,background:'rgba(0,0,0,.55)',
                       backdropFilter:'blur(6px)',border:'none',borderRadius:'50%',
-                      width:30,height:30,color:'white',fontSize:16,cursor:'pointer',
+                      width:30,height:30,color:'#F9F0F0',fontSize:16,cursor:'pointer',
                       display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
                   )}
                 </div>
@@ -380,13 +381,13 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                 <button onClick={() => fileRef.current?.click()}
                   style={{
                     width:'100%',padding:'20px',borderRadius:16,cursor:'pointer',
-                    border:'2px dashed rgba(255,255,255,.18)',background:'rgba(255,255,255,.04)',
-                    color:'rgba(255,255,255,.45)',fontSize:14,display:'flex',
+                    border:'2px dashed rgba(249,240,240,.18)',background:'rgba(249,240,240,.04)',
+                    color:'rgba(249,240,240,.45)',fontSize:14,display:'flex',
                     flexDirection:'column',alignItems:'center',gap:8,transition:'all .15s'
                   }}
-                  onMouseEnter={e=>{ e.currentTarget.style.borderColor='rgba(180,140,220,.5)'; e.currentTarget.style.background='rgba(100,78,148,.08)'; }}
-                  onMouseLeave={e=>{ e.currentTarget.style.borderColor='rgba(255,255,255,.18)'; e.currentTarget.style.background='rgba(255,255,255,.04)'; }}>
-                  <span style={{fontSize:28}}>📎</span>
+                  onMouseEnter={e=>{ e.currentTarget.style.borderColor='rgba(180,140,220,.5)'; e.currentTarget.style.background='rgba(95, 64, 128,.08)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.borderColor='rgba(249,240,240,.18)'; e.currentTarget.style.background='rgba(249,240,240,.04)'; }}>
+                  <Icon name="attach" size={28} />
                   <span>Добавить фото или аудио</span>
                   {isSuper ? (
                     <>
@@ -394,7 +395,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                         JPG/PNG/WebP до 15 МБ · MP3 до 30 МБ
                       </span>
                       <span style={{fontSize:11,color:'rgba(200,170,255,.75)',
-                        background:'rgba(120,90,200,.18)',
+                        background:'rgba(95, 64, 128,.18)',
                         border:'1px solid rgba(180,140,220,.3)',
                         borderRadius:10,padding:'3px 10px',marginTop:2}}>
                         ✦ Расширенные лимиты Super
@@ -421,15 +422,15 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               {/* Свёрнутый триггер */}
               <button onClick={() => setMoodOpen(o => !o)}
                 style={{
-                  width:'100%',background:'rgba(255,255,255,.04)',
-                  border:'1px solid rgba(255,255,255,.08)',borderRadius:12,
+                  width:'100%',background:'rgba(249,240,240,.04)',
+                  border:'1px solid rgba(249,240,240,.08)',borderRadius:12,
                   padding:'10px 14px',cursor:'pointer',
                   display:'flex',alignItems:'center',gap:10,
-                  color:'rgba(255,255,255,.6)',fontSize:13,fontFamily:'inherit',
+                  color:'rgba(249,240,240,.6)',fontSize:13,fontFamily:'inherit',
                   transition:'background .15s',
                 }}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.06)'}
-                onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}>
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(249,240,240,.06)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(249,240,240,.04)'}>
                 {/* Мини-превью текущего выбора, либо иконка-плейсхолдер */}
                 {moodEmoji ? (
                   <div style={{width:28,height:28,borderRadius:8,overflow:'hidden',flexShrink:0}}>
@@ -444,7 +445,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                     : 'Настроение карточки — авто'}
                 </span>
                 <span style={{
-                  fontSize:11,color:'rgba(255,255,255,.4)',
+                  fontSize:11,color:'rgba(249,240,240,.4)',
                   transform: moodOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition:'transform .15s',
                 }}>▾</span>
@@ -457,7 +458,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                   {moodEmoji && (
                     <div style={{
                       height:120,borderRadius:14,overflow:'hidden',marginBottom:10,
-                      border:'1px solid rgba(255,255,255,.1)',
+                      border:'1px solid rgba(249,240,240,.1)',
                     }}>
                       <MoodEmoji type={moodEmoji} size={70}/>
                     </div>
@@ -471,7 +472,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                           border: moodEmoji===opt.type
                             ? '2px solid rgba(180,140,220,.9)'
                             : '2px solid transparent',
-                          background:'rgba(255,255,255,.05)',
+                          background:'rgba(249,240,240,.05)',
                           overflow:'hidden',position:'relative',
                           transition:'border-color .15s, transform .12s',
                         }}
@@ -482,7 +483,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                     ))}
                   </div>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',
-                    marginTop:8,color:'rgba(255,255,255,.35)',fontSize:11}}>
+                    marginTop:8,color:'rgba(249,240,240,.35)',fontSize:11}}>
                     <span>{moodEmoji ? 'Сменить или сбросить →' : 'Или подберём автоматически по тексту'}</span>
                     {moodEmoji && (
                       <button onClick={()=>setMoodEmoji(null)}
@@ -511,29 +512,27 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
             placeholder="Расскажи как другу — что у тебя сейчас."
             style={{
               width:'100%', boxSizing:'border-box',
-              background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.14)',
-              borderRadius:14, padding:'13px 15px', color:'white', fontSize:15,
+              background:'rgba(249,240,240,.07)', border:'1px solid rgba(249,240,240,.14)',
+              borderRadius:14, padding:'13px 15px', color:'#F9F0F0', fontSize:15,
               lineHeight:1.7, minHeight:120, maxHeight: 360, overflow:'auto',
               transition:'border-color .15s', whiteSpace:'pre-wrap',
             }}
             onFocus={(e)=>{ e.currentTarget.style.borderColor='rgba(180,140,220,.55)'; }}
-            onBlur={(e)=>{ e.currentTarget.style.borderColor='rgba(255,255,255,.14)'; }}
+            onBlur={(e)=>{ e.currentTarget.style.borderColor='rgba(249,240,240,.14)'; }}
           />
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',
-            color:'rgba(255,255,255,.45)',fontSize:11,marginTop:-12}}>
+            color:'rgba(249,240,240,.45)',fontSize:11,marginTop:-12}}>
             <button type="button"
               onClick={() => setEmojiOpen(o => !o)}
               title="HEY-эмодзи"
               style={{
-                background: emojiOpen ? 'rgba(140,100,220,.4)' : 'rgba(255,255,255,.08)',
-                border:'1px solid rgba(255,255,255,.14)',
+                background: emojiOpen ? 'rgba(140,100,220,.4)' : 'rgba(249,240,240,.08)',
+                border:'1px solid rgba(249,240,240,.14)',
                 borderRadius:50, padding:'4px 10px 4px 6px',
-                color:'white', cursor:'pointer', fontFamily:'inherit',
+                color:'#F9F0F0', cursor:'pointer', fontFamily:'inherit',
                 display:'inline-flex', alignItems:'center', gap:6, fontSize:12,
               }}>
-              <img src="/emoji/smiling.svg" alt=""
-                style={{width:16,height:16,pointerEvents:'none',
-                  filter:'drop-shadow(1px 1px 1px rgba(0,0,0,0.4))'}}/>
+              <Icon name="smile" size={16} />
               <span>{emojiOpen ? 'Скрыть' : 'Эмодзи'}</span>
             </button>
             <span>{text.length}/2000</span>
@@ -545,7 +544,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
               background:'rgba(48,38,78,.85)', borderRadius:12,
               padding:'8px 6px', display:'grid',
               gridTemplateColumns:'repeat(8, 1fr)', gap:2,
-              border:'1px solid rgba(255,255,255,.08)',
+              border:'1px solid rgba(249,240,240,.08)',
             }}>
               {HEY_EMOJI.map(name => (
                 <button key={name} type="button" title={emojiLabel(name)}
@@ -578,7 +577,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                     padding:5, borderRadius:8, transition:'background .12s',
                     display:'flex', alignItems:'center', justifyContent:'center',
                   }}
-                  onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.12)'}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(249,240,240,.12)'}
                   onMouseLeave={e=>e.currentTarget.style.background='none'}>
                   <img src={emojiUrl(name)} alt={name}
                     style={{width:26,height:26,pointerEvents:'none',
@@ -597,7 +596,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
           {detectedVideoUrl && (
             <div style={{
               background:'rgba(20,10,50,.8)',
-              border:'1px solid rgba(120,80,200,.35)',
+              border:'1px solid rgba(95, 64, 128,.35)',
               borderRadius:12,
               padding:'10px 14px',
               display:'flex',
@@ -609,10 +608,10 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                 <div style={{color:'rgba(200,180,255,.9)',fontSize:13,fontWeight:600,marginBottom:3}}>
                   🎬 {videoProviderName(detectedVideoUrl)} распознан
                 </div>
-                <div style={{color:'rgba(255,255,255,.4)',fontSize:11,wordBreak:'break-all'}}>
+                <div style={{color:'rgba(249,240,240,.4)',fontSize:11,wordBreak:'break-all'}}>
                   {detectedVideoUrl}
                 </div>
-                <div style={{color:'rgba(255,255,255,.3)',fontSize:11,marginTop:3}}>
+                <div style={{color:'rgba(249,240,240,.3)',fontSize:11,marginTop:3}}>
                   После публикации появится превью
                 </div>
               </div>
@@ -622,21 +621,21 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
           {/* Search toggle */}
           <div style={{
             display:'flex',alignItems:'center',gap:14,
-            background:'rgba(255,255,255,.06)',borderRadius:14,padding:'14px 16px',cursor:'pointer'
+            background:'rgba(249,240,240,.06)',borderRadius:14,padding:'14px 16px',cursor:'pointer'
           }} onClick={() => setIsSearch(v => !v)}>
             <div style={{
               width:42,height:24,borderRadius:12,transition:'background .2s',position:'relative',flexShrink:0,
-              background: isSearch ? 'rgba(100,78,148,.9)' : 'rgba(255,255,255,.15)',
+              background: isSearch ? 'rgba(95, 64, 128,.9)' : 'rgba(249,240,240,.15)',
             }}>
               <div style={{
                 position:'absolute',top:3,left: isSearch ? 21 : 3,
-                width:18,height:18,borderRadius:'50%',background:'white',transition:'left .2s',
+                width:18,height:18,borderRadius:'50%',background:'#F9F0F0',transition:'left .2s',
                 boxShadow:'0 1px 4px rgba(0,0,0,.3)'
               }}/>
             </div>
             <div>
-              <div style={{color:'white',fontSize:14,fontWeight:600}}>🤝 Это поиск</div>
-              <div style={{color:'rgba(255,255,255,.4)',fontSize:12,marginTop:2}}>
+              <div style={{color:'#F9F0F0',fontSize:14,fontWeight:600}}>🤝 Это поиск</div>
+              <div style={{color:'rgba(249,240,240,.4)',fontSize:12,marginTop:2}}>
                 Отметь если ищешь людей, идеи или возможности
               </div>
             </div>
@@ -651,14 +650,14 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
         </div>
 
         {/* Footer */}
-        <div style={{padding:'14px 20px 20px',borderTop:'1px solid rgba(255,255,255,.08)',flexShrink:0}}>
+        <div style={{padding:'14px 20px 20px',borderTop:'1px solid rgba(249,240,240,.08)',flexShrink:0}}>
           <button onClick={save} disabled={saving || uploading || !text.trim()}
             style={{
               width:'100%',padding:'14px',borderRadius:50,fontSize:15,fontWeight:700,
               cursor: saving || uploading || !text.trim() ? 'not-allowed' : 'pointer',
-              background: !text.trim() ? 'rgba(255,255,255,.08)' : 'rgba(120,90,200,.85)',
-              border:'none',color: !text.trim() ? 'rgba(255,255,255,.3)' : 'white',
-              transition:'all .2s',boxShadow: text.trim() ? '0 4px 20px rgba(120,80,200,.35)' : 'none'
+              background: !text.trim() ? 'rgba(249,240,240,.08)' : 'rgba(95, 64, 128,.85)',
+              border:'none',color: !text.trim() ? 'rgba(249,240,240,.3)' : '#F9F0F0',
+              transition:'all .2s',boxShadow: text.trim() ? '0 4px 20px rgba(95, 64, 128,.35)' : 'none'
             }}>
             {saving ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Опубликовать'}
           </button>

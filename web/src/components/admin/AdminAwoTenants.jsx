@@ -2,13 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 import { useAuth } from '../../AuthContext';
 import AwoGuide from './AwoGuide';
 
 const cardStyle = {
   background: 'rgba(20,12,40,.65)',
-  border: '1px solid rgba(255,255,255,.12)',
+  border: '1px solid rgba(249,240,240,.12)',
   borderRadius: 14,
   padding: '16px 18px',
   marginBottom: 12,
@@ -18,14 +18,14 @@ const cardStyle = {
 };
 const btn = {
   padding: '9px 16px', borderRadius: 10, border: 'none',
-  background: 'rgba(140,110,220,.85)', color: 'white',
+  background: 'rgba(140,110,220,.85)', color:'#F9F0F0',
   fontSize: 13, fontWeight: 600, cursor: 'pointer',
   fontFamily: 'inherit',
 };
 const btnGhost = {
   ...btn,
-  background: 'rgba(255,255,255,.08)',
-  border: '1px solid rgba(255,255,255,.18)',
+  background: 'rgba(249,240,240,.08)',
+  border: '1px solid rgba(249,240,240,.18)',
   color: 'rgba(225,220,245,.9)',
 };
 
@@ -88,13 +88,13 @@ export default function AdminAwoTenants() {
   return (
     <div style={{ padding: '28px 32px', maxWidth: 760 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
-        <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, margin: 0, flex: 1 }}>
+        <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, margin: 0, flex: 1 }}>
           🎓 АВО / Школы
         </h1>
         <button onClick={() => setShowGuide(true)}
           style={{
             padding: '7px 14px', borderRadius: 10,
-            background: 'rgba(120,90,200,.25)',
+            background: 'rgba(95, 64, 128,.25)',
             border: '1px solid rgba(180,140,220,.4)',
             color: 'rgba(220,200,255,.95)',
             fontSize: 12, fontWeight: 600, cursor: 'pointer',
@@ -116,7 +116,7 @@ export default function AdminAwoTenants() {
       {/* Create form — только для создателей школ */}
       {canCreate && (
         <div style={{
-          background: 'rgba(20,12,40,.5)', border: '1px solid rgba(255,255,255,.12)',
+          background: 'rgba(20,12,40,.5)', border: '1px solid rgba(249,240,240,.12)',
           borderRadius: 14, padding: '14px 16px', marginBottom: 22,
           display:'flex', gap:8,
         }}>
@@ -125,8 +125,8 @@ export default function AdminAwoTenants() {
             placeholder="Название новой школы"
             style={{
               flex:1, padding:'10px 12px', borderRadius:10,
-              background:'rgba(0,0,0,.4)', border:'1px solid rgba(255,255,255,.18)',
-              color:'white', fontSize:14, outline:'none', fontFamily:'inherit',
+              background:'rgba(0,0,0,.4)', border:'1px solid rgba(249,240,240,.18)',
+              color:'#F9F0F0', fontSize:14, outline:'none', fontFamily:'inherit',
             }}/>
           <button onClick={create} disabled={creating || !newName.trim()} style={btn}>
             {creating ? '…' : '+ Создать школу'}
@@ -152,10 +152,10 @@ export default function AdminAwoTenants() {
               width: 44, height: 44, borderRadius: 12, flexShrink: 0,
               background: 'linear-gradient(135deg,#6b46c1,#a78bfa)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, color: 'white', fontWeight: 700,
+              fontSize: 20, color:'#F9F0F0', fontWeight: 700,
             }}>🎓</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: 'white', fontSize: 16, fontWeight: 700,
+              <div style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700,
                 overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {t.name}
                 {t.id === 'tnt_default' && (

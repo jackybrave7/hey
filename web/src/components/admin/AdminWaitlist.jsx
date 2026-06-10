@@ -3,7 +3,7 @@
 // помечает «уведомлён» когда написал, или удаляет неактуальное.
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -78,10 +78,10 @@ export default function AdminWaitlist() {
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100 }}>
       <div style={{ display:'flex', alignItems:'baseline', gap:14, flexWrap:'wrap', marginBottom: 8 }}>
-        <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, margin: 0 }}>
+        <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, margin: 0 }}>
           📨 Заявки на открытие регистрации
         </h1>
-        <div style={{ color:'rgba(255,255,255,.75)', fontSize: 13, fontWeight:500 }}>
+        <div style={{ color:'rgba(249,240,240,.75)', fontSize: 13, fontWeight:500 }}>
           {counts.all.toLocaleString('ru')} всего
           {counts.pending > 0 && (
             <span style={{ color:'rgba(255,200,160,1)', fontWeight:700 }}>
@@ -99,7 +99,7 @@ export default function AdminWaitlist() {
         </div>
       </div>
 
-      <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 13, marginTop: 0, marginBottom: 18,
+      <p style={{ color: 'rgba(249,240,240,.7)', fontSize: 13, marginTop: 0, marginBottom: 18,
         lineHeight: 1.5 }}>
         Юзеры, оставившие email на экране «Только по приглашению». Когда
         напишешь им — нажми «✓ Уведомлён», чтобы убрать из счётчика.
@@ -121,9 +121,9 @@ export default function AdminWaitlist() {
           style={{
             marginLeft:'auto', flex:'0 0 280px', maxWidth:'100%',
             padding:'8px 12px', borderRadius:9,
-            background:'rgba(255,255,255,.07)',
-            border:'1px solid rgba(255,255,255,.12)',
-            color:'white', fontSize:13, outline:'none',
+            background:'rgba(249,240,240,.07)',
+            border:'1px solid rgba(249,240,240,.12)',
+            color:'#F9F0F0', fontSize:13, outline:'none',
           }}/>
       </div>
 
@@ -133,16 +133,16 @@ export default function AdminWaitlist() {
       )}
 
       {loading ? (
-        <div style={{ color:'rgba(255,255,255,.5)', padding: 40, textAlign:'center' }}>Загрузка…</div>
+        <div style={{ color:'rgba(249,240,240,.5)', padding: 40, textAlign:'center' }}>Загрузка…</div>
       ) : !filtered.length ? (
-        <div style={{ color:'rgba(255,255,255,.5)', padding: 40, textAlign:'center' }}>
+        <div style={{ color:'rgba(249,240,240,.5)', padding: 40, textAlign:'center' }}>
           {filter === 'pending' ? 'Все заявки обработаны 👌' : 'Заявок нет.'}
         </div>
       ) : (
         <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, color:'white' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, color:'#F9F0F0' }}>
             <thead>
-              <tr style={{ color:'rgba(235,230,255,1)', borderBottom:'1px solid rgba(255,255,255,.18)',
+              <tr style={{ color:'rgba(235,230,255,1)', borderBottom:'1px solid rgba(249,240,240,.18)',
                 fontSize:12, textTransform:'uppercase', letterSpacing:.4 }}>
                 <th style={th}>Email</th>
                 <th style={th}>Источник</th>
@@ -153,14 +153,14 @@ export default function AdminWaitlist() {
             </thead>
             <tbody>
               {filtered.map(it => (
-                <tr key={it.id} style={{ borderBottom:'1px solid rgba(255,255,255,.1)' }}>
+                <tr key={it.id} style={{ borderBottom:'1px solid rgba(249,240,240,.1)' }}>
                   <td style={td}>
                     <a href={`mailto:${it.email}`}
                       style={{ color:'rgba(200,180,255,1)', fontWeight:600,
                         textDecoration:'underline',
                         textDecorationColor:'rgba(200,180,255,.4)',
                         textUnderlineOffset:2 }}
-                      onMouseEnter={e=>e.currentTarget.style.color='white'}
+                      onMouseEnter={e=>e.currentTarget.style.color='#F9F0F0'}
                       onMouseLeave={e=>e.currentTarget.style.color='rgba(200,180,255,1)'}>
                       {it.email}
                     </a>
@@ -169,14 +169,14 @@ export default function AdminWaitlist() {
                     {it.source ? (
                       <span style={{
                         display:'inline-block', padding:'2px 8px', borderRadius:6,
-                        background:'rgba(120,90,200,.22)',
+                        background:'rgba(95, 64, 128,.22)',
                         border:'1px solid rgba(180,140,255,.25)',
                         color:'rgba(220,210,255,.95)', fontSize:11, fontWeight:600,
                         letterSpacing:.2,
                       }}>{it.source}</span>
-                    ) : <span style={{ color:'rgba(255,255,255,.4)' }}>—</span>}
+                    ) : <span style={{ color:'rgba(249,240,240,.4)' }}>—</span>}
                   </td>
-                  <td style={{ ...td, color:'rgba(255,255,255,.9)', fontWeight:500 }}>
+                  <td style={{ ...td, color:'rgba(249,240,240,.9)', fontWeight:500 }}>
                     {fmtDate(it.created_at)}
                   </td>
                   <td style={td}>
@@ -221,22 +221,22 @@ const td = { padding:'10px 12px' };
 function btn() {
   return {
     padding:'8px 14px', borderRadius:9, fontSize:13, fontWeight:600,
-    cursor:'pointer', border:'none', color:'white',
-    background:'rgba(120,90,200,.55)',
+    cursor:'pointer', border:'none', color:'#F9F0F0',
+    background:'rgba(95, 64, 128,.55)',
   };
 }
 function smallBtn(variant) {
   return {
     padding:'5px 10px', borderRadius:7, fontSize:12, fontWeight:600,
-    cursor:'pointer', border:'none', color:'white',
-    background: variant === 'danger' ? 'rgba(220,80,80,.45)' : 'rgba(255,255,255,.08)',
+    cursor:'pointer', border:'none', color:'#F9F0F0',
+    background: variant === 'danger' ? 'rgba(220,80,80,.45)' : 'rgba(249,240,240,.08)',
   };
 }
 function tab(active) {
   return {
     padding:'8px 12px', borderRadius:9, fontSize:13, fontWeight:600,
     cursor:'pointer', border:'none',
-    background: active ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.06)',
-    color: active ? 'white' : 'rgba(255,255,255,.65)',
+    background: active ? 'rgba(95, 64, 128,.7)' : 'rgba(249,240,240,.06)',
+    color: active ? '#F9F0F0' : 'rgba(249,240,240,.65)',
   };
 }

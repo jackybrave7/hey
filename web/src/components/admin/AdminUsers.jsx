@@ -2,8 +2,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 import { useBulkSelection, Checkbox, BulkActionBar } from './bulk';
+import Icon from '../Icon';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -66,8 +67,8 @@ export default function AdminUsers() {
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
   }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cell = { padding: '12px 16px', color: 'rgba(255,255,255,.8)', fontSize: 13, borderBottom: '1px solid rgba(255,255,255,.06)' };
-  const hcell = { ...cell, color: 'rgba(255,255,255,.4)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .8 };
+  const cell = { padding: '12px 16px', color: 'rgba(249,240,240,.8)', fontSize: 13, borderBottom: '1px solid rgba(249,240,240,.06)' };
+  const hcell = { ...cell, color: 'rgba(249,240,240,.4)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .8 };
 
   const sortedUsers = useMemo(() => [...users].sort((a, b) => {
     const va = a[sortBy] ?? '';
@@ -101,7 +102,7 @@ export default function AdminUsers() {
     const meta = LABELS[action];
     const ok = await customConfirm(
       <>
-        <div style={{fontWeight:700,marginBottom:8,color: action === 'hard_delete' ? 'rgba(255,160,160,.95)' : 'white'}}>
+        <div style={{fontWeight:700,marginBottom:8,color: action === 'hard_delete' ? 'rgba(255,160,160,.95)' : '#F9F0F0'}}>
           {meta.confirmLabel} {ids.length} {ids.length === 1 ? 'пользователя' : 'пользователей'}?
         </div>
         {meta.warning && (
@@ -124,7 +125,7 @@ export default function AdminUsers() {
 
   return (
     <div style={{ padding: '28px 32px' }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 20 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 20 }}>
         👥 Пользователи
       </h1>
 
@@ -136,8 +137,8 @@ export default function AdminUsers() {
           placeholder="Поиск по имени или телефону…"
           style={{
             flex: 1, minWidth: 220,
-            background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)',
-            borderRadius: 10, padding: '9px 14px', color: 'white', fontSize: 14,
+            background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.14)',
+            borderRadius: 10, padding: '9px 14px', color:'#F9F0F0', fontSize: 14,
             fontFamily: 'inherit', outline: 'none',
           }}
         />
@@ -147,8 +148,8 @@ export default function AdminUsers() {
               style={{
                 padding: '9px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', border: 'none',
-                background: filter === f.value ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
-                color: filter === f.value ? 'white' : 'rgba(255,255,255,.6)',
+                background: filter === f.value ? 'rgba(95, 64, 128,.7)' : 'rgba(249,240,240,.08)',
+                color: filter === f.value ? '#F9F0F0' : 'rgba(249,240,240,.6)',
               }}>
               {f.label}
             </button>
@@ -164,9 +165,9 @@ export default function AdminUsers() {
       )}
 
       {loading ? (
-        <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 14 }}>Загрузка…</div>
+        <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 14 }}>Загрузка…</div>
       ) : (
-        <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)' }}>
+        <div style={{ background: 'rgba(249,240,240,.04)', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(249,240,240,.08)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -192,30 +193,30 @@ export default function AdminUsers() {
             </thead>
             <tbody>
               {users.length === 0 && (
-                <tr><td colSpan={7} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={7} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
                   Пусто
                 </td></tr>
               )}
               {sortedUsers.map(u => (
                 <tr key={u.id}
                   onClick={() => nav(`/admin/users/${u.id}`)}
-                  style={{ cursor: 'pointer', background: bulk.has(u.id) ? 'rgba(120,90,200,.10)' : 'transparent' }}
-                  onMouseEnter={e => e.currentTarget.style.background = bulk.has(u.id) ? 'rgba(120,90,200,.16)' : 'rgba(255,255,255,.04)'}
-                  onMouseLeave={e => e.currentTarget.style.background = bulk.has(u.id) ? 'rgba(120,90,200,.10)' : 'transparent'}>
+                  style={{ cursor: 'pointer', background: bulk.has(u.id) ? 'rgba(95, 64, 128,.10)' : 'transparent' }}
+                  onMouseEnter={e => e.currentTarget.style.background = bulk.has(u.id) ? 'rgba(95, 64, 128,.16)' : 'rgba(249,240,240,.04)'}
+                  onMouseLeave={e => e.currentTarget.style.background = bulk.has(u.id) ? 'rgba(95, 64, 128,.10)' : 'transparent'}>
                   <td style={cell} onClick={(e) => e.stopPropagation()}>
                     {u.is_admin
-                      ? <span style={{ color:'rgba(255,255,255,.2)', fontSize: 11 }}>—</span>
+                      ? <span style={{ color:'rgba(249,240,240,.2)', fontSize: 11 }}>—</span>
                       : <Checkbox checked={bulk.has(u.id)} onClick={() => bulk.toggle(u.id)} title="Выделить"/>}
                   </td>
                   <td style={cell}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{
                         width: 36, height: 36, borderRadius: '50%',
-                        background: 'rgba(120,90,200,.4)',
+                        background: 'rgba(95, 64, 128,.4)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 14, color: 'white', fontWeight: 700, flexShrink: 0,
+                        fontSize: 14, color:'#F9F0F0', fontWeight: 700, flexShrink: 0,
                         overflow: 'hidden',
-                        border: '1px solid rgba(255,255,255,.1)',
+                        border: '1px solid rgba(249,240,240,.1)',
                       }}>
                         {u.avatar && (u.avatar.startsWith('/') || u.avatar.startsWith('http') || u.avatar.startsWith('data:'))
                           ? <img src={u.avatar} alt=""
@@ -224,7 +225,7 @@ export default function AdminUsers() {
                           : (u.name?.[0]?.toUpperCase() || '?')}
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ color: 'white', fontWeight: 600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.name}</div>
+                        <div style={{ color:'#F9F0F0', fontWeight: 600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.name}</div>
                         <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
                           {u.is_admin && <span style={{ color: 'rgba(180,140,255,.8)', fontSize: 11 }}>admin</span>}
                           {u.is_super && (
@@ -253,9 +254,9 @@ export default function AdminUsers() {
                     {(u.invited_total || 0) > 0 ? (
                       <span title={`Всего: ${u.invited_total}, написали первое сообщение: ${u.invited_confirmed || 0}`}>
                         <strong style={{color:'rgba(220,200,255,.95)'}}>{u.invited_total}</strong>
-                        <span style={{color:'rgba(255,255,255,.4)'}}> ({u.invited_confirmed || 0})</span>
+                        <span style={{color:'rgba(249,240,240,.4)'}}> ({u.invited_confirmed || 0})</span>
                       </span>
-                    ) : <span style={{color:'rgba(255,255,255,.25)'}}>—</span>}
+                    ) : <span style={{color:'rgba(249,240,240,.25)'}}>—</span>}
                   </td>
                   <td style={cell}>{fmtDate(u.created_at)}</td>
                   <td style={cell}>
@@ -278,7 +279,7 @@ export default function AdminUsers() {
         </div>
       )}
 
-      <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 12, marginTop: 12 }}>
+      <div style={{ color: 'rgba(249,240,240,.3)', fontSize: 12, marginTop: 12 }}>
         {users.length} пользователей
       </div>
 
@@ -288,7 +289,7 @@ export default function AdminUsers() {
         onClear={bulk.clear}
         onAction={(a) => applyBulkAction(a.key)}
         actions={[
-          { key: 'block',       label: '🚫 Заблокировать' },
+          { key: 'block',       label: <><Icon name="ban" size={14} /> Заблокировать</> },
           { key: 'unblock',     label: '↩ Разблокировать' },
           { key: 'delete',      label: '🗑 Удалить', danger: true },
           { key: 'hard_delete', label: '💣 Стереть полностью', danger: true },
@@ -297,8 +298,8 @@ export default function AdminUsers() {
 
       {toast && (
         <div style={{ position:'fixed', bottom: 80, left: '50%', transform:'translateX(-50%)',
-          background:'rgba(22,15,50,.97)', border:'1px solid rgba(255,255,255,.15)',
-          borderRadius: 50, padding:'10px 20px', color:'white', fontSize: 14, fontWeight: 600,
+          background:'rgba(22,15,50,.97)', border:'1px solid rgba(249,240,240,.15)',
+          borderRadius: 50, padding:'10px 20px', color:'#F9F0F0', fontSize: 14, fontWeight: 600,
           zIndex: 1200, whiteSpace:'nowrap', boxShadow:'0 4px 20px rgba(0,0,0,.5)' }}>
           {toast}
         </div>

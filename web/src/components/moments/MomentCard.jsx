@@ -34,7 +34,7 @@ function AudioBars() {
       {heights.map((h, i) => (
         <div key={i} style={{
           width:5, height:h,
-          background:'rgba(255,255,255,.85)',
+          background:'rgba(249,240,240,.85)',
           borderRadius:2,
         }}/>
       ))}
@@ -78,11 +78,11 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
   const providerBadge = embedProvider ? PROVIDER_BADGE[embedProvider] : null;
 
   // Рамка: своя > Super автора > обычная
-  let border = '1px solid rgba(255,255,255,.06)';
+  let border = '1px solid rgba(249,240,240,.06)';
   let boxShadow = 'none';
   if (isMine) {
     border = '2px solid rgba(180,140,220,.7)';
-    boxShadow = '0 0 0 1px rgba(120,90,200,.25), 0 4px 18px rgba(120,80,200,.3)';
+    boxShadow = '0 0 0 1px rgba(95, 64, 128,.25), 0 4px 18px rgba(95, 64, 128,.3)';
   } else if (isAuthorSuper) {
     // Лиловая обводка для Super-авторов из ленты
     border = '2px solid rgba(200,140,255,.75)';
@@ -141,7 +141,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
               position:'absolute',top:'50%',left:'50%',
               transform:'translate(-50%,-50%)',
               width:48,height:48,borderRadius:'50%',
-              background:'rgba(255,255,255,.92)',
+              background:'rgba(249,240,240,.92)',
               display:'flex',alignItems:'center',justifyContent:'center',
               fontSize:18,color:'#2a1a3e',
               boxShadow:'0 6px 20px rgba(0,0,0,.4)',
@@ -175,7 +175,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
             <div style={{
               position:'absolute',top:'50%',left:'50%',
               transform:'translate(-50%,-50%)',fontSize:42,
-              opacity:.35,color:'white',pointerEvents:'none',
+              opacity:.35,color:'#F9F0F0',pointerEvents:'none',
             }}>🎬</div>
           )}
         </>
@@ -193,7 +193,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
           width:28,height:28,borderRadius:'50%',
           background:'rgba(0,0,0,.55)',backdropFilter:'blur(8px)',
           display:'flex',alignItems:'center',justifyContent:'center',
-          fontSize:11,color:'white',
+          fontSize:11,color:'#F9F0F0',
         }}>▶</div>
       )}
       {moment.media_type === 'audio' && (
@@ -202,7 +202,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
           width:28,height:28,borderRadius:'50%',
           background:'rgba(0,0,0,.55)',backdropFilter:'blur(8px)',
           display:'flex',alignItems:'center',justifyContent:'center',
-          fontSize:13,color:'white',
+          fontSize:13,color:'#F9F0F0',
         }}>🎧</div>
       )}
       {/* Embedded video badge */}
@@ -226,7 +226,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
         <div style={{
           position:'absolute',top:10,right: moment.media_type ? 44 : 10,zIndex:3,
           background:'rgba(60,140,100,.75)',backdropFilter:'blur(6px)',
-          borderRadius:9,padding:'3px 8px',fontSize:10,color:'white',
+          borderRadius:9,padding:'3px 8px',fontSize:10,color:'#F9F0F0',
         }}>
           🤝 Поиск
         </div>
@@ -248,9 +248,9 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
               width:18,height:18,borderRadius:'50%',flexShrink:0,
               background:'rgba(200,160,210,.45)',
               display:'flex',alignItems:'center',justifyContent:'center',
-              fontSize:10,color:'white',fontWeight:700,
+              fontSize:10,color:'#F9F0F0',fontWeight:700,
               overflow:'hidden',
-              border:'1px solid rgba(255,255,255,.2)',
+              border:'1px solid rgba(249,240,240,.2)',
             }}>
               {moment.author_avatar && (moment.author_avatar.startsWith('/') ||
                                         moment.author_avatar.startsWith('http') ||
@@ -260,21 +260,21 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
                 : (moment.author_name || '?')[0].toUpperCase()}
             </div>
             <span style={{
-              color:'rgba(255,255,255,.75)',fontSize:11,fontWeight:500,
+              color:'rgba(249,240,240,.75)',fontSize:11,fontWeight:500,
               overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
             }}>
               {moment.author_name}
             </span>
           </div>
           <div style={{
-            color:'white',fontSize:12,fontWeight:400,lineHeight:1.45,
+            color:'#F9F0F0',fontSize:12,fontWeight:400,lineHeight:1.45,
             overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,
             WebkitBoxOrient:'vertical',
           }}>
             {preview}{moment.text?.length > 80 ? '…' : ''}
           </div>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
-            <span style={{color:'rgba(255,255,255,.35)',fontSize:10}}>{fmtTime(moment.created_at)}</span>
+            <span style={{color:'rgba(249,240,240,.35)',fontSize:10}}>{fmtTime(moment.created_at)}</span>
             {moment.myReaction && MY_RX_ICON[moment.myReaction] && (
               <span title={MY_RX_LABEL[moment.myReaction] || ''}
                 style={{
@@ -297,7 +297,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
           background:'rgba(20,12,40,.6)',backdropFilter:'blur(10px)',
           borderRadius:50,padding:'4px 10px',
           display:'flex',alignItems:'center',gap:8,
-          fontSize:11,color:'rgba(255,255,255,.85)',
+          fontSize:11,color:'rgba(249,240,240,.85)',
         }}>
           {moment.views > 0          && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye"     size={12}/>{moment.views}</span>}
           {moment.stats?.resonate > 0 && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="sparkle" size={12}/>{moment.stats.resonate}</span>}

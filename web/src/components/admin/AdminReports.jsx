@@ -1,7 +1,7 @@
 // AdminReports.jsx — список жалоб от пользователей
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 import { useAuth } from '../../AuthContext';
 import MomentDetailPopup from '../moments/MomentDetailPopup';
 import { useBulkSelection, Checkbox, BulkActionBar } from './bulk';
@@ -72,7 +72,7 @@ export default function AdminReports() {
         <div style={{fontWeight:600,marginBottom:8}}>
           {hard ? '💣 ПОЛНОСТЬЮ стереть момент?' : 'Удалить момент?'}
         </div>
-        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:4}}>
+        <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:4}}>
           «{(moment.text || '').slice(0, 120)}{(moment.text || '').length > 120 ? '…' : ''}»
         </div>
         {hard && (
@@ -149,7 +149,7 @@ export default function AdminReports() {
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 900 }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         🚩 Жалобы
       </h1>
       <p style={{ color: 'rgba(225,220,245,.85)', fontSize: 14, marginTop: 0, marginBottom: 24 }}>
@@ -164,8 +164,8 @@ export default function AdminReports() {
               padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
               cursor: 'pointer', fontFamily: 'inherit',
               background: status === t.v ? 'rgba(140,110,220,.85)' : 'rgba(20,12,40,.5)',
-              border: status === t.v ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.12)',
-              color: status === t.v ? 'white' : 'rgba(225,220,245,.85)',
+              border: status === t.v ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(249,240,240,.12)',
+              color: status === t.v ? '#F9F0F0' : 'rgba(225,220,245,.85)',
             }}>
             {t.l}
           </button>
@@ -178,7 +178,7 @@ export default function AdminReports() {
         <div style={{
           padding: '40px 20px', textAlign: 'center',
           background: 'rgba(20,12,40,.5)', borderRadius: 14,
-          border: '1px dashed rgba(255,255,255,.15)',
+          border: '1px dashed rgba(249,240,240,.15)',
           color: 'rgba(225,220,245,.85)', fontSize: 14,
         }}>
           {status === 'open' ? '✓ Открытых жалоб нет' : 'Пусто'}
@@ -189,8 +189,8 @@ export default function AdminReports() {
             <div style={{
               display:'flex', alignItems:'center', gap: 10,
               padding:'8px 14px', borderRadius: 10,
-              background:'rgba(255,255,255,.04)',
-              border:'1px solid rgba(255,255,255,.08)',
+              background:'rgba(249,240,240,.04)',
+              border:'1px solid rgba(249,240,240,.08)',
               color:'rgba(225,220,245,.75)', fontSize: 12,
             }}>
               <Checkbox
@@ -208,8 +208,8 @@ export default function AdminReports() {
             const isSelected = bulk.has(r.id);
             return (
               <div key={r.id} style={{
-                background: isSelected ? 'rgba(120,90,200,.18)' : 'rgba(20,12,40,.65)',
-                border: isSelected ? '1px solid rgba(180,140,255,.45)' : '1px solid rgba(255,255,255,.14)',
+                background: isSelected ? 'rgba(95, 64, 128,.18)' : 'rgba(20,12,40,.65)',
+                border: isSelected ? '1px solid rgba(180,140,255,.45)' : '1px solid rgba(249,240,240,.14)',
                 borderRadius: 14, padding: 16,
                 backdropFilter: 'blur(8px)',
                 boxShadow: '0 4px 14px rgba(0,0,0,.15)',
@@ -226,7 +226,7 @@ export default function AdminReports() {
                   flexWrap: 'wrap',
                 }}>
                   <span style={{
-                    background: 'rgba(255,255,255,.08)', borderRadius: 6,
+                    background: 'rgba(249,240,240,.08)', borderRadius: 6,
                     padding: '3px 9px', fontSize: 11, fontWeight: 700,
                     color: 'rgba(240,235,255,.95)',
                   }}>
@@ -295,8 +295,8 @@ export default function AdminReports() {
                       <button onClick={() => resolve(r, 'dismissed')}
                         style={{
                           padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-                          cursor: 'pointer', border: '1px solid rgba(255,255,255,.15)',
-                          background: 'rgba(255,255,255,.08)', color: 'rgba(240,235,255,.95)',
+                          cursor: 'pointer', border: '1px solid rgba(249,240,240,.15)',
+                          background: 'rgba(249,240,240,.08)', color: 'rgba(240,235,255,.95)',
                           fontFamily: 'inherit',
                         }}>
                         Отклонить
@@ -312,7 +312,7 @@ export default function AdminReports() {
                       style={{
                         padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                         cursor: loadingMoment ? 'wait' : 'pointer', border: '1px solid rgba(180,140,220,.3)',
-                        background: 'rgba(120,90,200,.25)', color: 'rgba(220,200,255,.95)',
+                        background: 'rgba(95, 64, 128,.25)', color: 'rgba(220,200,255,.95)',
                         fontFamily: 'inherit',
                       }}>
                       {loadingMoment ? '…' : '→ Открыть момент'}
@@ -324,7 +324,7 @@ export default function AdminReports() {
                       style={{
                         padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                         textDecoration: 'none',
-                        background: 'rgba(120,90,200,.25)', color: 'rgba(220,200,255,.95)',
+                        background: 'rgba(95, 64, 128,.25)', color: 'rgba(220,200,255,.95)',
                         border: '1px solid rgba(180,140,220,.3)',
                       }}>
                       → Карточка юзера ↗
@@ -360,8 +360,8 @@ export default function AdminReports() {
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(22,15,50,.97)', border: '1px solid rgba(255,255,255,.15)',
-          borderRadius: 50, padding: '10px 20px', color: 'white', fontSize: 14, fontWeight: 600,
+          background: 'rgba(22,15,50,.97)', border: '1px solid rgba(249,240,240,.15)',
+          borderRadius: 50, padding: '10px 20px', color:'#F9F0F0', fontSize: 14, fontWeight: 600,
           zIndex: 1000, whiteSpace: 'nowrap', boxShadow: '0 4px 20px rgba(0,0,0,.5)' }}>
           {toast}
         </div>
@@ -393,7 +393,7 @@ export default function AdminReports() {
           <div style={{
             position:'fixed', top: 18, left: '50%', transform:'translateX(-50%)',
             zIndex: 10001, display:'flex', gap:10, alignItems:'center',
-            background:'rgba(220,60,60,.92)', color:'white',
+            background:'rgba(220,60,60,.92)', color:'#F9F0F0',
             border:'1px solid rgba(255,180,180,.5)',
             borderRadius: 50, padding:'8px 14px 8px 16px',
             boxShadow:'0 6px 22px rgba(0,0,0,.5)',
@@ -403,8 +403,8 @@ export default function AdminReports() {
             <button onClick={() => handleAdminDeleteMoment(momentPopup.moments[momentPopup.idx], false)}
               title="Мягкое удаление (status=deleted)"
               style={{
-                background:'rgba(255,255,255,.18)', border:'1px solid rgba(255,255,255,.35)',
-                color:'white', borderRadius:50, padding:'6px 12px',
+                background:'rgba(249,240,240,.18)', border:'1px solid rgba(249,240,240,.35)',
+                color:'#F9F0F0', borderRadius:50, padding:'6px 12px',
                 fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
               }}>
               🗑 Удалить
@@ -412,8 +412,8 @@ export default function AdminReports() {
             <button onClick={() => handleAdminDeleteMoment(momentPopup.moments[momentPopup.idx], true)}
               title="Полное удаление (БД + S3)"
               style={{
-                background:'rgba(255,255,255,.32)', border:'1px solid rgba(255,255,255,.5)',
-                color:'white', borderRadius:50, padding:'6px 12px',
+                background:'rgba(249,240,240,.32)', border:'1px solid rgba(249,240,240,.5)',
+                color:'#F9F0F0', borderRadius:50, padding:'6px 12px',
                 fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit',
               }}>
               💣 Стереть

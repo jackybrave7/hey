@@ -2,16 +2,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 
 export default function AdminSystem() {
   const [tab, setTab] = useState('broadcast'); // 'broadcast' | 'moment'
   return (
     <div style={{ padding: '28px 32px', maxWidth: 720 }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         📢 HEY-заведующий
       </h1>
-      <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 13, marginTop: 0, marginBottom: 24 }}>
+      <p style={{ color: 'rgba(249,240,240,.45)', fontSize: 13, marginTop: 0, marginBottom: 24 }}>
         Публикуй моменты и рассылай сообщения от лица сервисного аккаунта.
         Юзеры не смогут ответить — это односторонний канал.
       </p>
@@ -27,8 +27,8 @@ export default function AdminSystem() {
             style={{
               padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
               cursor: 'pointer', border: 'none',
-              background: tab === t.v ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
-              color: tab === t.v ? 'white' : 'rgba(255,255,255,.6)',
+              background: tab === t.v ? 'rgba(95, 64, 128,.7)' : 'rgba(249,240,240,.08)',
+              color: tab === t.v ? '#F9F0F0' : 'rgba(249,240,240,.6)',
             }}>
             {t.l}
           </button>
@@ -77,7 +77,7 @@ function ManagePublished() {
     const ok = await customConfirm(
       <>
         <div style={{fontWeight:600,marginBottom:8}}>Удалить сообщение?</div>
-        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:6}}>
+        <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:6}}>
           Только у одного получателя {m.recipient_name ? `(${m.recipient_name})` : ''}.
         </div>
       </>,
@@ -90,13 +90,13 @@ function ManagePublished() {
 
   useEffect(() => { load(); }, []);
 
-  if (loading) return <div style={{padding:20,color:'rgba(255,255,255,.5)'}}>Загрузка…</div>;
+  if (loading) return <div style={{padding:20,color:'rgba(249,240,240,.5)'}}>Загрузка…</div>;
 
   async function deleteMoment(m) {
     const ok = await customConfirm(
       <>
         <div style={{fontWeight:600,marginBottom:8}}>Удалить момент?</div>
-        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:6}}>
+        <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:6}}>
           «{(m.text || '').slice(0, 120)}{(m.text || '').length > 120 ? '…' : ''}»
         </div>
         <div style={{color:'rgba(255,180,180,.7)',fontSize:12}}>Это действие необратимо.</div>
@@ -117,7 +117,7 @@ function ManagePublished() {
     const ok = await customConfirm(
       <>
         <div style={{fontWeight:600,marginBottom:8}}>Удалить рассылку?</div>
-        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:6}}>
+        <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:6}}>
           У всех получателей — это <strong>{b.recipients}</strong> чатов.
         </div>
         <div style={{color:'rgba(255,180,180,.7)',fontSize:12}}>Это действие необратимо.</div>
@@ -167,7 +167,7 @@ function ManagePublished() {
                   <img src={m.media_url} alt="" style={{
                     maxWidth: 220, maxHeight: 220, borderRadius: 10,
                     objectFit: 'cover', display: 'block', marginBottom: 10,
-                    border: '1px solid rgba(255,255,255,.08)',
+                    border: '1px solid rgba(249,240,240,.08)',
                   }}/>
                 )}
                 {m.media_url && m.media_type === 'video' && (
@@ -253,8 +253,8 @@ function ManagePublished() {
         <div style={{
           position:'fixed', bottom:30, left:'50%', transform:'translateX(-50%)',
           background:'rgba(22,15,50,.97)', borderRadius:50, padding:'10px 20px',
-          color:'white', fontSize:14, fontWeight:600, zIndex:1000,
-          border:'1px solid rgba(255,255,255,.15)', boxShadow:'0 4px 20px rgba(0,0,0,.5)',
+          color:'#F9F0F0', fontSize:14, fontWeight:600, zIndex:1000,
+          border:'1px solid rgba(249,240,240,.15)', boxShadow:'0 4px 20px rgba(0,0,0,.5)',
         }}>{toast}</div>
       )}
       {confirmModal}
@@ -267,7 +267,7 @@ function Section({ title, children }) {
   return (
     <div>
       <div style={{
-        color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:700, textTransform:'uppercase',
+        color:'rgba(249,240,240,.7)', fontSize:13, fontWeight:700, textTransform:'uppercase',
         letterSpacing:.8, marginBottom:10, paddingLeft:2,
       }}>{title}</div>
       <div style={{display:'flex',flexDirection:'column',gap:10}}>{children}</div>
@@ -277,17 +277,17 @@ function Section({ title, children }) {
 function Card({ children }) {
   return (
     <div style={{
-      background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)',
+      background:'rgba(249,240,240,.05)', border:'1px solid rgba(249,240,240,.08)',
       borderRadius:14, padding:'14px 16px',
     }}>{children}</div>
   );
 }
 function Meta({ children }) {
   return <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,
-    color:'rgba(255,255,255,.5)',fontSize:12}}>{children}</div>;
+    color:'rgba(249,240,240,.5)',fontSize:12}}>{children}</div>;
 }
 function Text({ children }) {
-  return <div style={{color:'rgba(255,255,255,.9)',fontSize:14,lineHeight:1.5,
+  return <div style={{color:'rgba(249,240,240,.9)',fontSize:14,lineHeight:1.5,
     marginBottom:12,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{children}</div>;
 }
 function Actions({ children }) {
@@ -303,19 +303,19 @@ function Status({ status }) {
   return <span style={{background:s.bg,color:s.color,borderRadius:6,padding:'2px 8px',fontSize:11,fontWeight:700}}>{s.label}</span>;
 }
 function Badge({ children }) {
-  return <span style={{background:'rgba(255,255,255,.08)',borderRadius:6,padding:'2px 8px',fontSize:11}}>{children}</span>;
+  return <span style={{background:'rgba(249,240,240,.08)',borderRadius:6,padding:'2px 8px',fontSize:11}}>{children}</span>;
 }
 function Empty({ children }) {
-  return <div style={{padding:'20px',textAlign:'center',color:'rgba(255,255,255,.35)',fontSize:13,
-    background:'rgba(255,255,255,.03)',borderRadius:12,border:'1px dashed rgba(255,255,255,.08)'}}>{children}</div>;
+  return <div style={{padding:'20px',textAlign:'center',color:'rgba(249,240,240,.35)',fontSize:13,
+    background:'rgba(249,240,240,.03)',borderRadius:12,border:'1px dashed rgba(249,240,240,.08)'}}>{children}</div>;
 }
 function BtnSecondary({ children, ...p }) {
   return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer',
-    border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.05)',color:'white',fontFamily:'inherit'}}>{children}</button>;
+    border:'1px solid rgba(249,240,240,.15)',background:'rgba(249,240,240,.05)',color:'#F9F0F0',fontFamily:'inherit'}}>{children}</button>;
 }
 function BtnPrimary({ children, ...p }) {
   return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',
-    border:'none',background:'rgba(120,90,200,.85)',color:'white',fontFamily:'inherit'}}>{children}</button>;
+    border:'none',background:'rgba(95, 64, 128,.85)',color:'#F9F0F0',fontFamily:'inherit'}}>{children}</button>;
 }
 function BtnDanger({ children, ...p }) {
   return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer',
@@ -323,8 +323,8 @@ function BtnDanger({ children, ...p }) {
 }
 const editTextareaStyle = {
   width:'100%', boxSizing:'border-box',
-  background:'rgba(0,0,0,.35)', border:'1px solid rgba(255,255,255,.15)',
-  borderRadius:10, padding:'10px 12px', color:'white', fontSize:14,
+  background:'rgba(0,0,0,.35)', border:'1px solid rgba(249,240,240,.15)',
+  borderRadius:10, padding:'10px 12px', color:'#F9F0F0', fontSize:14,
   fontFamily:'inherit', resize:'vertical', outline:'none', lineHeight:1.5,
   marginBottom:10,
 };
@@ -414,10 +414,10 @@ function BroadcastForm() {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,.04)', borderRadius: 14,
-      border: '1px solid rgba(255,255,255,.08)', padding: 20,
+      background: 'rgba(249,240,240,.04)', borderRadius: 14,
+      border: '1px solid rgba(249,240,240,.08)', padding: 20,
     }}>
-      <div style={{ color: 'rgba(255,255,255,.7)', fontSize: 13, marginBottom: 8 }}>
+      <div style={{ color: 'rgba(249,240,240,.7)', fontSize: 13, marginBottom: 8 }}>
         Текст сообщения (придёт всем юзерам в чат с HEY-заведующим):
       </div>
       <textarea
@@ -427,14 +427,14 @@ function BroadcastForm() {
         placeholder="Привет! С сегодня в HEY доступна новая функция…"
         style={{
           width: '100%', boxSizing: 'border-box',
-          background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.14)',
-          borderRadius: 12, padding: '12px 14px', color: 'white', fontSize: 14,
+          background: 'rgba(0,0,0,.3)', border: '1px solid rgba(249,240,240,.14)',
+          borderRadius: 12, padding: '12px 14px', color:'#F9F0F0', fontSize: 14,
           fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5,
           minHeight: 120,
         }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4,
-        fontSize: 11, color: 'rgba(255,255,255,.5)' }}>
+        fontSize: 11, color: 'rgba(249,240,240,.5)' }}>
         <span>Можно добавить картинки (до {MAX_IMGS})</span>
         <span>{text.length} / 2000</span>
       </div>
@@ -449,14 +449,14 @@ function BroadcastForm() {
                   style={{
                     width:64, height:64, objectFit:'cover', borderRadius:10,
                     opacity: p.uploading ? .5 : 1,
-                    border:'1px solid rgba(255,255,255,.15)',
+                    border:'1px solid rgba(249,240,240,.15)',
                   }}/>
                 {!p.uploading && (
                   <button onClick={() => removeImg(idx)}
                     style={{
                       position:'absolute', top:-4, right:-4,
                       width:20, height:20, borderRadius:'50%',
-                      background:'rgba(0,0,0,.85)', border:'none', color:'white',
+                      background:'rgba(0,0,0,.85)', border:'none', color:'#F9F0F0',
                       fontSize:13, cursor:'pointer', padding:0, lineHeight:1,
                       display:'flex', alignItems:'center', justifyContent:'center',
                     }}>✕</button>
@@ -471,7 +471,7 @@ function BroadcastForm() {
             padding:'8px 14px', borderRadius:10, fontSize:13, fontWeight:600,
             cursor: imgs.length >= MAX_IMGS ? 'not-allowed' : 'pointer',
             border:'1px dashed rgba(180,140,220,.4)',
-            background:'rgba(120,90,200,.08)',
+            background:'rgba(95, 64, 128,.08)',
             color:'rgba(220,200,255,.85)',
             fontFamily:'inherit',
             opacity: imgs.length >= MAX_IMGS ? .5 : 1,
@@ -501,18 +501,18 @@ function BroadcastForm() {
         {confirming ? (
           <>
             <button onClick={() => setConfirming(false)} disabled={sending}
-              style={btnStyle('rgba(255,255,255,.08)', 'rgba(255,255,255,.85)')}>
+              style={btnStyle('rgba(249,240,240,.08)', 'rgba(249,240,240,.85)')}>
               Отмена
             </button>
             <button onClick={send} disabled={sending}
-              style={btnStyle('rgba(200,80,80,.85)', 'white')}>
+              style={btnStyle('rgba(200,80,80,.85)', '#F9F0F0')}>
               {sending ? 'Отправка…' : '⚠ Подтверди — это уйдёт ВСЕМ'}
             </button>
           </>
         ) : (
           <button onClick={send} disabled={sending || !canSend}
             style={{
-              ...btnStyle('rgba(120,90,200,.85)', 'white'),
+              ...btnStyle('rgba(95, 64, 128,.85)', '#F9F0F0'),
               opacity: (!canSend || sending) ? .5 : 1,
               cursor:  (!canSend || sending) ? 'not-allowed' : 'pointer',
             }}>
@@ -591,10 +591,10 @@ function MomentForm() {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,.04)', borderRadius: 14,
-      border: '1px solid rgba(255,255,255,.08)', padding: 20,
+      background: 'rgba(249,240,240,.04)', borderRadius: 14,
+      border: '1px solid rgba(249,240,240,.08)', padding: 20,
     }}>
-      <div style={{ color: 'rgba(255,255,255,.7)', fontSize: 13, marginBottom: 8 }}>
+      <div style={{ color: 'rgba(249,240,240,.7)', fontSize: 13, marginBottom: 8 }}>
         Текст момента:
       </div>
       <textarea
@@ -604,20 +604,20 @@ function MomentForm() {
         placeholder="Анонс / новость / приглашение…"
         style={{
           width: '100%', boxSizing: 'border-box',
-          background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.14)',
-          borderRadius: 12, padding: '12px 14px', color: 'white', fontSize: 14,
+          background: 'rgba(0,0,0,.3)', border: '1px solid rgba(249,240,240,.14)',
+          borderRadius: 12, padding: '12px 14px', color:'#F9F0F0', fontSize: 14,
           fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5,
           minHeight: 100,
         }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4,
-        fontSize: 11, color: 'rgba(255,255,255,.5)', marginBottom: 16 }}>
+        fontSize: 11, color: 'rgba(249,240,240,.5)', marginBottom: 16 }}>
         <span>Поддерживаются YouTube/Vimeo/RuTube/Kinescope ссылки в тексте</span>
         <span>{text.length} / 2000</span>
       </div>
 
       {/* Media uploader */}
-      <div style={{ color: 'rgba(255,255,255,.7)', fontSize: 13, marginBottom: 8 }}>
+      <div style={{ color: 'rgba(249,240,240,.7)', fontSize: 13, marginBottom: 8 }}>
         Медиа (картинка или аудио) — необязательно:
       </div>
       {!media ? (
@@ -625,13 +625,13 @@ function MomentForm() {
           style={{
             width: '100%', padding: '20px', borderRadius: 12, cursor: 'pointer',
             border: '2px dashed rgba(180,140,220,.35)',
-            background: 'rgba(120,90,200,.06)',
-            color: 'rgba(255,255,255,.7)', fontSize: 14, fontFamily: 'inherit',
+            background: 'rgba(95, 64, 128,.06)',
+            color: 'rgba(249,240,240,.7)', fontSize: 14, fontFamily: 'inherit',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
             transition: 'all .15s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(120,90,200,.12)'; e.currentTarget.style.borderColor = 'rgba(180,140,220,.55)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(120,90,200,.06)'; e.currentTarget.style.borderColor = 'rgba(180,140,220,.35)'; }}>
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(95, 64, 128,.12)'; e.currentTarget.style.borderColor = 'rgba(180,140,220,.55)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(95, 64, 128,.06)'; e.currentTarget.style.borderColor = 'rgba(180,140,220,.35)'; }}>
           <span style={{ fontSize: 28 }}>📎</span>
           <span>Прикрепить файл</span>
           <span style={{ fontSize: 12, opacity: .65 }}>JPG / PNG / WebP / GIF · MP3 / OGG · до 20 МБ</span>
@@ -639,7 +639,7 @@ function MomentForm() {
       ) : (
         <div style={{
           position: 'relative', borderRadius: 12, overflow: 'hidden',
-          background: '#0a0518', border: '1px solid rgba(255,255,255,.1)',
+          background: '#0a0518', border: '1px solid rgba(249,240,240,.1)',
           maxHeight: 240,
         }}>
           {media.type === 'image' ? (
@@ -656,7 +656,7 @@ function MomentForm() {
             <div style={{
               position: 'absolute', inset: 0, background: 'rgba(10,5,25,.7)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: 14, fontWeight: 600, gap: 8,
+              color:'#F9F0F0', fontSize: 14, fontWeight: 600, gap: 8,
             }}>
               <span style={{ fontSize: 24 }}>⏳</span> Загрузка…
             </div>
@@ -667,7 +667,7 @@ function MomentForm() {
                 position: 'absolute', top: 8, right: 8,
                 width: 32, height: 32, borderRadius: '50%',
                 background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(6px)',
-                border: 'none', color: 'white', fontSize: 16, cursor: 'pointer',
+                border: 'none', color:'#F9F0F0', fontSize: 16, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>✕</button>
           )}
@@ -694,7 +694,7 @@ function MomentForm() {
       <button onClick={publish}
         disabled={sending || text.trim().length < 5 || media?.uploading}
         style={{
-          ...btnStyle('rgba(120,90,200,.85)', 'white'),
+          ...btnStyle('rgba(95, 64, 128,.85)', '#F9F0F0'),
           marginTop: 16,
           opacity: (sending || text.trim().length < 5 || media?.uploading) ? .5 : 1,
           cursor: (sending || text.trim().length < 5 || media?.uploading) ? 'not-allowed' : 'pointer',

@@ -22,7 +22,7 @@ export default function BottomNav({ user, unread = 0 }) {
     <div style={{
       position:'fixed',bottom:0,left:0,right:0,zIndex:500,
       background:'var(--topbar)',backdropFilter:'blur(24px)',
-      borderTop:'1px solid rgba(255,255,255,.08)',
+      borderTop:'1px solid rgba(249,240,240,.08)',
       padding:'0 0 env(safe-area-inset-bottom)',
       height:60,
     }}>
@@ -52,11 +52,11 @@ export default function BottomNav({ user, unread = 0 }) {
             {isMe ? (
               <div style={{
                 width:26,height:26,borderRadius:'50%',
-                background: active ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.3)',
+                background: active ? 'rgba(249,240,240,.9)' : 'rgba(249,240,240,.3)',
                 display:'flex',alignItems:'center',justifyContent:'center',
                 fontSize:11,fontWeight:700,
-                color: active ? '#5c4f94' : 'white',
-                border: active ? '2px solid rgba(255,255,255,.8)' : '2px solid transparent',
+                color: active ? '#5F4080' : '#F9F0F0',
+                border: active ? '2px solid rgba(249,240,240,.8)' : '2px solid transparent',
                 transition:'all .2s',
               }}>
                 {(user?.name || '?')[0].toUpperCase()}
@@ -64,7 +64,7 @@ export default function BottomNav({ user, unread = 0 }) {
             ) : (
               <div style={{
                 position:'relative',
-                color:'white',
+                color:'#F9F0F0',
                 lineHeight:1,
                 display:'flex',alignItems:'center',justifyContent:'center',
               }}>
@@ -73,7 +73,7 @@ export default function BottomNav({ user, unread = 0 }) {
                 {badge > 0 && (
                   <div style={{
                     position:'absolute',top:-6,right:-10,
-                    background:'#e74c3c',color:'white',
+                    background:'#e74c3c',color:'#F9F0F0',
                     fontSize:9,fontWeight:700,
                     minWidth:16,height:16,borderRadius:8,
                     display:'flex',alignItems:'center',justifyContent:'center',
@@ -89,7 +89,7 @@ export default function BottomNav({ user, unread = 0 }) {
             {/* Label */}
             <div style={{
               fontSize:10,fontWeight: active ? 700 : 400,
-              color:'white',
+              color:'#F9F0F0',
               transition:'opacity .2s',
               letterSpacing:.1,
             }}>
@@ -101,7 +101,7 @@ export default function BottomNav({ user, unread = 0 }) {
               <div style={{
                 position:'absolute',bottom:5,
                 width:20,height:2,borderRadius:1,
-                background:'white',opacity:.7,
+                background:'#F9F0F0',opacity:.7,
               }}/>
             )}
           </button>

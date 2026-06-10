@@ -24,6 +24,7 @@ const NAV = [
   { to: '/admin/test-users', label: '🧪 Тестовые юзеры' },
   { to: '/admin/logs',     label: '📋 Логи' },
   { to: '/admin/settings', label: '⚙ Настройки' },
+  { to: '/admin/guide',    label: '📖 Руководство' },
 ];
 
 const COUNT_POLL_MS = 30000;
@@ -79,7 +80,7 @@ export default function AdminLayout({ children }) {
     padding: '12px 20px',
     fontSize: 14,
     fontWeight: 500,
-    color: 'rgba(255,255,255,.55)',
+    color: 'rgba(249,240,240,.55)',
     textDecoration: 'none',
     borderLeft: '3px solid transparent',
     transition: 'all .15s',
@@ -92,7 +93,7 @@ export default function AdminLayout({ children }) {
         minWidth: 20, height: 20, padding: '0 6px',
         borderRadius: 10,
         background: 'rgba(220,80,80,.95)',
-        color: 'white',
+        color:'#F9F0F0',
         fontSize: 11, fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: '0 1px 4px rgba(120,30,30,.5)',
@@ -103,20 +104,20 @@ export default function AdminLayout({ children }) {
   // Содержимое сайдбара одно и то же — отличается только обёртка.
   const sidebarBody = (
     <>
-      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,.07)',
+      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(249,240,240,.07)',
         display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
-          <div style={{ color: 'white', fontSize: 16, fontWeight: 800, letterSpacing: -.3 }}>
+          <div style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 800, letterSpacing: -.3 }}>
             ⚙ HEY Admin
           </div>
-          <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11, marginTop: 2 }}>
+          <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 11, marginTop: 2 }}>
             {user?.name}
           </div>
         </div>
         {isMobile && (
           <button onClick={() => setDrawerOpen(false)} aria-label="Закрыть меню"
-            style={{ background:'rgba(255,255,255,.08)', border:'none', borderRadius:10,
-              width:32, height:32, color:'white', fontSize:18, cursor:'pointer' }}>×</button>
+            style={{ background:'rgba(249,240,240,.08)', border:'none', borderRadius:10,
+              width:32, height:32, color:'#F9F0F0', fontSize:18, cursor:'pointer' }}>×</button>
         )}
       </div>
 
@@ -128,8 +129,8 @@ export default function AdminLayout({ children }) {
             end={exact}
             style={({ isActive }) => ({
               ...linkBase,
-              color: isActive ? 'white' : 'rgba(255,255,255,.55)',
-              background: isActive ? 'rgba(120,90,200,.18)' : 'transparent',
+              color: isActive ? '#F9F0F0' : 'rgba(249,240,240,.55)',
+              background: isActive ? 'rgba(95, 64, 128,.18)' : 'transparent',
               borderLeftColor: isActive ? 'rgba(140,110,220,.8)' : 'transparent',
             })}
           >
@@ -139,13 +140,13 @@ export default function AdminLayout({ children }) {
         ))}
       </nav>
 
-      <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
+      <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(249,240,240,.07)' }}>
         <button
           onClick={() => nav('/main')}
           style={{
             width: '100%', padding: '11px', borderRadius: 10,
-            background: 'rgba(255,255,255,.07)', border: 'none',
-            color: 'rgba(255,255,255,.5)', fontSize: 13, cursor: 'pointer',
+            background: 'rgba(249,240,240,.07)', border: 'none',
+            color: 'rgba(249,240,240,.5)', fontSize: 13, cursor: 'pointer',
           }}
         >
           ← К приложению
@@ -161,7 +162,7 @@ export default function AdminLayout({ children }) {
         <div style={{
           width: 220, flexShrink: 0,
           background: 'rgba(14,8,32,.98)',
-          borderRight: '1px solid rgba(255,255,255,.08)',
+          borderRight: '1px solid rgba(249,240,240,.08)',
           display: 'flex', flexDirection: 'column',
           minHeight: '100vh',
         }}>
@@ -189,23 +190,23 @@ export default function AdminLayout({ children }) {
         display:'flex', alignItems:'center', gap:10,
         padding:'10px 14px',
         background:'rgba(14,8,32,.96)', backdropFilter:'blur(14px)',
-        borderBottom:'1px solid rgba(255,255,255,.08)',
+        borderBottom:'1px solid rgba(249,240,240,.08)',
       }}>
         <button onClick={() => setDrawerOpen(true)} aria-label="Открыть меню"
-          style={{ background:'rgba(255,255,255,.08)', border:'none', borderRadius:10,
-            width:38, height:38, color:'white', fontSize:18, cursor:'pointer',
+          style={{ background:'rgba(249,240,240,.08)', border:'none', borderRadius:10,
+            width:38, height:38, color:'#F9F0F0', fontSize:18, cursor:'pointer',
             display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           ☰
         </button>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ color:'white', fontSize:15, fontWeight:700,
+          <div style={{ color:'#F9F0F0', fontSize:15, fontWeight:700,
             whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
             {active?.label || '⚙ HEY Admin'}
           </div>
         </div>
         <button onClick={() => nav('/main')} aria-label="К приложению"
-          style={{ background:'rgba(255,255,255,.06)', border:'none', borderRadius:10,
-            padding:'8px 12px', color:'rgba(255,255,255,.7)', fontSize:13, cursor:'pointer',
+          style={{ background:'rgba(249,240,240,.06)', border:'none', borderRadius:10,
+            padding:'8px 12px', color:'rgba(249,240,240,.7)', fontSize:13, cursor:'pointer',
             flexShrink:0 }}>
           ← Назад
         </button>
@@ -229,7 +230,7 @@ export default function AdminLayout({ children }) {
         position:'fixed', top:0, bottom:0, left:0, zIndex:101,
         width:'min(280px, 84vw)',
         background:'rgba(14,8,32,.98)',
-        borderRight:'1px solid rgba(255,255,255,.08)',
+        borderRight:'1px solid rgba(249,240,240,.08)',
         boxShadow:'4px 0 24px rgba(0,0,0,.4)',
         transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
         transition:'transform .22s ease-out',

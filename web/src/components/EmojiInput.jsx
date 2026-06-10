@@ -40,14 +40,36 @@ function tokensToHTML(text) {
     .replace(/\n/g, '<br>');
 }
 
-// DOM → text (img → [name], <br> → \n)
-function serialize(el) {
+// Inline-узлы внутри строки (без block-обёрток)
+function serializeInline(el) {
   let s = '';
   for (const node of el.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) s += node.textContent;
     else if (node.nodeName === 'IMG' && node.dataset.emoji) s += '[' + node.dataset.emoji + ']';
     else if (node.nodeName === 'BR') s += '\n';
-    else if (node.nodeType === Node.ELEMENT_NODE) s += serialize(node);
+    else if (node.nodeType === Node.ELEMENT_NODE) s += serializeInline(node);
+  }
+  return s;
+}
+
+// DOM → text (img → [name], <br>/<div> → \n). Chrome при Enter создаёт <div>,
+// без обработки block-элементов многострочный текст схлопывался в одну строку.
+function serialize(el) {
+  let s = '';
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const node = el.childNodes[i];
+    if (node.nodeType === Node.TEXT_NODE) {
+      s += node.textContent;
+    } else if (node.nodeName === 'IMG' && node.dataset.emoji) {
+      s += '[' + node.dataset.emoji + ']';
+    } else if (node.nodeName === 'BR') {
+      s += '\n';
+    } else if (node.nodeName === 'DIV' || node.nodeName === 'P') {
+      if (s.length > 0 && !s.endsWith('\n')) s += '\n';
+      s += serializeInline(node);
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      s += serializeInline(node);
+    }
   }
   return s;
 }
@@ -211,7 +233,18 @@ const EmojiInput = forwardRef(function EmojiInput(
       spellCheck
       data-placeholder={placeholder || ''}
       onInput={handleInput}
-      onKeyDown={onKeyDown}
+      onKeyDown={(e) => {
+        // Enter → новая строка (<br>), Ctrl/Cmd+Enter — родитель (отправка).
+        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          if (document.queryCommandSupported?.('insertLineBreak')) {
+            document.execCommand('insertLineBreak');
+          } else {
+            document.execCommand('insertHTML', false, '<br>');
+          }
+        }
+        onKeyDown?.(e);
+      }}
       onPaste={handlePaste}
       className={(className || '') + ' hey-emoji-input'}
       style={{

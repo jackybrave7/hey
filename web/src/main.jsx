@@ -17,7 +17,7 @@ class ErrorBoundary extends React.Component {
       return (
         <div style={{
           minHeight:'100vh', padding:'40px 20px',
-          background:'var(--grad,#2a1058)', color:'white',
+          background:'var(--grad,#2a1058)', color:'#F9F0F0',
           fontFamily:'system-ui,sans-serif', boxSizing:'border-box',
           overflow:'auto',
         }}>
@@ -36,14 +36,14 @@ class ErrorBoundary extends React.Component {
                 <pre style={{
                   background:'rgba(0,0,0,.4)',padding:12,borderRadius:10,
                   whiteSpace:'pre-wrap',wordBreak:'break-word',fontSize:11,
-                  color:'rgba(255,255,255,.7)',marginTop:8,
+                  color:'rgba(249,240,240,.7)',marginTop:8,
                 }}>{this.state.error.stack}</pre>
               </details>
             )}
             <button onClick={() => location.reload()}
               style={{
                 marginTop:18,padding:'10px 24px',borderRadius:50,
-                background:'rgba(120,90,200,.85)',border:'none',color:'white',
+                background:'rgba(95, 64, 128,.85)',border:'none',color:'#F9F0F0',
                 fontSize:14,fontWeight:700,cursor:'pointer',
               }}>
               Перезагрузить

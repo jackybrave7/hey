@@ -49,7 +49,7 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
     borderRadius:24,width:'min(100%,520px)',
     maxHeight:'90vh',display:'flex',flexDirection:'column',
     boxShadow:'0 8px 48px rgba(0,0,0,.6)',
-    border:'1px solid rgba(255,255,255,.1)',
+    border:'1px solid rgba(249,240,240,.1)',
     overflow:'hidden',
   };
 
@@ -57,24 +57,24 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
     <div style={overlay} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div style={sheet}>
         {/* Header */}
-        <div style={{padding:'14px 20px 12px',borderBottom:'1px solid rgba(255,255,255,.08)',
+        <div style={{padding:'14px 20px 12px',borderBottom:'1px solid rgba(249,240,240,.08)',
           display:'flex',alignItems:'center',gap:12}}>
           <div style={{fontSize:28}}>📦</div>
           <div>
-            <div style={{color:'white',fontSize:16,fontWeight:700}}>У тебя уже есть активный момент</div>
-            <div style={{color:'rgba(255,255,255,.45)',fontSize:13,marginTop:2}}>
+            <div style={{color:'#F9F0F0',fontSize:16,fontWeight:700}}>У тебя уже есть активный момент</div>
+            <div style={{color:'rgba(249,240,240,.45)',fontSize:13,marginTop:2}}>
               Бесплатный аккаунт — 1 активный момент
             </div>
           </div>
           <button onClick={onClose} style={{marginLeft:'auto',background:'none',border:'none',
-            color:'rgba(255,255,255,.4)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
+            color:'rgba(249,240,240,.4)',fontSize:22,cursor:'pointer',lineHeight:1}}>✕</button>
         </div>
 
         <div style={{flex:1,overflowY:'auto',padding:'16px 20px',display:'flex',flexDirection:'column',gap:14}}>
           {/* Existing moment preview */}
-          <div style={{background:'rgba(255,255,255,.06)',borderRadius:16,padding:'14px 16px',
-            border:'1px solid rgba(255,255,255,.1)'}}>
-            <div style={{color:'rgba(255,255,255,.4)',fontSize:11,marginBottom:6,textTransform:'uppercase',letterSpacing:.5}}>
+          <div style={{background:'rgba(249,240,240,.06)',borderRadius:16,padding:'14px 16px',
+            border:'1px solid rgba(249,240,240,.1)'}}>
+            <div style={{color:'rgba(249,240,240,.4)',fontSize:11,marginBottom:6,textTransform:'uppercase',letterSpacing:.5}}>
               Текущий момент
             </div>
             {existing.media_url && existing.media_type === 'image' && (
@@ -83,11 +83,11 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
                   objectPosition: existing.media_position || '50% 50%',
                   borderRadius:10,marginBottom:8,display:'block'}}/>
             )}
-            <div style={{color:'rgba(255,255,255,.85)',fontSize:14,lineHeight:1.5,
+            <div style={{color:'rgba(249,240,240,.85)',fontSize:14,lineHeight:1.5,
               overflow:'hidden',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>
               {existing.text}
             </div>
-            <div style={{color:'rgba(255,255,255,.3)',fontSize:11,marginTop:8}}>
+            <div style={{color:'rgba(249,240,240,.3)',fontSize:11,marginTop:8}}>
               {fmtDate(existing.created_at)}
             </div>
           </div>
@@ -96,12 +96,12 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
           <button onClick={handleArchiveAndCreate} disabled={!!loading}
             style={{
               width:'100%',padding:'16px',borderRadius:16,cursor: loading ? 'not-allowed' : 'pointer',
-              background: loading === 'archive' ? 'rgba(100,78,148,.6)' : 'rgba(120,90,200,.85)',
+              background: loading === 'archive' ? 'rgba(95, 64, 128,.6)' : 'rgba(95, 64, 128,.85)',
               border:'1px solid rgba(180,140,255,.3)',
-              color:'white',fontSize:15,fontWeight:700,
+              color:'#F9F0F0',fontSize:15,fontWeight:700,
               display:'flex',alignItems:'center',gap:12,
               transition:'all .2s',opacity: loading && loading !== 'archive' ? 0.5 : 1,
-              boxShadow: !loading ? '0 4px 20px rgba(120,80,200,.35)' : 'none',
+              boxShadow: !loading ? '0 4px 20px rgba(95, 64, 128,.35)' : 'none',
             }}>
             <span style={{fontSize:22}}>📦</span>
             <div style={{textAlign:'left'}}>
@@ -118,7 +118,7 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
               width:'100%',padding:'16px',borderRadius:16,cursor: loading ? 'not-allowed' : 'pointer',
               background: loading === 'delete' ? 'rgba(160,40,40,.7)' : 'rgba(200,50,50,.15)',
               border:'1px solid rgba(255,80,80,.25)',
-              color: loading === 'delete' ? 'white' : 'rgba(255,120,120,.9)',
+              color: loading === 'delete' ? '#F9F0F0' : 'rgba(255,120,120,.9)',
               fontSize:15,fontWeight:600,
               display:'flex',alignItems:'center',gap:12,
               transition:'all .2s',opacity: loading && loading !== 'delete' ? 0.5 : 1,

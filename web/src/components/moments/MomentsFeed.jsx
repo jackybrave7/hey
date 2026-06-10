@@ -11,6 +11,7 @@ import MomentDilemma from './MomentDilemma';
 import SuperMomentGallery from './SuperMomentGallery';
 import SuperInfoScreen from '../super/SuperInfoScreen';
 import { useSalesPressure } from '../../lib/publicSettings';
+import HeyLogo from '../HeyLogo';
 
 export default function MomentsFeed({ currentUser }) {
   const salesPressure = useSalesPressure();
@@ -338,25 +339,26 @@ export default function MomentsFeed({ currentUser }) {
       <div style={{
         position: 'sticky', top: 0, zIndex: 10,
         background: 'var(--topbar)', backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,.06)',
+        borderBottom: '1px solid rgba(249,240,240,.06)',
       }}>
         <div style={{
           maxWidth: 680, margin: '0 auto',
           padding: '16px 20px 12px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <div style={{ color: 'white', fontSize: 20, fontWeight: 800, letterSpacing: -.3 }}>
-            ✦ Моменты
+          <div style={{ color:'#F9F0F0', fontSize: 20, fontWeight: 800, letterSpacing: -.3, display:'flex', alignItems:'center', gap:10 }}>
+            <HeyLogo size={22} color="#F9F0F0" />
+            Моменты
           </div>
           {canAddMore && (
             <button onClick={() => setShowCreate(true)}
               style={{
                 padding: '8px 16px', borderRadius: 50, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: 'rgba(120,90,200,.85)', border: 'none', color: 'white',
-                boxShadow: '0 2px 12px rgba(120,80,200,.4)', transition: 'all .18s',
+                background: 'rgba(95, 64, 128,.85)', border: 'none', color:'#F9F0F0',
+                boxShadow: '0 2px 12px rgba(95, 64, 128,.4)', transition: 'all .18s',
               }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,110,220,.9)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(120,90,200,.85)'}>
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(95, 64, 128,.85)'}>
               {hasMyMoments ? '+ Добавить' : '+ Мой момент'}
             </button>
           )}
@@ -407,14 +409,14 @@ export default function MomentsFeed({ currentUser }) {
                   style={{
                     aspectRatio:'1 / 1', borderRadius:12, cursor:'pointer',
                     border:'2px dashed rgba(180,140,220,.4)',
-                    background:'rgba(120,90,200,.06)',
+                    background:'rgba(95, 64, 128,.06)',
                     display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-                    gap:6, color:'white', transition:'all .15s',
+                    gap:6, color:'#F9F0F0', transition:'all .15s',
                   }}
-                  onMouseEnter={e=>{ e.currentTarget.style.background='rgba(120,90,200,.14)'; e.currentTarget.style.borderColor='rgba(180,140,220,.6)'; }}
-                  onMouseLeave={e=>{ e.currentTarget.style.background='rgba(120,90,200,.06)'; e.currentTarget.style.borderColor='rgba(180,140,220,.4)'; }}>
+                  onMouseEnter={e=>{ e.currentTarget.style.background='rgba(95, 64, 128,.14)'; e.currentTarget.style.borderColor='rgba(180,140,220,.6)'; }}
+                  onMouseLeave={e=>{ e.currentTarget.style.background='rgba(95, 64, 128,.06)'; e.currentTarget.style.borderColor='rgba(180,140,220,.4)'; }}>
                   <span style={{fontSize:28,lineHeight:1}}>+</span>
-                  <span style={{fontSize:13,fontWeight:600,color:'rgba(255,255,255,.85)'}}>Добавить</span>
+                  <span style={{fontSize:13,fontWeight:600,color:'rgba(249,240,240,.85)'}}>Добавить</span>
                 </button>
               )}
 
@@ -427,13 +429,13 @@ export default function MomentsFeed({ currentUser }) {
                   style={{
                     aspectRatio:'1 / 1', borderRadius:12, cursor:'pointer',
                     border:'2px dashed rgba(180,140,220,.22)',
-                    background:'rgba(255,255,255,.04)',
+                    background:'rgba(249,240,240,.04)',
                     display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
                     gap:6, transition:'all .15s',
                   }}
                   onMouseEnter={e=>{ e.currentTarget.style.background='rgba(180,140,220,.08)'; }}
-                  onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,.04)'; }}>
-                  <span style={{fontSize:20,color:'rgba(180,140,220,.6)'}}>✦</span>
+                  onMouseLeave={e=>{ e.currentTarget.style.background='rgba(249,240,240,.04)'; }}>
+                  <HeyLogo size={20} color="rgba(180,140,220,.75)" />
                   <span style={{fontSize:12,fontWeight:500,color:'rgba(200,170,255,.55)'}}>Ещё в СУПЕР</span>
                 </button>
               )}
@@ -446,19 +448,21 @@ export default function MomentsFeed({ currentUser }) {
               width:'100%',
               padding: '28px 20px', borderRadius: 12, cursor: 'pointer',
               border: '2px dashed rgba(180,140,220,.25)',
-              background: 'rgba(120,90,200,.06)',
+              background: 'rgba(95, 64, 128,.06)',
               display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 18,
               transition: 'all .2s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(180,140,220,.45)'; e.currentTarget.style.background = 'rgba(120,90,200,.1)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(180,140,220,.25)'; e.currentTarget.style.background = 'rgba(120,90,200,.06)'; }}>
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(180,140,220,.45)'; e.currentTarget.style.background = 'rgba(95, 64, 128,.1)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(180,140,220,.25)'; e.currentTarget.style.background = 'rgba(95, 64, 128,.06)'; }}>
             <div style={{ fontSize: 36, flexShrink:0,
               width:60,height:60,borderRadius:14,
-              background:'rgba(120,90,200,.35)',
-              display:'flex',alignItems:'center',justifyContent:'center'}}>✦</div>
+              background:'rgba(95, 64, 128,.35)',
+              display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <HeyLogo size={30} color="#F9F0F0" />
+            </div>
             <div style={{textAlign:'left',flex:1}}>
-              <div style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom:4 }}>Создай свой первый момент</div>
-              <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 13 }}>
+              <div style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom:4 }}>Создай свой первый момент</div>
+              <div style={{ color: 'rgba(249,240,240,.45)', fontSize: 13 }}>
                 Покажи над чем работаешь — друзья увидят
               </div>
             </div>
@@ -470,10 +474,10 @@ export default function MomentsFeed({ currentUser }) {
       <div style={{ padding: '20px 20px 14px', maxWidth: 680, margin: '0 auto' }}>
         {!loading && feedGroups.length > 0 && (
           <div style={{
-            color: 'rgba(255,255,255,.5)', fontSize: 11, fontWeight: 600,
+            color: 'rgba(249,240,240,.5)', fontSize: 11, fontWeight: 600,
             textTransform: 'uppercase', letterSpacing: '1px',
             padding: '0 4px 12px',
-            borderTop:'1px solid rgba(255,255,255,.06)',
+            borderTop:'1px solid rgba(249,240,240,.06)',
             paddingTop:14,marginTop:6,
           }}>
             Из твоих контактов
@@ -482,14 +486,14 @@ export default function MomentsFeed({ currentUser }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {loading ? (
-            <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,.35)', fontSize: 14 }}>
+            <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '40px 0', color: 'rgba(249,240,240,.35)', fontSize: 14 }}>
               Загрузка…
             </div>
           ) : feedGroups.length === 0 && !hasMyMoments ? (
             <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '40px 20px' }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🌱</div>
-              <div style={{ color: 'rgba(255,255,255,.6)', fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Лента пуста</div>
-              <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 13, lineHeight: 1.6 }}>
+              <div style={{ color: 'rgba(249,240,240,.6)', fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Лента пуста</div>
+              <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 13, lineHeight: 1.6 }}>
                 Когда контакты опубликуют моменты — они появятся здесь
               </div>
             </div>
@@ -517,12 +521,12 @@ export default function MomentsFeed({ currentUser }) {
               <button onClick={loadMore} disabled={loadingMore}
                 style={{
                   padding: '10px 28px', borderRadius: 50, fontSize: 13, fontWeight: 600,
-                  background: loadingMore ? 'rgba(255,255,255,.06)' : 'rgba(120,90,200,.75)',
-                  border: '1px solid rgba(180,140,220,.3)', color: 'white', cursor: 'pointer',
+                  background: loadingMore ? 'rgba(249,240,240,.06)' : 'rgba(95, 64, 128,.75)',
+                  border: '1px solid rgba(180,140,220,.3)', color:'#F9F0F0', cursor: 'pointer',
                   transition: 'all .18s',
                 }}
                 onMouseEnter={e => { if (!loadingMore) e.currentTarget.style.background = 'rgba(140,110,220,.9)'; }}
-                onMouseLeave={e => { if (!loadingMore) e.currentTarget.style.background = 'rgba(120,90,200,.75)'; }}>
+                onMouseLeave={e => { if (!loadingMore) e.currentTarget.style.background = 'rgba(95, 64, 128,.75)'; }}>
                 {loadingMore ? 'Загрузка…' : 'Показать ещё'}
               </button>
             </div>
@@ -610,9 +614,9 @@ export default function MomentsFeed({ currentUser }) {
         <div style={{
           position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
           background: 'rgba(30,20,60,.95)', backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,.15)',
+          border: '1px solid rgba(249,240,240,.15)',
           borderRadius: 50, padding: '10px 20px',
-          color: 'white', fontSize: 14, fontWeight: 600,
+          color:'#F9F0F0', fontSize: 14, fontWeight: 600,
           zIndex: 1000, whiteSpace: 'nowrap',
           boxShadow: '0 4px 20px rgba(0,0,0,.4)',
         }}>
@@ -625,10 +629,10 @@ export default function MomentsFeed({ currentUser }) {
       {reorderHint && (
         <div style={{
           position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(120,90,200,.94)', backdropFilter: 'blur(16px)',
+          background: 'rgba(95, 64, 128,.94)', backdropFilter: 'blur(16px)',
           border: '1px solid rgba(220,200,255,.5)',
           borderRadius: 50, padding: '10px 22px',
-          color: 'white', fontSize: 14, fontWeight: 700,
+          color:'#F9F0F0', fontSize: 14, fontWeight: 700,
           zIndex: 1100, whiteSpace: 'nowrap',
           boxShadow: '0 8px 28px rgba(80,40,160,.55)',
           pointerEvents: 'none',
@@ -656,9 +660,9 @@ export default function MomentsFeed({ currentUser }) {
             bottom: 80,  // над BottomNav (60px height + breathing room)
             zIndex: 400,
             width: 44, height: 44, borderRadius: '50%',
-            background: 'rgba(120,90,200,.92)',
+            background: 'rgba(95, 64, 128,.92)',
             border: '1px solid rgba(180,140,220,.5)',
-            color: 'white',
+            color:'#F9F0F0',
             cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 6px 20px rgba(80,50,150,.45),0 2px 6px rgba(0,0,0,.2)',
@@ -667,7 +671,7 @@ export default function MomentsFeed({ currentUser }) {
             fontSize: 20, fontWeight: 700, lineHeight: 1,
           }}
           onMouseEnter={e => { e.currentTarget.style.background='rgba(140,110,220,1)'; e.currentTarget.style.transform='translateY(-2px)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background='rgba(120,90,200,.92)'; e.currentTarget.style.transform='translateY(0)'; }}>
+          onMouseLeave={e => { e.currentTarget.style.background='rgba(95, 64, 128,.92)'; e.currentTarget.style.transform='translateY(0)'; }}>
           ↑
         </button>
       )}

@@ -34,6 +34,7 @@ import AdminBusinessRequests from './components/admin/AdminBusinessRequests';
 import IntegrationsLayout from './components/IntegrationsLayout';
 import BusinessLanding from './components/BusinessLanding';
 import AdminTestUsers from './components/admin/AdminTestUsers';
+import AdminGuide from './components/admin/AdminGuide';
 import JoinScreen from './components/JoinScreen';
 import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
@@ -113,7 +114,7 @@ function Protected({ children }) {
   if (loading) return (
     <div style={{minHeight:'100vh',background:'var(--grad)',display:'flex',
       alignItems:'center',justifyContent:'center'}}>
-      <div style={{color:'rgba(255,255,255,.5)',fontSize:16}}>Загрузка…</div>
+      <div style={{color:'rgba(249,240,240,.5)',fontSize:16}}>Загрузка…</div>
     </div>
   );
   return user ? children : <Navigate to="/login" replace/>;
@@ -130,7 +131,7 @@ function RequireAdmin({ children }) {
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--grad)',
       display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 16 }}>Загрузка…</div>
+      <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 16 }}>Загрузка…</div>
     </div>
   );
   if (!user) return <Navigate to="/login" replace/>;
@@ -144,7 +145,7 @@ function RequireBusinessOrAdmin({ children }) {
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--grad)',
       display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 16 }}>Загрузка…</div>
+      <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 16 }}>Загрузка…</div>
     </div>
   );
   if (!user) return <Navigate to="/login" replace/>;
@@ -274,10 +275,10 @@ function GlobalHandlers() {
           gap:18, animation:'fadeIn .25s ease', padding:24,
         }}>
           <div style={{fontSize:56}}>🚫</div>
-          <div style={{color:'white', fontSize:22, fontWeight:800, letterSpacing:-.3}}>
+          <div style={{color:'#F9F0F0', fontSize:22, fontWeight:800, letterSpacing:-.3}}>
             Аккаунт заблокирован
           </div>
-          <div style={{color:'rgba(255,255,255,.5)', fontSize:14, textAlign:'center', maxWidth:320, lineHeight:1.6}}>
+          <div style={{color:'rgba(249,240,240,.5)', fontSize:14, textAlign:'center', maxWidth:320, lineHeight:1.6}}>
             Доступ ограничен администрацией.<br/>
             По вопросам — напишите в поддержку.
           </div>
@@ -285,7 +286,7 @@ function GlobalHandlers() {
             onClick={() => setBlockedOverlay(false)}
             style={{
               marginTop:6, padding:'11px 28px', borderRadius:12, border:'none',
-              background:'rgba(140,110,220,.6)', color:'white',
+              background:'rgba(140,110,220,.6)', color:'#F9F0F0',
               fontSize:14, fontWeight:600, cursor:'pointer',
             }}
             onMouseEnter={e => e.currentTarget.style.background='rgba(160,130,240,.75)'}
@@ -302,7 +303,7 @@ function GlobalHandlers() {
           position:'fixed', bottom:90, left:'50%', transform:'translateX(-50%)',
           background:'linear-gradient(135deg,rgba(100,60,180,.97),rgba(60,20,120,.97))',
           backdropFilter:'blur(20px)', border:'1px solid rgba(200,160,255,.3)',
-          borderRadius:50, padding:'12px 22px', color:'white',
+          borderRadius:50, padding:'12px 22px', color:'#F9F0F0',
           fontSize:14, fontWeight:600, zIndex:9998,
           whiteSpace:'nowrap', maxWidth:'90vw', textAlign:'center',
           boxShadow:'0 8px 32px rgba(80,40,160,.5)',
@@ -502,6 +503,11 @@ export default function App() {
           <Route path="/admin/test-users" element={
             <RequireAdmin>
               <AdminLayout><AdminTestUsers/></AdminLayout>
+            </RequireAdmin>
+          }/>
+          <Route path="/admin/guide" element={
+            <RequireAdmin>
+              <AdminLayout><AdminGuide/></AdminLayout>
             </RequireAdmin>
           }/>
 

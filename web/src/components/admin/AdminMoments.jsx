@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 import { useBulkSelection, Checkbox, BulkActionBar } from './bulk';
 
 function fmtDate(ts) {
@@ -31,7 +31,7 @@ export default function AdminMoments() {
     const hard = action === 'hard_delete';
     const reason = await customPrompt(
       <>
-        <div style={{fontWeight:700,marginBottom:8,color: hard ? 'rgba(255,160,160,.95)' : 'white'}}>
+        <div style={{fontWeight:700,marginBottom:8,color: hard ? 'rgba(255,160,160,.95)' : '#F9F0F0'}}>
           {hard ? '💣 ПОЛНОСТЬЮ стереть' : '🗑 Удалить'} {ids.length} {ids.length === 1 ? 'момент' : 'моментов'}?
         </div>
         {hard && (
@@ -87,7 +87,7 @@ export default function AdminMoments() {
         <div style={{fontWeight:600,marginBottom:8}}>
           {hard ? '💣 ПОЛНОСТЬЮ стереть момент?' : 'Удалить момент?'}
         </div>
-        <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:4}}>
+        <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:4}}>
           «{(moment.text || '').slice(0, 120)}{(moment.text || '').length > 120 ? '…' : ''}»
         </div>
         {hard && (
@@ -118,14 +118,14 @@ export default function AdminMoments() {
     { value: 'all', label: 'Все' },
   ];
 
-  const cell = { padding: '12px 16px', color: 'rgba(255,255,255,.8)', fontSize: 13,
-    borderBottom: '1px solid rgba(255,255,255,.06)', verticalAlign: 'top' };
-  const hcell = { ...cell, color: 'rgba(255,255,255,.4)', fontSize: 11, fontWeight: 700,
+  const cell = { padding: '12px 16px', color: 'rgba(249,240,240,.8)', fontSize: 13,
+    borderBottom: '1px solid rgba(249,240,240,.06)', verticalAlign: 'top' };
+  const hcell = { ...cell, color: 'rgba(249,240,240,.4)', fontSize: 11, fontWeight: 700,
     textTransform: 'uppercase', letterSpacing: .8, verticalAlign: 'middle' };
 
   return (
     <div style={{ padding: '28px 32px' }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 20 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 20 }}>
         ✦ Моменты
       </h1>
 
@@ -134,8 +134,8 @@ export default function AdminMoments() {
           placeholder="Поиск по тексту, автору или телефону…"
           style={{
             flex: 1, minWidth: 220,
-            background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)',
-            borderRadius: 10, padding: '9px 14px', color: 'white', fontSize: 14,
+            background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.14)',
+            borderRadius: 10, padding: '9px 14px', color:'#F9F0F0', fontSize: 14,
             fontFamily: 'inherit', outline: 'none',
           }}/>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -144,8 +144,8 @@ export default function AdminMoments() {
               style={{
                 padding: '9px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', border: 'none',
-                background: status === s.value ? 'rgba(120,90,200,.7)' : 'rgba(255,255,255,.08)',
-                color: status === s.value ? 'white' : 'rgba(255,255,255,.6)',
+                background: status === s.value ? 'rgba(95, 64, 128,.7)' : 'rgba(249,240,240,.08)',
+                color: status === s.value ? '#F9F0F0' : 'rgba(249,240,240,.6)',
               }}>
               {s.label}
             </button>
@@ -161,7 +161,7 @@ export default function AdminMoments() {
       )}
 
       {loading ? (
-        <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 14 }}>Загрузка…</div>
+        <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 14 }}>Загрузка…</div>
       ) : (() => {
         const q = search.trim().toLowerCase();
         const filtered = q
@@ -191,8 +191,8 @@ export default function AdminMoments() {
           return { checked: allSelected, indeterminate: !allSelected };
         })();
         return (
-        <div style={{ background: 'rgba(255,255,255,.04)', borderRadius: 14, overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,.08)' }}>
+        <div style={{ background: 'rgba(249,240,240,.04)', borderRadius: 14, overflow: 'hidden',
+          border: '1px solid rgba(249,240,240,.08)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -216,13 +216,13 @@ export default function AdminMoments() {
             </thead>
             <tbody>
               {sorted.length === 0 && (
-                <tr><td colSpan={9} style={{ ...cell, textAlign: 'center', color: 'rgba(255,255,255,.3)' }}>
+                <tr><td colSpan={9} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
                   {q ? 'Ничего не найдено' : 'Пусто'}
                 </td></tr>
               )}
               {sorted.map(m => (
                 <tr key={m.id}
-                  style={{ background: bulk.has(m.id) ? 'rgba(120,90,200,.10)' : 'transparent' }}>
+                  style={{ background: bulk.has(m.id) ? 'rgba(95, 64, 128,.10)' : 'transparent' }}>
                   <td style={cell}>
                     <Checkbox checked={bulk.has(m.id)} onClick={() => bulk.toggle(m.id)} title="Выделить"/>
                   </td>
@@ -235,7 +235,7 @@ export default function AdminMoments() {
                         {m.author_name}
                       </Link>
                     ) : (
-                      <div style={{ color: 'white', fontWeight: 600 }}>{m.author_name}</div>
+                      <div style={{ color:'#F9F0F0', fontWeight: 600 }}>{m.author_name}</div>
                     )}
                     {m.author_is_deleted ? (
                       <div style={{ color: 'rgba(255,180,140,.85)', fontSize: 11, fontWeight: 600,
@@ -243,7 +243,7 @@ export default function AdminMoments() {
                         🪦 автор удалён
                       </div>
                     ) : null}
-                    <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11 }}>{m.author_phone}</div>
+                    <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 11 }}>{m.author_phone}</div>
                   </td>
                   <td style={{ ...cell, maxWidth: 260 }}>
                     <div style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
@@ -253,7 +253,7 @@ export default function AdminMoments() {
                       <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {m.auto_tags.map(t => (
                           <span key={t} style={{ fontSize: 10, color: 'rgba(180,140,255,.7)',
-                            background: 'rgba(120,90,200,.15)', borderRadius: 4, padding: '1px 5px' }}>
+                            background: 'rgba(95, 64, 128,.15)', borderRadius: 4, padding: '1px 5px' }}>
                             {t}
                           </span>
                         ))}
@@ -266,29 +266,29 @@ export default function AdminMoments() {
                       <img src={m.media_url} alt="" loading="lazy"
                         onClick={() => setPreview({ url: m.media_url, type: 'image' })}
                         style={{ width: 64, height: 64, borderRadius: 8, objectFit: 'cover',
-                          cursor: 'zoom-in', border: '1px solid rgba(255,255,255,.12)' }}/>
+                          cursor: 'zoom-in', border: '1px solid rgba(249,240,240,.12)' }}/>
                     )}
                     {m.media_type === 'video' && m.media_url && (
                       <div onClick={() => setPreview({ url: m.media_url, type: 'video' })}
                         style={{ position: 'relative', width: 64, height: 64, borderRadius: 8,
                           overflow: 'hidden', cursor: 'pointer', background: 'rgba(0,0,0,.4)',
-                          border: '1px solid rgba(255,255,255,.12)' }}>
+                          border: '1px solid rgba(249,240,240,.12)' }}>
                         <video src={m.media_url + '#t=0.1'} preload="metadata" muted
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
                         <div style={{ position: 'absolute', inset: 0, display: 'flex',
                           alignItems: 'center', justifyContent: 'center',
-                          fontSize: 22, color: 'white', textShadow: '0 1px 4px rgba(0,0,0,.7)' }}>▶</div>
+                          fontSize: 22, color:'#F9F0F0', textShadow: '0 1px 4px rgba(0,0,0,.7)' }}>▶</div>
                       </div>
                     )}
                     {m.media_type === 'audio' && (
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)',
-                        background: 'rgba(255,255,255,.08)', borderRadius: 4, padding: '2px 6px' }}>
+                      <span style={{ fontSize: 11, color: 'rgba(249,240,240,.5)',
+                        background: 'rgba(249,240,240,.08)', borderRadius: 4, padding: '2px 6px' }}>
                         🎤 audio
                       </span>
                     )}
                     {m.media_type && !['image','video','audio'].includes(m.media_type) && (
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)',
-                        background: 'rgba(255,255,255,.08)', borderRadius: 4, padding: '2px 6px' }}>
+                      <span style={{ fontSize: 11, color: 'rgba(249,240,240,.5)',
+                        background: 'rgba(249,240,240,.08)', borderRadius: 4, padding: '2px 6px' }}>
                         {m.media_type}
                       </span>
                     )}
@@ -303,8 +303,8 @@ export default function AdminMoments() {
                   <td style={cell}>
                     <span style={{
                       fontSize: 11, fontWeight: 600, borderRadius: 6, padding: '2px 8px',
-                      background: m.status === 'active' ? 'rgba(60,180,100,.12)' : 'rgba(255,255,255,.08)',
-                      color: m.status === 'active' ? 'rgba(100,220,140,.8)' : 'rgba(255,255,255,.4)',
+                      background: m.status === 'active' ? 'rgba(60,180,100,.12)' : 'rgba(249,240,240,.08)',
+                      color: m.status === 'active' ? 'rgba(100,220,140,.8)' : 'rgba(249,240,240,.4)',
                     }}>
                       {m.status}
                     </span>
@@ -321,7 +321,7 @@ export default function AdminMoments() {
                       <button onClick={() => handleDelete(m, true)}
                         title="Полное удаление (БД + S3)"
                         style={{ background: 'rgba(200,50,50,.5)', border: 'none', borderRadius: 8,
-                          padding: '6px 10px', color: 'white', fontSize: 12,
+                          padding: '6px 10px', color:'#F9F0F0', fontSize: 12,
                           cursor: 'pointer', fontWeight: 700 }}>
                         💣
                       </button>
@@ -335,7 +335,7 @@ export default function AdminMoments() {
         );
       })()}
 
-      <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 12, marginTop: 12 }}>
+      <div style={{ color: 'rgba(249,240,240,.3)', fontSize: 12, marginTop: 12 }}>
         {moments.length} моментов{search.trim() && ` · показано совпадений`}
       </div>
 
@@ -366,16 +366,16 @@ export default function AdminMoments() {
               style={{ maxWidth: '95vw', maxHeight: '92vh', borderRadius: 12, cursor: 'default' }}/>
           )}
           <button onClick={() => setPreview(null)}
-            style={{ position: 'absolute', top: 20, right: 24, background: 'rgba(255,255,255,.1)',
+            style={{ position: 'absolute', top: 20, right: 24, background: 'rgba(249,240,240,.1)',
               border: 'none', borderRadius: '50%', width: 40, height: 40,
-              color: 'white', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+              color:'#F9F0F0', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>✕</button>
         </div>
       )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(22,15,50,.97)', border: '1px solid rgba(255,255,255,.15)',
-          borderRadius: 50, padding: '10px 20px', color: 'white', fontSize: 14, fontWeight: 600,
+          background: 'rgba(22,15,50,.97)', border: '1px solid rgba(249,240,240,.15)',
+          borderRadius: 50, padding: '10px 20px', color:'#F9F0F0', fontSize: 14, fontWeight: 600,
           zIndex: 1000, whiteSpace: 'nowrap' }}>
           {toast}
         </div>

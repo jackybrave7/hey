@@ -1,12 +1,14 @@
 // SuperInfoScreen.jsx — полноэкранный попап с информацией о HEY СУПЕР
 import { useAuth } from '../../AuthContext';
-import { heyToast } from '../Screens';
+import { heyToast } from '../shared/Toast';
+import HeyLogo from '../HeyLogo';
+import Icon from '../Icon';
 
 export default function SuperInfoScreen({ onClose, onInvite }) {
   const { user } = useAuth();
   const features = [
     { icon: '✦', text: '3 момента одновременно (вместо 1)' },
-    { icon: '🎙', text: 'Голосовые до 5 минут (вместо 1)' },
+    { icon: 'mic', text: 'Голосовые до 5 минут (вместо 1)' },
     { icon: '🟢', text: 'Видишь, когда контакт был онлайн' },
     { icon: '📊', text: 'Детальная аналитика — кто видел и резонирует' },
     { icon: '🖼', text: 'Картинки до 15 МБ, файлы до 50 МБ' },
@@ -44,33 +46,32 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
         borderRadius: 24, width: 'min(100%, 480px)',
         maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 8px 48px rgba(0,0,0,.6)',
-        border: '1px solid rgba(255,255,255,.1)',
+        border: '1px solid rgba(249,240,240,.1)',
         overflow: 'hidden',
       }}>
         {/* Header */}
         <div style={{
           padding: '28px 24px 20px',
-          background: 'linear-gradient(160deg, rgba(120,80,200,.35) 0%, rgba(80,40,140,.2) 100%)',
-          borderBottom: '1px solid rgba(255,255,255,.08)',
+          background: 'linear-gradient(160deg, rgba(95, 64, 128,.35) 0%, rgba(80,40,140,.2) 100%)',
+          borderBottom: '1px solid rgba(249,240,240,.08)',
           textAlign: 'center',
           position: 'relative',
         }}>
           <button onClick={onClose} style={{
             position: 'absolute', top: 16, right: 16,
-            background: 'rgba(255,255,255,.1)', border: 'none', borderRadius: '50%',
-            width: 32, height: 32, color: 'white', fontSize: 16, cursor: 'pointer',
+            background: 'rgba(249,240,240,.1)', border: 'none', borderRadius: '50%',
+            width: 32, height: 32, color:'#F9F0F0', fontSize: 16, cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>✕</button>
 
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 64, height: 64, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #c8a8ff 0%, #7858b0 100%)',
-            fontSize: 28, color: 'white', fontWeight: 700,
+            background: 'linear-gradient(135deg, #c8a8ff 0%, #5F4080 100%)',
             marginBottom: 14,
-            boxShadow: '0 4px 20px rgba(120,80,200,.5)',
+            boxShadow: '0 4px 20px rgba(95, 64, 128,.5)',
           }}>
-            ✦
+            <HeyLogo size={34} color="#F9F0F0" />
           </div>
           <div style={{
             fontSize: 22, fontWeight: 800, marginBottom: 6,
@@ -79,7 +80,7 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
           }}>
             HEY СУПЕР
           </div>
-          <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 14 }}>
+          <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 14 }}>
             Когда хочется больше
           </div>
         </div>
@@ -90,41 +91,43 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
             {features.map(({ icon, text }) => (
               <div key={text} style={{
                 display: 'flex', alignItems: 'center', gap: 14,
-                background: 'rgba(255,255,255,.05)',
+                background: 'rgba(249,240,240,.05)',
                 borderRadius: 14, padding: '13px 16px',
-                border: '1px solid rgba(255,255,255,.07)',
+                border: '1px solid rgba(249,240,240,.07)',
               }}>
-                <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
-                <span style={{ color: 'rgba(255,255,255,.85)', fontSize: 14 }}>{text}</span>
+                <span style={{ fontSize: 20, flexShrink: 0, display:'inline-flex', color:'rgba(249,240,240,.85)' }}>
+                  {icon === 'mic' ? <Icon name="mic" size={20} /> : icon}
+                </span>
+                <span style={{ color: 'rgba(249,240,240,.85)', fontSize: 14 }}>{text}</span>
               </div>
             ))}
           </div>
 
           {/* Referral block */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(120,80,200,.3), rgba(80,40,140,.2))',
+            background: 'linear-gradient(135deg, rgba(95, 64, 128,.3), rgba(80,40,140,.2))',
             border: '1px solid rgba(180,140,255,.25)',
             borderRadius: 18, padding: '20px',
             textAlign: 'center',
           }}>
             <div style={{ fontSize: 28, marginBottom: 10 }}>🎁</div>
-            <div style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
+            <div style={{ color:'#F9F0F0', fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
               Пригласи 3 друзей — получи 3 месяца СУПЕР
             </div>
-            <div style={{ color: 'rgba(255,255,255,.6)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+            <div style={{ color: 'rgba(249,240,240,.6)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
               Разовая акция для новых пользователей.<br/>
               Друг засчитывается когда зарегистрируется по твоей ссылке
               и напишет хотя бы одно сообщение.
             </div>
             <button onClick={copyInviteLink} style={{
               width: '100%', padding: '13px', borderRadius: 14,
-              background: 'rgba(120,90,200,.85)', border: '1px solid rgba(180,140,255,.4)',
-              color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(95, 64, 128,.85)', border: '1px solid rgba(180,140,255,.4)',
+              color:'#F9F0F0', fontSize: 15, fontWeight: 700, cursor: 'pointer',
               transition: 'all .18s',
             }}>
               🔗 Скопировать пригласительную ссылку
             </button>
-            <div style={{ color: 'rgba(255,255,255,.35)', fontSize: 11, marginTop: 12 }}>
+            <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 11, marginTop: 12 }}>
               Прямая покупка появится позже
             </div>
           </div>

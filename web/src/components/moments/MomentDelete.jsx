@@ -34,7 +34,7 @@ export default function MomentDelete({ moment, onConfirm, onClose }) {
     background:'rgba(22,15,50,.98)', backdropFilter:'blur(24px)',
     borderRadius:24, width:'min(100%,380px)',
     boxShadow:'0 8px 48px rgba(0,0,0,.6)',
-    border:'1px solid rgba(255,255,255,.1)',
+    border:'1px solid rgba(249,240,240,.1)',
     padding:'28px 24px',
     display:'flex', flexDirection:'column', gap:18,
   };
@@ -44,19 +44,19 @@ export default function MomentDelete({ moment, onConfirm, onClose }) {
       <div style={box}>
         <div style={{ textAlign:'center' }}>
           <div style={{ fontSize:44, marginBottom:12 }}>🗑</div>
-          <div style={{ color:'white', fontSize:18, fontWeight:700, marginBottom:8 }}>
+          <div style={{ color:'#F9F0F0', fontSize:18, fontWeight:700, marginBottom:8 }}>
             Удалить момент навсегда?
           </div>
-          <div style={{ color:'rgba(255,255,255,.55)', fontSize:14, lineHeight:1.55 }}>
+          <div style={{ color:'rgba(249,240,240,.55)', fontSize:14, lineHeight:1.55 }}>
             Это действие нельзя отменить. Момент и все реакции на него будут удалены безвозвратно.
           </div>
         </div>
 
         {/* Превью текста, чтобы видеть какой именно момент удаляем */}
         {moment?.text && (
-          <div style={{ background:'rgba(255,255,255,.06)', borderRadius:14,
+          <div style={{ background:'rgba(249,240,240,.06)', borderRadius:14,
             padding:'12px 16px', borderLeft:'3px solid rgba(255,80,80,.4)' }}>
-            <div style={{ color:'rgba(255,255,255,.72)', fontSize:13, lineHeight:1.5,
+            <div style={{ color:'rgba(249,240,240,.72)', fontSize:13, lineHeight:1.5,
               overflow:'hidden', display:'-webkit-box',
               WebkitLineClamp:3, WebkitBoxOrient:'vertical' }}>
               {moment.text}
@@ -67,15 +67,15 @@ export default function MomentDelete({ moment, onConfirm, onClose }) {
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} disabled={deleting}
             style={{ flex:1, padding:'13px', borderRadius:14,
-              background:'rgba(255,255,255,.08)', border:'none',
-              color:'rgba(255,255,255,.7)', fontSize:15, fontWeight:600,
+              background:'rgba(249,240,240,.08)', border:'none',
+              color:'rgba(249,240,240,.7)', fontSize:15, fontWeight:600,
               cursor: deleting ? 'wait' : 'pointer', fontFamily:'inherit' }}>
             Отмена
           </button>
           <button onClick={handleDelete} disabled={deleting} autoFocus
             style={{ flex:1, padding:'13px', borderRadius:14,
               background:'rgba(200,50,50,.9)', border:'none',
-              color:'white', fontSize:15, fontWeight:700,
+              color:'#F9F0F0', fontSize:15, fontWeight:700,
               cursor: deleting ? 'wait' : 'pointer', fontFamily:'inherit',
               opacity: deleting ? .7 : 1, transition:'opacity .15s' }}>
             {deleting ? 'Удаление…' : 'Удалить'}

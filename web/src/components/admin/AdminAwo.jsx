@@ -5,15 +5,16 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 import AwoGuide from './AwoGuide';
+import Icon from '../Icon';
 import TenantAdminsSection from './TenantAdminsSection';
 
 // Тёмные карточки + высоко-контрастный текст — фон админки имеет светлые
 // области градиента, поэтому используем не прозрачно-белые, а тёмные подложки.
 const cardStyle = {
   background: 'rgba(20,12,40,.65)',
-  border: '1px solid rgba(255,255,255,.12)',
+  border: '1px solid rgba(249,240,240,.12)',
   borderRadius: 14,
   padding: '20px 22px',
   marginBottom: 18,
@@ -25,17 +26,17 @@ const labelStyle = {
 };
 const inputStyle = {
   width: '100%', padding: '10px 12px', borderRadius: 10,
-  background: 'rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)',
-  color: 'white', fontSize: 14, outline: 'none',
+  background: 'rgba(0,0,0,.45)', border: '1px solid rgba(249,240,240,.18)',
+  color:'#F9F0F0', fontSize: 14, outline: 'none',
   fontFamily: 'inherit',
 };
 const btnStyle = {
   padding: '9px 16px', borderRadius: 10, border: 'none',
-  background: 'rgba(140,110,220,.7)', color: 'white', fontSize: 13,
+  background: 'rgba(140,110,220,.7)', color:'#F9F0F0', fontSize: 13,
   fontWeight: 600, cursor: 'pointer',
   fontFamily: 'inherit',
 };
-const btnGhost = { ...btnStyle, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.18)' };
+const btnGhost = { ...btnStyle, background: 'rgba(249,240,240,.12)', border: '1px solid rgba(249,240,240,.18)' };
 const btnDanger = { ...btnStyle, background: 'rgba(220,90,90,.55)', border: '1px solid rgba(255,160,160,.4)' };
 const mutedText = { color: 'rgba(220,215,240,.78)' };  // вторичный текст с хорошим контрастом
 const hintText  = { color: 'rgba(220,215,240,.6)' };   // подсказки — легче, но читаемо
@@ -290,14 +291,14 @@ export default function AdminAwo() {
           style={{
             marginLeft: 'auto',
             padding: '7px 14px', borderRadius: 10,
-            background: 'rgba(120,90,200,.25)',
+            background: 'rgba(95, 64, 128,.25)',
             border: '1px solid rgba(180,140,220,.4)',
             color: 'rgba(220,200,255,.95)',
             fontSize: 12, fontWeight: 600, cursor: 'pointer',
             fontFamily: 'inherit',
           }}>📖 Руководство</button>
       </div>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         🎓 {currentTenant?.name || 'Школа'}
       </h1>
       <p style={{ color: 'rgba(225,220,245,.85)', fontSize: 14, marginBottom: 24 }}>
@@ -312,7 +313,7 @@ export default function AdminAwo() {
       )}
       {toast && (
         <div style={{ position: 'fixed', top: 20, right: 20, background: 'rgba(60,170,110,.95)',
-          color: 'white', padding: '10px 16px', borderRadius: 10, fontSize: 13, zIndex: 9999 }}>
+          color:'#F9F0F0', padding: '10px 16px', borderRadius: 10, fontSize: 13, zIndex: 9999 }}>
           {toast}
         </div>
       )}
@@ -321,7 +322,7 @@ export default function AdminAwo() {
           должен перепривязывать школу на свой профиль. */}
       {isOwner && (
       <div style={cardStyle}>
-        <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+        <h3 style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
           🎓 Официальный аккаунт школы
         </h3>
         <p style={{ color: 'rgba(225,220,245,.82)', fontSize: 13, marginBottom: 16, lineHeight:1.55 }}>
@@ -333,21 +334,21 @@ export default function AdminAwo() {
         {/* Current */}
         {settings?.school_account ? (
           <div style={{ display:'flex', alignItems:'center', gap:12,
-            padding:'12px 14px', background:'rgba(120,90,200,.14)',
+            padding:'12px 14px', background:'rgba(95, 64, 128,.14)',
             border:'1px solid rgba(180,140,220,.3)', borderRadius:12, marginBottom:14 }}>
             {settings.school_account.avatar && /^https?:|^\//.test(settings.school_account.avatar) ? (
               <img src={settings.school_account.avatar} alt=""
                 style={{ width:44, height:44, borderRadius:'50%', objectFit:'cover' }}/>
             ) : (
               <div style={{ width:44, height:44, borderRadius:'50%',
-                background:'rgba(120,90,200,.5)', color:'white',
+                background:'rgba(95, 64, 128,.5)', color:'#F9F0F0',
                 display:'flex',alignItems:'center',justifyContent:'center',
                 fontSize:18, fontWeight:700 }}>
                 {(settings.school_account.name || '?')[0].toUpperCase()}
               </div>
             )}
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ color:'white', fontSize:15, fontWeight:600,
+              <div style={{ color:'#F9F0F0', fontSize:15, fontWeight:600,
                 overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {settings.school_account.name}
               </div>
@@ -381,7 +382,7 @@ export default function AdminAwo() {
                   : 'rgba(140,110,220,.85)',
                 color: settings?.school_account?.id === me.id
                   ? 'rgba(140,240,180,.95)'
-                  : 'white',
+                  : '#F9F0F0',
                 fontSize: 13, fontWeight: 600,
                 cursor: bindingAccount || settings?.school_account?.id === me.id ? 'default' : 'pointer',
                 fontFamily: 'inherit', marginBottom: 12,
@@ -434,9 +435,9 @@ export default function AdminAwo() {
                   disabled={bindingAccount || u.id === settings?.school_account?.id}
                   style={{
                     display:'flex', alignItems:'center', gap:10, padding:'8px 10px',
-                    background: u.id === settings?.school_account?.id ? 'rgba(120,200,140,.15)' : 'rgba(255,255,255,.04)',
-                    border:'1px solid rgba(255,255,255,.08)', borderRadius:8,
-                    color:'white', fontSize:13, cursor: bindingAccount ? 'wait' : 'pointer',
+                    background: u.id === settings?.school_account?.id ? 'rgba(120,200,140,.15)' : 'rgba(249,240,240,.04)',
+                    border:'1px solid rgba(249,240,240,.08)', borderRadius:8,
+                    color:'#F9F0F0', fontSize:13, cursor: bindingAccount ? 'wait' : 'pointer',
                     textAlign:'left', fontFamily:'inherit', width:'100%',
                     opacity: u.id === settings?.school_account?.id ? 0.65 : 1,
                   }}>
@@ -444,7 +445,7 @@ export default function AdminAwo() {
                     <img src={u.avatar} alt="" style={{ width:28, height:28, borderRadius:'50%', objectFit:'cover' }}/>
                   ) : (
                     <div style={{ width:28, height:28, borderRadius:'50%',
-                      background:'rgba(120,90,200,.5)', display:'flex',
+                      background:'rgba(95, 64, 128,.5)', display:'flex',
                       alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}>
                       {(u.nickname||u.name||'?')[0].toUpperCase()}
                     </div>
@@ -472,9 +473,9 @@ export default function AdminAwo() {
                 disabled={bindingAccount || u.id === settings?.school_account?.id}
                 style={{
                   display:'flex', alignItems:'center', gap:10, padding:'8px 10px',
-                  background: u.id === settings?.school_account?.id ? 'rgba(120,200,140,.15)' : 'rgba(255,255,255,.04)',
-                  border:'1px solid rgba(255,255,255,.08)', borderRadius:8,
-                  color:'white', fontSize:13, cursor: bindingAccount ? 'wait' : 'pointer',
+                  background: u.id === settings?.school_account?.id ? 'rgba(120,200,140,.15)' : 'rgba(249,240,240,.04)',
+                  border:'1px solid rgba(249,240,240,.08)', borderRadius:8,
+                  color:'#F9F0F0', fontSize:13, cursor: bindingAccount ? 'wait' : 'pointer',
                   textAlign:'left', fontFamily:'inherit', width:'100%',
                   opacity: u.id === settings?.school_account?.id ? 0.65 : 1,
                 }}>
@@ -482,7 +483,7 @@ export default function AdminAwo() {
                   <img src={u.avatar} alt="" style={{ width:28, height:28, borderRadius:'50%', objectFit:'cover' }}/>
                 ) : (
                   <div style={{ width:28, height:28, borderRadius:'50%',
-                    background:'rgba(120,90,200,.5)', display:'flex',
+                    background:'rgba(95, 64, 128,.5)', display:'flex',
                     alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700 }}>
                     {(u.name||'?')[0].toUpperCase()}
                   </div>
@@ -510,14 +511,14 @@ export default function AdminAwo() {
           Со-админ управляет привязками курсов и читает логи. */}
       {isOwner && (
       <div style={cardStyle}>
-        <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+        <h3 style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
           ⚙ Настройки webhook
         </h3>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, cursor: 'pointer' }}>
           <input type="checkbox" checked={testMode} onChange={e => setTestMode(e.target.checked)}
             style={{ width: 18, height: 18 }}/>
-          <span style={{ color: 'white', fontSize: 14 }}>
+          <span style={{ color:'#F9F0F0', fontSize: 14 }}>
             Тестовый режим — обрабатывать только один заданный курс
           </span>
         </label>
@@ -531,7 +532,9 @@ export default function AdminAwo() {
         )}
 
         <div style={{ marginBottom: 14 }}>
-          <div style={labelStyle}>🚫 Стоп-слова для доступа к чату (через запятую)</div>
+          <div style={{...labelStyle, display:'flex', alignItems:'center', gap:6}}>
+            <Icon name="ban" size={14} /> Стоп-слова для доступа к чату (через запятую)
+          </div>
           <input style={inputStyle} value={chatExcludes} onChange={e => setChatExcludes(e.target.value)}
             placeholder="слушатель, запись"/>
           <div style={{ color: 'rgba(225,220,245,.75)', fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
@@ -549,11 +552,11 @@ export default function AdminAwo() {
         {settings?.webhook_token && (() => {
           const webhookUrl = `${window.location.origin}/api/integrations/awo/webhook/${tenantId}?token=${settings.webhook_token}`;
           return (
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,.08)' }}>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(249,240,240,.08)' }}>
               <div style={{ ...labelStyle, marginBottom: 8 }}>📨 Webhook URL для АВО</div>
               <div style={{
                 background: 'rgba(0,0,0,.45)', borderRadius: 10,
-                border: '1px solid rgba(255,255,255,.12)',
+                border: '1px solid rgba(249,240,240,.12)',
                 padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'center',
               }}>
                 <code style={{ flex: 1, color: 'rgba(200,220,255,1)', fontSize: 11.5,
@@ -583,7 +586,7 @@ export default function AdminAwo() {
 
       {/* Маппинг курс → чат */}
       <div style={cardStyle}>
-        <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+        <h3 style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
           🔗 Курс → групповой чат
         </h3>
         <p style={{ color: 'rgba(225,220,245,.75)', fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}>
@@ -611,7 +614,7 @@ export default function AdminAwo() {
             {mappings.map(m => (
               <div key={m.course} style={{ display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 12px', background: 'rgba(0,0,0,.2)', borderRadius: 10 }}>
-                <div style={{ flex: 1, color: 'white', fontSize: 13 }}>
+                <div style={{ flex: 1, color:'#F9F0F0', fontSize: 13 }}>
                   <strong>{m.course}</strong>
                   <span style={{ color: 'rgba(225,220,245,.75)', marginLeft: 8 }}>
                     → {m.chat_name || m.chat_id}
@@ -628,7 +631,7 @@ export default function AdminAwo() {
           сниппет уровня учётной записи школы в АВО). */}
       {isOwner && (
       <div style={cardStyle}>
-        <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 10 }}>
+        <h3 style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom: 10 }}>
           📦 Виджет HEY в ЛК АВО
         </h3>
         <p style={{ color: 'rgba(225,220,245,.85)', fontSize: 13, marginBottom: 12, lineHeight: 1.55 }}>
@@ -639,7 +642,7 @@ export default function AdminAwo() {
         <div style={{ ...labelStyle, marginTop: 4 }}>Сниппет для поля «Редактирование скриптов» в АВО</div>
         <div style={{
           position: 'relative', background: 'rgba(0,0,0,.45)',
-          border: '1px solid rgba(255,255,255,.12)', borderRadius: 10,
+          border: '1px solid rgba(249,240,240,.12)', borderRadius: 10,
           padding: '12px 14px', marginBottom: 10,
         }}>
           <pre style={{
@@ -657,7 +660,7 @@ export default function AdminAwo() {
           </button>
         </div>
         <div style={{ color: 'rgba(225,220,245,.78)', fontSize: 12, lineHeight: 1.6 }}>
-          <strong style={{ color: 'white' }}>Куда вставлять:</strong> Настройки АВО → «Редактирование
+          <strong style={{ color:'#F9F0F0' }}>Куда вставлять:</strong> Настройки АВО → «Редактирование
           скриптов (javascript) для кабинета ученика». Переменную{' '}
           <code style={{ background: 'rgba(0,0,0,.45)', padding: '1px 5px', borderRadius: 4,
             color: 'rgba(200,220,255,1)', fontSize: 11.5 }}>{'{email}'}</code>{' '}
@@ -670,7 +673,7 @@ export default function AdminAwo() {
 
       {/* Генератор join-ссылки */}
       <div style={cardStyle}>
-        <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+        <h3 style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
           🔗 Сгенерировать /join-ссылку
         </h3>
         <p style={{ color: 'rgba(225,220,245,.75)', fontSize: 12, marginBottom: 14 }}>
@@ -686,7 +689,7 @@ export default function AdminAwo() {
         {generatedLink && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 12px',
             background: 'rgba(0,0,0,.3)', borderRadius: 10 }}>
-            <code style={{ flex: 1, color: 'rgba(255,255,255,.85)', fontSize: 12, wordBreak: 'break-all' }}>
+            <code style={{ flex: 1, color: 'rgba(249,240,240,.85)', fontSize: 12, wordBreak: 'break-all' }}>
               {generatedLink}
             </code>
             <button style={btnGhost} onClick={copyLink}>📋</button>
@@ -701,7 +704,7 @@ export default function AdminAwo() {
       {isOwner && (
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h3 style={{ color: 'white', fontSize: 16, fontWeight: 700, margin: 0 }}>
+          <h3 style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, margin: 0 }}>
             📋 Последние webhook'и
           </h3>
           <button style={btnGhost} onClick={refreshLog}>⟳ Обновить</button>
@@ -710,9 +713,9 @@ export default function AdminAwo() {
           <div style={{ color: 'rgba(220,215,240,.65)', fontSize: 13 }}>Пока ничего не приходило.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: 'rgba(255,255,255,.85)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: 'rgba(249,240,240,.85)' }}>
               <thead>
-                <tr style={{ color: 'rgba(225,220,245,.82)', borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <tr style={{ color: 'rgba(225,220,245,.82)', borderBottom: '1px solid rgba(249,240,240,.1)' }}>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Когда</th>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Email</th>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Телефон</th>
@@ -722,14 +725,14 @@ export default function AdminAwo() {
               </thead>
               <tbody>
                 {log.map(row => (
-                  <tr key={row.id_account} style={{ borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+                  <tr key={row.id_account} style={{ borderBottom: '1px solid rgba(249,240,240,.05)' }}>
                     <td style={{ padding: '6px 8px' }}>{fmtDate(row.processed_at)}</td>
                     <td style={{ padding: '6px 8px' }}>{row.email || '—'}</td>
                     <td style={{ padding: '6px 8px' }}>{row.phone || '—'}</td>
                     <td style={{ padding: '6px 8px' }}>{row.course || '—'}</td>
                     <td style={{ padding: '6px 8px',
                       color: row.result?.startsWith('invite') || row.result?.includes('added') ? 'rgba(110,235,150,.95)'
-                           : row.result?.startsWith('ignored') ? 'rgba(255,200,100,.8)' : 'rgba(255,255,255,.7)' }}>
+                           : row.result?.startsWith('ignored') ? 'rgba(255,200,100,.8)' : 'rgba(249,240,240,.7)' }}>
                       {row.result}
                     </td>
                   </tr>

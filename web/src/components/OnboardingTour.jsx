@@ -1,17 +1,18 @@
 // OnboardingTour.jsx — гид для новых пользователей
 // Показывается после регистрации, объясняет ключевые концепции HEY.
 import { useState, useEffect } from 'react';
+import HeyLogo from './HeyLogo';
 
 const STEPS = [
   {
     icon: '✦',
-    gradient: 'linear-gradient(135deg, #5a2d96, #7c45c7, #a87ce4)',
+    gradient: 'linear-gradient(135deg, #5F4080, #7c45c7, #a87ce4)',
     title: 'Это HEY',
     body: 'Приватный мессенджер для близкого круга. Без алгоритмов, без бесконечной ленты, без рекламы.\n\nЗдесь видят тебя только те, кого ты сам добавил.',
   },
   {
     icon: '✦',
-    gradient: 'linear-gradient(135deg, #2a1058, #5a2d96, #b89aff)',
+    gradient: 'linear-gradient(135deg, #2a1058, #5F4080, #b89aff)',
     title: 'Моменты',
     body: 'Это не «посты» и не «сторис». Момент — короткая записка о том, что у тебя сейчас самое актуальное.\n\nЖивёт пока ты его не уберёшь. У обычных — один активный, у ✦ Super — до трёх.',
   },
@@ -41,7 +42,7 @@ const STEPS = [
   },
   {
     icon: '📝',
-    gradient: 'linear-gradient(135deg, #2a2055, #5a4090, #b0a0e0)',
+    gradient: 'linear-gradient(135deg, #2a2055, #5F4080, #b0a0e0)',
     title: 'Монолог',
     body: 'Твой личный чат — пишешь сам себе.\n\nКлади сюда мысли, ссылки, заметки, файлы. Как «избранное» в Telegram — всегда под рукой, никто кроме тебя не видит.',
   },
@@ -71,7 +72,7 @@ const STEPS = [
   },
   {
     icon: '🚀',
-    gradient: 'linear-gradient(135deg, #2a1058, #5a2d96, #a87ce4)',
+    gradient: 'linear-gradient(135deg, #2a1058, #5F4080, #a87ce4)',
     title: 'Поехали',
     body: 'Первое что стоит сделать — добавить аватарку и пару контактов.\n\nКогда у тебя появятся друзья в HEY, лента моментов оживёт.',
   },
@@ -123,9 +124,9 @@ export default function OnboardingTour({ onDone }) {
       }}>
         <button onClick={onDone}
           style={{
-            background:'rgba(0,0,0,.25)', border:'1px solid rgba(255,255,255,.15)',
+            background:'rgba(0,0,0,.25)', border:'1px solid rgba(249,240,240,.15)',
             borderRadius:50, padding:'7px 14px',
-            color:'rgba(255,255,255,.7)', fontSize:12, fontWeight:600,
+            color:'rgba(249,240,240,.7)', fontSize:12, fontWeight:600,
             cursor:'pointer', backdropFilter:'blur(8px)',
             fontFamily:'inherit',
           }}>
@@ -143,7 +144,7 @@ export default function OnboardingTour({ onDone }) {
             style={{
               flex: i === idx ? 2 : 1, maxWidth: i === idx ? 36 : 16,
               height: 4, borderRadius: 4,
-              background: i <= idx ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.25)',
+              background: i <= idx ? 'rgba(249,240,240,.85)' : 'rgba(249,240,240,.25)',
               transition:'all .3s',
             }}/>
         ))}
@@ -157,22 +158,24 @@ export default function OnboardingTour({ onDone }) {
         animation:'heyTourFade .45s ease-out',
       }}>
         <div style={{
-          fontSize: 84, lineHeight:1,
           marginBottom: 28,
           filter:'drop-shadow(0 6px 22px rgba(0,0,0,.35))',
+          display:'flex', alignItems:'center', justifyContent:'center',
         }}>
-          {step.icon}
+          {step.icon === '✦'
+            ? <HeyLogo size={84} color="#F9F0F0" />
+            : <span style={{ fontSize: 84, lineHeight: 1 }}>{step.icon}</span>}
         </div>
 
         <div style={{
-          color:'white', fontSize: 30, fontWeight: 800, letterSpacing:-.5,
+          color:'#F9F0F0', fontSize: 30, fontWeight: 800, letterSpacing:-.5,
           textAlign:'center', marginBottom: 16,
         }}>
           {step.title}
         </div>
 
         <div style={{
-          color:'rgba(255,255,255,.9)', fontSize: 16, lineHeight: 1.6,
+          color:'rgba(249,240,240,.9)', fontSize: 16, lineHeight: 1.6,
           textAlign:'center', maxWidth: 420, whiteSpace:'pre-wrap',
         }}>
           {step.body}
@@ -190,8 +193,8 @@ export default function OnboardingTour({ onDone }) {
           <button onClick={() => setIdx(i => i - 1)}
             style={{
               flex:1, padding:'14px', borderRadius:50,
-              background:'rgba(255,255,255,.15)', border:'1px solid rgba(255,255,255,.25)',
-              color:'white', fontSize:15, fontWeight:700, cursor:'pointer',
+              background:'rgba(249,240,240,.15)', border:'1px solid rgba(249,240,240,.25)',
+              color:'#F9F0F0', fontSize:15, fontWeight:700, cursor:'pointer',
               fontFamily:'inherit', backdropFilter:'blur(6px)',
             }}>
             ‹ Назад
@@ -200,7 +203,7 @@ export default function OnboardingTour({ onDone }) {
         <button onClick={() => last ? onDone() : setIdx(i => i + 1)}
           style={{
             flex: idx > 0 ? 2 : 1, padding:'14px', borderRadius:50,
-            background:'rgba(255,255,255,.95)', border:'none',
+            background:'rgba(249,240,240,.95)', border:'none',
             color:'#2a1058', fontSize:15, fontWeight:800, cursor:'pointer',
             fontFamily:'inherit',
             boxShadow:'0 4px 16px rgba(0,0,0,.25)',

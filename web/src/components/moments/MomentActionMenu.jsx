@@ -20,13 +20,13 @@ export default function MomentActionMenu({ moment, onEdit, onArchive, onDelete, 
     background:'rgba(22,15,50,.98)',backdropFilter:'blur(24px)',
     borderRadius:24,width:'min(100%,520px)',
     boxShadow:'0 8px 48px rgba(0,0,0,.6)',
-    border:'1px solid rgba(255,255,255,.1)',
+    border:'1px solid rgba(249,240,240,.1)',
     overflow:'hidden',
   };
-  const item = (color='rgba(255,255,255,.88)') => ({
+  const item = (color='rgba(249,240,240,.88)') => ({
     display:'flex',alignItems:'center',gap:14,
     padding:'16px 20px',cursor:'pointer',
-    borderBottom:'1px solid rgba(255,255,255,.06)',
+    borderBottom:'1px solid rgba(249,240,240,.06)',
     color, fontSize:15, fontWeight:500,
     transition:'background .15s',
   });
@@ -35,9 +35,9 @@ export default function MomentActionMenu({ moment, onEdit, onArchive, onDelete, 
     <div style={overlay} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div style={sheet}>
         {/* Moment preview */}
-        <div style={{padding:'8px 20px 12px',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
-          <div style={{color:'rgba(255,255,255,.4)',fontSize:12,marginBottom:4}}>Момент</div>
-          <div style={{color:'rgba(255,255,255,.75)',fontSize:13,
+        <div style={{padding:'8px 20px 12px',borderBottom:'1px solid rgba(249,240,240,.08)'}}>
+          <div style={{color:'rgba(249,240,240,.4)',fontSize:12,marginBottom:4}}>Момент</div>
+          <div style={{color:'rgba(249,240,240,.75)',fontSize:13,
             overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
             {moment.text}
           </div>
@@ -47,7 +47,7 @@ export default function MomentActionMenu({ moment, onEdit, onArchive, onDelete, 
         <div
           style={item()}
           onClick={() => { onEdit(); onClose(); }}
-          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(249,240,240,.05)'}
           onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
           <span style={{fontSize:20}}>✎</span>
           <span>Изменить момент</span>
@@ -56,7 +56,7 @@ export default function MomentActionMenu({ moment, onEdit, onArchive, onDelete, 
         <div
           style={item()}
           onClick={copyLink}
-          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(249,240,240,.05)'}
           onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
           <span style={{fontSize:20}}>↗</span>
           <span>Поделиться ссылкой</span>
@@ -65,7 +65,7 @@ export default function MomentActionMenu({ moment, onEdit, onArchive, onDelete, 
         <div
           style={item()}
           onClick={() => { onArchive(); onClose(); }}
-          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.05)'}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(249,240,240,.05)'}
           onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
           <span style={{fontSize:20}}>📦</span>
           <span>В архив</span>
@@ -84,8 +84,8 @@ export default function MomentActionMenu({ moment, onEdit, onArchive, onDelete, 
         <div style={{padding:'8px 20px 24px'}}>
           <button onClick={onClose}
             style={{width:'100%',padding:'13px',borderRadius:14,
-              background:'rgba(255,255,255,.08)',border:'none',
-              color:'rgba(255,255,255,.6)',fontSize:15,fontWeight:600,cursor:'pointer'}}>
+              background:'rgba(249,240,240,.08)',border:'none',
+              color:'rgba(249,240,240,.6)',fontSize:15,fontWeight:600,cursor:'pointer'}}>
             Отмена
           </button>
         </div>

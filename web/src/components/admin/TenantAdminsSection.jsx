@@ -111,11 +111,11 @@ export default function TenantAdminsSection({ tenantId, notify }) {
   return (
     <div style={{
       background: 'rgba(20,12,40,.5)',
-      border: '1px solid rgba(255,255,255,.12)',
+      border: '1px solid rgba(249,240,240,.12)',
       borderRadius: 14, padding: '16px 18px', marginBottom: 22,
     }}>
       <div style={{ display:'flex', alignItems:'center', gap: 10, marginBottom: 6 }}>
-        <h2 style={{ color:'white', fontSize: 16, fontWeight: 700, margin: 0 }}>
+        <h2 style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, margin: 0 }}>
           👥 Со-админы школы
         </h2>
       </div>
@@ -143,14 +143,14 @@ export default function TenantAdminsSection({ tenantId, notify }) {
             placeholder="Имя или телефон (от 3 символов)"
             style={{
               flex: 1, padding: '10px 12px', borderRadius: 10,
-              background:'rgba(0,0,0,.4)', border:'1px solid rgba(255,255,255,.18)',
-              color: 'white', fontSize: 14, outline: 'none', fontFamily: 'inherit',
+              background:'rgba(0,0,0,.4)', border:'1px solid rgba(249,240,240,.18)',
+              color:'#F9F0F0', fontSize: 14, outline: 'none', fontFamily: 'inherit',
             }}
           />
           <button onClick={addByQuery} disabled={busy || !query.trim()}
             style={{
               padding: '10px 16px', borderRadius: 10, border: 'none',
-              background: 'rgba(140,110,220,.85)', color: 'white',
+              background: 'rgba(140,110,220,.85)', color:'#F9F0F0',
               fontSize: 13, fontWeight: 600,
               cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit',
               opacity: busy || !query.trim() ? .55 : 1,
@@ -166,7 +166,7 @@ export default function TenantAdminsSection({ tenantId, notify }) {
           <div style={{
             marginTop: 6,
             background:'rgba(20,12,40,.95)', backdropFilter:'blur(14px)',
-            border:'1px solid rgba(255,255,255,.14)',
+            border:'1px solid rgba(249,240,240,.14)',
             borderRadius: 10, padding: 4,
             maxHeight: 260, overflowY:'auto',
           }}>
@@ -192,17 +192,17 @@ export default function TenantAdminsSection({ tenantId, notify }) {
                     width:'100%', display:'flex', alignItems:'center', gap: 10,
                     padding:'8px 10px', borderRadius: 8,
                     background:'transparent', border:'none',
-                    color:'white', cursor: busy ? 'wait' : 'pointer',
+                    color:'#F9F0F0', cursor: busy ? 'wait' : 'pointer',
                     fontFamily: 'inherit', textAlign: 'left',
                     transition:'background .12s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.07)'}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(249,240,240,.07)'}
                   onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                   <div style={{
                     width: 32, height: 32, borderRadius: '50%',
-                    background:'rgba(120,90,200,.4)',
+                    background:'rgba(95, 64, 128,.4)',
                     display:'flex', alignItems:'center', justifyContent:'center',
-                    color:'white', fontSize: 12, fontWeight: 700,
+                    color:'#F9F0F0', fontSize: 12, fontWeight: 700,
                     overflow:'hidden', flexShrink: 0,
                   }}>
                     {isImg
@@ -236,23 +236,23 @@ export default function TenantAdminsSection({ tenantId, notify }) {
               <div key={a.id} style={{
                 display:'flex', alignItems:'center', gap: 12,
                 padding: '10px 12px', borderRadius: 10,
-                background: 'rgba(255,255,255,.04)',
-                border: '1px solid rgba(255,255,255,.08)',
+                background: 'rgba(249,240,240,.04)',
+                border: '1px solid rgba(249,240,240,.08)',
               }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: '50%',
-                  background: 'rgba(120,90,200,.4)',
+                  background: 'rgba(95, 64, 128,.4)',
                   display:'flex', alignItems:'center', justifyContent:'center',
-                  color:'white', fontSize: 14, fontWeight: 700,
+                  color:'#F9F0F0', fontSize: 14, fontWeight: 700,
                   overflow: 'hidden', flexShrink: 0,
-                  border: '1px solid rgba(255,255,255,.1)',
+                  border: '1px solid rgba(249,240,240,.1)',
                 }}>
                   {isImg
                     ? <img src={av} alt="" style={{width:'100%', height:'100%', objectFit:'cover'}}/>
                     : (a.name?.[0]?.toUpperCase() || '?')}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color:'white', fontWeight: 600 }}>{a.name}</div>
+                  <div style={{ color:'#F9F0F0', fontWeight: 600 }}>{a.name}</div>
                   <div style={{ color:'rgba(225,220,245,.55)', fontSize: 12 }}>
                     {a.phone} · добавил {a.added_by_name || '—'} · {fmtDate(a.added_at)}
                   </div>

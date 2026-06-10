@@ -180,21 +180,6 @@ const SECTIONS = [
     ],
   },
   {
-    id: 'admin',
-    icon: '⚙',
-    title: 'Админка (только для администраторов)',
-    body: [
-      'Если ты администратор HEY — у тебя есть доступ к `/admin` со следующими разделами:',
-      '· **Дашборд** — общая статистика пользователей, моментов, реакций, сообщений, открытых жалоб.',
-      '· **Пользователи** — поиск, блокировка, сброс пароля, выдача Super, удаление.',
-      '· **Моменты** — модерация, удаление с указанием причины.',
-      '· **Жалобы** — обработка жалоб от пользователей (принять меры или отклонить).',
-      '· **HEY-заведующий** — публикация моментов и рассылок от системного аккаунта.',
-      '· **АВО / Школа** — настройка интеграции с АвтоВебОфис: тестовый режим, маппинг курсов на чаты, лог webhook\'ов.',
-      '· **Логи** — журнал действий администраторов.',
-    ],
-  },
-  {
     id: 'notifications',
     icon: '🔔',
     title: 'Уведомления — детально по браузерам',
@@ -294,7 +279,7 @@ function renderParagraph(text, highlightQuery) {
 
   return parts.map((p, i) =>
     p.type === 'bold'
-      ? <strong key={i} style={{ color: 'white' }}>{highlight(p.value)}</strong>
+      ? <strong key={i} style={{ color:'#F9F0F0' }}>{highlight(p.value)}</strong>
       : <span key={i}>{highlight(p.value)}</span>
   );
 }
@@ -346,18 +331,18 @@ export default function UserGuide() {
         position: 'sticky', top: 0, zIndex: 10,
         background: 'rgba(22,15,50,.97)',
         backdropFilter: 'blur(16px)',
-        borderBottom: '1px solid rgba(255,255,255,.08)',
+        borderBottom: '1px solid rgba(249,240,240,.08)',
         padding: '14px 16px',
       }}>
         <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => nav(-1)}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: 'rgba(255,255,255,.7)', fontSize: 22, padding: 4, lineHeight: 1,
+              color: 'rgba(249,240,240,.7)', fontSize: 22, padding: 4, lineHeight: 1,
             }}>‹</button>
           <div style={{ flex: 1 }}>
-            <div style={{ color: 'white', fontSize: 17, fontWeight: 700 }}>📖 Руководство</div>
-            <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 11 }}>
+            <div style={{ color:'#F9F0F0', fontSize: 17, fontWeight: 700 }}>📖 Руководство</div>
+            <div style={{ color: 'rgba(249,240,240,.4)', fontSize: 11 }}>
               Последнее обновление · {GUIDE_VERSION}
             </div>
           </div>
@@ -370,14 +355,14 @@ export default function UserGuide() {
             placeholder="🔍 Поиск по руководству…"
             style={{
               width: '100%', boxSizing: 'border-box',
-              background: 'rgba(255,255,255,.08)',
-              border: '1px solid rgba(255,255,255,.14)',
+              background: 'rgba(249,240,240,.08)',
+              border: '1px solid rgba(249,240,240,.14)',
               borderRadius: 12, padding: '10px 14px',
-              color: 'white', fontSize: 14, outline: 'none',
+              color:'#F9F0F0', fontSize: 14, outline: 'none',
               fontFamily: 'inherit',
             }}
             onFocus={e => e.target.style.borderColor = 'rgba(180,140,220,.6)'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,.14)'}/>
+            onBlur={e => e.target.style.borderColor = 'rgba(249,240,240,.14)'}/>
         </div>
       </div>
 
@@ -385,7 +370,7 @@ export default function UserGuide() {
       <div style={{ flex: 1, padding: '16px 16px 40px' }}>
         <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtered.length === 0 && (
-            <div style={{ color: 'rgba(255,255,255,.4)', textAlign: 'center', padding: 40, fontSize: 14 }}>
+            <div style={{ color: 'rgba(249,240,240,.4)', textAlign: 'center', padding: 40, fontSize: 14 }}>
               По запросу «{query}» ничего не найдено
             </div>
           )}
@@ -394,8 +379,8 @@ export default function UserGuide() {
             return (
               <div key={section.id} id={'guide-' + section.id}
                 style={{
-                  background: 'rgba(255,255,255,.05)',
-                  border: '1px solid rgba(255,255,255,.08)',
+                  background: 'rgba(249,240,240,.05)',
+                  border: '1px solid rgba(249,240,240,.08)',
                   borderRadius: 14,
                   overflow: 'hidden',
                 }}>
@@ -407,7 +392,7 @@ export default function UserGuide() {
                     padding: '14px 16px',
                     background: 'transparent', border: 'none',
                     cursor: query.trim() ? 'default' : 'pointer',
-                    color: 'white', fontFamily: 'inherit', textAlign: 'left',
+                    color:'#F9F0F0', fontFamily: 'inherit', textAlign: 'left',
                   }}>
                   <span style={{ fontSize: 22, flexShrink: 0 }}>{section.icon}</span>
                   <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>
@@ -415,7 +400,7 @@ export default function UserGuide() {
                   </span>
                   {!query.trim() && (
                     <span style={{
-                      fontSize: 14, color: 'rgba(255,255,255,.4)',
+                      fontSize: 14, color: 'rgba(249,240,240,.4)',
                       transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
                       transition: 'transform .2s',
                     }}>›</span>
@@ -424,7 +409,7 @@ export default function UserGuide() {
                 {open && (
                   <div style={{
                     padding: '0 16px 16px 50px',
-                    color: 'rgba(255,255,255,.78)',
+                    color: 'rgba(249,240,240,.78)',
                     fontSize: 14, lineHeight: 1.65,
                   }}>
                     {section.body.map((line, i) => (
@@ -443,7 +428,7 @@ export default function UserGuide() {
 
         <div style={{
           maxWidth: 680, margin: '24px auto 0',
-          color: 'rgba(255,255,255,.3)', fontSize: 11, textAlign: 'center',
+          color: 'rgba(249,240,240,.3)', fontSize: 11, textAlign: 'center',
         }}>
           Чего-то не хватает в руководстве? Напиши в Telegram-бот поддержки — добавим.
         </div>

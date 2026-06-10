@@ -1,7 +1,8 @@
 // AdminFeedbacks.jsx — обращения пользователей через «Написать разработчику».
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
+import Icon from '../Icon';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -17,11 +18,11 @@ const STATUS_LABELS = {
 };
 
 const TYPE_LABELS = {
-  bug:    '🐛 Баг',
-  idea:   '💡 Идея',
-  thanks: '🙏 Спасибо',
-  question: '❓ Вопрос',
-  other:  '✉ Общее',
+  bug:      { label: 'Баг',     icon: 'alert' },
+  idea:     { label: 'Идея',    icon: 'sparkle' },
+  thanks:   { label: 'Спасибо', icon: 'heart' },
+  question: { label: 'Вопрос',  icon: 'help' },
+  other:    { label: 'Общее',   icon: 'mail' },
 };
 
 const TABS = [
@@ -58,7 +59,7 @@ export default function AdminFeedbacks() {
           <div style={{fontWeight:600,marginBottom:8}}>
             Пометить как «{labelMap[action]}»?
           </div>
-          <div style={{color:'rgba(255,255,255,.6)',fontSize:13,marginBottom:4}}>
+          <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:4}}>
             «{(f.text || '').slice(0, 120)}{(f.text || '').length > 120 ? '…' : ''}»
           </div>
         </>,
@@ -77,7 +78,7 @@ export default function AdminFeedbacks() {
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 900 }}>
-      <h1 style={{ color:'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         ✉ Обращения пользователей
       </h1>
       <p style={{ color:'rgba(225,220,245,.85)', fontSize: 14, marginTop: 0, marginBottom: 24 }}>
@@ -91,8 +92,8 @@ export default function AdminFeedbacks() {
               padding:'9px 16px', borderRadius:10, fontSize:13, fontWeight:600,
               cursor:'pointer', fontFamily:'inherit',
               background: status === t.v ? 'rgba(140,110,220,.85)' : 'rgba(20,12,40,.5)',
-              border:   status === t.v ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.12)',
-              color:    status === t.v ? 'white' : 'rgba(225,220,245,.85)',
+              border:   status === t.v ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(249,240,240,.12)',
+              color:    status === t.v ? '#F9F0F0' : 'rgba(225,220,245,.85)',
             }}>
             {t.l}
           </button>
@@ -104,7 +105,7 @@ export default function AdminFeedbacks() {
       ) : list.length === 0 ? (
         <div style={{ padding:'40px 20px', textAlign:'center',
           background:'rgba(20,12,40,.5)', borderRadius:14,
-          border:'1px dashed rgba(255,255,255,.15)',
+          border:'1px dashed rgba(249,240,240,.15)',
           color:'rgba(225,220,245,.85)', fontSize:14 }}>
           {status === 'open' ? '✓ Новых обращений нет' : 'Пусто'}
         </div>
@@ -116,16 +117,25 @@ export default function AdminFeedbacks() {
             return (
               <div key={f.id} style={{
                 background:'rgba(20,12,40,.65)',
-                border:'1px solid rgba(255,255,255,.14)',
+                border:'1px solid rgba(249,240,240,.14)',
                 borderRadius: 14, padding: 16,
                 boxShadow:'0 4px 14px rgba(0,0,0,.15)',
               }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
                   <span style={{
-                    background:'rgba(255,255,255,.08)', borderRadius:6,
+                    background:'rgba(249,240,240,.08)', borderRadius:6,
                     padding:'3px 9px', fontSize:11, fontWeight:700,
                     color:'rgba(240,235,255,.95)',
-                  }}>{TYPE_LABELS[f.type] || ('✉ ' + (f.type || 'общее'))}</span>
+                  }}>
+                    {(() => {
+                      const t = TYPE_LABELS[f.type] || { label: f.type || 'общее', icon: 'mail' };
+                      return (
+                        <span style={{display:'inline-flex',alignItems:'center',gap:5}}>
+                          <Icon name={t.icon} size={12} /> {t.label}
+                        </span>
+                      );
+                    })()}
+                  </span>
                   <span style={{
                     background:'rgba(0,0,0,.25)', borderRadius:6,
                     padding:'3px 9px', fontSize:11, fontWeight:700,
@@ -168,7 +178,7 @@ export default function AdminFeedbacks() {
 
                 {f.admin_note && (
                   <div style={{
-                    background:'rgba(120,90,200,.10)', borderRadius:10, padding:'10px 14px',
+                    background:'rgba(95, 64, 128,.10)', borderRadius:10, padding:'10px 14px',
                     color:'rgba(220,200,255,.85)', fontSize:13, lineHeight:1.5,
                     border:'1px solid rgba(140,110,220,.25)',
                     whiteSpace:'pre-wrap', wordBreak:'break-word', marginBottom:14,
@@ -195,8 +205,8 @@ export default function AdminFeedbacks() {
                       <button onClick={() => resolve(f, 'dismissed')}
                         style={{
                           padding:'8px 16px', borderRadius:10, fontSize:13, fontWeight:600,
-                          cursor:'pointer', border:'1px solid rgba(255,255,255,.15)',
-                          background:'rgba(255,255,255,.08)', color:'rgba(240,235,255,.95)',
+                          cursor:'pointer', border:'1px solid rgba(249,240,240,.15)',
+                          background:'rgba(249,240,240,.08)', color:'rgba(240,235,255,.95)',
                           fontFamily:'inherit',
                         }}>
                         Отклонить
@@ -207,8 +217,8 @@ export default function AdminFeedbacks() {
                     <button onClick={() => resolve(f, 'open')}
                       style={{
                         padding:'8px 16px', borderRadius:10, fontSize:13, fontWeight:600,
-                        cursor:'pointer', border:'1px solid rgba(255,255,255,.15)',
-                        background:'rgba(255,255,255,.08)', color:'rgba(240,235,255,.95)',
+                        cursor:'pointer', border:'1px solid rgba(249,240,240,.15)',
+                        background:'rgba(249,240,240,.08)', color:'rgba(240,235,255,.95)',
                         fontFamily:'inherit',
                       }}>
                       ↩ Снова открыть
@@ -219,7 +229,7 @@ export default function AdminFeedbacks() {
                       style={{
                         padding:'8px 16px', borderRadius:10, fontSize:13, fontWeight:600,
                         textDecoration:'none',
-                        background:'rgba(120,90,200,.25)', color:'rgba(220,200,255,.95)',
+                        background:'rgba(95, 64, 128,.25)', color:'rgba(220,200,255,.95)',
                         border:'1px solid rgba(180,140,220,.3)',
                       }}>
                       → Карточка юзера ↗
@@ -253,8 +263,8 @@ export default function AdminFeedbacks() {
 
       {toast && (
         <div style={{ position:'fixed', bottom:32, left:'50%', transform:'translateX(-50%)',
-          background:'rgba(22,15,50,.97)', border:'1px solid rgba(255,255,255,.15)',
-          borderRadius:50, padding:'10px 20px', color:'white', fontSize:14, fontWeight:600,
+          background:'rgba(22,15,50,.97)', border:'1px solid rgba(249,240,240,.15)',
+          borderRadius:50, padding:'10px 20px', color:'#F9F0F0', fontSize:14, fontWeight:600,
           zIndex:1000, whiteSpace:'nowrap', boxShadow:'0 4px 20px rgba(0,0,0,.5)' }}>
           {toast}
         </div>

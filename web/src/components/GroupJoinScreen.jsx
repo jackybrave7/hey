@@ -14,7 +14,7 @@ function MiniAvatar({ avatar, name, size = 28 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: 'rgba(120,90,200,.5)', color: 'white',
+      background: 'rgba(95, 64, 128,.5)', color:'#F9F0F0',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.45, fontWeight: 700,
     }}>{letter}</div>
@@ -52,8 +52,8 @@ export default function GroupJoinScreen() {
   };
   const card = {
     maxWidth: 460, width: '100%', background: 'rgba(20,12,40,.72)',
-    border: '1px solid rgba(255,255,255,.14)', borderRadius: 18, padding: '32px 28px',
-    color: 'white', textAlign: 'center', backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(249,240,240,.14)', borderRadius: 18, padding: '32px 28px',
+    color:'#F9F0F0', textAlign: 'center', backdropFilter: 'blur(20px)',
     boxShadow: '0 20px 60px rgba(0,0,0,.35)',
   };
 
@@ -102,11 +102,11 @@ export default function GroupJoinScreen() {
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           {group.icon && /^https?:/.test(group.icon) ? (
             <img src={group.icon} alt="" style={{ width: 72, height: 72, borderRadius: 18, objectFit: 'cover',
-              border: '2px solid rgba(255,255,255,.18)' }}/>
+              border: '2px solid rgba(249,240,240,.18)' }}/>
           ) : (
             <div style={{
               width: 72, height: 72, borderRadius: 18, fontSize: 36,
-              background: 'rgba(120,90,200,.3)', border: '2px solid rgba(255,255,255,.18)',
+              background: 'rgba(95, 64, 128,.3)', border: '2px solid rgba(249,240,240,.18)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>{group.icon || '👥'}</div>
           )}
@@ -122,11 +122,11 @@ export default function GroupJoinScreen() {
         {/* Inviter */}
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 10,
-          padding: '8px 14px', background: 'rgba(255,255,255,.06)',
+          padding: '8px 14px', background: 'rgba(249,240,240,.06)',
           borderRadius: 50, marginBottom: 22,
         }}>
           <MiniAvatar avatar={inviter.avatar} name={inviter.name} size={28}/>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,.85)' }}>
+          <span style={{ fontSize: 13, color: 'rgba(249,240,240,.85)' }}>
             {inviter.name} приглашает тебя
           </span>
         </div>
@@ -138,7 +138,7 @@ export default function GroupJoinScreen() {
         {user ? (
           <button onClick={handleAccept} disabled={busy} style={{
             width: '100%', padding: '14px 28px', borderRadius: 12, border: 'none',
-            background: 'rgba(140,110,220,.7)', color: 'white', fontSize: 15, fontWeight: 700,
+            background: 'rgba(140,110,220,.7)', color:'#F9F0F0', fontSize: 15, fontWeight: 700,
             cursor: busy ? 'wait' : 'pointer',
           }}>
             {busy ? '…' : 'Войти в группу'}
@@ -147,7 +147,7 @@ export default function GroupJoinScreen() {
           <>
             <button onClick={handleRegister} style={{
               width: '100%', padding: '14px 28px', borderRadius: 12, border: 'none',
-              background: 'rgba(140,110,220,.7)', color: 'white', fontSize: 15, fontWeight: 700,
+              background: 'rgba(140,110,220,.7)', color:'#F9F0F0', fontSize: 15, fontWeight: 700,
               cursor: 'pointer', marginBottom: 10,
             }}>
               Зарегистрироваться и войти

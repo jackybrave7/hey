@@ -35,16 +35,16 @@
       '.hey-widget-bubble:hover{transform:translateY(-2px) scale(1.04);' +
         'box-shadow:0 12px 32px rgba(107,70,193,.55),0 4px 12px rgba(0,0,0,.25);}' +
       '.hey-widget-bubble:active{transform:translateY(0) scale(.98);}' +
-      '.hey-widget-icon{color:#fff;font-size:28px;line-height:1;font-weight:800;' +
-        'text-shadow:0 1px 2px rgba(0,0,0,.2);user-select:none;pointer-events:none;}' +
+      '.hey-widget-icon{width:30px;height:30px;display:block;user-select:none;pointer-events:none;' +
+        'filter:drop-shadow(0 1px 2px rgba(0,0,0,.2));}' +
       '.hey-widget-badge{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;' +
-        'padding:0 6px;border-radius:11px;background:#ef4444;color:#fff;' +
+        'padding:0 6px;border-radius:11px;background:#ef4444;color:#F9F0F0;' +
         'font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;' +
-        'box-shadow:0 0 0 2px #fff,0 2px 6px rgba(239,68,68,.45);' +
+        'box-shadow:0 0 0 2px #F9F0F0,0 2px 6px rgba(239,68,68,.45);' +
         'line-height:1;letter-spacing:.2px;}' +
       '.hey-widget-badge.hey-widget-badge-visible{display:flex;}' +
       '.hey-widget-tooltip{position:absolute;bottom:calc(100% + 10px);right:0;' +
-        'background:rgba(20,12,40,.95);color:#fff;font-size:12px;font-weight:500;' +
+        'background:rgba(20,12,40,.95);color:#F9F0F0;font-size:12px;font-weight:500;' +
         'padding:7px 12px;border-radius:8px;white-space:nowrap;' +
         'opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;' +
         'pointer-events:none;backdrop-filter:blur(8px);' +
@@ -52,7 +52,7 @@
       '.hey-widget-bubble:hover .hey-widget-tooltip{opacity:1;transform:translateY(0);}' +
       '@media (max-width:600px){' +
         '.hey-widget-bubble{width:54px;height:54px;bottom:18px;right:18px;}' +
-        '.hey-widget-icon{font-size:25px;}' +
+        '.hey-widget-icon{width:27px;height:27px;}' +
       '}';
     document.head.appendChild(s);
   }
@@ -65,7 +65,8 @@
 
     var icon = document.createElement('span');
     icon.className = 'hey-widget-icon';
-    icon.textContent = '✦';
+    icon.innerHTML =
+      '<img src="https://hey-messenger.ru/hey-logo.png" width="100%" height="100%" alt="" aria-hidden="true" draggable="false" />';
     bubble.appendChild(icon);
 
     badge = document.createElement('span');

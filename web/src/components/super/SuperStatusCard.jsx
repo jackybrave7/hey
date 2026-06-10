@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import SuperInfoScreen from './SuperInfoScreen';
 import { useSalesPressure } from '../../lib/publicSettings';
+import HeyLogo from '../HeyLogo';
 
 function fmtDate(ts) {
   return new Date(ts * 1000).toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -50,7 +51,7 @@ export default function SuperStatusCard({ user, onInvite }) {
   const inactiveCardStyle = {
     ...baseCardStyle,
     background: 'rgba(22,15,50,.6)',
-    border: '1px solid rgba(255,255,255,.1)',
+    border: '1px solid rgba(249,240,240,.1)',
   };
 
   function SuperHeader({ subtitle }) {
@@ -58,10 +59,10 @@ export default function SuperStatusCard({ user, onInvite }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         <div style={{
           width: 40, height: 40, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #c8a8ff, #7858b0)',
+          background: 'linear-gradient(135deg, #c8a8ff, #5F4080)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, color: 'white', fontWeight: 700, flexShrink: 0,
-        }}>✦</div>
+          flexShrink: 0,
+        }}><HeyLogo size={22} color="#F9F0F0" /></div>
         <div>
           <div style={{
             fontSize: 16, fontWeight: 700,
@@ -70,7 +71,7 @@ export default function SuperStatusCard({ user, onInvite }) {
           }}>
             ✦ HEY СУПЕР активен
           </div>
-          <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 12, marginTop: 2 }}>
             {subtitle}
           </div>
         </div>
@@ -83,15 +84,15 @@ export default function SuperStatusCard({ user, onInvite }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         <div style={{
           width: 40, height: 40, borderRadius: '50%',
-          background: 'rgba(120,90,200,.3)',
+          background: 'rgba(95, 64, 128,.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, color: 'rgba(200,170,255,.7)', fontWeight: 700, flexShrink: 0,
-        }}>✦</div>
+          flexShrink: 0,
+        }}><HeyLogo size={22} color="rgba(200,170,255,.85)" /></div>
         <div>
-          <div style={{ color: 'rgba(255,255,255,.85)', fontSize: 16, fontWeight: 700 }}>
+          <div style={{ color: 'rgba(249,240,240,.85)', fontSize: 16, fontWeight: 700 }}>
             HEY СУПЕР
           </div>
-          <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: 'rgba(249,240,240,.4)', fontSize: 12, marginTop: 2 }}>
             {subtitle}
           </div>
         </div>
@@ -102,7 +103,7 @@ export default function SuperStatusCard({ user, onInvite }) {
   function ExpiryInfo() {
     if (!expiresAt) {
       return (
-        <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12, marginBottom: 12 }}>
+        <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 12, marginBottom: 12 }}>
           Все возможности разблокированы
         </div>
       );
@@ -110,7 +111,7 @@ export default function SuperStatusCard({ user, onInvite }) {
     const days = daysLeft(expiresAt);
     return (
       <div style={{ marginBottom: 12 }}>
-        <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 12 }}>
+        <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 12 }}>
           Активен до {fmtDate(expiresAt)}
         </div>
         {days <= 30 && days > 0 && (
@@ -132,10 +133,10 @@ export default function SuperStatusCard({ user, onInvite }) {
     return (
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
-          <div style={{ color: 'rgba(255,255,255,.6)', fontSize: 12 }}>
+          <div style={{ color: 'rgba(249,240,240,.6)', fontSize: 12 }}>
             Прогресс: {invitedConfirmed} / 3 друзей
             {invitedTotal > invitedConfirmed && (
-              <span style={{ color: 'rgba(255,255,255,.4)', marginLeft: 6 }}>
+              <span style={{ color: 'rgba(249,240,240,.4)', marginLeft: 6 }}>
                 · ещё {invitedTotal - invitedConfirmed} зарегистрировались
               </span>
             )}
@@ -145,14 +146,14 @@ export default function SuperStatusCard({ user, onInvite }) {
               Остался 1 шаг!
             </div>
           ) : remainingToSuper > 0 ? (
-            <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, fontWeight: 600 }}>
+            <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, fontWeight: 600 }}>
               Осталось: {remainingToSuper}
             </div>
           ) : null}
         </div>
         <div style={{
           height: 6, borderRadius: 3,
-          background: 'rgba(255,255,255,.1)',
+          background: 'rgba(249,240,240,.1)',
           overflow: 'hidden',
         }}>
           <div style={{
@@ -161,12 +162,12 @@ export default function SuperStatusCard({ user, onInvite }) {
             borderRadius: 3,
             background: almostDone
               ? 'linear-gradient(90deg, #ffa500, #ff6b00)'
-              : 'linear-gradient(90deg, #c8a8ff, #7858b0)',
+              : 'linear-gradient(90deg, #c8a8ff, #5F4080)',
             transition: 'width .3s ease',
           }} />
         </div>
         {invitedTotal > invitedConfirmed && (
-          <div style={{ color: 'rgba(255,255,255,.45)', fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
+          <div style={{ color: 'rgba(249,240,240,.45)', fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
             Засчитываются те, кто после регистрации написал хотя бы одно сообщение в HEY.
           </div>
         )}
@@ -205,16 +206,16 @@ export default function SuperStatusCard({ user, onInvite }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button onClick={onInvite} style={{
               width: '100%', padding: '12px', borderRadius: 12,
-              background: 'rgba(120,90,200,.8)', border: '1px solid rgba(180,140,255,.3)',
-              color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              background: 'rgba(95, 64, 128,.8)', border: '1px solid rgba(180,140,255,.3)',
+              color:'#F9F0F0', fontSize: 14, fontWeight: 700, cursor: 'pointer',
               transition: 'all .18s',
             }}>
               🎁 Пригласи 3 друзей — получи 3 месяца СУПЕР
             </button>
             <button onClick={() => setShowInfo(true)} style={{
               width: '100%', padding: '10px', borderRadius: 12,
-              background: 'transparent', border: '1px solid rgba(255,255,255,.12)',
-              color: 'rgba(255,255,255,.55)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'transparent', border: '1px solid rgba(249,240,240,.12)',
+              color: 'rgba(249,240,240,.55)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
             }}>
               Узнать больше
             </button>
@@ -237,15 +238,15 @@ export default function SuperStatusCard({ user, onInvite }) {
           <InactiveHeader subtitle="Реферальный бонус исчерпан" />
           <div style={{
             marginBottom: 12, padding: '8px 12px', borderRadius: 10,
-            background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)',
-            color: 'rgba(255,255,255,.45)', fontSize: 12,
+            background: 'rgba(249,240,240,.05)', border: '1px solid rgba(249,240,240,.08)',
+            color: 'rgba(249,240,240,.45)', fontSize: 12,
           }}>
             Ты уже использовал бонус за приглашения
           </div>
           <button onClick={() => setShowInfo(true)} style={{
             width: '100%', padding: '10px', borderRadius: 12,
-            background: 'transparent', border: '1px solid rgba(255,255,255,.12)',
-            color: 'rgba(255,255,255,.55)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            background: 'transparent', border: '1px solid rgba(249,240,240,.12)',
+            color: 'rgba(249,240,240,.55)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}>
             Узнать больше
           </button>

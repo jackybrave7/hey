@@ -40,14 +40,14 @@ export default function AdminGroupDetail() {
   );
 
   if (!g) return (
-    <div style={{ padding: '28px 32px', color: 'rgba(255,255,255,.35)' }}>Загрузка…</div>
+    <div style={{ padding: '28px 32px', color: 'rgba(249,240,240,.35)' }}>Загрузка…</div>
   );
 
   const ic = g.icon || '';
   const isImg = ic && (ic.startsWith('http') || ic.startsWith('/') || ic.startsWith('data:'));
 
   const card = {
-    background:'rgba(20,12,40,.65)', border:'1px solid rgba(255,255,255,.14)',
+    background:'rgba(20,12,40,.65)', border:'1px solid rgba(249,240,240,.14)',
     borderRadius:14, padding:'18px 20px', boxShadow:'0 4px 14px rgba(0,0,0,.15)',
   };
 
@@ -61,20 +61,20 @@ export default function AdminGroupDetail() {
       <div style={{ display:'flex', alignItems:'center', gap: 18, margin: '16px 0 24px' }}>
         <div style={{
           width: 72, height: 72, borderRadius: 16,
-          background: isImg ? '#0a0518' : 'rgba(120,90,200,.4)',
+          background: isImg ? '#0a0518' : 'rgba(95, 64, 128,.4)',
           display:'flex', alignItems:'center', justifyContent:'center',
-          fontSize: 30, color:'white', fontWeight: 800,
-          border:'1px solid rgba(255,255,255,.1)', overflow:'hidden', flexShrink:0,
+          fontSize: 30, color:'#F9F0F0', fontWeight: 800,
+          border:'1px solid rgba(249,240,240,.1)', overflow:'hidden', flexShrink:0,
         }}>
           {isImg
             ? <img src={ic} alt="" style={{width:'100%', height:'100%', objectFit:'cover'}}/>
             : (ic || '👥')}
         </div>
         <div style={{ minWidth: 0 }}>
-          <h1 style={{ color:'white', fontSize: 22, fontWeight: 800, marginBottom: 4 }}>
+          <h1 style={{ color:'#F9F0F0', fontSize: 22, fontWeight: 800, marginBottom: 4 }}>
             {g.name || '— без названия —'}
           </h1>
-          <div style={{ color:'rgba(255,255,255,.5)', fontSize: 13 }}>
+          <div style={{ color:'rgba(249,240,240,.5)', fontSize: 13 }}>
             Создана {fmtDate(g.created_at)} · ID {g.id.slice(0, 8)}…
           </div>
         </div>
@@ -84,9 +84,9 @@ export default function AdminGroupDetail() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
         gap: 12, marginBottom: 24 }}>
         <div style={card}>
-          <div style={{ color:'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase',
+          <div style={{ color:'rgba(249,240,240,.5)', fontSize: 11, textTransform: 'uppercase',
             letterSpacing: .6, marginBottom: 6 }}>Участники</div>
-          <div style={{ color:'white', fontSize: 28, fontWeight: 800 }}>{active.length}</div>
+          <div style={{ color:'#F9F0F0', fontSize: 28, fontWeight: 800 }}>{active.length}</div>
           {pending.length > 0 && (
             <div style={{ color:'rgba(255,200,120,.85)', fontSize: 12, marginTop: 4 }}>
               +{pending.length} ждут подтверждения
@@ -94,27 +94,27 @@ export default function AdminGroupDetail() {
           )}
         </div>
         <div style={card}>
-          <div style={{ color:'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase',
+          <div style={{ color:'rgba(249,240,240,.5)', fontSize: 11, textTransform: 'uppercase',
             letterSpacing: .6, marginBottom: 6 }}>Сообщений</div>
-          <div style={{ color:'white', fontSize: 28, fontWeight: 800 }}>{g.messages_count}</div>
+          <div style={{ color:'#F9F0F0', fontSize: 28, fontWeight: 800 }}>{g.messages_count}</div>
         </div>
         <div style={card}>
-          <div style={{ color:'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase',
+          <div style={{ color:'rgba(249,240,240,.5)', fontSize: 11, textTransform: 'uppercase',
             letterSpacing: .6, marginBottom: 6 }}>Последняя активность</div>
-          <div style={{ color:'white', fontSize: 14, fontWeight: 700, marginTop: 6 }}>
+          <div style={{ color:'#F9F0F0', fontSize: 14, fontWeight: 700, marginTop: 6 }}>
             {fmtDate(g.last_message_at)}
           </div>
         </div>
         <div style={card}>
-          <div style={{ color:'rgba(255,255,255,.5)', fontSize: 11, textTransform: 'uppercase',
+          <div style={{ color:'rgba(249,240,240,.5)', fontSize: 11, textTransform: 'uppercase',
             letterSpacing: .6, marginBottom: 6 }}>Видимость истории</div>
-          <div style={{ color:'white', fontSize: 14, fontWeight: 700, marginTop: 6 }}>
+          <div style={{ color:'#F9F0F0', fontSize: 14, fontWeight: 700, marginTop: 6 }}>
             {g.history_visibility === 'since_joined' ? '🔒 С момента вступления' : '👁 Вся история'}
           </div>
         </div>
       </div>
 
-      <h2 style={{ color:'white', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+      <h2 style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
         Участники ({active.length + pending.length})
       </h2>
 
@@ -126,24 +126,24 @@ export default function AdminGroupDetail() {
             <div key={m.id}
               onClick={() => nav(`/admin/users/${m.id}`)}
               style={{ display:'flex', alignItems:'center', gap: 12,
-                padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,.06)',
+                padding: '12px 16px', borderBottom: '1px solid rgba(249,240,240,.06)',
                 cursor: 'pointer', transition: 'background .12s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.04)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(249,240,240,.04)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <div style={{
                 width: 36, height: 36, borderRadius: '50%',
-                background: 'rgba(120,90,200,.4)',
+                background: 'rgba(95, 64, 128,.4)',
                 display:'flex', alignItems:'center', justifyContent:'center',
-                color:'white', fontSize: 14, fontWeight: 700,
+                color:'#F9F0F0', fontSize: 14, fontWeight: 700,
                 overflow:'hidden', flexShrink: 0,
-                border:'1px solid rgba(255,255,255,.1)',
+                border:'1px solid rgba(249,240,240,.1)',
               }}>
                 {isImg
                   ? <img src={av} alt="" style={{width:'100%', height:'100%', objectFit:'cover'}}/>
                   : (m.name?.[0]?.toUpperCase() || '?')}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color:'white', fontWeight: 600, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <div style={{ color:'#F9F0F0', fontWeight: 600, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                   {m.name}
                   {m.id === g.admin_id && (
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,210,120,1)',
@@ -168,18 +168,18 @@ export default function AdminGroupDetail() {
                     </span>
                   )}
                   {m.is_deleted && (
-                    <span style={{ fontSize: 11, color:'rgba(255,255,255,.45)',
-                      background:'rgba(255,255,255,.06)', borderRadius: 6, padding: '2px 7px', fontWeight: 600 }}>
+                    <span style={{ fontSize: 11, color:'rgba(249,240,240,.45)',
+                      background:'rgba(249,240,240,.06)', borderRadius: 6, padding: '2px 7px', fontWeight: 600 }}>
                       удалён
                     </span>
                   )}
                 </div>
-                <div style={{ color:'rgba(255,255,255,.45)', fontSize: 12, marginTop: 2 }}>
+                <div style={{ color:'rgba(249,240,240,.45)', fontSize: 12, marginTop: 2 }}>
                   Вступил {m.joined_at ? fmtDate(m.joined_at) : '—'}
                   {m.online && <span style={{ color:'rgba(110,235,150,.95)', marginLeft: 8 }}>● онлайн</span>}
                 </div>
               </div>
-              <span style={{ color:'rgba(255,255,255,.35)', fontSize: 18 }}>›</span>
+              <span style={{ color:'rgba(249,240,240,.35)', fontSize: 18 }}>›</span>
             </div>
           );
         })}

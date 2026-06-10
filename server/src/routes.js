@@ -593,7 +593,7 @@ module.exports = function makeRouter(db, broadcast) {
       text: `Привет, ${name || ''}!\n\nПодтверди email в HEY:\n${link}\n\nЕсли это не ты — просто проигнорируй письмо.`,
       html: `<p>Привет, ${name || ''}!</p>
 <p>Подтверди email в HEY, нажав на ссылку:</p>
-<p><a href="${link}" style="background:#7858b0;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Подтвердить email</a></p>
+<p><a href="${link}" style="background:#5F4080;color:#F9F0F0;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Подтвердить email</a></p>
 <p style="color:#888;font-size:12px">Если кнопка не работает — открой в браузере: ${link}</p>
 <p style="color:#888;font-size:12px">Если это не ты — просто проигнорируй письмо.</p>`,
     });
@@ -623,7 +623,7 @@ module.exports = function makeRouter(db, broadcast) {
       html: `<p>Привет, ${name || ''}!</p>
 <p>Кто-то запросил сброс пароля для аккаунта HEY с этим email.</p>
 <p>Если это ты — задай новый пароль:</p>
-<p><a href="${link}" style="background:#7858b0;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Задать новый пароль</a></p>
+<p><a href="${link}" style="background:#5F4080;color:#F9F0F0;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Задать новый пароль</a></p>
 <p style="color:#888;font-size:12px">Если кнопка не работает — открой в браузере: ${link}</p>
 <p style="color:#888;font-size:12px">Ссылка действительна 1 час. Если это не ты — просто проигнорируй письмо.</p>`,
     });

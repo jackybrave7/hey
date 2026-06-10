@@ -54,7 +54,7 @@ export function Checkbox({ checked, indeterminate, title, onClick }) {
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 18, height: 18, borderRadius: 5, padding: 0,
-        border: `1.5px solid ${checked || indeterminate ? 'rgba(180,140,255,.85)' : 'rgba(255,255,255,.25)'}`,
+        border: `1.5px solid ${checked || indeterminate ? 'rgba(180,140,255,.85)' : 'rgba(249,240,240,.25)'}`,
         background: checked
           ? 'rgba(140,110,220,.9)'
           : indeterminate
@@ -65,11 +65,11 @@ export function Checkbox({ checked, indeterminate, title, onClick }) {
       }}>
       {checked && (
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-          <path d="M5 12.5l5 5L20 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M5 12.5l5 5L20 7" stroke='#F9F0F0' strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       )}
       {indeterminate && !checked && (
-        <div style={{ width: 9, height: 2, borderRadius: 1, background: 'white' }}/>
+        <div style={{ width: 9, height: 2, borderRadius: 1, background:'#F9F0F0' }}/>
       )}
     </button>
   );
@@ -87,10 +87,10 @@ export function BulkActionBar({ count, onClear, actions, onAction, busy }) {
       border: '1px solid rgba(180,140,255,.35)',
       borderRadius: 50, padding: '8px 8px 8px 18px',
       display: 'flex', alignItems: 'center', gap: 12,
-      boxShadow: '0 18px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05) inset',
+      boxShadow: '0 18px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(249,240,240,.05) inset',
       maxWidth: 'calc(100vw - 32px)', flexWrap: 'wrap',
     }}>
-      <span style={{ color:'white', fontSize: 13, fontWeight: 700 }}>
+      <span style={{ color:'#F9F0F0', fontSize: 13, fontWeight: 700 }}>
         Выбрано: {count}
       </span>
       <div style={{ display:'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -99,13 +99,13 @@ export function BulkActionBar({ count, onClear, actions, onAction, busy }) {
             ? { bg: 'rgba(220,60,60,.85)',   border: 'rgba(255,160,160,.5)'  }
             : a.accent
               ? { bg: 'rgba(140,110,220,.9)', border: 'rgba(200,160,255,.45)' }
-              : { bg: 'rgba(255,255,255,.10)', border: 'rgba(255,255,255,.18)' };
+              : { bg: 'rgba(249,240,240,.10)', border: 'rgba(249,240,240,.18)' };
           return (
             <button key={a.key} onClick={() => onAction(a)} disabled={busy}
               style={{
                 padding: '8px 14px', borderRadius: 50,
                 fontSize: 12, fontWeight: 700, cursor: busy ? 'wait' : 'pointer',
-                fontFamily: 'inherit', color: 'white',
+                fontFamily: 'inherit', color:'#F9F0F0',
                 background: palette.bg, border: `1px solid ${palette.border}`,
                 opacity: busy ? .6 : 1,
               }}>
@@ -117,7 +117,7 @@ export function BulkActionBar({ count, onClear, actions, onAction, busy }) {
       <button onClick={onClear} disabled={busy}
         style={{
           padding: '8px 12px', borderRadius: 50, border: 'none',
-          background:'rgba(255,255,255,.06)', color:'rgba(255,255,255,.6)',
+          background:'rgba(249,240,240,.06)', color:'rgba(249,240,240,.6)',
           fontSize: 12, cursor: busy ? 'wait' : 'pointer', fontFamily:'inherit',
         }}>
         ✕ Сбросить

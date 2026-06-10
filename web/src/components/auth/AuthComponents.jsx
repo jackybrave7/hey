@@ -3,19 +3,20 @@
 // InviteBadge, ForgotPasswordPopup
 
 import { useState } from 'react';
+import HeyLogo from '../HeyLogo';
 
 // ─── CSS injected once ────────────────────────────────────────────────────────
 const AUTH_CSS = `
 .auth-field { margin-bottom: 14px; position: relative; }
 .auth-input {
-  width: 100%; background: rgba(255,255,255,.94);
+  width: 100%; background: rgba(249,240,240,.94);
   border: 1.5px solid transparent; border-radius: 26px;
   padding: 16px 18px 10px; color: #2a1a3e; font-size: 15px;
   font-family: inherit; outline: none; box-sizing: border-box;
   transition: all .15s;
 }
 .auth-input:focus {
-  background: white; border-color: rgba(120,88,176,.5);
+  background: #F9F0F0; border-color: rgba(95, 64, 128,.5);
   box-shadow: 0 0 0 4px rgba(160,100,255,.15);
 }
 .auth-label {
@@ -26,8 +27,8 @@ const AUTH_CSS = `
 }
 .auth-input:focus + .auth-label,
 .auth-input:not(:placeholder-shown) + .auth-label {
-  top: -8px; font-size: 11px; color: #7858b0;
-  background: white; padding: 0 6px; font-weight: 600;
+  top: -8px; font-size: 11px; color: #5F4080;
+  background: #F9F0F0; padding: 0 6px; font-weight: 600;
   border-radius: 4px; left: 14px;
 }
 .auth-input-eye { padding-right: 50px; }
@@ -37,20 +38,20 @@ const AUTH_CSS = `
   color: rgba(90,74,138,.5); font-size: 17px; padding: 4px;
   line-height: 1; font-family: inherit;
 }
-.auth-eye-btn:hover { color: #7858b0; }
+.auth-eye-btn:hover { color: #5F4080; }
 .auth-btn-primary {
-  width: 100%; background: #7858b0; border: none; border-radius: 26px;
-  padding: 15px; color: white; font-size: 15px; font-weight: 700;
+  width: 100%; background: #5F4080; border: none; border-radius: 26px;
+  padding: 15px; color: #F9F0F0; font-size: 15px; font-weight: 700;
   cursor: pointer; font-family: inherit; transition: all .15s;
-  box-shadow: 0 8px 24px rgba(120,88,176,.35);
+  box-shadow: 0 8px 24px rgba(95, 64, 128,.35);
 }
 .auth-btn-primary:hover {
-  background: #8868c0; transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(120,88,176,.45);
+  background: #735494; transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(95, 64, 128,.45);
 }
 .auth-btn-primary:active { transform: translateY(0); }
 .auth-btn-primary:disabled {
-  background: rgba(120,88,176,.4); cursor: not-allowed;
+  background: rgba(95, 64, 128,.4); cursor: not-allowed;
   transform: none; box-shadow: none;
 }
 @keyframes authFadeUp {
@@ -81,19 +82,15 @@ export function AuthBrand({ delay = 0 }) {
         fontSize: 58, fontWeight: 700, letterSpacing: -2,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
         marginBottom: 8,
-        background: 'linear-gradient(135deg, #ffffff 0%, #e8d8ff 100%)',
+        background: 'linear-gradient(135deg, #F9F0F0 0%, #e8d8ff 100%)',
         WebkitBackgroundClip: 'text', backgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         fontFamily: 'Comfortaa, sans-serif'
       }}>
-        <span style={{
-          background: 'linear-gradient(135deg,#ffffff,#c8a8ff)',
-          WebkitBackgroundClip: 'text', backgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>✦</span>
+        <HeyLogo size={52} color="#F9F0F0" title="HEY" />
         HEY
       </div>
-      <div style={{ fontSize: 15, color: 'rgba(255,255,255,.72)', fontWeight: 400, letterSpacing: .3 }}>
+      <div style={{ fontSize: 15, color: 'rgba(249,240,240,.72)', fontWeight: 400, letterSpacing: .3 }}>
         Мессенджер для тех, кто творит
       </div>
     </div>
@@ -153,13 +150,13 @@ export function InviteBadge({ name, avatar }) {
         width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
         background: avatar ? 'transparent' : 'linear-gradient(135deg,#e090c0,#c060a0)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: 'white', fontWeight: 700, fontSize: 15, overflow: 'hidden'
+        color:'#F9F0F0', fontWeight: 700, fontSize: 15, overflow: 'hidden'
       }}>
         {avatar
           ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
           : initial}
       </div>
-      <div style={{ fontSize: 13, lineHeight: 1.45, color: 'white' }}>
+      <div style={{ fontSize: 13, lineHeight: 1.45, color:'#F9F0F0' }}>
         <strong style={{ fontWeight: 700 }}>{name}</strong> приглашает тебя в HEY
       </div>
     </div>
@@ -207,18 +204,18 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
         background: 'rgba(38,28,68,.98)', borderRadius: 22,
         width: '100%', maxWidth: 380, padding: '28px 26px 24px',
         position: 'relative', boxShadow: '0 30px 80px rgba(0,0,0,.6)',
-        border: '1px solid rgba(255,255,255,.1)'
+        border: '1px solid rgba(249,240,240,.1)'
       }}>
         <button onClick={onClose} style={{
           position: 'absolute', top: 14, right: 14,
-          background: 'rgba(255,255,255,.1)', border: 'none', borderRadius: '50%',
-          width: 32, height: 32, color: 'white', fontSize: 16, cursor: 'pointer',
+          background: 'rgba(249,240,240,.1)', border: 'none', borderRadius: '50%',
+          width: 32, height: 32, color:'#F9F0F0', fontSize: 16, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontFamily: 'inherit'
         }}>✕</button>
 
         <div style={{ fontSize: 42, textAlign: 'center', marginBottom: 14 }}>🔑</div>
-        <div style={{ color: 'white', fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 10 }}>
+        <div style={{ color:'#F9F0F0', fontSize: 18, fontWeight: 700, textAlign: 'center', marginBottom: 10 }}>
           Забыли пароль?
         </div>
 
@@ -235,7 +232,7 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
         ) : (
           <>
             <div style={{
-              color: 'rgba(255,255,255,.7)', fontSize: 13, lineHeight: 1.55,
+              color: 'rgba(249,240,240,.7)', fontSize: 13, lineHeight: 1.55,
               textAlign: 'center', marginBottom: 16,
             }}>
               Если ты указал email в профиле — введи его здесь, и пришлём ссылку для сброса пароля.
@@ -245,8 +242,8 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
               placeholder="you@example.com" autoFocus type="email"
               style={{
                 width:'100%', boxSizing:'border-box', marginBottom: 12,
-                background:'rgba(0,0,0,.4)', border:'1px solid rgba(255,255,255,.18)',
-                borderRadius: 12, padding:'12px 14px', color:'white', fontSize: 14,
+                background:'rgba(0,0,0,.4)', border:'1px solid rgba(249,240,240,.18)',
+                borderRadius: 12, padding:'12px 14px', color:'#F9F0F0', fontSize: 14,
                 fontFamily: 'inherit', outline: 'none',
               }}/>
             {err && (
@@ -257,7 +254,7 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
               style={{
                 width: '100%', padding: '13px', borderRadius: 14,
                 background: 'rgba(140,110,220,.95)', border: '1px solid rgba(180,140,220,.4)',
-                color: 'white', fontSize: 14, fontWeight: 700,
+                color:'#F9F0F0', fontSize: 14, fontWeight: 700,
                 cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit',
                 opacity: busy ? .7 : 1, marginBottom: 14,
               }}>
@@ -268,7 +265,7 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
 
         <div style={{
           textAlign: 'center', margin: '4px 0 10px',
-          color: 'rgba(255,255,255,.4)', fontSize: 12,
+          color: 'rgba(249,240,240,.4)', fontSize: 12,
         }}>
           или
         </div>
@@ -276,7 +273,7 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
           href={`https://t.me/${handle}`} target="_blank" rel="noreferrer"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            background: '#229ED9', color: 'white', borderRadius: 16,
+            background: '#229ED9', color:'#F9F0F0', borderRadius: 16,
             padding: 12, fontSize: 13, fontWeight: 600, textDecoration: 'none',
             transition: 'background .15s'
           }}
@@ -286,7 +283,7 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
           <span style={{ fontSize: 16 }}>✈</span> Восстановить через Telegram-бота
         </a>
         <div style={{ textAlign:'center', marginTop: 8,
-          color:'rgba(255,255,255,.45)', fontSize: 11, lineHeight: 1.5 }}>
+          color:'rgba(249,240,240,.45)', fontSize: 11, lineHeight: 1.5 }}>
           Бот попросит поделиться номером и сразу выдаст разовый пароль.
         </div>
       </div>

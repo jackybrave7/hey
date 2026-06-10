@@ -1,11 +1,11 @@
 // AdminBusinessRequests.jsx — обработка заявок на бизнес-доступ
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 
 const cardStyle = {
   background: 'rgba(20,12,40,.65)',
-  border: '1px solid rgba(255,255,255,.12)',
+  border: '1px solid rgba(249,240,240,.12)',
   borderRadius: 14,
   padding: '16px 18px',
   marginBottom: 12,
@@ -85,7 +85,7 @@ export default function AdminBusinessRequests() {
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 760 }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         💼 Бизнес-заявки
       </h1>
       <p style={{ color: 'rgba(225,220,245,.85)', fontSize: 14, marginBottom: 20, lineHeight: 1.55 }}>
@@ -100,7 +100,7 @@ export default function AdminBusinessRequests() {
       )}
       {toast && (
         <div style={{ position: 'fixed', top: 20, right: 20, background: 'rgba(60,170,110,.95)',
-          color: 'white', padding: '10px 16px', borderRadius: 10, fontSize: 13, zIndex: 9999 }}>
+          color:'#F9F0F0', padding: '10px 16px', borderRadius: 10, fontSize: 13, zIndex: 9999 }}>
           {toast}
         </div>
       )}
@@ -113,8 +113,8 @@ export default function AdminBusinessRequests() {
               padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
               cursor: 'pointer', fontFamily: 'inherit',
               background: status === t.v ? 'rgba(140,110,220,.85)' : 'rgba(20,12,40,.5)',
-              border: status === t.v ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(255,255,255,.12)',
-              color: status === t.v ? 'white' : 'rgba(225,220,245,.85)',
+              border: status === t.v ? '1px solid rgba(180,140,255,.5)' : '1px solid rgba(249,240,240,.12)',
+              color: status === t.v ? '#F9F0F0' : 'rgba(225,220,245,.85)',
             }}>
             {t.l}
           </button>
@@ -129,15 +129,15 @@ export default function AdminBusinessRequests() {
         <div key={u.id} style={cardStyle}>
           <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
             <div style={{width:44,height:44,borderRadius:'50%',
-              background:'rgba(120,90,200,.4)',
+              background:'rgba(95, 64, 128,.4)',
               display:'flex',alignItems:'center',justifyContent:'center',
-              fontSize:18,color:'white',fontWeight:700,overflow:'hidden',flexShrink:0}}>
+              fontSize:18,color:'#F9F0F0',fontWeight:700,overflow:'hidden',flexShrink:0}}>
               {u.avatar && (u.avatar.startsWith('http') || u.avatar.startsWith('/') || u.avatar.startsWith('data:'))
                 ? <img src={u.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                 : (u.name?.[0]?.toUpperCase() || '?')}
             </div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{color:'white',fontSize:15,fontWeight:700}}>{u.name}</div>
+              <div style={{color:'#F9F0F0',fontSize:15,fontWeight:700}}>{u.name}</div>
               <div style={{color:'rgba(225,220,245,.7)',fontSize:12,marginTop:2}}>
                 {u.phone} · {status === 'pending'
                   ? 'запросил ' + fmtDate(u.business_requested_at)
@@ -169,8 +169,8 @@ export default function AdminBusinessRequests() {
                   ...btn, background:'rgba(60,180,100,.25)', color:'rgba(140,240,180,.95)',
                 }}>✓ Одобрить</button>
                 <button onClick={() => reject(u)} style={{
-                  ...btn, background:'rgba(255,255,255,.08)',
-                  border:'1px solid rgba(255,255,255,.18)', color:'rgba(225,220,245,.9)',
+                  ...btn, background:'rgba(249,240,240,.08)',
+                  border:'1px solid rgba(249,240,240,.18)', color:'rgba(225,220,245,.9)',
                 }}>Отклонить</button>
               </>
             )}
@@ -186,7 +186,7 @@ export default function AdminBusinessRequests() {
               }}>✓ Одобрить заново</button>
             )}
             <a href={`/admin/users/${u.id}`} style={{
-              ...btn, background:'rgba(120,90,200,.18)',
+              ...btn, background:'rgba(95, 64, 128,.18)',
               border:'1px solid rgba(180,140,220,.3)', color:'rgba(220,200,255,.95)',
               textDecoration:'none',
             }}>Профиль →</a>

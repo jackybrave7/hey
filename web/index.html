@@ -13,7 +13,7 @@
   <meta name="generator" content="Vite + React"/>
 
   <!-- ── Theme & UI ───────────────────────────────────────────────────── -->
-  <meta name="theme-color" content="#5a2d96"/>
+  <meta name="theme-color" content="#5F4080"/>
   <meta name="color-scheme" content="dark"/>
   <meta name="format-detection" content="telephone=no"/>
 
@@ -27,7 +27,7 @@
   <!-- ── Favicons ─────────────────────────────────────────────────────── -->
   <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
   <link rel="alternate icon" href="/favicon.svg"/>
-  <link rel="mask-icon" href="/favicon.svg" color="#7c45c7"/>
+  <link rel="mask-icon" href="/favicon.svg" color="#5F4080"/>
   <link rel="apple-touch-icon" href="/apple-touch-icon.svg"/>
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.svg"/>
 
@@ -87,29 +87,31 @@
 
   <!-- ── Initial loading paint (избегаем белого экрана) ────────────────── -->
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #1a0a30; color: #fff; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #1a0a30; color: #F9F0F0; }
     body { font-family: 'Comfortaa', system-ui, -apple-system, sans-serif; }
     #root { min-height: 100vh; }
     .boot-splash {
       position: fixed; inset: 0;
       display: flex; align-items: center; justify-content: center;
-      background: linear-gradient(135deg,#2a1058,#5a2d96,#7c45c7);
-      font-size: 38px; color: white;
+      background: linear-gradient(135deg,#2a1058,#5F4080,#7c45c7);
       animation: pulse 1.4s ease-in-out infinite;
     }
+    .boot-splash svg { width: 52px; height: 52px; display: block; }
     @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
   </style>
 </head>
 <body>
   <div id="root">
-    <div class="boot-splash">✦</div>
+    <div class="boot-splash">
+      <img src="/hey-logo.png" width="52" height="52" alt="" aria-hidden="true" />
+    </div>
   </div>
   <script type="module" src="/src/main.jsx"></script>
 
   <!-- noscript fallback -->
   <noscript>
     <div style="padding:40px;max-width:480px;margin:0 auto;text-align:center;">
-      <h1 style="color:#fff;">HEY Messenger</h1>
+      <h1 style="color:#F9F0F0;">HEY Messenger</h1>
       <p style="color:#d8c5f5;">Для работы приложения нужен JavaScript. Включи его в настройках браузера.</p>
     </div>
   </noscript>

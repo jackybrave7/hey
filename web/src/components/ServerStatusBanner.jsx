@@ -45,7 +45,7 @@ export default function ServerStatusBanner() {
       top: 0, left: 0, right: 0,
       zIndex: 9999,
       background: 'linear-gradient(135deg, rgba(220,90,90,.95), rgba(200,80,80,.95))',
-      color: 'white',
+      color:'#F9F0F0',
       padding: '10px 16px',
       paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))',
       fontSize: 13,
@@ -64,9 +64,9 @@ export default function ServerStatusBanner() {
       <span style={{ flex: 1, maxWidth: 600 }}>{MESSAGES[issue] || MESSAGES.timeout}</span>
       <button onClick={() => window.location.reload()}
         style={{
-          background: 'rgba(255,255,255,.18)',
-          border: '1px solid rgba(255,255,255,.3)',
-          color: 'white',
+          background: 'rgba(249,240,240,.18)',
+          border: '1px solid rgba(249,240,240,.3)',
+          color:'#F9F0F0',
           padding: '5px 12px',
           borderRadius: 8,
           fontSize: 12,

@@ -3,26 +3,26 @@
 // и поиске, для удобства тестирования интерфейса.
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../shared/Confirm';
 
 const cardStyle = {
-  background: 'rgba(255,255,255,.04)',
-  border: '1px solid rgba(255,255,255,.08)',
+  background: 'rgba(249,240,240,.04)',
+  border: '1px solid rgba(249,240,240,.08)',
   borderRadius: 14,
   padding: '20px 22px',
   marginBottom: 18,
 };
 const btnPrimary = {
   padding: '10px 18px', borderRadius: 12, border: 'none',
-  background: 'rgba(120,90,200,.85)', color: 'white',
+  background: 'rgba(95, 64, 128,.85)', color:'#F9F0F0',
   fontSize: 13, fontWeight: 600, cursor: 'pointer',
   fontFamily: 'inherit',
 };
 const btnGhost = {
   ...btnPrimary,
-  background: 'rgba(255,255,255,.08)',
-  border: '1px solid rgba(255,255,255,.14)',
-  color: 'rgba(255,255,255,.85)',
+  background: 'rgba(249,240,240,.08)',
+  border: '1px solid rgba(249,240,240,.14)',
+  color: 'rgba(249,240,240,.85)',
 };
 const btnDanger = {
   ...btnPrimary,
@@ -77,7 +77,7 @@ export default function AdminTestUsers() {
     if (!await customConfirm(
       <>
         <div style={{fontWeight:700,marginBottom:8}}>Удалить всех тестовых пользователей?</div>
-        <div style={{color:'rgba(255,255,255,.65)',fontSize:13,lineHeight:1.55}}>
+        <div style={{color:'rgba(249,240,240,.65)',fontSize:13,lineHeight:1.55}}>
           Будут удалены 100 фейковых юзеров и все их моменты. Реальные пользователи
           не затрагиваются. Действие необратимо — но можно пересоздать заново.
         </div>
@@ -95,10 +95,10 @@ export default function AdminTestUsers() {
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 720 }}>
-      <h1 style={{ color: 'white', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         🧪 Тестовые пользователи
       </h1>
-      <p style={{ color: 'rgba(255,255,255,.45)', fontSize: 14, marginTop: 0, marginBottom: 24, lineHeight: 1.55 }}>
+      <p style={{ color: 'rgba(249,240,240,.45)', fontSize: 14, marginTop: 0, marginBottom: 24, lineHeight: 1.55 }}>
         Режим для удобства тестирования интерфейса. Когда включён — в ленте моментов
         у админов появляются 100 фейковых пользователей с разными именами, аватарами,
         био и моментами. Имена помечены «(тестовый)». Реальные пользователи их не видят.
@@ -106,7 +106,7 @@ export default function AdminTestUsers() {
 
       {toast && (
         <div style={{ position: 'fixed', top: 20, right: 20,
-          background: 'rgba(60,170,110,.95)', color: 'white',
+          background: 'rgba(60,170,110,.95)', color:'#F9F0F0',
           padding: '10px 16px', borderRadius: 10, fontSize: 13, zIndex: 9999 }}>
           {toast}
         </div>
@@ -121,10 +121,10 @@ export default function AdminTestUsers() {
             boxShadow: status?.enabled ? '0 0 12px rgba(80,220,120,.6)' : 'none',
           }}/>
           <div style={{ flex: 1 }}>
-            <div style={{ color: 'white', fontSize: 16, fontWeight: 700 }}>
+            <div style={{ color:'#F9F0F0', fontSize: 16, fontWeight: 700 }}>
               {status?.enabled ? 'Режим включён' : 'Режим выключен'}
             </div>
-            <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 13, marginTop: 2 }}>
+            <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 13, marginTop: 2 }}>
               {status === null ? 'Загрузка…' :
                 status.count > 0
                   ? `В базе ${status.count} тестовых пользователей`
@@ -158,11 +158,11 @@ export default function AdminTestUsers() {
 
       {/* Info */}
       <div style={{ ...cardStyle, marginBottom: 0 }}>
-        <div style={{ color: 'rgba(255,255,255,.55)', fontSize: 12, fontWeight: 700,
+        <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, fontWeight: 700,
           textTransform: 'uppercase', letterSpacing: .6, marginBottom: 10 }}>
           Что попадает в ленту
         </div>
-        <ul style={{ color: 'rgba(255,255,255,.78)', fontSize: 13, lineHeight: 1.7,
+        <ul style={{ color: 'rgba(249,240,240,.78)', fontSize: 13, lineHeight: 1.7,
           margin: 0, paddingLeft: 20 }}>
           <li>Имена: 65% русские, 35% иностранные (с фамилиями)</li>
           <li>Аватары: реальные портреты с randomuser.me (детерминированно по id)</li>
