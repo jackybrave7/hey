@@ -31,15 +31,12 @@ const MessageRow = memo(function MessageRow({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const hoverOffTimer = useRef(null);
-  // На touch/WebView ховера нет, поэтому кнопку реакции держим видимой.
-  // На десктопе показываем её по hover; tap по пузырю остаётся запасным
-  // способом открыть кнопку. Right-click / long-press открывает меню.
+  // На десктопе показываем кнопку по hover, на touch/WebView — по тапу
+  // на пузырь. Right-click / long-press открывает меню.
   const [tappedReveal, setTappedReveal] = useState(false);
   const isDeleted = Number(m.is_deleted) === 1;
-  const canHover = typeof window !== 'undefined'
-    && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
   const showReactBtn = !isOut && !isDeleted
-    && (!canHover || isHovered || tappedReveal || reactionPickerMsgId === m.id);
+    && (isHovered || tappedReveal || reactionPickerMsgId === m.id);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
   const deletedLabel = isOut
     ? 'Вы удалили сообщение'
@@ -80,7 +77,7 @@ const MessageRow = memo(function MessageRow({
         // поэтому 36-px смайл-слот вылезает за экран. С width:100% row
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
-        marginBottom: hasReactions ? 8 : 2}}
+        marginBottom: hasReactions ? 12 : 8}}
       onMouseEnter={keepHovered}
       onMouseMove={keepHovered}
       onMouseLeave={releaseHovered}
@@ -482,6 +479,7 @@ const MessageRow = memo(function MessageRow({
             onClick={(e) => {
               e.stopPropagation();
               const rect = e.currentTarget.getBoundingClientRect();
+              setTappedReveal(false);
               onSetReactionPicker(p => p?.msgId === m.id ? null
                 : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });
             }}
