@@ -37,8 +37,11 @@ export function mediaUrl(url) {
 }
 
 function absolutize(path) {
-  // Относительный /media/… — браузер сам бьёт в текущий origin (vite proxy, nginx).
-  // Абсолютизация ломала dev и давала лишние cross-origin нюансы.
+  // Для TWA/Android всегда отдаём полный same-origin URL: так WebView не
+  // интерпретирует /media относительно нестандартного app/base контекста.
+  if (typeof window !== 'undefined' && /^https?:$/i.test(window.location.protocol)) {
+    return window.location.origin + path;
+  }
   return path;
 }
 

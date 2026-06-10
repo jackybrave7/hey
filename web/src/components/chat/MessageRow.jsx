@@ -35,8 +35,10 @@ const MessageRow = memo(function MessageRow({
   // на пузырь. Right-click / long-press открывает меню.
   const [tappedReveal, setTappedReveal] = useState(false);
   const isDeleted = Number(m.is_deleted) === 1;
+  const canHover = typeof window !== 'undefined'
+    && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
   const showReactBtn = !isOut && !isDeleted
-    && (isHovered || tappedReveal || reactionPickerMsgId === m.id);
+    && (isHovered || (!canHover && tappedReveal) || reactionPickerMsgId === m.id);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
   const deletedLabel = isOut
     ? 'Вы удалили сообщение'
@@ -78,9 +80,6 @@ const MessageRow = memo(function MessageRow({
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
         marginBottom: hasReactions ? 12 : 8}}
-      onMouseEnter={keepHovered}
-      onMouseMove={keepHovered}
-      onMouseLeave={releaseHovered}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
@@ -106,7 +105,10 @@ const MessageRow = memo(function MessageRow({
         // Жёсткий пиксельный cap (без CSS min() — на случай нестандартного
         // поведения flex-min-content). Достаточно для всех нормальных
         // viewport'ов, на узких мобилках всё равно ограничится width родителя.
-        maxWidth: 540, minWidth: 0}}>
+        maxWidth: 540, minWidth: 0}}
+        onMouseEnter={keepHovered}
+        onMouseMove={keepHovered}
+        onMouseLeave={releaseHovered}>
         <div
           key={isFlashing ? 'flash-' + m.id : m.id}
           className={isFlashing ? 'hey-flash' : ''}
@@ -116,7 +118,7 @@ const MessageRow = memo(function MessageRow({
             // потому что на десктопе isHovered=true и кнопка и так видна.
             // Селект текста и клик по ссылкам не ломаем: игнорируем клики
             // если внутри пузыря выделен текст или клик пришёл с <a>.
-            if (isOut) return;
+            if (isOut || canHover) return;
             const sel = window.getSelection?.();
             if (sel && sel.toString().length > 0) return;
             if (e.target.closest && e.target.closest('a,button,img[role="button"]')) return;
@@ -474,7 +476,10 @@ const MessageRow = memo(function MessageRow({
         <div style={{
           width: 36, flexShrink: 0, alignSelf: 'flex-end',
           marginBottom: 4, display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
+        }}
+          onMouseEnter={keepHovered}
+          onMouseMove={keepHovered}
+          onMouseLeave={releaseHovered}>
           <button
             onClick={(e) => {
               e.stopPropagation();

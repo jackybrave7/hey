@@ -5,6 +5,8 @@ import { useAuth } from '../../AuthContext';
 import HeyLogo from '../HeyLogo';
 import MoodEmoji from './MoodEmoji';
 import Icon from '../Icon';
+import { AudioPlayer } from '../chat/AudioPlayer';
+import { mediaUrl } from '../../lib/mediaUrl';
 
 export function MomentPage() {
   const { id } = useParams();
@@ -142,18 +144,18 @@ function MomentPageLegacy() {
           {hasMedia && (
             <div style={{ background:'#0a0518' }}>
               {moment.media_type === 'image' && (
-                <img src={moment.media_url} alt=""
+                <img src={mediaUrl(moment.media_url)} alt=""
                   style={{ width:'100%', maxHeight:'55vw', objectFit:'contain', display:'block' }}/>
               )}
               {moment.media_type === 'video' && (
-                <video src={moment.media_url} controls
+                <video src={mediaUrl(moment.media_url)} controls
                   style={{ width:'100%', display:'block', background:'#000' }}/>
               )}
               {moment.media_type === 'audio' && (
                 <div style={{ padding:'28px 22px 24px', display:'flex', flexDirection:'column', gap:14,
                   background:'linear-gradient(135deg,#1a0a38,#2a1858)' }}>
                   <div style={{ fontSize:34, textAlign:'center', opacity:.9 }}>🎵</div>
-                  <AudioPlayer url={moment.media_url}
+                  <AudioPlayer url={mediaUrl(moment.media_url)}
                     duration={moment.media_duration} wide={true}/>
                 </div>
               )}
@@ -171,7 +173,7 @@ function MomentPageLegacy() {
                 overflow:'hidden',
               }}>
                 {moment.author_avatar
-                  ? <img src={moment.author_avatar} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                  ? <img src={mediaUrl(moment.author_avatar)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
                   : (moment.author_name||'?')[0].toUpperCase()}
               </div>
               <div>

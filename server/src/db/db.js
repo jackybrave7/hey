@@ -1798,6 +1798,23 @@ function cancelScheduledMessage(id, senderId) {
   return info.changes > 0;
 }
 
+function updateScheduledMessage(id, senderId, { text, sendAt }) {
+  const row = db.prepare(
+    "SELECT attachment FROM scheduled_messages WHERE id=? AND sender_id=? AND status='pending'"
+  ).get(id, senderId);
+  if (!row) return null;
+  const nextText = text == null ? null : String(text).trim() || null;
+  if (!nextText && !row.attachment) {
+    throw new Error('Пустое сообщение');
+  }
+  const info = db.prepare(
+    `UPDATE scheduled_messages SET text=?, send_at=?
+     WHERE id=? AND sender_id=? AND status='pending'`
+  ).run(nextText, sendAt, id, senderId);
+  if (!info.changes) return null;
+  return getScheduledMessage(id);
+}
+
 // Достать всё что пора отправить. Удаляем запись внутри транзакции
 // при создании реального сообщения — чтобы не отправить дважды.
 function popDueScheduledMessages(nowTs, limit = 50) {
@@ -2193,6 +2210,20 @@ function deleteMessage(id, storage) {
   ).run(ts, id);
   _cleanupS3Keys(storage, keys, id);
   return getMessageById(id);
+}
+
+function hardDeleteMessage(id, storage) {
+  const row = db.prepare('SELECT attachment FROM messages WHERE id=?').get(id);
+  if (!row) return { id, hard_deleted: true };
+  const keys = _attachmentS3Keys(row.attachment);
+  db.transaction(() => {
+    db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE pinned_message_id=?').run(id);
+    db.prepare('DELETE FROM personal_message_pins WHERE message_id=?').run(id);
+    db.prepare('DELETE FROM reactions WHERE message_id=?').run(id);
+    db.prepare('DELETE FROM messages WHERE id=?').run(id);
+  })();
+  _cleanupS3Keys(storage, keys, id);
+  return { id, hard_deleted: true };
 }
 
 // ── Calls ──────────────────────────────────────────────────────────────────
@@ -3710,12 +3741,12 @@ module.exports = {
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
   getMessages, createMessage, createSystemEventMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
-  scheduleMessage, getScheduledMessage, listScheduledMessages, cancelScheduledMessage,
+  scheduleMessage, getScheduledMessage, listScheduledMessages, cancelScheduledMessage, updateScheduledMessage,
   popDueScheduledMessages, deleteScheduledMessageById,
   getLinkPreviewCached, setLinkPreviewCached, updateMessageLinkPreview,
   pinMessage, unpinMessage, getPinnedMessage, forwardMessageToChats,
   pushSubscribe, pushUnsubscribe, getPushSubscriptions, removePushSubscriptions,
-  clearConversationMessages, editMessage, deleteMessage,
+  clearConversationMessages, editMessage, deleteMessage, hardDeleteMessage,
   getMediaMessages, searchMessages, searchAllMessages,
   getCalls, createCall,
   setOnline, getPresence,

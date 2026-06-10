@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { api } from '../../api';
 import SuperPromoBanner from '../super/SuperPromoBanner';
+import { mediaUrl } from '../../lib/mediaUrl';
 
 function fmtDate(ts) {
   if (!ts) return '';
@@ -78,7 +79,7 @@ export default function MomentDilemma({ existing, pendingData, onResolved, onClo
               Текущий момент
             </div>
             {existing.media_url && existing.media_type === 'image' && (
-              <img src={existing.media_url} alt=""
+              <img src={mediaUrl(existing.media_url)} alt=""
                 style={{width:'100%',height:100,objectFit:'cover',
                   objectPosition: existing.media_position || '50% 50%',
                   borderRadius:10,marginBottom:8,display:'block'}}/>

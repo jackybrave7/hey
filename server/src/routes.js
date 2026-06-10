@@ -1068,6 +1068,14 @@ module.exports = function makeRouter(db, broadcast) {
     if (Number(m.is_deleted) === 1) return res.status(400).json({ error: 'Сообщение уже удалено' });
     if (m.sender_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Not a member' });
+    const conv = db.getConversationById(req.params.id);
+    if (conv?.type === 'monolog') {
+      const deleted = db.hardDeleteMessage(req.params.msgId, storage);
+      broadcast(db.getConversationMembers(req.params.id), {
+        type: 'message:deleted', messageId: req.params.msgId, hard: true, conversationId: req.params.id,
+      });
+      return res.json(deleted);
+    }
     const tombstone = db.deleteMessage(req.params.msgId, storage);
     broadcast(db.getConversationMembers(req.params.id), {
       type: 'message:deleted', message: tombstone, conversationId: req.params.id,
@@ -1198,8 +1206,8 @@ module.exports = function makeRouter(db, broadcast) {
         code: 'ADMIN_ONLY',
       });
     }
-    db.clearConversationMessages(convId);
     const members = db.getConversationMembers(convId);
+    db.clearConversationMessages(convId);
     broadcast(members, { type: 'chat:cleared', conversationId: convId });
     res.json({ ok: true });
   });
@@ -2300,6 +2308,25 @@ module.exports = function makeRouter(db, broadcast) {
     const ok = db.cancelScheduledMessage(req.params.id, req.user.id);
     if (!ok) return res.status(404).json({ error: 'Не найдено или уже отправлено' });
     res.json({ ok: true });
+  });
+
+  r.patch('/scheduled/:id', requireAuth, (req, res) => {
+    const { text, send_at } = req.body || {};
+    const sendAt = Number(send_at);
+    if (!Number.isFinite(sendAt)) return res.status(400).json({ error: 'send_at required' });
+    const now = Math.floor(Date.now() / 1000);
+    if (sendAt < now + 30) return res.status(400).json({ error: 'Время отправки — минимум через 30 секунд' });
+    if (sendAt > now + 365 * 24 * 3600) return res.status(400).json({ error: 'Не больше года вперёд' });
+    try {
+      const updated = db.updateScheduledMessage(req.params.id, req.user.id, {
+        text: text || null,
+        sendAt,
+      });
+      if (!updated) return res.status(404).json({ error: 'Не найдено или уже отправлено' });
+      res.json(updated);
+    } catch (e) {
+      res.status(400).json({ error: e.message || 'Не удалось обновить' });
+    }
   });
 
   // ── Admin: Groups ───────────────────────────────────────────────────────

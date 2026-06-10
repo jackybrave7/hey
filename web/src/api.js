@@ -87,6 +87,7 @@ export const api = {
   addContact:     (data)   => req('POST', '/contacts', data),
   scheduleMessage: (convId, body) => req('POST', `/conversations/${convId}/scheduled`, body),
   listScheduledMessages: (convId) => req('GET', `/conversations/${convId}/scheduled`),
+  updateScheduledMessage: (id, body) => req('PATCH', `/scheduled/${id}`, body),
   cancelScheduledMessage: (id) => req('DELETE', `/scheduled/${id}`),
   lookupUserByPhone: (phone) => req('GET', `/users/lookup?phone=${encodeURIComponent(phone)}`),
   deleteContact:  (id)     => req('DELETE', `/contacts/${id}`),

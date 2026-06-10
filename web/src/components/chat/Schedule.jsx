@@ -51,11 +51,95 @@ function ScheduleModal({ defaultValue, onCancel, onSubmit }) {
   );
 }
 
+function toLocalInputValue(ts) {
+  const d = new Date(ts * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function ScheduledEditModal({ item, onCancel, onSubmit }) {
+  const [text, setText] = useState(item.text || '');
+  const [sendAt, setSendAt] = useState(toLocalInputValue(item.send_at));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const hasAttachment = !!item.attachment;
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await onSubmit({ text, sendAt });
+    } catch (e) {
+      setError(e.message === 'bad time' ? 'Выбери время хотя бы через минуту' : (e.message || 'Не удалось сохранить'));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return createPortal(
+    <div onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+      style={{ position:'fixed', inset:0, zIndex:10000,
+        background:'rgba(0,0,0,.6)', backdropFilter:'blur(10px)',
+        display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{
+        background:'rgba(22,15,50,.98)', borderRadius:18, padding:'22px 22px 18px',
+        width:'min(94vw, 420px)', boxShadow:'0 20px 60px rgba(0,0,0,.55)',
+        border:'1px solid rgba(249,240,240,.1)',
+      }}>
+        <div style={{ color:'#F9F0F0', fontSize: 17, fontWeight: 700, marginBottom: 6,
+          display:'flex', alignItems:'center', gap: 8 }}>
+          <Icon name="edit" size={18} /> Редактировать отложенное
+        </div>
+        <div style={{ color:'rgba(249,240,240,.55)', fontSize: 13, marginBottom: 14, lineHeight: 1.5 }}>
+          Можно изменить текст и время отправки. Вложение останется прежним.
+        </div>
+        <textarea value={text} onChange={(e) => setText(e.target.value)}
+          placeholder={hasAttachment ? 'Подпись к вложению' : 'Текст сообщения'}
+          rows={4}
+          style={{
+            width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius: 10,
+            background:'rgba(0,0,0,.4)', border:'1px solid rgba(249,240,240,.18)',
+            color:'#F9F0F0', fontSize: 14, outline: 'none', fontFamily: 'inherit',
+            marginBottom: 10, resize:'vertical',
+          }}/>
+        <input type="datetime-local" value={sendAt} onChange={(e) => setSendAt(e.target.value)}
+          style={{
+            width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius: 10,
+            background:'rgba(0,0,0,.4)', border:'1px solid rgba(249,240,240,.18)',
+            color:'#F9F0F0', fontSize: 14, outline: 'none', fontFamily: 'inherit',
+            marginBottom: 16, colorScheme: 'dark',
+          }}/>
+        {error && (
+          <div style={{ color:'rgba(255,170,170,.95)', fontSize: 12, margin:'-6px 0 12px' }}>
+            {error}
+          </div>
+        )}
+        <div style={{ display:'flex', gap: 10 }}>
+          <button onClick={onCancel} disabled={saving}
+            style={{ flex: 1, padding:'11px', borderRadius: 12,
+              background:'rgba(249,240,240,.08)', border:'1px solid rgba(249,240,240,.14)',
+              color:'rgba(249,240,240,.7)', fontSize: 14, fontWeight: 600,
+              cursor:'pointer', fontFamily: 'inherit' }}>
+            Отмена
+          </button>
+          <button onClick={save} disabled={saving}
+            style={{ flex: 2, padding:'11px', borderRadius: 12,
+              background:'rgba(140,110,220,.9)', border:'1px solid rgba(180,140,220,.4)',
+              color:'#F9F0F0', fontSize: 14, fontWeight: 700,
+              cursor:'pointer', fontFamily: 'inherit' }}>
+            {saving ? 'Сохраняю…' : 'Сохранить'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // Индикатор + раскрывающийся список запланированных сообщений в чате.
 // Закрытый — одна тонкая строка над композером. Открытый — карточка с
 // каждой записью и кнопкой «отменить».
-function ScheduledList({ items, onCancel }) {
+function ScheduledList({ items, onCancel, onEdit }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
   const n = items.length;
   if (!n) return null;
   return (
@@ -137,19 +221,40 @@ function ScheduledList({ items, onCancel }) {
                               : att?.type ? 'изображение' : '(пусто)')}
                   </div>
                 </div>
-                <button onClick={() => onCancel(s.id)}
-                  title="Отменить"
-                  style={{ background:'rgba(200,60,60,.18)',
-                    border:'1px solid rgba(255,120,120,.35)',
-                    color:'rgba(255,180,180,.95)',
-                    borderRadius: 8, padding:'4px 8px', fontSize: 12,
-                    cursor:'pointer', fontFamily:'inherit', flexShrink: 0 }}>
-                  ✕
-                </button>
+                <div style={{ display:'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => setEditing(s)}
+                    title="Редактировать"
+                    style={{ background:'rgba(249,240,240,.08)',
+                      border:'1px solid rgba(249,240,240,.16)',
+                      color:'rgba(220,200,255,.95)',
+                      borderRadius: 8, padding:'5px 7px',
+                      cursor:'pointer', fontFamily:'inherit', display:'inline-flex' }}>
+                    <Icon name="edit" size={13}/>
+                  </button>
+                  <button onClick={() => onCancel(s.id)}
+                    title="Отменить"
+                    style={{ background:'rgba(200,60,60,.18)',
+                      border:'1px solid rgba(255,120,120,.35)',
+                      color:'rgba(255,180,180,.95)',
+                      borderRadius: 8, padding:'4px 8px', fontSize: 12,
+                      cursor:'pointer', fontFamily:'inherit', flexShrink: 0 }}>
+                    ✕
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
+      )}
+      {editing && (
+        <ScheduledEditModal
+          item={editing}
+          onCancel={() => setEditing(null)}
+          onSubmit={async (data) => {
+            await onEdit(editing.id, data);
+            setEditing(null);
+          }}
+        />
       )}
     </div>
   );

@@ -20,6 +20,7 @@ import MomentDetailPopup from '../moments/MomentDetailPopup';
 import ForwardModal from './ForwardModal';
 import MediaViewerModal from './MediaViewerModal';
 import MessageRow from './MessageRow';
+import { AudioPlayer } from './AudioPlayer';
 import { chatImgDrafts, chatFileDrafts } from './chatDrafts';
 import { ScheduleModal, ScheduledList } from './Schedule';
 import { renderText, renderPreviewWithEmoji } from './chatRender';
@@ -124,6 +125,7 @@ export function ChatScreen() {
   const analyserRef       = useRef(null);
   const waveCanvasRef     = useRef(null);
   const waveRafRef        = useRef(null);
+  const waveLevelsRef     = useRef([]);
   const [firstItemIndex, setFirstItemIndex] = useState(1_000_000); // Virtuoso prepend index
   const virtuosoRef        = useRef();
   const atBottomRef        = useRef(true);  // tracks whether list is scrolled to bottom
@@ -492,10 +494,15 @@ export function ChatScreen() {
       if (message.conversation_id === convId)
         setMessages(prev => prev.map(m => m.id === message.id ? { ...m, text: message.text, edited_at: message.edited_at } : m));
     });
-    const u8 = socket.on('message:deleted', ({ message, messageId, conversationId: cid }) => {
+    const u8 = socket.on('message:deleted', ({ message, messageId, hard, conversationId: cid }) => {
       if (cid !== convId) return;
       const id = message?.id || messageId;
       if (!id) return;
+      if (hard) {
+        setMessages(prev => prev.filter(m => m.id !== id));
+        setPinnedMessage(p => p && p.id === id ? null : p);
+        return;
+      }
       if (message) {
         setMessages(prev => prev.map(m => m.id === id ? { ...m, ...message } : m));
         setPinnedMessage(p => p && p.id === id ? { ...p, ...message } : p);
@@ -641,6 +648,7 @@ export function ChatScreen() {
 
       // ── Web Audio: waveform analyser ──
       try {
+        waveLevelsRef.current = [];
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const source   = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
@@ -661,21 +669,31 @@ export function ChatScreen() {
 
           ctx2d.clearRect(0, 0, W, H);
 
-          const barCount = 28;
-          const barW     = 3;
-          const gap      = (W - barCount * barW) / (barCount + 1);
+          const barCount = 34;
+          const barW     = 5;
+          const gap      = Math.max(2, (W - barCount * barW) / (barCount + 1));
+          const levels   = waveLevelsRef.current;
+          const t        = performance.now() / 520;
+          const gradient = ctx2d.createLinearGradient(0, 0, W, 0);
+          gradient.addColorStop(0,   'rgba(95,64,128,.62)');
+          gradient.addColorStop(.45, 'rgba(126,82,168,.98)');
+          gradient.addColorStop(1,   'rgba(95,64,128,.72)');
+          ctx2d.fillStyle = gradient;
           for (let i = 0; i < barCount; i++) {
             // Sample from lower half of freq bins (voice range)
             const binIdx  = Math.floor((i / barCount) * (bufLen * 0.5));
             const raw     = data[binIdx] / 255;
-            const minH    = 3;
-            const barH    = Math.max(minH, raw * (H - 4));
+            const flow    = 0.55 + 0.45 * Math.sin(t + i * 0.42);
+            const target  = Math.min(1, raw * 2.8 + flow * 0.22);
+            const prev    = levels[i] ?? target;
+            const smooth  = prev + (target - prev) * 0.16;
+            levels[i] = smooth;
+            const minH    = 8;
+            const barH    = Math.max(minH, smooth * (H - 2));
             const x       = gap + i * (barW + gap);
             const y       = (H - barH) / 2;
-            const alpha   = 0.4 + raw * 0.6;
-            ctx2d.fillStyle = `rgba(220,180,255,${alpha})`;
             ctx2d.beginPath();
-            ctx2d.roundRect(x, y, barW, barH, 2);
+            ctx2d.roundRect(x, y, barW, barH, 4);
             ctx2d.fill();
           }
         };
@@ -709,6 +727,7 @@ export function ChatScreen() {
     cancelAnimationFrame(waveRafRef.current);
     waveRafRef.current  = null;
     analyserRef.current = null;
+    waveLevelsRef.current = [];
   }
 
   function stopRecording() {
@@ -1029,6 +1048,11 @@ export function ChatScreen() {
     setMsgMenu(null);
     try {
       const tombstone = await api.deleteMessage(convId, msg.id);
+      if (tombstone?.hard_deleted) {
+        setMessages(prev => prev.filter(m => m.id !== msg.id));
+        setPinnedMessage(p => p && p.id === msg.id ? null : p);
+        return;
+      }
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, ...tombstone } : m));
       setPinnedMessage(p => p && p.id === msg.id ? { ...p, ...tombstone } : p);
     } catch (e) {
@@ -1131,6 +1155,7 @@ export function ChatScreen() {
     })) return;
     await api.clearMessages(convId);
     setMessages([]);
+    setPinnedMessage(null);
   }
 
   function handleExportChat() {
@@ -1470,10 +1495,13 @@ export function ChatScreen() {
       {/* TopBar — клик на аватар/имя собеседника открывает его профиль */}
       <div className="topbar">
         <div className="topbar-inner">
-          <button className="back-btn" onClick={() => {
-            if (window.history.length > 1 && location.key !== 'default') nav(-1);
-            else nav('/chats');
-          }}>‹</button>
+          <button
+            type="button"
+            className="back-btn"
+            aria-label="Назад к чатам"
+            title="Назад к чатам"
+            onClick={() => nav('/chats')}
+          >‹</button>
           {partner.isMonolog ? (
             <div style={{width:36,height:36,borderRadius:'12px',flexShrink:0,
               background:'linear-gradient(135deg,#5F4080,#8060c0)',
@@ -2339,16 +2367,20 @@ export function ChatScreen() {
               )}
               {/* Cancel */}
               <button onClick={cancelVoice} title="Отменить"
-                style={{width:28,height:28,borderRadius:'50%',flexShrink:0,
-                  background:'rgba(200,60,60,.45)',border:'1px solid rgba(255,140,140,.55)',
-                  color:'rgba(255,180,180,.85)',fontSize:14,cursor:'pointer',lineHeight:1,
-                  display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                style={{width:32,height:32,borderRadius:'50%',flexShrink:0,
+                  background:'rgba(95,64,128,.12)',border:'1.5px solid rgba(95,64,128,.42)',
+                  color:'rgba(95,64,128,.95)',cursor:'pointer',lineHeight:1,
+                  display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <Icon name="delete" size={16}/>
+              </button>
               {/* Stop → preview */}
               <button onClick={stopRecording} title="Остановить"
-                style={{width:36,height:36,borderRadius:18,flexShrink:0,
-                  background:'rgba(95, 64, 128,.85)',border:'none',
-                  color:'#F9F0F0',fontSize:14,cursor:'pointer',
-                  display:'flex',alignItems:'center',justifyContent:'center'}}>■</button>
+                style={{width:38,height:38,borderRadius:'50%',flexShrink:0,
+                  background:'rgba(95,64,128,.95)',border:'1.5px solid rgba(95,64,128,.95)',
+                  color:'#F9F0F0',cursor:'pointer',
+                  display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <span style={{width:12,height:12,borderRadius:3,background:'currentColor',display:'block'}}/>
+              </button>
             </div>
           </div>
         )}
@@ -2359,17 +2391,17 @@ export function ChatScreen() {
             maxWidth:680,margin:'0 auto'}}>
             <button onClick={cancelVoice} title="Удалить"
               style={{width:36,height:36,borderRadius:'50%',flexShrink:0,
-                background:'rgba(255,80,80,.15)',border:'1px solid rgba(255,120,120,.35)',
-                color:'rgba(255,180,180,.9)',cursor:'pointer',lineHeight:1,display:'inline-flex',alignItems:'center',justifyContent:'center'}}><Icon name="trash" size={16}/></button>
+                background:'rgba(249,240,240,.08)',border:'1.5px solid rgba(249,240,240,.24)',
+                color:'rgba(249,240,240,.86)',cursor:'pointer',lineHeight:1,display:'inline-flex',alignItems:'center',justifyContent:'center'}}><Icon name="trash" size={16}/></button>
             <div style={{flex:1,background:'rgba(249,240,240,.07)',borderRadius:26,
               padding:'8px 14px',border:'1px solid rgba(249,240,240,.12)'}}>
               <AudioPlayer url={voiceObjUrl} duration={voiceDuration} isOut={true}/>
             </div>
             <button onClick={sendVoice} title="Отправить"
-              style={{width:44,height:44,background:'rgba(95, 64, 128,.85)',border:'none',
-                borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',
-                justifyContent:'center',flexShrink:0,fontSize:20,color:'#F9F0F0'}}>
-              ➤
+              style={{width:44,height:44,background:'rgba(95,64,128,.95)',border:'1.5px solid rgba(249,240,240,.16)',
+                borderRadius:'50%',cursor:'pointer',display:'flex',alignItems:'center',
+                justifyContent:'center',flexShrink:0,color:'#F9F0F0'}}>
+              <Icon name="send" size={20}/>
             </button>
           </div>
         )}
@@ -2407,6 +2439,26 @@ export function ChatScreen() {
                   setScheduled(prev => prev.filter(s => s.id !== id));
                   heyToast('Запланированное сообщение отменено', 'info');
                 } catch (e) { heyToast('Не удалось отменить', 'error'); }
+              }}
+              onEdit={async (id, { text: nextText, sendAt: localStr }) => {
+                const at = new Date(localStr);
+                const sendAt = Math.floor(at.getTime() / 1000);
+                if (!Number.isFinite(sendAt) || sendAt < Math.floor(Date.now() / 1000) + 30) {
+                  heyToast('Выбери время хотя бы через минуту', 'warning');
+                  throw new Error('bad time');
+                }
+                try {
+                  const updated = await api.updateScheduledMessage(id, {
+                    text: nextText || null,
+                    send_at: sendAt,
+                  });
+                  setScheduled(prev => prev.map(s => s.id === id ? updated : s)
+                    .sort((a, b) => a.send_at - b.send_at));
+                  heyToast('Отложенное сообщение обновлено', 'success');
+                } catch (e) {
+                  heyToast(e.message || 'Не удалось обновить', 'error');
+                  throw e;
+                }
               }}
             />
           )}
