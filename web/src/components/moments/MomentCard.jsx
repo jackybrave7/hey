@@ -4,6 +4,7 @@ import EmbeddedVideoPreview from './EmbeddedVideoPreview';
 import Icon from '../Icon';
 import { useSalesPressure } from '../../lib/publicSettings';
 import { mediaUrl } from '../../lib/mediaUrl';
+import { MediaImage } from '../shared/MediaImage';
 
 // Карта реакции юзера → иконка для бейджа над превью момента.
 // Раньше показывали россыпь эмодзи (👁 ✨ 🤝) по тотал-счётчикам, что
@@ -124,8 +125,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
           // иногда уходит в image-viewer вместо нашего onClick. Отключаем все
           // нативные жесты на самой картинке, события идут только через
           // карточку-обёртку (которая открывает MomentDetailPopup).
-          <img src={mediaUrl(moment.media_url)} alt="" draggable={false}
-            referrerPolicy="no-referrer" decoding="async"
+          <MediaImage src={moment.media_url} alt="" draggable={false}
             onContextMenu={e => e.preventDefault()}
             style={{width:'100%',height:'100%',objectFit:'cover',
               objectPosition: moment.media_position || '50% 50%',display:'block',
@@ -161,7 +161,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
         /* Embedded video thumbnail as card background */
         <>
           {moment.embedded_video.thumbnail_url && (
-            <img src={moment.embedded_video.thumbnail_url} alt=""
+            <MediaImage src={moment.embedded_video.thumbnail_url} alt=""
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
               style={{width:'100%',height:'100%',objectFit:'cover',display:'block',
                 background:'linear-gradient(135deg,#1e0a40,#4a1a80,#7030b0)'}}/>
@@ -257,7 +257,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
               {moment.author_avatar && (moment.author_avatar.startsWith('/') ||
                                         moment.author_avatar.startsWith('http') ||
                                         moment.author_avatar.startsWith('data:'))
-                ? <img src={mediaUrl(moment.author_avatar)} alt="" referrerPolicy="no-referrer"
+                ? <MediaImage src={moment.author_avatar} alt=""
                     style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                 : (moment.author_name || '?')[0].toUpperCase()}
             </div>

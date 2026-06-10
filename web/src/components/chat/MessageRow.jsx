@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, memo } from 'react';
 import Icon from '../Icon';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
+import { MediaImage } from '../shared/MediaImage';
 import { AudioPlayer } from './AudioPlayer';
 import HeyLogo from '../HeyLogo';
 import EmbeddedVideoPreview from '../moments/EmbeddedVideoPreview';
@@ -199,7 +200,7 @@ const MessageRow = memo(function MessageRow({
                 onMouseEnter={e => e.currentTarget.style.background = isOut ? 'rgba(249,240,240,.2)' : 'rgba(95, 64, 128,.18)'}
                 onMouseLeave={e => e.currentTarget.style.background = isOut ? 'rgba(249,240,240,.12)' : 'rgba(95, 64, 128,.1)'}>
                 {isImg && m.reply_to.attachment_url && (
-                  <img src={mediaUrl(m.reply_to.attachment_url)} alt=""
+                  <MediaImage src={m.reply_to.attachment_url} alt=""
                     style={{
                       width:36, height:36, objectFit:'cover', borderRadius:6,
                       flexShrink:0,
@@ -236,7 +237,7 @@ const MessageRow = memo(function MessageRow({
               </div>
             );
             return (
-              <img src={src} alt="" referrerPolicy="no-referrer" decoding="async"
+              <MediaImage src={src} alt=""
                 onClick={() => onLightbox(src, [src])}
                 style={{maxWidth:'100%',maxHeight:300,borderRadius:10,
                   display:'block',marginBottom: m.text ? 6 : 2,
@@ -259,7 +260,7 @@ const MessageRow = memo(function MessageRow({
                 maxWidth: 360,
               }}>
                 {urls.map((u, i) => (
-                  <img key={i} src={u} alt=""
+                  <MediaImage key={i} src={u} alt=""
                     onClick={() => onLightbox(u, urls)}
                     style={{
                       width:'100%', aspectRatio:'1 / 1',
@@ -327,7 +328,7 @@ const MessageRow = memo(function MessageRow({
                   overflow:'hidden', background:'#1a0a30',
                   display:'flex', alignItems:'center', justifyContent:'center'}}>
                   {mom.media_url && mom.media_type === 'image' ? (
-                    <img src={mediaUrl(mom.media_url)} alt="" draggable={false}
+                    <MediaImage src={mom.media_url} alt="" draggable={false}
                       style={{width:'100%', height:'100%', objectFit:'cover',
                         objectPosition: mom.media_position || '50% 50%'}}/>
                   ) : (
@@ -445,7 +446,7 @@ const MessageRow = memo(function MessageRow({
                             fontSize: 9, fontWeight: 700,
                           }}>
                           {r.avatar && typeof r.avatar === 'string'
-                            ? <img src={mediaUrl(r.avatar)} alt=""
+                            ? <MediaImage src={r.avatar} alt=""
                                 style={{width:'100%', height:'100%', objectFit:'cover'}}/>
                             : <span>{(r.name || '?').charAt(0).toUpperCase()}</span>}
                         </span>

@@ -36,6 +36,12 @@ export function mediaUrl(url) {
   return url;
 }
 
+export function mediaFallbackUrl(url) {
+  const key = s3KeyFromUrl(url);
+  if (!key) return null;
+  return `https://s3.twcstorage.ru/heymessenger/${key}`;
+}
+
 function absolutize(path) {
   // Для TWA/Android всегда отдаём полный same-origin URL: так WebView не
   // интерпретирует /media относительно нестандартного app/base контекста.

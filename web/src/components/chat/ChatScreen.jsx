@@ -8,6 +8,7 @@ import Icon from '../Icon';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
 import { useConfirm } from '../shared/Confirm';
 import { heyToast } from '../shared/Toast';
+import { MediaImage } from '../shared/MediaImage';
 import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile } from '../../lib/uploadMedia';
 import { fmtTime, fmtDate, fmtLastSeenShort } from '../../lib/formatTime';
 import { HEY_EMOJI as HEY_EMOJI_LIST, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
@@ -1907,7 +1908,7 @@ export function ChatScreen() {
               overflow:'hidden',background:'#1a0a30',
               display:'flex',alignItems:'center',justifyContent:'center'}}>
               {momentRef.media_url && momentRef.media_type === 'image' ? (
-                <img src={momentRef.media_url} alt="" draggable={false}
+                <MediaImage src={momentRef.media_url} alt="" draggable={false}
                   style={{width:'100%',height:'100%',objectFit:'cover',
                     objectPosition: momentRef.media_position || '50% 50%'}}/>
               ) : (

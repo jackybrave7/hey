@@ -15,6 +15,7 @@ import ChatContextMenu from '../chat/ChatContextMenu';
 import HeyLogo from '../HeyLogo';
 import { HEY_EMOJI_SET, emojiUrl } from '../../lib/heyEmoji';
 import { mediaUrl } from '../../lib/mediaUrl';
+import { MediaImage } from '../shared/MediaImage';
 
 function fmtDate(ts) {
   if (!ts) return '';
@@ -611,7 +612,7 @@ export default function MomentDetailPopup({
         {hasMedia && (
           <div style={{flexShrink:0,position:'relative',background:'#0a0518',maxHeight:'45vh',overflow:'hidden'}}>
             {moment.media_type === 'image' && (
-              <img src={mediaUrl(moment.media_url)} alt=""
+              <MediaImage src={moment.media_url} alt=""
                 onClick={() => setImgLightbox(true)}
                 style={{width:'100%',maxHeight:'45vh',objectFit:'contain',display:'block',
                   cursor:'zoom-in',transition:'opacity .15s'}}
@@ -996,7 +997,7 @@ export default function MomentDetailPopup({
       <div onClick={() => setImgLightbox(false)}
         style={{position:'fixed',inset:0,zIndex:1200,background:'rgba(0,0,0,.92)',backdropFilter:'blur(20px)',
           display:'flex',alignItems:'center',justifyContent:'center',cursor:'zoom-out',padding:16}}>
-        <img src={mediaUrl(moment.media_url)} alt=""
+        <MediaImage src={moment.media_url} alt=""
           style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',borderRadius:12,
             boxShadow:'0 8px 60px rgba(0,0,0,.7)',pointerEvents:'none'}}/>
         <button onClick={() => setImgLightbox(false)}

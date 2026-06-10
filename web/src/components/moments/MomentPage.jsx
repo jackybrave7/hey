@@ -7,6 +7,7 @@ import MoodEmoji from './MoodEmoji';
 import Icon from '../Icon';
 import { AudioPlayer } from '../chat/AudioPlayer';
 import { mediaUrl } from '../../lib/mediaUrl';
+import { MediaImage } from '../shared/MediaImage';
 
 export function MomentPage() {
   const { id } = useParams();
@@ -144,7 +145,7 @@ function MomentPageLegacy() {
           {hasMedia && (
             <div style={{ background:'#0a0518' }}>
               {moment.media_type === 'image' && (
-                <img src={mediaUrl(moment.media_url)} alt=""
+                <MediaImage src={moment.media_url} alt=""
                   style={{ width:'100%', maxHeight:'55vw', objectFit:'contain', display:'block' }}/>
               )}
               {moment.media_type === 'video' && (
@@ -173,7 +174,7 @@ function MomentPageLegacy() {
                 overflow:'hidden',
               }}>
                 {moment.author_avatar
-                  ? <img src={mediaUrl(moment.author_avatar)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                  ? <MediaImage src={moment.author_avatar} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
                   : (moment.author_name||'?')[0].toUpperCase()}
               </div>
               <div>

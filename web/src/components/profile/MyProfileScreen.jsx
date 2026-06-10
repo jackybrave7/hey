@@ -16,9 +16,9 @@ import SuperStatusCard from '../super/SuperStatusCard';
 import AchievementBadges from '../super/AchievementBadges';
 import OnboardingTour from '../OnboardingTour';
 import MomentDetailPopup from '../moments/MomentDetailPopup';
-import { mediaUrl } from '../../lib/mediaUrl';
 import MomentCard from '../moments/MomentCard';
 import { useSalesPressure } from '../../lib/publicSettings';
+import { MediaImage } from '../shared/MediaImage';
 
 export function MyProfileScreen() {
   const nav = useNavigate();
@@ -716,7 +716,7 @@ export function MyProfileScreen() {
                       onMouseEnter={e=>e.currentTarget.style.background='rgba(249,240,240,.1)'}
                       onMouseLeave={e=>e.currentTarget.style.background='rgba(249,240,240,.06)'}>
                       {active.media_url && active.media_type === 'image' ? (
-                        <img src={active.media_url} alt=""
+                        <MediaImage src={active.media_url} alt=""
                           style={{width:'100%',height: activeMoments.length > 1 ? 100 : 140,objectFit:'cover',
                             objectPosition: active.media_position || '50% 50%',display:'block'}}/>
                       ) : (
@@ -781,7 +781,7 @@ export function MyProfileScreen() {
                       onMouseLeave={e=>e.currentTarget.style.background='rgba(249,240,240,.06)'}>
                       {/* Hero: фото / mood / аудио-иконка */}
                       {hasImg ? (
-                        <img src={mediaUrl(m.media_url)} alt=""
+                        <MediaImage src={m.media_url} alt=""
                           style={{width:'100%',height:100,objectFit:'cover',
                             objectPosition: m.media_position || '50% 50%',display:'block'}}/>
                       ) : isAudio ? (
@@ -967,7 +967,7 @@ export function MyProfileScreen() {
                         border:'1px solid rgba(249,240,240,.1)', overflow:'hidden',
                         cursor:'pointer', aspectRatio:'1/1', position:'relative' }}>
                       {m.media_url && m.media_type === 'image' ? (
-                        <img src={mediaUrl(m.media_url)} alt=""
+                        <MediaImage src={m.media_url} alt=""
                           style={{ width:'100%', height:'100%', objectFit:'cover',
                             objectPosition: m.media_position || '50% 50%' }}/>
                       ) : (
@@ -1090,7 +1090,7 @@ export function MyProfileScreen() {
                             onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.boxShadow='none'; }}>
                             {/* Background */}
                             {hasImg ? (
-                              <img src={mediaUrl(m.media_url)} alt=""
+                              <MediaImage src={m.media_url} alt=""
                                 style={{position:'absolute',inset:0,width:'100%',height:'100%',
                                   objectFit:'cover',objectPosition: m.media_position || '50% 50%'}}/>
                             ) : isAudio ? (
