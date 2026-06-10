@@ -93,7 +93,7 @@ const MessageRow = memo(function MessageRow({
         <div
           onClick={(e) => { e.stopPropagation(); openUserCard(m.sender_id); }}
           title={m.sender_name || 'Открыть профиль'}
-          style={{ flexShrink:0, marginBottom:6, cursor:'pointer' }}>
+          style={{ flexShrink:0, alignSelf:'flex-start', marginTop:6, cursor:'pointer' }}>
           <AvatarDisplay
             avatar={m.sender_avatar}
             name={m.sender_name}
@@ -516,9 +516,12 @@ const MessageRow = memo(function MessageRow({
   prev.m.id === next.m.id &&
   rxSig(prev.m.reactions) === rxSig(next.m.reactions) &&
   prev.m.is_deleted === next.m.is_deleted &&
+  prev.m.sender_name === next.m.sender_name &&
+  prev.m.sender_avatar === next.m.sender_avatar &&
   prev.m.text === next.m.text &&
   prev.m.status === next.m.status &&
   prev.isOut === next.isOut &&
+  prev.isGroup === next.isGroup &&
   prev.isFlashing === next.isFlashing &&
   prev.editingMsgId === next.editingMsgId &&
   prev.reactionPickerMsgId === next.reactionPickerMsgId &&
