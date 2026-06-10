@@ -9,6 +9,7 @@ import { openUserCard } from '../../lib/openUserCard';
 import GroupInvitePreview from './GroupInvitePreview';
 import { fmtTime } from '../../lib/formatTime';
 import { fileTypeIcon, AttachmentPreview } from '../../lib/fileTypeIcon';
+import { mediaUrl } from '../../lib/mediaUrl';
 import { renderPreviewWithEmoji } from './chatRender';
 
 const MessageRow = memo(function MessageRow({
@@ -143,7 +144,7 @@ const MessageRow = memo(function MessageRow({
                 onMouseEnter={e => e.currentTarget.style.background = isOut ? 'rgba(249,240,240,.2)' : 'rgba(95, 64, 128,.18)'}
                 onMouseLeave={e => e.currentTarget.style.background = isOut ? 'rgba(249,240,240,.12)' : 'rgba(95, 64, 128,.1)'}>
                 {isImg && m.reply_to.attachment_url && (
-                  <img src={m.reply_to.attachment_url} alt=""
+                  <img src={mediaUrl(m.reply_to.attachment_url)} alt=""
                     style={{
                       width:36, height:36, objectFit:'cover', borderRadius:6,
                       flexShrink:0,
@@ -171,14 +172,14 @@ const MessageRow = memo(function MessageRow({
             );
           })()}
           {m.attachment?.type === 'image' && (() => {
-            const src = m.attachment.url;
+            const src = mediaUrl(m.attachment.url);
             if (!src) return (
               <div style={{padding:'10px 0',fontSize:13,opacity:.5}}>
                 🖼 Изображение недоступно
               </div>
             );
             return (
-              <img src={src} alt=""
+              <img src={src} alt="" referrerPolicy="no-referrer" decoding="async"
                 onClick={() => onLightbox(src, [src])}
                 style={{maxWidth:'100%',maxHeight:300,borderRadius:10,
                   display:'block',marginBottom: m.text ? 6 : 2,
@@ -186,7 +187,7 @@ const MessageRow = memo(function MessageRow({
             );
           })()}
           {m.attachment?.type === 'images' && Array.isArray(m.attachment.urls) && (() => {
-            const urls = m.attachment.urls.filter(Boolean);
+            const urls = m.attachment.urls.filter(Boolean).map(mediaUrl);
             if (!urls.length) return null;
             // Сетка: 1 → одна большая; 2 → две в ряд; 3-4 → 2x2; 5+ → 3 колонки
             const cols = urls.length === 1 ? 1
@@ -269,7 +270,7 @@ const MessageRow = memo(function MessageRow({
                   overflow:'hidden', background:'#1a0a30',
                   display:'flex', alignItems:'center', justifyContent:'center'}}>
                   {mom.media_url && mom.media_type === 'image' ? (
-                    <img src={mom.media_url} alt="" draggable={false}
+                    <img src={mediaUrl(mom.media_url)} alt="" draggable={false}
                       style={{width:'100%', height:'100%', objectFit:'cover',
                         objectPosition: mom.media_position || '50% 50%'}}/>
                   ) : (

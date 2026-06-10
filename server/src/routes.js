@@ -396,6 +396,30 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ id: user.id, name: user.name, avatar_url: user.avatar || null });
   });
 
+  // ── Media proxy: стрим S3 через same-origin (критично для Android PWA/TWA) ──
+  r.get(/^\/media\/(.+)/, async (req, res) => {
+    const key = req.params[0];
+    if (!key || key.includes('..')) return res.status(400).end();
+    try {
+      if (storage.MODE === 'local') {
+        const localPath = require('path').join(__dirname, '../data/uploads', key.replace(/\//g, require('path').sep));
+        return res.sendFile(localPath, err => { if (err) res.status(404).end(); });
+      }
+      const readUrl = await storage.getReadUrl(key, 3600);
+      if (!readUrl) return res.status(404).end();
+      const upstream = await fetch(readUrl);
+      if (!upstream.ok) return res.status(upstream.status).end();
+      res.set('Cache-Control', 'public, max-age=86400, immutable');
+      const ct = upstream.headers.get('content-type');
+      if (ct) res.set('Content-Type', ct);
+      const buf = Buffer.from(await upstream.arrayBuffer());
+      res.send(buf);
+    } catch (e) {
+      console.error('[/api/media]', key, e.message);
+      res.status(502).end();
+    }
+  });
+
   // ── Avatar endpoint — отдельный endpoint, кешируется браузером на 30 дней ───
   // /api/avatars/:userId  → возвращает бинарь аватара с сильным Cache-Control,
   // позволяя клиентским запросам conversation/messages не таскать base64 инлайн.
@@ -410,10 +434,12 @@ module.exports = function makeRouter(db, broadcast) {
       res.set('Cache-Control', 'public, max-age=60'); // короткий кеш — может появиться позже
       return res.send(px);
     }
-    // Если это уже внешний URL (S3 / http) — редирект, браузер сам закеширует с того ресурса
+    // S3 / http — через same-origin /media/ (Android PWA не грузит прямой S3)
     if (/^https?:\/\//i.test(av)) {
+      const { toPublicMediaUrl } = require('./mediaUrl');
+      const target = toPublicMediaUrl(av);
       res.set('Cache-Control', 'public, max-age=86400');
-      return res.redirect(302, av);
+      return res.redirect(302, target);
     }
     // Если это data URL — декодируем и отдаём бинарём
     const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/s.exec(av);

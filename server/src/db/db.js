@@ -634,10 +634,12 @@ function findUserById(id)       { return stmtFindById.get(id) || null; }
 // Если аватар — base64 (data:image/...), возвращает ссылку на /api/avatars/:userId
 // (кешируется на 30 дней, не таскается инлайн в каждом сообщении/чате).
 // Если аватар — URL (S3/http) или emoji/буква — возвращает как есть.
+const { toPublicMediaUrl, rewriteAttachment } = require('../mediaUrl');
+
 function avatarPayload(userId, rawAvatar) {
   if (!rawAvatar) return null;
   if (rawAvatar.startsWith('data:image/')) return `/api/avatars/${userId}`;
-  return rawAvatar; // URL / emoji / one-char letter — пропускаем как есть
+  return toPublicMediaUrl(rawAvatar); // S3 → /media/…; emoji/буква без изменений
 }
 
 // Универсальный post-process: проходит по строке/массиву строк и заменяет тяжёлые
@@ -1629,6 +1631,8 @@ function _parseMsg(m) {
     attachment:   m.attachment   ? JSON.parse(m.attachment)   : null,
     link_preview: m.link_preview ? JSON.parse(m.link_preview) : null,
   };
+  if (parsed.attachment) parsed.attachment = rewriteAttachment(parsed.attachment);
+  if (parsed.sender_avatar) parsed.sender_avatar = toPublicMediaUrl(parsed.sender_avatar);
   if (parsed.forwarded_from_user_id) {
     const u = db.prepare('SELECT id, name, avatar, is_deleted FROM users WHERE id=?')
       .get(parsed.forwarded_from_user_id);
@@ -1636,7 +1640,7 @@ function _parseMsg(m) {
       parsed.forwarded_from = {
         id: u.id,
         name: u.is_deleted ? 'Удалённый пользователь' : u.name,
-        avatar: u.avatar || null,
+        avatar: u.avatar ? avatarPayload(u.id, u.avatar) : null,
       };
     }
   }
@@ -1659,6 +1663,7 @@ function _replySnippet(replyToId) {
       attType = att?.type || null;
       if (attType === 'image')  attUrl = att.url || null;
       if (attType === 'images') attUrl = (att.urls && att.urls[0]) || null;
+      if (attUrl) attUrl = toPublicMediaUrl(attUrl);
     }
   } catch {}
   return {
@@ -2277,7 +2282,10 @@ function _parseMoment(m) {
   // Заменяем тяжёлый base64 author_avatar на ссылку /api/avatars/:userId
   if (typeof parsed.author_avatar === 'string' && parsed.author_avatar.startsWith('data:image/')) {
     parsed.author_avatar = `/api/avatars/${parsed.user_id}`;
+  } else if (parsed.author_avatar) {
+    parsed.author_avatar = toPublicMediaUrl(parsed.author_avatar);
   }
+  if (parsed.media_url) parsed.media_url = toPublicMediaUrl(parsed.media_url);
   return parsed;
 }
 

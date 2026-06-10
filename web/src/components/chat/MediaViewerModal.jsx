@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { fmtDateTime } from '../../lib/formatTime';
 import Icon from '../Icon';
+import { mediaUrl } from '../../lib/mediaUrl';
 import { fileTypeIcon } from '../../lib/fileTypeIcon';
 import { AudioPlayer } from './AudioPlayer';
 import { URL_RE } from './chatRender';
@@ -116,7 +117,7 @@ function MediaViewerModal({ convId, onClose }) {
                   return (
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:4}}>
                       {valid.map((m, i) => (
-                        <img key={i} src={m.attachment.url} alt=""
+                        <img key={i} src={mediaUrl(m.attachment.url)} alt=""
                           onClick={()=>setLight({ urls, index: i, msgIds })}
                           style={{width:'100%',aspectRatio:'1',objectFit:'cover',
                             borderRadius:8,cursor:'zoom-in'}}/>

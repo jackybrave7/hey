@@ -1,6 +1,7 @@
 const { WebSocketServer } = require('ws');
 const { wsAuth } = require('./auth');
 const db = require('./db/db');
+const { toPublicMediaUrl } = require('./mediaUrl');
 const { detectVideoUrl, detectGroupInviteUrl, fetchByProvider } = require('./linkPreview');
 const awo = require('./awo');
 
@@ -141,7 +142,7 @@ module.exports = function setupWS(server) {
           // до перезагрузки чата (там getMessages join'ит users.avatar).
           const senderAvatar = user.avatar && user.avatar.startsWith('data:image/')
             ? `/api/avatars/${user.id}`
-            : (user.avatar || null);
+            : toPublicMediaUrl(user.avatar || null);
           const full = {
             ...saved,
             sender_name: user.name,

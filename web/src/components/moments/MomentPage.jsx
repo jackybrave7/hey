@@ -183,7 +183,13 @@ function MomentPageLegacy() {
               </div>
             </div>
 
-            {/* Auto tags */}
+            {/* Text */}
+            <div style={{ color:'rgba(249,240,240,.9)', fontSize:15, lineHeight:1.7,
+              whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
+              <TextWithLinks text={moment.text}/>
+            </div>
+
+            {/* Auto tags — под описанием */}
             {moment.auto_tags?.length > 0 && (
               <div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
@@ -197,12 +203,6 @@ function MomentPageLegacy() {
                 <div style={{ color:'rgba(249,240,240,.25)', fontSize:10, marginTop:4 }}>подобрано автоматически</div>
               </div>
             )}
-
-            {/* Text */}
-            <div style={{ color:'rgba(249,240,240,.9)', fontSize:15, lineHeight:1.7,
-              whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
-              <TextWithLinks text={moment.text}/>
-            </div>
 
             {/* Search flag */}
             {moment.is_search && (

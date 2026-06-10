@@ -22,6 +22,13 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Static uploads
 app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
+
+// Legacy /media/* → /api/media/* (старые URL в БД и nginx-конфиг)
+app.get('/media/*', (req, res) => {
+  const key = req.path.replace(/^\/media\//, '');
+  if (!key || key.includes('..')) return res.status(400).end();
+  res.redirect(301, `/api/media/${key}`);
+});
 // Pre-downloaded test-user images (avoid third-party CDN blocking by browsers).
 // Под /api/ потому что только этот префикс проксируется nginx'ом → Node.
 app.use('/api/test-images', express.static(path.join(__dirname, '../data/test-images'), {

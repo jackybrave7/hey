@@ -1,4 +1,5 @@
 // web/src/api.js
+import { rewriteMediaDeep } from './lib/mediaUrl';
 
 const BASE = '/api';
 const REQUEST_TIMEOUT_MS = 15000; // 15с — отсечка «сервер не отвечает»
@@ -58,7 +59,8 @@ async function req(method, path, body) {
     throw new Error(err.error || `HTTP ${res.status}`);
   }
   notifyServerOk();
-  return res.json();
+  const data = await res.json();
+  return rewriteMediaDeep(data);
 }
 
 export const api = {
@@ -317,7 +319,7 @@ class HeySocket {
 
     this.ws.onmessage = (e) => {
       try {
-        const msg = JSON.parse(e.data);
+        const msg = rewriteMediaDeep(JSON.parse(e.data));
         this._emit(msg.type, msg);
         this._emit('*', msg);
       } catch {}

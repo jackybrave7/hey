@@ -763,7 +763,17 @@ export default function MomentDetailPopup({
               )}
             </div>
 
-            {/* Auto tags */}
+            {/* Text — если есть превью видео, скрываем сам URL из подписи
+                (он избыточен; автор увидит в режиме редактирования) */}
+            <div style={{color:'rgba(249,240,240,.9)',fontSize:15,lineHeight:1.7,
+              whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
+              <TextWithLinks
+                text={hasEmbedVideo && moment.embedded_video?.url
+                  ? moment.text.replace(moment.embedded_video.url, '').replace(/\s{2,}/g, ' ').trim()
+                  : moment.text}/>
+            </div>
+
+            {/* Auto tags — под описанием */}
             {moment.auto_tags?.length > 0 && (
               <div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
@@ -775,16 +785,6 @@ export default function MomentDetailPopup({
                 <div style={{color:'rgba(249,240,240,.25)',fontSize:10,marginTop:4}}>подобрано автоматически</div>
               </div>
             )}
-
-            {/* Text — если есть превью видео, скрываем сам URL из подписи
-                (он избыточен; автор увидит в режиме редактирования) */}
-            <div style={{color:'rgba(249,240,240,.9)',fontSize:15,lineHeight:1.7,
-              whiteSpace:'pre-wrap',wordBreak:'break-word'}}>
-              <TextWithLinks
-                text={hasEmbedVideo && moment.embedded_video?.url
-                  ? moment.text.replace(moment.embedded_video.url, '').replace(/\s{2,}/g, ' ').trim()
-                  : moment.text}/>
-            </div>
 
             {/* Embedded video (shown below text when there's also a media_url) */}
             {hasEmbedVideo && hasMedia && (

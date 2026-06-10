@@ -1,5 +1,6 @@
 // web/src/lib/uploadMedia.js
 // Direct-to-S3 upload via presigned PUT URL.
+import { mediaUrl } from './mediaUrl';
 // Falls back to legacy base64 endpoint when STORAGE_MODE=local (no uploadUrl returned).
 
 // ── Client-side image resize ──────────────────────────────────────────────────
@@ -98,7 +99,7 @@ export async function uploadMedia(file, category, apiFns) {
   if (presign.uploadUrl) {
     await putToS3(presign.uploadUrl, uploadBlob, contentType, presign.headers || {});
     return {
-      url:       presign.publicUrl,
+      url:       mediaUrl(presign.publicUrl),
       key:       presign.key,
       mediaType: isImage ? 'image' : isVideo ? 'video' : 'audio',
     };
@@ -128,7 +129,7 @@ export async function uploadAudioBlob(blob, apiFns) {
   const presign = await apiFns.getPresignUrl('chat-audio', contentType, blob.size);
   if (presign.uploadUrl) {
     await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});
-    return presign.publicUrl;
+    return mediaUrl(presign.publicUrl);
   }
   // Local fallback: base64 data URL stored as-is
   return blobToDataUrl(blob);
@@ -147,7 +148,7 @@ export async function uploadFile(file, apiFns) {
   if (presign.uploadUrl) {
     await putToS3(presign.uploadUrl, file, contentType, presign.headers || {});
     return {
-      url:  presign.publicUrl,
+      url:  mediaUrl(presign.publicUrl),
       name: file.name,
       size: file.size,
       mime: contentType,
@@ -178,7 +179,7 @@ export async function uploadAvatar(file, apiFns) {
   const presign = await apiFns.getPresignUrl('avatar', contentType, blob.size);
   if (presign.uploadUrl) {
     await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});
-    return presign.publicUrl;
+    return mediaUrl(presign.publicUrl);
   }
   // Local fallback: return data URL (stored in SQLite as before)
   return blobToDataUrl(blob);
@@ -194,7 +195,7 @@ export async function uploadGroupIcon(file, apiFns) {
   const presign = await apiFns.getPresignUrl('group-icon', contentType, blob.size);
   if (presign.uploadUrl) {
     await putToS3(presign.uploadUrl, blob, contentType, presign.headers || {});
-    return presign.publicUrl;
+    return mediaUrl(presign.publicUrl);
   }
   return blobToDataUrl(blob);
 }

@@ -3,6 +3,7 @@ import MoodEmoji from './MoodEmoji';
 import EmbeddedVideoPreview from './EmbeddedVideoPreview';
 import Icon from '../Icon';
 import { useSalesPressure } from '../../lib/publicSettings';
+import { mediaUrl } from '../../lib/mediaUrl';
 
 // Карта реакции юзера → иконка для бейджа над превью момента.
 // Раньше показывали россыпь эмодзи (👁 ✨ 🤝) по тотал-счётчикам, что
@@ -123,7 +124,8 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
           // иногда уходит в image-viewer вместо нашего onClick. Отключаем все
           // нативные жесты на самой картинке, события идут только через
           // карточку-обёртку (которая открывает MomentDetailPopup).
-          <img src={moment.media_url} alt="" draggable={false}
+          <img src={mediaUrl(moment.media_url)} alt="" draggable={false}
+            referrerPolicy="no-referrer" decoding="async"
             onContextMenu={e => e.preventDefault()}
             style={{width:'100%',height:'100%',objectFit:'cover',
               objectPosition: moment.media_position || '50% 50%',display:'block',
@@ -132,7 +134,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
               WebkitUserDrag:'none'}}/>
         ) : moment.media_type === 'video' ? (
           <>
-            <video src={moment.media_url} muted playsInline preload="metadata"
+            <video src={mediaUrl(moment.media_url)} muted playsInline preload="metadata"
               onContextMenu={e => e.preventDefault()}
               style={{width:'100%',height:'100%',objectFit:'cover',display:'block',
                 pointerEvents:'none', WebkitTouchCallout:'none'}}/>
@@ -255,7 +257,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
               {moment.author_avatar && (moment.author_avatar.startsWith('/') ||
                                         moment.author_avatar.startsWith('http') ||
                                         moment.author_avatar.startsWith('data:'))
-                ? <img src={moment.author_avatar} alt=""
+                ? <img src={mediaUrl(moment.author_avatar)} alt="" referrerPolicy="no-referrer"
                     style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                 : (moment.author_name || '?')[0].toUpperCase()}
             </div>
