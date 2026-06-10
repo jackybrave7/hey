@@ -23,8 +23,11 @@ const MessageRow = memo(function MessageRow({
   // на пузыре. Повторный тап скрывает. Right-click / long-press
   // продолжает открывать контекст-меню (onContextMenu).
   const [tappedReveal, setTappedReveal] = useState(false);
-  const showReactBtn = !isOut && (isHovered || tappedReveal);
+  const showReactBtn = !isOut && !m.is_deleted && (isHovered || tappedReveal);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
+  const deletedLabel = isOut
+    ? 'Вы удалили сообщение'
+    : `${m.sender_name || 'Участник'} удалил(а) сообщение`;
 
   return (
     <div
@@ -95,7 +98,7 @@ const MessageRow = memo(function MessageRow({
             wordBreak: 'break-word',
             cursor: !isOut ? 'pointer' : 'default',
           }}>
-          {isGroup && !isOut && (
+          {isGroup && !isOut && !m.is_deleted && (
             <div
               onClick={(e) => { e.stopPropagation(); openUserCard(m.sender_id); }}
               style={{fontSize:12,fontWeight:700,color:'rgba(180,130,255,1)',marginBottom:4,
@@ -104,6 +107,16 @@ const MessageRow = memo(function MessageRow({
               {m.sender_name}
             </div>
           )}
+          {m.is_deleted ? (
+            <div style={{
+              fontSize: 13, fontStyle: 'italic', lineHeight: 1.45,
+              color: isOut ? 'rgba(249,240,240,.55)' : 'rgba(80,60,120,.55)',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <Icon name="delete" size={14} />
+              <span>{deletedLabel}</span>
+            </div>
+          ) : (<>
           {/* Forwarded-from label */}
           {m.forwarded_from && (
             <div style={{
@@ -161,11 +174,13 @@ const MessageRow = memo(function MessageRow({
                     fontSize:12, color: subtxt,
                     overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>
-                    {previewText
-                      ? renderPreviewWithEmoji(previewText)
-                      : attType
-                        ? <AttachmentPreview type={attType} size={12} />
-                        : '…'}
+                    {m.reply_to.is_deleted || attType === 'deleted'
+                      ? 'Удалённое сообщение'
+                      : previewText
+                        ? renderPreviewWithEmoji(previewText)
+                        : attType
+                          ? <AttachmentPreview type={attType} size={12} />
+                          : '…'}
                   </div>
                 </div>
               </div>
@@ -329,6 +344,7 @@ const MessageRow = memo(function MessageRow({
               </div>
             );
           })()}
+          </>)}
           <div style={{fontSize:11,opacity:.6,textAlign:'right',marginTop:3,display:'flex',justifyContent:'flex-end',gap:4}}>
             {m.edited_at && <span>изм.</span>}
             <span>{fmtTime(m.created_at)}</span>

@@ -37,10 +37,8 @@ export function mediaUrl(url) {
 }
 
 function absolutize(path) {
-  if (!path.startsWith('/')) return path;
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin + path;
-  }
+  // Относительный /media/… — браузер сам бьёт в текущий origin (vite proxy, nginx).
+  // Абсолютизация ломала dev и давала лишние cross-origin нюансы.
   return path;
 }
 

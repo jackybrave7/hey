@@ -479,10 +479,20 @@ export function ChatScreen() {
       if (message.conversation_id === convId)
         setMessages(prev => prev.map(m => m.id === message.id ? { ...m, text: message.text, edited_at: message.edited_at } : m));
     });
-    const u8 = socket.on('message:deleted', ({ messageId, conversationId: cid }) => {
-      if (cid === convId) {
-        setMessages(prev => prev.filter(m => m.id !== messageId));
-        setPinnedMessage(p => p && p.id === messageId ? null : p);
+    const u8 = socket.on('message:deleted', ({ message, messageId, conversationId: cid }) => {
+      if (cid !== convId) return;
+      const id = message?.id || messageId;
+      if (!id) return;
+      if (message) {
+        setMessages(prev => prev.map(m => m.id === id ? { ...m, ...message } : m));
+        setPinnedMessage(p => p && p.id === id ? { ...p, ...message } : p);
+      } else {
+        setMessages(prev => prev.map(m => m.id === id
+          ? { ...m, is_deleted: true, text: null, attachment: null, link_preview: null }
+          : m));
+        setPinnedMessage(p => p && p.id === id
+          ? { ...p, is_deleted: true, text: null, attachment: null, link_preview: null }
+          : p);
       }
     });
     const u9 = socket.on('reaction:update', ({ messageId, reactions }) => {
@@ -959,6 +969,14 @@ export function ChatScreen() {
   // Локальный snippet для оптимистического показа цитаты (до прихода реального с сервера)
   function makeReplySnippet(m) {
     if (!m) return null;
+    if (m.is_deleted) {
+      return {
+        id: m.id,
+        sender_id: m.sender_id,
+        sender_name: m.sender_id === user?.id ? (user?.name || 'Вы') : (m.sender_name || partner.name),
+        text: null, attachment_type: 'deleted', is_deleted: true,
+      };
+    }
     let attType = null;
     if (m.attachment?.type) attType = m.attachment.type;
     return {
@@ -988,8 +1006,13 @@ export function ChatScreen() {
 
   async function deleteMsg(msg) {
     setMsgMenu(null);
-    await api.deleteMessage(convId, msg.id);
-    setMessages(prev => prev.filter(m => m.id !== msg.id));
+    try {
+      const tombstone = await api.deleteMessage(convId, msg.id);
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, ...tombstone } : m));
+      setPinnedMessage(p => p && p.id === msg.id ? { ...p, ...tombstone } : p);
+    } catch (e) {
+      heyToast(e.message || 'Не удалось удалить', 'error');
+    }
   }
 
   async function pinMsg(msg) {
@@ -1487,8 +1510,14 @@ export function ChatScreen() {
       {/* Pinned message banner */}
       {pinnedMessage && !searchMode && (() => {
         const canUnpin = partner.isGroup ? !!partner.myIsGroupAdmin : true;
-        const pinnedText = pinnedMessage.text || '';
-        const pinnedAtt = !pinnedText && pinnedMessage.attachment ? pinnedMessage.attachment : null;
+        const pinnedDeleted = !!pinnedMessage.is_deleted;
+        const pinnedText = pinnedDeleted
+          ? (pinnedMessage.sender_id === user?.id
+              ? 'Вы удалили сообщение'
+              : `${pinnedMessage.sender_name || 'Участник'} удалил(а) сообщение`)
+          : (pinnedMessage.text || '');
+        const pinnedAtt = !pinnedDeleted && !pinnedText && pinnedMessage.attachment
+          ? pinnedMessage.attachment : null;
         return (
           <div style={{
             background:'rgba(50,38,90,.85)', backdropFilter:'blur(12px)',
@@ -1908,11 +1937,12 @@ export function ChatScreen() {
       {replyTo && !editingMsg && (() => {
         const isOwnReply = replyTo.sender_id === user?.id;
         const att = replyTo.attachment;
-        let preview = (replyTo.text || '').slice(0, 120);
+        const replyDeleted = !!replyTo.is_deleted;
+        let preview = replyDeleted ? 'Удалённое сообщение' : (replyTo.text || '').slice(0, 120);
         let thumbUrl = null;
-        if (att?.type === 'image')  thumbUrl = att.url;
-        if (att?.type === 'images') thumbUrl = (att.urls && att.urls[0]) || null;
-        const attType = !preview ? att?.type : null;
+        if (!replyDeleted && att?.type === 'image')  thumbUrl = att.url;
+        if (!replyDeleted && att?.type === 'images') thumbUrl = (att.urls && att.urls[0]) || null;
+        const attType = !replyDeleted && !preview ? att?.type : null;
         return (
           // overflow:hidden — критично для мобилок: длинное имя отправителя
           // или длинный URL в превью не должен распирать чат и вызывать
@@ -2543,10 +2573,11 @@ export function ChatScreen() {
 
       {msgMenu && (() => {
         const isOwn   = msgMenu.msg.sender_id === user?.id;
-        const canEdit = isOwn && (Date.now()/1000 - msgMenu.msg.created_at) < 3*60*60 && !!msgMenu.msg.text;
+        const canEdit = isOwn && !msgMenu.msg.is_deleted
+          && (Date.now()/1000 - msgMenu.msg.created_at) < 24*60*60 && !!msgMenu.msg.text;
         const canPin  = partner.isGroup ? !!partner.myIsGroupAdmin : true;
         const isPinned = pinnedMessage && pinnedMessage.id === msgMenu.msg.id;
-        const canCopy = !!msgMenu.msg.text;
+        const canCopy = !!msgMenu.msg.text && !msgMenu.msg.is_deleted;
         const copyText = () => {
           try { navigator.clipboard.writeText(msgMenu.msg.text || ''); heyToast('Скопировано', 'success'); }
           catch { heyToast('Не удалось скопировать', 'error'); }
@@ -2555,11 +2586,11 @@ export function ChatScreen() {
         const items = [
           { label:'Ответить', icon: iconEl('reply'), onClick: () => { setReplyTo(msgMenu.msg); textareaRef.current?.focus(); } },
           canCopy && { label:'Копировать', iconName:'copy', onClick: copyText },
-          { label:'Переслать', icon: iconEl('forward'), onClick: () => openForwardModal(msgMenu.msg) },
+          !msgMenu.msg.is_deleted && { label:'Переслать', icon: iconEl('forward'), onClick: () => openForwardModal(msgMenu.msg) },
           canPin && !isPinned && { label:'Закрепить', icon: iconEl('pin'), onClick: () => pinMsg(msgMenu.msg) },
           canPin &&  isPinned && { label:'Открепить', icon: iconEl('unpin'), onClick: () => unpinMsg() },
           canEdit && { label:'Редактировать', icon: iconEl('pencil'), onClick: () => startEdit(msgMenu.msg) },
-          isOwn && { label:'Удалить', iconName:'delete', danger:true, separatorBefore:true, onClick: () => deleteMsg(msgMenu.msg) },
+          isOwn && !msgMenu.msg.is_deleted && { label:'Удалить', iconName:'delete', danger:true, separatorBefore:true, onClick: () => deleteMsg(msgMenu.msg) },
         ].filter(Boolean);
         return (
           <AnchoredContextMenu

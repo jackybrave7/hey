@@ -1457,7 +1457,7 @@ function getConversationsForUser(userId, opts = {}) {
      GROUP BY m.conversation_id`
   ).all(...convIds)
     .forEach(r => {
-      if (r.is_deleted) {
+      if (Number(r.is_deleted) === 1) {
         r.text = r.sender_id === userId
           ? 'Вы удалили сообщение'
           : `${r.sender_name || 'Участник'} удалил(а) сообщение`;
@@ -1641,7 +1641,7 @@ function _parseMsg(m) {
   const parsed = { ...m,
     attachment:   m.attachment   ? JSON.parse(m.attachment)   : null,
     link_preview: m.link_preview ? JSON.parse(m.link_preview) : null,
-    is_deleted:   !!m.is_deleted,
+    is_deleted:   Number(m.is_deleted) === 1,
   };
   if (parsed.is_deleted) {
     parsed.text = null;
@@ -1673,7 +1673,7 @@ function _replySnippet(replyToId) {
      WHERE m.id=?`
   ).get(replyToId);
   if (!r) return null;
-  if (r.is_deleted) {
+  if (Number(r.is_deleted) === 1) {
     return {
       id: r.id, sender_id: r.sender_id, sender_name: r.sender_name,
       text: null, attachment_type: 'deleted', attachment_url: null, is_deleted: true,
@@ -2033,8 +2033,10 @@ function clearConversationMessages(convId) {
 
 function editMessage(id, text) {
   const ts = now();
-  db.prepare('UPDATE messages SET text=?, edited_at=? WHERE id=?').run(text, ts, id);
-  return _parseMsg(db.prepare('SELECT * FROM messages WHERE id=?').get(id));
+  db.prepare(
+    'UPDATE messages SET text=?, edited_at=? WHERE id=? AND (is_deleted IS NULL OR is_deleted = 0)'
+  ).run(text, ts, id);
+  return getMessageById(id);
 }
 
 // Парсит JSON-аттач и возвращает все S3-ключи, на которые он ссылается.
@@ -2172,15 +2174,18 @@ async function sweepOrphanS3Media(storage, opts = {}) {
 }
 
 function deleteMessage(id, storage) {
-  // Достаём аттач ДО удаления — нужны ключи для последующего S3-cleanup.
-  const row = db.prepare('SELECT attachment FROM messages WHERE id=?').get(id);
-  const keys = row ? _attachmentS3Keys(row.attachment) : [];
-  // Если это закреплённое сообщение — снять закрепление (и общий пин группы,
-  // и личные пины в direct-чатах).
+  const row = db.prepare('SELECT attachment, is_deleted FROM messages WHERE id=?').get(id);
+  if (!row || Number(row.is_deleted) === 1) return getMessageById(id);
+  const keys = _attachmentS3Keys(row.attachment);
   db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE pinned_message_id=?').run(id);
   db.prepare('DELETE FROM personal_message_pins WHERE message_id=?').run(id);
-  db.prepare('DELETE FROM messages WHERE id=?').run(id);
+  const ts = now();
+  db.prepare(
+    `UPDATE messages SET is_deleted=1, deleted_at=?, text=NULL, attachment=NULL,
+            link_preview=NULL, edited_at=NULL WHERE id=?`
+  ).run(ts, id);
   _cleanupS3Keys(storage, keys, id);
+  return getMessageById(id);
 }
 
 // ── Calls ──────────────────────────────────────────────────────────────────

@@ -396,15 +396,14 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ id: user.id, name: user.name, avatar_url: user.avatar || null });
   });
 
-  // Legacy /api/media/* → /media/* (в проде nginx отдаёт S3; Node-fetch к S3 давал 502)
+  // /api/media/* — дубль app-level handler (на случай если роутер смонтирован без index.js)
   r.get(/^\/media\/(.+)/, (req, res) => {
+    const { streamMedia } = require('./mediaProxy');
     const key = req.params[0];
-    if (!key || key.includes('..')) return res.status(400).end();
-    if (storage.MODE === 'local') {
-      const localPath = require('path').join(__dirname, '../data/uploads', key.replace(/\//g, require('path').sep));
-      return res.sendFile(localPath, err => { if (err) res.status(404).end(); });
-    }
-    res.redirect(301, `/media/${key}`);
+    streamMedia(key, res).catch(e => {
+      console.error('[/api/media]', key, e.message);
+      if (!res.headersSent) res.status(502).end();
+    });
   });
 
   // ── Avatar endpoint — отдельный endpoint, кешируется браузером на 30 дней ───
@@ -1053,10 +1052,11 @@ module.exports = function makeRouter(db, broadcast) {
   r.patch('/conversations/:id/messages/:msgId', requireAuth, (req, res) => {
     const m = db.getMessageById(req.params.msgId);
     if (!m) return res.status(404).json({ error: 'Not found' });
+    if (Number(m.is_deleted) === 1) return res.status(400).json({ error: 'Сообщение удалено' });
     if (m.sender_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Not a member' });
-    if (db.now() - m.created_at > 3 * 60 * 60)
-      return res.status(403).json({ error: 'Слишком поздно для редактирования' });
+    if (db.now() - m.created_at > 24 * 60 * 60)
+      return res.status(403).json({ error: 'Редактировать можно только в течение 24 часов' });
     const updated = db.editMessage(req.params.msgId, req.body.text?.trim());
     broadcast(db.getConversationMembers(req.params.id), { type: 'message:edited', message: updated });
     res.json(updated);
@@ -1065,13 +1065,14 @@ module.exports = function makeRouter(db, broadcast) {
   r.delete('/conversations/:id/messages/:msgId', requireAuth, (req, res) => {
     const m = db.getMessageById(req.params.msgId);
     if (!m) return res.status(404).json({ error: 'Not found' });
+    if (Number(m.is_deleted) === 1) return res.status(400).json({ error: 'Сообщение уже удалено' });
     if (m.sender_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Not a member' });
-    db.deleteMessage(req.params.msgId, storage);
+    const tombstone = db.deleteMessage(req.params.msgId, storage);
     broadcast(db.getConversationMembers(req.params.id), {
-      type: 'message:deleted', messageId: req.params.msgId, conversationId: req.params.id
+      type: 'message:deleted', message: tombstone, conversationId: req.params.id,
     });
-    res.json({ ok: true });
+    res.json(tombstone);
   });
 
   r.delete('/conversations/:id', requireAuth, (req, res) => {
