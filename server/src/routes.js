@@ -396,28 +396,15 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ id: user.id, name: user.name, avatar_url: user.avatar || null });
   });
 
-  // ── Media proxy: стрим S3 через same-origin (критично для Android PWA/TWA) ──
-  r.get(/^\/media\/(.+)/, async (req, res) => {
+  // Legacy /api/media/* → /media/* (в проде nginx отдаёт S3; Node-fetch к S3 давал 502)
+  r.get(/^\/media\/(.+)/, (req, res) => {
     const key = req.params[0];
     if (!key || key.includes('..')) return res.status(400).end();
-    try {
-      if (storage.MODE === 'local') {
-        const localPath = require('path').join(__dirname, '../data/uploads', key.replace(/\//g, require('path').sep));
-        return res.sendFile(localPath, err => { if (err) res.status(404).end(); });
-      }
-      const readUrl = await storage.getReadUrl(key, 3600);
-      if (!readUrl) return res.status(404).end();
-      const upstream = await fetch(readUrl);
-      if (!upstream.ok) return res.status(upstream.status).end();
-      res.set('Cache-Control', 'public, max-age=86400, immutable');
-      const ct = upstream.headers.get('content-type');
-      if (ct) res.set('Content-Type', ct);
-      const buf = Buffer.from(await upstream.arrayBuffer());
-      res.send(buf);
-    } catch (e) {
-      console.error('[/api/media]', key, e.message);
-      res.status(502).end();
+    if (storage.MODE === 'local') {
+      const localPath = require('path').join(__dirname, '../data/uploads', key.replace(/\//g, require('path').sep));
+      return res.sendFile(localPath, err => { if (err) res.status(404).end(); });
     }
+    res.redirect(301, `/media/${key}`);
   });
 
   // ── Avatar endpoint — отдельный endpoint, кешируется браузером на 30 дней ───

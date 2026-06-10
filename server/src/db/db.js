@@ -166,6 +166,8 @@ try { db.exec('ALTER TABLE messages ADD COLUMN broadcast_id TEXT'); } catch {}  
 try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_user_id TEXT'); } catch {}    // переслано от автора
 try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_message_id TEXT'); } catch {} // ссылка на оригинал (опционально)
 try { db.exec('ALTER TABLE messages ADD COLUMN link_preview TEXT'); } catch {}              // JSON c metadata видео-ссылки (YouTube/Vimeo/RuTube/Kinescope)
+try { db.exec('ALTER TABLE messages ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE messages ADD COLUMN deleted_at INTEGER'); } catch {}
 
 // Кеш og-tags / oEmbed для линк-превью. Если url-fetch успешен — кладём сюда,
 // а в новых сообщениях достаём из кеша. TTL ~7 дней (mark fetched_at и сверяем).
@@ -1191,6 +1193,7 @@ function getMediaMessages(convId) {
     `SELECT m.*, u.name AS sender_name FROM messages m
      JOIN users u ON u.id=m.sender_id
      WHERE m.conversation_id=? AND m.attachment IS NOT NULL
+       AND (m.is_deleted IS NULL OR m.is_deleted = 0)
      ORDER BY m.created_at DESC`
   ).all(convId).map(_parseMsg);
 }
@@ -1200,6 +1203,7 @@ function searchMessages(convId, query) {
     `SELECT m.*, u.name AS sender_name FROM messages m
      JOIN users u ON u.id=m.sender_id
      WHERE m.conversation_id=? AND m.text LIKE ?
+       AND (m.is_deleted IS NULL OR m.is_deleted = 0)
      ORDER BY m.created_at ASC`
   ).all(convId, `%${query}%`).map(_parseMsg);
 }
@@ -1216,6 +1220,7 @@ function searchAllMessages(userId, query) {
      JOIN members mem ON mem.conversation_id = m.conversation_id AND mem.user_id = ?
      JOIN users   u   ON u.id = m.sender_id
      WHERE LOWER(m.text) LIKE ?
+       AND (m.is_deleted IS NULL OR m.is_deleted = 0)
      ORDER BY m.created_at DESC
      LIMIT 100`
   ).all(userId, q);
@@ -1440,7 +1445,7 @@ function getConversationsForUser(userId, opts = {}) {
   // 1 query: last message per conversation
   const lastMap = {}; // convId -> { text, created_at, sender_id, sender_name }
   db.prepare(
-    `SELECT m.conversation_id, m.text, m.attachment, m.created_at, m.sender_id,
+    `SELECT m.conversation_id, m.text, m.attachment, m.created_at, m.sender_id, m.is_deleted,
             u.name AS sender_name
      FROM messages m
      JOIN (
@@ -1452,6 +1457,12 @@ function getConversationsForUser(userId, opts = {}) {
      GROUP BY m.conversation_id`
   ).all(...convIds)
     .forEach(r => {
+      if (r.is_deleted) {
+        r.text = r.sender_id === userId
+          ? 'Вы удалили сообщение'
+          : `${r.sender_name || 'Участник'} удалил(а) сообщение`;
+        r.attachment = null;
+      }
       // Если последнее сообщение — системное событие группы, генерим читаемое превью.
       if (!r.text && r.attachment) {
         try {
@@ -1630,7 +1641,13 @@ function _parseMsg(m) {
   const parsed = { ...m,
     attachment:   m.attachment   ? JSON.parse(m.attachment)   : null,
     link_preview: m.link_preview ? JSON.parse(m.link_preview) : null,
+    is_deleted:   !!m.is_deleted,
   };
+  if (parsed.is_deleted) {
+    parsed.text = null;
+    parsed.attachment = null;
+    parsed.link_preview = null;
+  }
   if (parsed.attachment) parsed.attachment = rewriteAttachment(parsed.attachment);
   if (parsed.sender_avatar) parsed.sender_avatar = toPublicMediaUrl(parsed.sender_avatar);
   if (parsed.forwarded_from_user_id) {
@@ -1651,11 +1668,17 @@ function _parseMsg(m) {
 function _replySnippet(replyToId) {
   if (!replyToId) return null;
   const r = db.prepare(
-    `SELECT m.id, m.sender_id, m.text, m.attachment, u.name AS sender_name
+    `SELECT m.id, m.sender_id, m.text, m.attachment, m.is_deleted, u.name AS sender_name
      FROM messages m JOIN users u ON u.id=m.sender_id
      WHERE m.id=?`
   ).get(replyToId);
   if (!r) return null;
+  if (r.is_deleted) {
+    return {
+      id: r.id, sender_id: r.sender_id, sender_name: r.sender_name,
+      text: null, attachment_type: 'deleted', attachment_url: null, is_deleted: true,
+    };
+  }
   let attType = null, attUrl = null;
   try {
     if (r.attachment) {
@@ -1989,7 +2012,17 @@ function markMessagesReadUpTo(conversationId, readerId, upToMessageId) {
 }
 
 function getMessageById(id) {
-  return _parseMsg(db.prepare('SELECT * FROM messages WHERE id=?').get(id));
+  const row = db.prepare(
+    `SELECT m.*, u.name AS sender_name,
+            CASE
+              WHEN u.avatar IS NULL OR u.avatar = '' THEN NULL
+              WHEN u.avatar LIKE 'data:image/%' THEN '/api/avatars/' || u.id
+              ELSE u.avatar
+            END AS sender_avatar
+     FROM messages m JOIN users u ON u.id=m.sender_id
+     WHERE m.id=?`
+  ).get(id);
+  return _parseMsg(row);
 }
 
 function clearConversationMessages(convId) {

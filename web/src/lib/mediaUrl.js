@@ -1,5 +1,5 @@
-// Переписывает S3/legacy URL в same-origin /api/media/… (Android PWA/TWA).
-const API_MEDIA = '/api/media/';
+// Переписывает S3/legacy URL в same-origin /media/… (nginx → S3, Android PWA/TWA).
+const API_MEDIA = '/media/';
 
 const MEDIA_KEYS = new Set([
   'url', 'media_url', 'avatar', 'icon', 'attachment_url', 'publicUrl',
@@ -12,11 +12,13 @@ function s3KeyFromUrl(url) {
   if (!url || typeof url !== 'string') return null;
   if (url.startsWith('data:') || url.startsWith('/uploads/')) return null;
   if (url.startsWith(API_MEDIA)) return url.slice(API_MEDIA.length).split('?')[0];
-  if (url.startsWith('/media/')) return url.slice('/media/'.length).split('?')[0];
+  if (url.startsWith('/api/media/')) return url.slice('/api/media/'.length).split('?')[0];
   const direct = url.match(/s3\.twcstorage\.ru\/heymessenger\/([^?#]+)/i);
   if (direct) return direct[1];
+  const legacyAbs = url.match(/\/api\/media\/([^?#]+)/);
+  if (legacyAbs) return legacyAbs[1];
   const m = url.match(/\/(chat\/(?:audio\/|files\/)?[^?#]+|moments\/[^?#]+|avatars\/[^?#]+|group-icons\/[^?#]+)/);
-  if (m && /twcstorage\.ru/i.test(url)) return m[1];
+  if (m) return m[1];
   return null;
 }
 
@@ -26,8 +28,8 @@ export function mediaUrl(url) {
   if (url.startsWith(API_MEDIA)) {
     return absolutize(url);
   }
-  if (url.startsWith('/media/')) {
-    return absolutize(API_MEDIA + url.slice('/media/'.length).split('?')[0]);
+  if (url.startsWith('/api/media/')) {
+    return absolutize(API_MEDIA + url.slice('/api/media/'.length).split('?')[0]);
   }
   const key = s3KeyFromUrl(url);
   if (key) return absolutize(API_MEDIA + key);

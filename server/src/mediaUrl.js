@@ -1,18 +1,20 @@
-// mediaUrl.js — переписывает прямые S3-URL в same-origin /api/media/…
+// mediaUrl.js — переписывает прямые S3-URL в same-origin /media/…
 // Android PWA/TWA часто не грузит s3.twcstorage.ru (Data Saver, лишний TLS).
-// Прокси на Node (/api/media/*) стримит через getReadUrl — работает и с
-// приватным бакетом. nginx /media/ — опциональный fast-path, не обязателен.
+// В проде nginx проксирует /media/ → S3 (быстрее и надёжнее Node-fetch).
 
 const PUBLIC_BASE = () =>
   (process.env.S3_PUBLIC_URL_BASE || 'https://s3.twcstorage.ru/heymessenger').replace(/\/$/, '');
 
-const API_MEDIA = '/api/media/';
+const API_MEDIA = '/media/';
 
 function s3KeyFromUrl(url) {
   if (!url || typeof url !== 'string') return null;
   if (url.startsWith('data:') || url.startsWith('/uploads/')) return null;
   if (url.startsWith(API_MEDIA)) return url.slice(API_MEDIA.length).split('?')[0];
-  if (url.startsWith('/media/')) return url.slice('/media/'.length).split('?')[0];
+  // legacy: /api/media/… (Node-прокси ломался в проде)
+  if (url.startsWith('/api/media/')) return url.slice('/api/media/'.length).split('?')[0];
+  const legacyAbs = url.match(/\/api\/media\/([^?#]+)/);
+  if (legacyAbs) return legacyAbs[1];
   const base = PUBLIC_BASE();
   if (url.startsWith(base + '/')) return url.slice(base.length + 1).split('?')[0];
   const m = url.match(/\/(chat\/(?:audio\/|files\/)?[^?#]+|moments\/[^?#]+|avatars\/[^?#]+|group-icons\/[^?#]+)/);
@@ -24,7 +26,7 @@ function toPublicMediaUrl(url) {
   if (url.startsWith('data:') || url.startsWith('/uploads/')) return url;
   if (url.startsWith('/api/avatars/')) return url;
   if (url.startsWith(API_MEDIA)) return url;
-  if (url.startsWith('/media/')) return API_MEDIA + url.slice('/media/'.length).split('?')[0];
+  if (url.startsWith('/api/media/')) return API_MEDIA + url.slice('/api/media/'.length).split('?')[0];
   const key = s3KeyFromUrl(url);
   if (key) return API_MEDIA + key;
   return url;
