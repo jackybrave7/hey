@@ -2049,20 +2049,26 @@ function _attachmentS3Keys(attachmentJson) {
   if (!a || typeof a !== 'object') return [];
   const keys = new Set();
   const push = k => { if (k && typeof k === 'string') keys.add(k); };
-  push(a.key); push(a.thumbKey); push(a.thumb_key);
-  // Восстановление key из URL
-  const base = (process.env.S3_PUBLIC_URL_BASE || 'https://s3.twcstorage.ru/heymessenger').replace(/\/$/, '');
-  const fromUrl = (u) => {
-    if (!u || typeof u !== 'string') return;
-    if (u.startsWith('data:') || u.startsWith('/uploads/')) return;
-    if (u.startsWith(base + '/')) { push(u.slice(base.length + 1).split('?')[0]); return; }
-    // Fallback: вытаскиваем по известным префиксам категорий
-    const m = u.match(/\/(chat\/(?:audio\/|files\/)?[^?#]+|moments\/[^?#]+|avatars\/[^?#]+|group-icons\/[^?#]+)/);
-    if (m) push(m[1]);
+  // В attachment встречаются разные формы:
+  // { url }, { urls: [...] }, { key }, { thumbUrl }, { moment: { media_url } }.
+  // Sweep должен видеть все ссылки, иначе живые файлы из пачек картинок
+  // ошибочно становятся "сиротами".
+  const walk = (v) => {
+    if (!v) return;
+    if (typeof v === 'string') {
+      const k = _s3KeyFromUrl(v);
+      if (k) push(k);
+      return;
+    }
+    if (Array.isArray(v)) {
+      for (const x of v) walk(x);
+      return;
+    }
+    if (typeof v === 'object') {
+      for (const x of Object.values(v)) walk(x);
+    }
   };
-  fromUrl(a.url);
-  fromUrl(a.thumb_url);
-  fromUrl(a.thumbUrl);
+  walk(a);
   return [...keys];
 }
 
@@ -2097,6 +2103,7 @@ function _cleanupS3Keys(storage, keys, excludeMessageId) {
 function _s3KeyFromUrl(url) {
   if (!url || typeof url !== 'string') return null;
   if (url.startsWith('data:') || url.startsWith('/uploads/')) return null;
+  if (/^(chat\/|moments\/|avatars\/|group-icons\/)/.test(url)) return url.split('?')[0];
   const base = (process.env.S3_PUBLIC_URL_BASE || 'https://s3.twcstorage.ru/heymessenger').replace(/\/$/, '');
   if (url.startsWith(base + '/')) return url.slice(base.length + 1).split('?')[0];
   const m = url.match(/\/(chat\/(?:audio\/|files\/)?[^?#]+|moments\/[^?#]+|avatars\/[^?#]+|group-icons\/[^?#]+)/);

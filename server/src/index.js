@@ -144,10 +144,9 @@ setInterval(runScheduledDispatcher, 10 * 1000);
 const { startBot } = require('./tgBot');
 startBot({ db }).catch(e => console.error('[tg-bot] fatal:', e.message));
 
-// S3-«сборщик сирот». Раз в сутки листает S3 по префиксам chat/, moments/,
-// group-icons/ и удаляет объекты, на которые в БД больше никто не ссылается
-// + которым больше 24 часов (защита от гонки с in-progress загрузкой).
-// Запускаем со сдвигом 10 минут после старта, чтобы не нагружать boot.
+// S3-«сборщик сирот». Потенциально удаляет пользовательские медиа, поэтому
+// автоматический запуск выключен по умолчанию. Ручная кнопка в админке остаётся.
+// Для автоочистки явно выставить S3_SWEEP_ENABLED=1.
 async function runOrphanSweep() {
   try {
     const r = await db.sweepOrphanS3Media(storage);
@@ -156,5 +155,7 @@ async function runOrphanSweep() {
     console.error('[s3-sweep] failed:', e.message);
   }
 }
-setTimeout(runOrphanSweep, 10 * 60 * 1000);              // через 10 минут после старта
-setInterval(runOrphanSweep, 24 * 60 * 60 * 1000);        // далее раз в сутки
+if (process.env.S3_SWEEP_ENABLED === '1') {
+  setTimeout(runOrphanSweep, 10 * 60 * 1000);            // через 10 минут после старта
+  setInterval(runOrphanSweep, 24 * 60 * 60 * 1000);      // далее раз в сутки
+}
