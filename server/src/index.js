@@ -29,7 +29,7 @@ app.get('/media/*', mediaProxyHandler);
 // Legacy /api/media/* → тот же стрим.
 app.get('/api/media/*', (req, res) => {
   const key = req.path.replace(/^\/api\/media\//, '');
-  streamMedia(key, res).catch(e => {
+  streamMedia(key, res, req.query || {}).catch(e => {
     console.error('[/api/media]', key, e.message);
     if (!res.headersSent) res.status(502).end();
   });

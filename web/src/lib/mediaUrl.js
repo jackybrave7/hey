@@ -26,13 +26,13 @@ function s3KeyFromUrl(url) {
 export function mediaUrl(url) {
   if (!url || typeof url !== 'string') return url;
   if (url.startsWith('data:') || url.startsWith('/uploads/') || url.startsWith('/api/avatars/')) return url;
+  const key = s3KeyFromUrl(url);
   if (url.startsWith(API_MEDIA)) {
     return absolutize(url);
   }
   if (url.startsWith(LEGACY_MEDIA)) {
     return absolutize(API_MEDIA + url.slice(LEGACY_MEDIA.length).split('?')[0]);
   }
-  const key = s3KeyFromUrl(url);
   if (key) return absolutize(API_MEDIA + key);
   return url;
 }
@@ -46,10 +46,22 @@ export function mediaFallbackUrl(url) {
 export function mediaFallbackUrls(url) {
   const key = s3KeyFromUrl(url);
   if (!key) return [];
+  const mediaProxy = absolutize(API_MEDIA + key);
   const apiProxy = absolutize(LEGACY_MEDIA + key);
   const directS3 = `https://s3.twcstorage.ru/heymessenger/${key}`;
-  return [apiProxy, directS3].filter((candidate, index, arr) => (
+  return [mediaProxy, apiProxy, directS3].filter((candidate, index, arr) => (
     candidate && arr.indexOf(candidate) === index && candidate !== mediaUrl(url)
+  ));
+}
+
+export function androidImageFetchUrls(url) {
+  if (!isAndroidBrowser()) return [];
+  const key = s3KeyFromUrl(url);
+  if (!key || !isImageKey(key)) return [];
+  const jpegProxy = absolutize(`${LEGACY_MEDIA}${key}?mobile=1&format=jpeg`);
+  const mediaProxy = absolutize(API_MEDIA + key);
+  return [jpegProxy, mediaProxy].filter((candidate, index, arr) => (
+    candidate && arr.indexOf(candidate) === index
   ));
 }
 
@@ -60,6 +72,15 @@ function absolutize(path) {
     return window.location.origin + path;
   }
   return path;
+}
+
+function isAndroidBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  return /Android/i.test(navigator.userAgent || '');
+}
+
+function isImageKey(key) {
+  return /\.(avif|gif|heic|heif|jpe?g|png|webp)$/i.test(key);
 }
 
 function rewriteAttachment(att) {

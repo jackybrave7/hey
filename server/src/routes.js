@@ -400,7 +400,7 @@ module.exports = function makeRouter(db, broadcast) {
   r.get(/^\/media\/(.+)/, (req, res) => {
     const { streamMedia } = require('./mediaProxy');
     const key = req.params[0];
-    streamMedia(key, res).catch(e => {
+    streamMedia(key, res, req.query || {}).catch(e => {
       console.error('[/api/media]', key, e.message);
       if (!res.headersSent) res.status(502).end();
     });
