@@ -1,0 +1,361 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { MediaImage } from './MediaImage';
+
+function clampPan(px, py, imgW, imgH, viewW, viewH) {
+  if (!imgW || !imgH || !viewW || !viewH) return { x: px, y: py };
+  const maxX = Math.max(0, (imgW - viewW) / 2);
+  const maxY = Math.max(0, (imgH - viewH) / 2);
+  return {
+    x: Math.max(-maxX, Math.min(maxX, px)),
+    y: Math.max(-maxY, Math.min(maxY, py)),
+  };
+}
+
+/**
+ * Просмотр фото: сначала вписывается в экран, повторный тап/клик — натуральный
+ * размер с перетаскиванием по деталям в пределах кадра.
+ */
+export function ImageLightbox({
+  urls,
+  index = 0,
+  onClose,
+  onIndexChange,
+  zIndex = 500,
+  children,
+}) {
+  const [zoomed, setZoomed] = useState(false);
+  const [natural, setNatural] = useState({ w: 0, h: 0 });
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [viewSize, setViewSize] = useState({ w: 0, h: 0 });
+  const [dragging, setDragging] = useState(false);
+  const viewportRef = useRef(null);
+  const touchRef = useRef(null);
+  const dragRef = useRef(null);
+  const movedRef = useRef(false);
+
+  const total = urls?.length || 0;
+  const current = urls?.[index];
+  const canPrev = index > 0;
+  const canNext = index < total - 1;
+
+  useEffect(() => {
+    setZoomed(false);
+    setNatural({ w: 0, h: 0 });
+    setPan({ x: 0, y: 0 });
+  }, [index, current]);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const update = () => setViewSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [zoomed]);
+
+  useEffect(() => {
+    if (!zoomed) return;
+    setPan(p => clampPan(p.x, p.y, natural.w, natural.h, viewSize.w, viewSize.h));
+  }, [zoomed, natural.w, natural.h, viewSize.w, viewSize.h]);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        if (zoomed) {
+          setZoomed(false);
+          setPan({ x: 0, y: 0 });
+          return;
+        }
+        onClose?.();
+        return;
+      }
+      if (zoomed || !onIndexChange) return;
+      if (e.key === 'ArrowLeft' && canPrev) onIndexChange(index - 1);
+      if (e.key === 'ArrowRight' && canNext) onIndexChange(index + 1);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomed, canPrev, canNext, index, onClose, onIndexChange]);
+
+  const toggleZoom = useCallback((e) => {
+    e?.stopPropagation?.();
+    setZoomed(z => {
+      if (z) setPan({ x: 0, y: 0 });
+      return !z;
+    });
+  }, []);
+
+  const onBackdropClick = useCallback(() => {
+    if (zoomed) {
+      setZoomed(false);
+      setPan({ x: 0, y: 0 });
+      return;
+    }
+    onClose?.();
+  }, [zoomed, onClose]);
+
+  const onTouchStart = (e) => {
+    if (zoomed || total <= 1 || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  };
+
+  const onTouchEnd = (e) => {
+    if (!touchRef.current || zoomed) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchRef.current.x;
+    const dy = t.clientY - touchRef.current.y;
+    const dt = Date.now() - touchRef.current.t;
+    touchRef.current = null;
+    if (dt > 600 || Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 50) return;
+    if (dx < 0 && canNext) onIndexChange?.(index + 1);
+    else if (dx > 0 && canPrev) onIndexChange?.(index - 1);
+  };
+
+  const onPanPointerDown = (e) => {
+    if (!zoomed || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    movedRef.current = false;
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    };
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPanPointerMove = (e) => {
+    if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) movedRef.current = true;
+    setPan(clampPan(
+      dragRef.current.panX + dx,
+      dragRef.current.panY + dy,
+      natural.w,
+      natural.h,
+      viewSize.w,
+      viewSize.h,
+    ));
+  };
+
+  const endPan = (e) => {
+    if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    const wasTap = !movedRef.current;
+    dragRef.current = null;
+    setDragging(false);
+    if (wasTap) toggleZoom(e);
+  };
+
+  if (!current) return null;
+
+  const navBtn = {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: zIndex + 2,
+    width: 48,
+    height: 48,
+    borderRadius: '50%',
+    background: 'rgba(249,240,240,.12)',
+    backdropFilter: 'blur(8px)',
+    border: '1px solid rgba(249,240,240,.18)',
+    color: '#F9F0F0',
+    fontSize: 24,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex,
+        background: 'rgba(0,0,0,.92)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+      onClick={onBackdropClick}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onClose?.(); }}
+        style={{
+          position: 'fixed',
+          top: 18,
+          right: 18,
+          zIndex: zIndex + 3,
+          background: 'rgba(0,0,0,.5)',
+          backdropFilter: 'blur(8px)',
+          border: 'none',
+          borderRadius: '50%',
+          width: 40,
+          height: 40,
+          color: '#F9F0F0',
+          fontSize: 20,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        ✕
+      </button>
+
+      {!zoomed && total > 1 && (
+        <div style={{
+          position: 'fixed',
+          top: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: zIndex + 2,
+          color: 'rgba(249,240,240,.85)',
+          fontSize: 14,
+          fontWeight: 600,
+          background: 'rgba(0,0,0,.4)',
+          padding: '5px 14px',
+          borderRadius: 20,
+          pointerEvents: 'none',
+        }}>
+          {index + 1} / {total}
+        </div>
+      )}
+
+      {!zoomed && canPrev && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onIndexChange?.(index - 1); }}
+          style={{ ...navBtn, left: 20 }}
+        >
+          ‹
+        </button>
+      )}
+      {!zoomed && canNext && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onIndexChange?.(index + 1); }}
+          style={{ ...navBtn, right: 20 }}
+        >
+          ›
+        </button>
+      )}
+
+      <div
+        ref={viewportRef}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={zoomed ? onPanPointerDown : undefined}
+        onPointerMove={zoomed ? onPanPointerMove : undefined}
+        onPointerUp={zoomed ? endPan : undefined}
+        onPointerCancel={zoomed ? endPan : undefined}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden',
+          position: 'relative',
+          touchAction: zoomed ? 'none' : 'manipulation',
+          cursor: zoomed ? (dragging ? 'grabbing' : 'grab') : 'default',
+        }}
+      >
+        {zoomed && natural.w > 0 ? (
+          <MediaImage
+            src={current}
+            alt=""
+            onLoad={(e) => {
+              setNatural({
+                w: e.currentTarget.naturalWidth,
+                h: e.currentTarget.naturalHeight,
+              });
+            }}
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              width: natural.w,
+              height: natural.h,
+              maxWidth: 'none',
+              maxHeight: 'none',
+              objectFit: 'contain',
+              transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px))`,
+              userSelect: 'none',
+              pointerEvents: 'none',
+            }}
+            draggable={false}
+          />
+        ) : (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%',
+            padding: 24,
+            boxSizing: 'border-box',
+          }}>
+            <MediaImage
+              src={current}
+              alt=""
+              onClick={toggleZoom}
+              onLoad={(e) => {
+                setNatural({
+                  w: e.currentTarget.naturalWidth,
+                  h: e.currentTarget.naturalHeight,
+                });
+              }}
+              style={{
+                maxWidth: '90vw',
+                maxHeight: '80vh',
+                objectFit: 'contain',
+                borderRadius: 14,
+                boxShadow: '0 8px 48px rgba(0,0,0,.6)',
+                cursor: 'zoom-in',
+                userSelect: 'none',
+              }}
+              draggable={false}
+            />
+          </div>
+        )}
+      </div>
+
+      {!zoomed && children && (
+        <div
+          style={{
+            flexShrink: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 12,
+            padding: '12px 16px 20px',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
+      )}
+
+      <div style={{
+        position: 'fixed',
+        bottom: zoomed ? 10 : (children ? 72 : 10),
+        left: '50%',
+        transform: 'translateX(-50%)',
+        color: 'rgba(249,240,240,.42)',
+        fontSize: 11,
+        pointerEvents: 'none',
+        zIndex: zIndex + 1,
+        whiteSpace: 'nowrap',
+      }}>
+        {zoomed ? 'Перетащите · тап без сдвига — уменьшить' : 'Нажмите на фото — полный размер'}
+      </div>
+    </div>
+  );
+}

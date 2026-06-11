@@ -16,6 +16,7 @@ import HeyLogo from '../HeyLogo';
 import { HEY_EMOJI_SET, emojiUrl } from '../../lib/heyEmoji';
 import { mediaUrl } from '../../lib/mediaUrl';
 import { MediaImage } from '../shared/MediaImage';
+import { ImageLightbox } from '../shared/ImageLightbox';
 
 function fmtDate(ts) {
   if (!ts) return '';
@@ -992,19 +993,13 @@ export default function MomentDetailPopup({
       />
     )}
 
-    {/* Image lightbox */}
-    {imgLightbox && (
-      <div onClick={() => setImgLightbox(false)}
-        style={{position:'fixed',inset:0,zIndex:1200,background:'rgba(0,0,0,.92)',backdropFilter:'blur(20px)',
-          display:'flex',alignItems:'center',justifyContent:'center',cursor:'zoom-out',padding:16}}>
-        <MediaImage src={moment.media_url} alt=""
-          style={{maxWidth:'100%',maxHeight:'100%',objectFit:'contain',borderRadius:12,
-            boxShadow:'0 8px 60px rgba(0,0,0,.7)',pointerEvents:'none'}}/>
-        <button onClick={() => setImgLightbox(false)}
-          style={{position:'fixed',top:18,right:18,background:'rgba(0,0,0,.5)',backdropFilter:'blur(8px)',
-            border:'none',borderRadius:'50%',width:40,height:40,color:'#F9F0F0',
-            fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
-      </div>
+    {imgLightbox && moment.media_type === 'image' && (
+      <ImageLightbox
+        urls={[moment.media_url]}
+        index={0}
+        onClose={() => setImgLightbox(false)}
+        zIndex={1200}
+      />
     )}
     </>
   );

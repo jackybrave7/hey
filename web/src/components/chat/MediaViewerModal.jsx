@@ -3,6 +3,7 @@ import { api } from '../../api';
 import { fmtDateTime } from '../../lib/formatTime';
 import Icon from '../Icon';
 import { MediaImage } from '../shared/MediaImage';
+import { ImageLightbox } from '../shared/ImageLightbox';
 import { fileTypeIcon } from '../../lib/fileTypeIcon';
 import { AudioPlayer } from './AudioPlayer';
 import { URL_RE } from './chatRender';
@@ -227,76 +228,30 @@ function MediaViewerModal({ convId, onClose }) {
       </div>
       {light && (() => {
         const { urls, index } = light;
-        const total = urls.length;
         const curUrl = urls[index];
-        const prev = () => setLight({ urls, index: (index - 1 + total) % total });
-        const next = () => setLight({ urls, index: (index + 1) % total });
         return (
-          <div style={{position:'fixed',inset:0,zIndex:600,background:'rgba(0,0,0,.94)',
-            display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}
-            onClick={(e) => {
-              // Стопим всплытие, чтобы не сработал onClose родительского
-              // overlay'я модалки «Медиа и ссылки» — пользователь должен
-              // вернуться в каталог, а не выйти полностью.
-              e.stopPropagation();
-              setLight(null);
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Escape') setLight(null);
-              if (e.key === 'ArrowLeft')  prev();
-              if (e.key === 'ArrowRight') next();
-            }}
-            tabIndex={0}
-            ref={el => el?.focus()}>
-            {/* Close */}
-            <button onClick={e => { e.stopPropagation(); setLight(null); }}
-              style={{position:'absolute',top:16,right:16,
-                background:'rgba(249,240,240,.12)',border:'none',color:'#F9F0F0',
-                width:40,height:40,borderRadius:'50%',cursor:'pointer',
-                fontSize:20,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
-            {/* Counter */}
-            {total > 1 && (
-              <div style={{position:'absolute',top:24,left:'50%',transform:'translateX(-50%)',
-                color:'rgba(249,240,240,.85)',fontSize:14,fontWeight:600,
-                background:'rgba(0,0,0,.4)',padding:'5px 14px',borderRadius:20}}>
-                {index + 1} / {total}
-              </div>
-            )}
-            {/* Prev */}
-            {total > 1 && (
-              <button onClick={e => { e.stopPropagation(); prev(); }}
-                style={{position:'absolute',left:16,top:'50%',transform:'translateY(-50%)',
-                  background:'rgba(249,240,240,.12)',border:'none',color:'#F9F0F0',
-                  width:48,height:48,borderRadius:'50%',cursor:'pointer',
-                  fontSize:24,display:'flex',alignItems:'center',justifyContent:'center'}}>‹</button>
-            )}
-            {/* Image */}
-            <MediaImage src={curUrl} alt="" onClick={e=>e.stopPropagation()}
-              style={{maxWidth:'90vw',maxHeight:'78vh',borderRadius:12,objectFit:'contain'}}/>
-            {/* Next */}
-            {total > 1 && (
-              <button onClick={e => { e.stopPropagation(); next(); }}
-                style={{position:'absolute',right:16,top:'50%',transform:'translateY(-50%)',
-                  background:'rgba(249,240,240,.12)',border:'none',color:'#F9F0F0',
-                  width:48,height:48,borderRadius:'50%',cursor:'pointer',
-                  fontSize:24,display:'flex',alignItems:'center',justifyContent:'center'}}>›</button>
-            )}
-            {/* Actions */}
-            <div style={{marginTop:16,display:'flex',gap:8}}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <ImageLightbox
+              urls={urls}
+              index={index}
+              onClose={() => setLight(null)}
+              onIndexChange={(i) => setLight({ urls, index: i, msgIds: light.msgIds })}
+              zIndex={600}
+            >
               {light.msgIds?.[index] && (
-                <button onClick={e => { e.stopPropagation(); goToMessage(light.msgIds[index]); }}
+                <button onClick={() => goToMessage(light.msgIds[index])}
                   style={{background:'rgba(140,110,220,.7)',border:'none',borderRadius:10,
                     padding:'8px 18px',color:'#F9F0F0',fontSize:14,cursor:'pointer',
                     fontFamily:'inherit',display:'inline-flex',alignItems:'center',gap:6}}>
                   💬 К сообщению
                 </button>
               )}
-              <a href={curUrl} download onClick={e=>e.stopPropagation()}
+              <a href={curUrl} download
                 style={{background:'rgba(249,240,240,.15)',borderRadius:10,
                   padding:'8px 18px',color:'#F9F0F0',textDecoration:'none',fontSize:14}}>
                 ⬇ Скачать
               </a>
-            </div>
+            </ImageLightbox>
           </div>
         );
       })()}

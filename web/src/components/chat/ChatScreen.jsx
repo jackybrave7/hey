@@ -9,6 +9,7 @@ import { AvatarDisplay } from '../shared/AvatarDisplay';
 import { useConfirm } from '../shared/Confirm';
 import { heyToast } from '../shared/Toast';
 import { MediaImage } from '../shared/MediaImage';
+import { ImageLightbox } from '../shared/ImageLightbox';
 import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile } from '../../lib/uploadMedia';
 import { fmtTime, fmtDate, fmtLastSeenShort } from '../../lib/formatTime';
 import { HEY_EMOJI as HEY_EMOJI_LIST, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
@@ -349,25 +350,11 @@ export function ChatScreen() {
     finally { setLoadingMore(false); }
   }
 
-  // ── Lightbox: стрелки ←/→ для навигации ───────────────────────────────
-  useEffect(() => {
-    if (!lightbox || lightbox.urls.length <= 1) return;
-    function onKey(e) {
-      if (e.key === 'ArrowLeft'  && lightbox.index > 0)
-        setLightbox(l => l && ({ ...l, index: l.index - 1 }));
-      if (e.key === 'ArrowRight' && lightbox.index < lightbox.urls.length - 1)
-        setLightbox(l => l && ({ ...l, index: l.index + 1 }));
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [lightbox]);
-
   // ── Esc — закрыть самый верхний попап чата ────────────────────────────
   useEffect(() => {
     function onKey(e) {
       if (e.key !== 'Escape') return;
       // Приоритет от самого «верхнего» к нижнему
-      if (lightbox)              { setLightbox(null);            return; }
       if (showMedia)             { setShowMedia(false);          return; }
       if (msgMenu)               { setMsgMenu(null);             return; }
       if (reactionPicker)        { setReactionPicker(null);      return; }
@@ -2817,96 +2804,28 @@ export function ChatScreen() {
         );
       })()}
 
-      {/* Lightbox */}
-      {lightbox && (() => {
-        const urls    = lightbox.urls || [];
-        const idx     = lightbox.index || 0;
-        const total   = urls.length;
-        const current = urls[idx];
-        const canPrev = idx > 0;
-        const canNext = idx < total - 1;
-        // Touch-swipe для перелистывания галереи на мобильном.
-        // Порог 50px по горизонтали + игнор если вертикальное движение
-        // больше — пользователь скроллит, а не свайпает.
-        let touchStart = null;
-        const onTouchStart = (e) => {
-          if (e.touches.length !== 1 || total <= 1) return;
-          const t = e.touches[0];
-          touchStart = { x: t.clientX, y: t.clientY, t: Date.now() };
-        };
-        const onTouchEnd = (e) => {
-          if (!touchStart) return;
-          const t = e.changedTouches[0];
-          const dx = t.clientX - touchStart.x;
-          const dy = t.clientY - touchStart.y;
-          const dt = Date.now() - touchStart.t;
-          touchStart = null;
-          if (dt > 600) return;                // слишком медленно — не свайп
-          if (Math.abs(dy) > Math.abs(dx)) return; // вертикальное — игнор
-          if (Math.abs(dx) < 50) return;       // короткий тап
-          if (dx < 0 && canNext) setLightbox({ urls, index: idx + 1 });
-          else if (dx > 0 && canPrev) setLightbox({ urls, index: idx - 1 });
-        };
-        return (
-          <div onClick={() => setLightbox(null)}
-            onTouchStart={onTouchStart}
-            onTouchEnd={onTouchEnd}
-            style={{position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,.92)',
-              display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-              backdropFilter:'blur(8px)', touchAction: 'pan-y'}}>
-            {/* Стрелки навигации (если в галерее больше одной) */}
-            {canPrev && (
-              <button onClick={(e) => { e.stopPropagation(); setLightbox({ urls, index: idx - 1 }); }}
-                style={{position:'absolute',left:20,top:'50%',transform:'translateY(-50%)',zIndex:2,
-                  width:48,height:48,borderRadius:'50%',
-                  background:'rgba(249,240,240,.12)',backdropFilter:'blur(8px)',
-                  border:'1px solid rgba(249,240,240,.18)',color:'#F9F0F0',
-                  fontSize:24,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                ‹
-              </button>
-            )}
-            {canNext && (
-              <button onClick={(e) => { e.stopPropagation(); setLightbox({ urls, index: idx + 1 }); }}
-                style={{position:'absolute',right:20,top:'50%',transform:'translateY(-50%)',zIndex:2,
-                  width:48,height:48,borderRadius:'50%',
-                  background:'rgba(249,240,240,.12)',backdropFilter:'blur(8px)',
-                  border:'1px solid rgba(249,240,240,.18)',color:'#F9F0F0',
-                  fontSize:24,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                ›
-              </button>
-            )}
-
-            <img src={current} alt=""
-              onClick={e => e.stopPropagation()}
-              style={{maxWidth:'90vw',maxHeight:'80vh',borderRadius:14,
-                boxShadow:'0 8px 48px rgba(0,0,0,.6)',objectFit:'contain'}}/>
-
-            <div style={{display:'flex',gap:12,marginTop:20,alignItems:'center'}}
-              onClick={e=>e.stopPropagation()}>
-              {total > 1 && (
-                <div style={{
-                  background:'rgba(249,240,240,.12)',borderRadius:50,padding:'8px 14px',
-                  color:'rgba(249,240,240,.85)',fontSize:13,fontWeight:600,
-                }}>
-                  {idx + 1} / {total}
-                </div>
-              )}
-              <a href={current} download
-                style={{background:'rgba(249,240,240,.15)',backdropFilter:'blur(6px)',
-                  borderRadius:12,padding:'10px 24px',color:'#F9F0F0',fontSize:14,
-                  textDecoration:'none',border:'1px solid rgba(249,240,240,.2)'}}>
-                ⬇ Скачать
-              </a>
-              <button onClick={() => setLightbox(null)}
-                style={{background:'rgba(249,240,240,.1)',border:'1px solid rgba(249,240,240,.2)',
-                  borderRadius:12,padding:'10px 24px',color:'#F9F0F0',fontSize:14,cursor:'pointer'}}>
-                Закрыть
-              </button>
-            </div>
-
-          </div>
-        );
-      })()}
+      {lightbox && (
+        <ImageLightbox
+          urls={lightbox.urls}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          onIndexChange={(i) => setLightbox(l => l && ({ ...l, index: i }))}
+          zIndex={500}
+        >
+          <a href={lightbox.urls[lightbox.index]} download
+            style={{background:'rgba(249,240,240,.15)',backdropFilter:'blur(6px)',
+              borderRadius:12,padding:'10px 24px',color:'#F9F0F0',fontSize:14,
+              textDecoration:'none',border:'1px solid rgba(249,240,240,.2)'}}>
+            ⬇ Скачать
+          </a>
+          <button onClick={() => setLightbox(null)}
+            style={{background:'rgba(249,240,240,.1)',border:'1px solid rgba(249,240,240,.2)',
+              borderRadius:12,padding:'10px 24px',color:'#F9F0F0',fontSize:14,cursor:'pointer',
+              fontFamily:'inherit'}}>
+            Закрыть
+          </button>
+        </ImageLightbox>
+      )}
 
 <style>{`@keyframes typing{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}`}</style>
       {confirmModal}
