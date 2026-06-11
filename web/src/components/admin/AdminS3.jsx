@@ -143,13 +143,13 @@ export default function AdminS3() {
 
   async function runSweep() {
     if (!await customConfirm(
-      'Запустить сборщик сирот?',
-      { hint: 'Удалит с S3 все объекты которые не используются БД и старше 24ч.', confirmLabel: 'Запустить' }
+      'Проверить сироты S3?',
+      { hint: 'Dry-run: ничего не удалит, только посчитает объекты, которые sweep удалил бы.', confirmLabel: 'Проверить' }
     )) return;
     setBusy(true);
     try {
       const r = await api.adminS3Sweep();
-      alert(`Сборщик отработал:\nпросканировано ${r.scanned}\nудалено ${r.deleted}\nживых ${r.skippedLive}\nсвежих <24ч ${r.skippedYoung}\nошибок ${r.errors}`);
+      alert(`Sweep dry-run:\nпросканировано ${r.scanned}\nудалил бы ${r.wouldDelete ?? 0}\nреально удалено ${r.deleted}\nживых ${r.skippedLive}\nсвежих <24ч ${r.skippedYoung}\nошибок ${r.errors}`);
       await load();
     } catch (e) { alert('Ошибка: ' + e.message); }
     setBusy(false);
@@ -173,14 +173,14 @@ export default function AdminS3() {
           <button onClick={load} disabled={loading}
             style={btnStyle()}>{loading ? 'Загрузка…' : '↻ Обновить'}</button>
           <button onClick={runSweep} disabled={busy || loading}
-            style={btnStyle('danger')}>🧹 Запустить sweep</button>
+            style={btnStyle()}>🧹 Sweep dry-run</button>
         </div>
       </div>
 
       <p style={{ color: 'rgba(249,240,240,.45)', fontSize: 13, marginTop: 0, marginBottom: 18 }}>
         Все объекты в S3-бакете. «Сирота» — ключ, на который ни одно живое сообщение,
-        момент или аватар не ссылается. Удаляй их только после проверки; авто-sweep
-        включается на сервере явно через S3_SWEEP_ENABLED=1.
+        момент или аватар не ссылается. Destructive sweep выключен: проверка работает
+        в dry-run, удаление требует серверный флаг S3_SWEEP_ALLOW_DELETE=1.
       </p>
 
       {/* Bulk selection toolbar — рисуется когда что-то выбрано */}

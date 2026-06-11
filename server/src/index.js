@@ -145,17 +145,20 @@ const { startBot } = require('./tgBot');
 startBot({ db }).catch(e => console.error('[tg-bot] fatal:', e.message));
 
 // S3-«сборщик сирот». Потенциально удаляет пользовательские медиа, поэтому
-// автоматический запуск выключен по умолчанию. Ручная кнопка в админке остаётся.
-// Для автоочистки явно выставить S3_SWEEP_ENABLED=1.
+// автоматический destructive-запуск выключен по умолчанию.
+// Для автоочистки нужно явно выставить оба флага:
+// S3_SWEEP_ENABLED=1 и S3_SWEEP_ALLOW_DELETE=1.
 async function runOrphanSweep() {
   try {
-    const r = await db.sweepOrphanS3Media(storage);
+    const r = await db.sweepOrphanS3Media(storage, { dryRun: false });
     console.log('[s3-sweep]', JSON.stringify(r));
   } catch (e) {
     console.error('[s3-sweep] failed:', e.message);
   }
 }
-if (process.env.S3_SWEEP_ENABLED === '1') {
+if (process.env.S3_SWEEP_ENABLED === '1' && process.env.S3_SWEEP_ALLOW_DELETE === '1') {
   setTimeout(runOrphanSweep, 10 * 60 * 1000);            // через 10 минут после старта
   setInterval(runOrphanSweep, 24 * 60 * 60 * 1000);      // далее раз в сутки
+} else if (process.env.S3_SWEEP_ENABLED === '1') {
+  console.warn('[s3-sweep] destructive auto-sweep disabled: set S3_SWEEP_ALLOW_DELETE=1 to allow deletes');
 }

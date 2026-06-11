@@ -118,6 +118,14 @@ async function buildMediaDiagnostics(req, input) {
   return { key, probes };
 }
 
+function s3DeleteEnabled() {
+  return process.env.S3_SWEEP_ALLOW_DELETE === '1';
+}
+
+function hasS3DeleteConfirmation(req, expected) {
+  return req.body?.confirm === expected || req.query?.confirm === expected;
+}
+
 // Middleware для tenant-scoped ручек: пускает либо системного админа,
 // либо владельца tenant'а (tenant.owner_id === req.user.id). Кладёт в req:
 //   req.tenant     — объект tenant'а
@@ -513,12 +521,17 @@ module.exports = function makeRouter(db, broadcast) {
       res.set('Cache-Control', 'public, max-age=60'); // короткий кеш — может появиться позже
       return res.send(px);
     }
-    // S3 / http — через same-origin /media/ (Android PWA не грузит прямой S3)
-    if (/^https?:\/\//i.test(av)) {
-      const { toPublicMediaUrl } = require('./mediaUrl');
-      const target = toPublicMediaUrl(av);
-      res.set('Cache-Control', 'public, max-age=86400');
-      return res.redirect(302, target);
+    // S3 / media URL — стримим через Node, без редиректа: так не зависим от
+    // кеша /media и public-read ACL, а Android получает обычный image response.
+    const { s3KeyFromUrl } = require('./mediaUrl');
+    const { streamMedia } = require('./mediaProxy');
+    const key = s3KeyFromUrl(av);
+    if (key) {
+      res.set('Cache-Control', 'public, max-age=300');
+      return streamMedia(key, res, req.query || {}).catch(e => {
+        console.error('[/api/avatars]', req.params.userId, key, e.message);
+        if (!res.headersSent) res.status(404).end();
+      });
     }
     // Если это data URL — декодируем и отдаём бинарём
     const m = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/s.exec(av);
@@ -1060,7 +1073,7 @@ module.exports = function makeRouter(db, broadcast) {
       'moment-image': `moments/${uuid()}/media.${ext}`,
       'moment-video': `moments/${uuid()}/video.${ext}`,
       'moment-audio': `moments/${uuid()}/audio.${ext}`,
-      'avatar':       `avatars/${req.user.id}.${ext}`,
+      'avatar':       `avatars/${req.user.id}/${uuid()}.${ext}`,
       // group-icon: уникальный ключ на каждую загрузку, чтобы икона
       // одной группы не перетирала иконку другой. Раньше при правке
       // группы клиент использовал category='avatar' — а её ключ
@@ -1070,14 +1083,6 @@ module.exports = function makeRouter(db, broadcast) {
     };
     try {
       const result = await storage.getPresignedUploadUrl(keyMap[category], contentType);
-      // Cache-buster для аватарок: S3-ключ avatars/{userId}.{ext} стабильный,
-      // поэтому publicUrl без версии всегда одинаков → браузер показывает
-      // закешированную старую картинку, и React не видит «изменения» в
-      // user.avatar (setUser получает ту же строку). Добавляем ?v=ts —
-      // картинка та же, но URL уникален.
-      if (category === 'avatar' && result.publicUrl) {
-        result.publicUrl = result.publicUrl + '?v=' + Date.now();
-      }
       res.json({ ...result, maxBytes });
     } catch (e) {
       console.error('[/upload/presign]', e);
@@ -2185,6 +2190,16 @@ module.exports = function makeRouter(db, broadcast) {
   r.delete('/admin/s3/object', requireAdmin, async (req, res) => {
     const key = req.body?.key || req.query?.key;
     if (!key) return res.status(400).json({ error: 'key required' });
+    if (!s3DeleteEnabled() || !hasS3DeleteConfirmation(req, 'DELETE_S3_OBJECT')) {
+      return res.status(403).json({
+        error: 'S3 delete disabled',
+        dryRun: true,
+        allowDelete: false,
+        requiredEnv: 'S3_SWEEP_ALLOW_DELETE=1',
+        requiredConfirm: 'DELETE_S3_OBJECT',
+        key,
+      });
+    }
     try {
       await storage.deleteFile(key);
       res.json({ ok: true, key });
@@ -2201,6 +2216,20 @@ module.exports = function makeRouter(db, broadcast) {
     const keys = Array.isArray(req.body?.keys) ? req.body.keys.filter(k => typeof k === 'string' && k) : [];
     if (!keys.length) return res.status(400).json({ error: 'keys required' });
     if (keys.length > 1000) return res.status(400).json({ error: 'максимум 1000 ключей за раз' });
+    if (!s3DeleteEnabled() || !hasS3DeleteConfirmation(req, 'DELETE_S3_OBJECTS')) {
+      return res.status(403).json({
+        error: 'S3 bulk delete disabled',
+        dryRun: true,
+        allowDelete: false,
+        requiredEnv: 'S3_SWEEP_ALLOW_DELETE=1',
+        requiredConfirm: 'DELETE_S3_OBJECTS',
+        requested: keys.length,
+        wouldDelete: keys.length,
+        deleted: 0,
+        errors: 0,
+        failed: [],
+      });
+    }
     let deleted = 0, errors = 0;
     const failed = [];
     for (const k of keys) {
@@ -2213,10 +2242,17 @@ module.exports = function makeRouter(db, broadcast) {
   r.post('/admin/system/s3-sweep', requireAdmin, async (req, res) => {
     try {
       const minAgeHours = parseInt(req.query.minAgeHours);
+      const allowDelete = s3DeleteEnabled() && hasS3DeleteConfirmation(req, 'DELETE_S3_ORPHANS');
       const r2 = await db.sweepOrphanS3Media(storage, {
         minAgeMs: Number.isFinite(minAgeHours) ? minAgeHours * 3600 * 1000 : undefined,
+        dryRun: !allowDelete,
       });
-      res.json(r2);
+      res.json({
+        ...r2,
+        allowDelete,
+        requiredEnv: 'S3_SWEEP_ALLOW_DELETE=1',
+        requiredConfirm: 'DELETE_S3_ORPHANS',
+      });
     } catch (e) {
       console.error('POST /admin/system/s3-sweep error:', e);
       res.status(500).json({ error: e.message });

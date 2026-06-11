@@ -752,9 +752,12 @@ function hardDeleteUserAccount(userId) {
 
   // Сначала собираем S3-ключи, которые надо будет стереть после транзакции
   const momentIds = db.prepare('SELECT id FROM moments WHERE user_id=?').all(userId).map(r => r.id);
-  const s3Prefixes = momentIds.map(id => `moments/${id}/`);
-  const avatarExt  = (u.avatar && typeof u.avatar === 'string' && /\.(webp|png|jpe?g)(\?|$)/i.exec(u.avatar)?.[1]) || 'webp';
-  const s3Keys     = [`avatars/${userId}.${avatarExt.toLowerCase()}`];
+  const s3Prefixes = [
+    ...momentIds.map(id => `moments/${id}/`),
+    `avatars/${userId}/`,
+  ];
+  const avatarKey = _s3KeyFromUrl(u.avatar);
+  const s3Keys = avatarKey && !avatarKey.startsWith(`avatars/${userId}/`) ? [avatarKey] : [];
 
   db.transaction(() => {
     // 1. Реакции/просмотры/жалобы/feedback'и пользователя
@@ -2166,6 +2169,7 @@ async function sweepOrphanS3Media(storage, opts = {}) {
   }
   const minAgeMs = opts.minAgeMs ?? 24 * 60 * 60 * 1000;
   const prefixes = opts.prefixes || ['chat/', 'moments/', 'group-icons/'];
+  const dryRun = opts.dryRun !== false;
   const cutoff = Date.now() - minAgeMs;
   const live = collectLiveS3Keys();
   // Префиксы живых моментов — защита для thumbnail'ов/доп. файлов внутри moments/{id}/
@@ -2175,7 +2179,7 @@ async function sweepOrphanS3Media(storage, opts = {}) {
       liveMomentPrefixes.push(k.slice(0, -'__live_prefix__'.length));
     }
   }
-  let scanned = 0, deleted = 0, skippedYoung = 0, skippedLive = 0, errors = 0;
+  let scanned = 0, deleted = 0, wouldDelete = 0, skippedYoung = 0, skippedLive = 0, errors = 0;
   for (const prefix of prefixes) {
     let objects;
     try { objects = await storage.listKeysByPrefix(prefix); }
@@ -2188,13 +2192,17 @@ async function sweepOrphanS3Media(storage, opts = {}) {
       if (liveMomentPrefixes.some(p => k.startsWith(p))) { skippedLive++; continue; }
       const mtime = obj.lastModified ? new Date(obj.lastModified).getTime() : 0;
       if (mtime > cutoff) { skippedYoung++; continue; }
+      if (dryRun) {
+        wouldDelete++;
+        continue;
+      }
       try {
         await storage.deleteFile(k);
         deleted++;
       } catch (e) { errors++; console.warn('[sweep] del', k, e.message); }
     }
   }
-  return { scanned, deleted, skippedYoung, skippedLive, errors };
+  return { dryRun, scanned, deleted, wouldDelete, skippedYoung, skippedLive, errors };
 }
 
 function deleteMessage(id, storage) {
