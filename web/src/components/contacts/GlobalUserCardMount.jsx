@@ -54,6 +54,7 @@ export function GlobalUserCardMount() {
   return (<>
     {confirmModal}
     <ContactCardModal
+      key={userId}
       contact={contactObj}
       isBlocked={isBlocked}
       isContact={isContact}

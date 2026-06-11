@@ -558,10 +558,21 @@ module.exports = function makeRouter(db, broadcast) {
     const activeMoments = db.getActiveMoments(target.id);
     const presence      = db.getPresence(target.id);
     const contacts      = db.getContacts(req.user.id);
-    const isContact     = contacts.some(c => c.id === target.id);
+    const contactEntry  = contacts.find(c => c.id === target.id);
+    const isContact     = !!contactEntry;
     const { password, phone, must_change_password, achievements: achRaw, ...safe } = target;
     const achievements = (() => { try { return JSON.parse(achRaw || '[]'); } catch { return []; } })();
-    res.json({ ...safe, achievements, active_moments: activeMoments, active_moment: activeMoments[0] || null, presence, is_contact: isContact });
+    res.json({
+      ...safe,
+      achievements,
+      active_moments: activeMoments,
+      active_moment: activeMoments[0] || null,
+      presence,
+      is_contact: isContact,
+      // Личные заметки и прозвище — только для своих контактов.
+      nickname: contactEntry?.nickname ?? null,
+      notes: contactEntry?.notes ?? null,
+    });
   });
 
   r.get('/me', requireAuth, (req, res) => {

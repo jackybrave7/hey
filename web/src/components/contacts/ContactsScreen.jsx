@@ -260,21 +260,25 @@ export function ContactsScreen() {
 
       {/* Contact card modal */}
       {card && (() => {
+        // Берём актуальную запись из списка контактов — в ней есть notes/nickname,
+        // которых нет в ответе lookup/profile при открытии по номеру.
+        const resolvedCard = contacts.find(c => c.id === card.id) || card;
         // Если карточка пришла из lookup (по телефону) — этот юзер ещё НЕ в
         // контактах: показываем кнопку «Добавить» вместо «В чат».
-        const cardIsContact = card.is_contact !== undefined
-          ? !!card.is_contact
-          : !!visibleContacts.find(c => c.id === card.id);
+        const cardIsContact = resolvedCard.is_contact !== undefined
+          ? !!resolvedCard.is_contact
+          : !!visibleContacts.find(c => c.id === resolvedCard.id);
         return (
           <ContactCardModal
-            contact={card}
-            isBlocked={isBlockedId(card.id)}
+            key={resolvedCard.id}
+            contact={resolvedCard}
+            isBlocked={isBlockedId(resolvedCard.id)}
             isContact={cardIsContact}
             onClose={() => setCard(null)}
-            onChat={() => openChat(card.id)}
+            onChat={() => openChat(resolvedCard.id)}
             onAddContact={async () => {
               try {
-                const c = await api.addContact({ userId: card.id });
+                const c = await api.addContact({ userId: resolvedCard.id });
                 setContacts(prev => prev.find(x => x.id === c.id) ? prev : [...prev, c]);
                 setQuery('');
                 setCard(null);
@@ -283,11 +287,11 @@ export function ContactsScreen() {
             }}
             onRemoveContact={async () => {
               if (!await customConfirm('Удалить из контактов? Чат и переписка останутся.', { confirmLabel: 'Удалить' })) return;
-              try { await api.deleteContact(card.id); setContacts(prev => prev.filter(c => c.id !== card.id)); setCard(null); }
+              try { await api.deleteContact(resolvedCard.id); setContacts(prev => prev.filter(c => c.id !== resolvedCard.id)); setCard(null); }
               catch (e) { heyToast('Ошибка: ' + e.message, 'error'); }
             }}
-            onBlock={() => handleBlock(card)}
-            onUnblock={() => handleUnblock(card.id)}
+            onBlock={() => handleBlock(resolvedCard)}
+            onUnblock={() => handleUnblock(resolvedCard.id)}
             onNotesChange={handleNotesChange}
             onOpenMoment={(m) => { setCard(null); nav(`/moments/${m.id}`); }}
           />

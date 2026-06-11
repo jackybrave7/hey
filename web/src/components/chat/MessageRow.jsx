@@ -32,6 +32,7 @@ const MessageRow = memo(function MessageRow({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const hoverOffTimer = useRef(null);
+  const tapRevealTimer = useRef(null);
   // На десктопе показываем кнопку по hover, на touch/WebView — по тапу
   // на пузырь. Right-click / long-press открывает меню.
   const [tappedReveal, setTappedReveal] = useState(false);
@@ -47,7 +48,23 @@ const MessageRow = memo(function MessageRow({
 
   useEffect(() => () => {
     if (hoverOffTimer.current) clearTimeout(hoverOffTimer.current);
+    if (tapRevealTimer.current) clearTimeout(tapRevealTimer.current);
   }, []);
+
+  useEffect(() => {
+    if (canHover || !tappedReveal || reactionPickerMsgId === m.id) return;
+    if (tapRevealTimer.current) clearTimeout(tapRevealTimer.current);
+    tapRevealTimer.current = setTimeout(() => {
+      setTappedReveal(false);
+      tapRevealTimer.current = null;
+    }, 1800);
+    return () => {
+      if (tapRevealTimer.current) {
+        clearTimeout(tapRevealTimer.current);
+        tapRevealTimer.current = null;
+      }
+    };
+  }, [canHover, tappedReveal, reactionPickerMsgId, m.id]);
 
   const keepHovered = () => {
     if (hoverOffTimer.current) {
@@ -68,7 +85,7 @@ const MessageRow = memo(function MessageRow({
       && x >= rect.left - 8 && x <= rect.right + 8
       && y >= rect.top - 8 && y <= rect.bottom + 8;
     if (stillInside) return;
-    hoverOffTimer.current = setTimeout(() => setIsHovered(false), 120);
+    hoverOffTimer.current = setTimeout(() => setIsHovered(false), 650);
   };
 
   return (
@@ -80,7 +97,7 @@ const MessageRow = memo(function MessageRow({
         // поэтому 36-px смайл-слот вылезает за экран. С width:100% row
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
-        marginBottom: hasReactions ? 12 : 8}}
+        marginBottom: 14, overflow:'visible'}}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
@@ -106,7 +123,7 @@ const MessageRow = memo(function MessageRow({
         // Жёсткий пиксельный cap (без CSS min() — на случай нестандартного
         // поведения flex-min-content). Достаточно для всех нормальных
         // viewport'ов, на узких мобилках всё равно ограничится width родителя.
-        maxWidth: 540, minWidth: 0}}
+        maxWidth: 540, minWidth: 0, position:'relative'}}
         onMouseEnter={keepHovered}
         onMouseMove={keepHovered}
         onMouseLeave={releaseHovered}>
@@ -123,7 +140,14 @@ const MessageRow = memo(function MessageRow({
             const sel = window.getSelection?.();
             if (sel && sel.toString().length > 0) return;
             if (e.target.closest && e.target.closest('a,button,img[role="button"]')) return;
-            setTappedReveal(v => !v);
+            setTappedReveal(v => {
+              const next = !v;
+              if (!next && tapRevealTimer.current) {
+                clearTimeout(tapRevealTimer.current);
+                tapRevealTimer.current = null;
+              }
+              return next;
+            });
           }}
           style={{
             background: editingMsgId === m.id
@@ -405,7 +429,12 @@ const MessageRow = memo(function MessageRow({
             Реакторы теперь приходят как [{id,name,avatar},...] вместо
             массива user_id (сервер делает JOIN). */}
         {hasReactions && (
-          <div style={{display:'flex', flexWrap:'wrap', gap:4, marginTop:5}}>
+          <div style={{
+            position:'absolute', top:'100%', marginTop:4,
+            ...(isOut ? { right:0 } : { left:0 }),
+            display:'flex', flexWrap:'wrap', gap:4,
+            maxWidth:'100%', zIndex:2,
+          }}>
             {Object.entries(m.reactions).map(([emoji, reactors]) => {
               // Бэк-compat: если сервер ещё прислал массив строк (старый
               // формат) — конвертим на лету в объекты-заглушки. Дополнительно
@@ -485,6 +514,10 @@ const MessageRow = memo(function MessageRow({
             onClick={(e) => {
               e.stopPropagation();
               const rect = e.currentTarget.getBoundingClientRect();
+              if (tapRevealTimer.current) {
+                clearTimeout(tapRevealTimer.current);
+                tapRevealTimer.current = null;
+              }
               setTappedReveal(false);
               onSetReactionPicker(p => p?.msgId === m.id ? null
                 : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });

@@ -29,18 +29,6 @@ import { fileTypeIcon, AttachmentPreview } from '../../lib/fileTypeIcon';
 
 const HEY_EMOJI = HEY_EMOJI_LIST;
 
-// Fingerprint for Virtuoso keys + memo — must change when reactions change.
-function rxKey(reactions) {
-  if (!reactions || !Object.keys(reactions).length) return '0';
-  return Object.keys(reactions).sort().map(emoji => {
-    const ids = (reactions[emoji] || [])
-      .map(r => (typeof r === 'string' ? r : r?.id))
-      .filter(Boolean)
-      .join(',');
-    return `${emoji}:${ids}`;
-  }).join('|');
-}
-
 export function ChatScreen() {
   const nav = useNavigate();
   const location = useLocation();
@@ -1753,9 +1741,7 @@ export function ChatScreen() {
           style={{ flex: 1, overscrollBehavior: 'contain' }}
           firstItemIndex={firstItemIndex}
           data={flatItems}
-          computeItemKey={(_index, item) => (
-            item.type === 'msg' ? `${item.id}#${rxKey(item.reactions)}` : item.id
-          )}
+          computeItemKey={(_index, item) => item.id}
           initialTopMostItemIndex={Math.max(0, flatItems.length - 1)}
           startReached={loadOlder}
           atBottomStateChange={bottom => { atBottomRef.current = bottom; setShowScrollDown(!bottom); }}

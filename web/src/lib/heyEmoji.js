@@ -4,12 +4,14 @@
 // показывали одинаковую формулировку.
 
 export const HEY_EMOJI = [
+  'thumbs up', // 👍 «Во!»
+  'handshake', // 🤝 «Договорились»
+  'fire', // 🔥 «Огонь»
+  'ok hand', // 👌 «Ок»
   'smiling','happy','winking','sad','angry','surprised',
   'wow','dead','discouraged','dissatisfied','chilly','silent',
   'suspicious','tricky smile','no comments','congrats','cute hearts','heart kiss',
   'cool','love','sleepy','nervous','starstruck','haha',
-  'thumbs up', // 👍 «Класс»
-  'handshake', // 🤝 «Договорились»
 ];
 
 export const HEY_EMOJI_SET = new Set(HEY_EMOJI);
@@ -42,8 +44,10 @@ export const HEY_EMOJI_LABEL = {
   'nervous':         'Нервничаю',
   'starstruck':      'Восторг',
   'haha':            'Смешно',
-  'thumbs up':       'Класс',
+  'thumbs up':       'Во!',
   'handshake':       'Договорились',
+  'fire':            'Огонь',
+  'ok hand':         'Ок',
 };
 
 export function emojiLabel(name) {
@@ -54,7 +58,7 @@ export function emojiLabel(name) {
 // насильно перетянут эмодзи когда мы редактируем SVG в /public/emoji.
 // Без этого long-cache на статике (nginx etag) держит старые версии
 // у пользователей которые не делают hard-reload.
-export const HEY_EMOJI_VERSION = '3';
+export const HEY_EMOJI_VERSION = '11';
 
 export function emojiUrl(name) {
   return `/emoji/${encodeURIComponent(name)}.svg?v=${HEY_EMOJI_VERSION}`;

@@ -42,6 +42,7 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
   onAddContact, onRemoveContact, onBlock, onUnblock, onNotesChange, onOpenMoment }) {
   const [notes, setNotes]         = useState(contact.notes || '');
   const [notesSaved, setNotesSaved] = useState(false);
+  const notesDirty = useRef(false);
   const [avatarFull, setAvatarFull] = useState(false);
   const [editingNick, setEditingNick] = useState(false);
   const [nickDraft, setNickDraft] = useState(contact.nickname || '');
@@ -64,6 +65,14 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
   const saveTimer = useRef();
 
   useEffect(() => {
+    setFresh(null);
+    setNotes(contact.notes || '');
+    setNickDraft(contact.nickname || '');
+    setEditingNick(false);
+    notesDirty.current = false;
+  }, [contact?.id]);
+
+  useEffect(() => {
     let alive = true;
     if (!contact?.id) return;
     api.getUserProfile(contact.id)
@@ -74,8 +83,14 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
 
   // Объединяем: свежие данные имеют приоритет над contacts-кешем
   const merged = { ...contact, ...(fresh || {}) };
-  merged.nickname = contact.nickname;
-  merged.notes    = contact.notes;
+  merged.nickname = contact.nickname ?? fresh?.nickname ?? null;
+  merged.notes    = contact.notes ?? fresh?.notes ?? null;
+
+  useEffect(() => {
+    if (!fresh || notesDirty.current) return;
+    const resolved = contact.notes ?? fresh.notes ?? '';
+    setNotes(resolved);
+  }, [fresh, contact.notes]);
   // Определяем isContact: явный проп > свежий is_contact с сервера
   const resolvedIsContact = isContact !== undefined ? isContact : !!fresh?.is_contact;
 
@@ -84,6 +99,7 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
   const avatarIsImg = av && (av.startsWith('/') || av.startsWith('http') || av.startsWith('data:'));
 
   function handleNotesChange(val) {
+    notesDirty.current = true;
     setNotes(val);
     setNotesSaved(false);
     clearTimeout(saveTimer.current);
@@ -256,12 +272,13 @@ function ContactCardModal({ contact, isBlocked, isContact, onClose, onChat,
             </div>
             <textarea value={notes} onChange={e=>handleNotesChange(e.target.value)}
               placeholder="Заметки видны только вам…"
-              rows={3}
+              rows={2}
               style={{
                 width:'100%',boxSizing:'border-box',
                 background:'rgba(249,240,240,.08)',border:'1px solid rgba(249,240,240,.15)',
                 borderRadius:12,padding:'10px 13px',color:'#F9F0F0',fontSize:14,
                 fontFamily:'inherit',resize:'none',outline:'none',lineHeight:1.5,
+                height:62,minHeight:62,maxHeight:62,overflowY:'auto',
                 transition:'border-color .15s'
               }}
               onFocus={e=>e.target.style.borderColor='rgba(180,140,220,.6)'}
