@@ -48,6 +48,76 @@ function requireBusinessOrAdmin(req, res, next) {
   });
 }
 
+function publicOrigin(req) {
+  const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}`;
+}
+
+async function probeMediaUrl(label, url, headers = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(url, {
+      headers: { Range: 'bytes=0-511', ...headers },
+      redirect: 'follow',
+      signal: ctrl.signal,
+    });
+    const buf = Buffer.from(await res.arrayBuffer());
+    return {
+      label,
+      url,
+      ok: res.ok,
+      status: res.status,
+      contentType: res.headers.get('content-type') || null,
+      contentLength: res.headers.get('content-length') || null,
+      bytesRead: buf.length,
+      firstBytesHex: buf.subarray(0, 24).toString('hex'),
+      firstText: buf.subarray(0, 80).toString('utf8').replace(/\s+/g, ' ').slice(0, 80),
+    };
+  } catch (e) {
+    return {
+      label,
+      url,
+      ok: false,
+      error: e?.name === 'AbortError' ? 'timeout' : (e?.message || String(e)),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function buildMediaDiagnostics(req, input) {
+  const { s3KeyFromUrl, PUBLIC_BASE } = require('./mediaUrl');
+  const key = s3KeyFromUrl(input.src || input.currentSrc || input.failedUrl || '');
+  const origin = publicOrigin(req);
+  const probes = [];
+
+  if (!key) {
+    return { key: null, probes, error: 'no_s3_key' };
+  }
+
+  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+  const ua = input.userAgent || req.headers['user-agent'] || '';
+  const commonHeaders = ua ? { 'User-Agent': ua } : {};
+
+  probes.push(await probeMediaUrl('same-origin /media', `${origin}/media/${encodedKey}`, commonHeaders));
+  probes.push(await probeMediaUrl('same-origin /api/media', `${origin}/api/media/${encodedKey}`, commonHeaders));
+  probes.push(await probeMediaUrl('same-origin /api/media jpeg', `${origin}/api/media/${encodedKey}?format=jpeg`, commonHeaders));
+  probes.push(await probeMediaUrl('direct s3', `${PUBLIC_BASE()}/${key}`, commonHeaders));
+
+  if (typeof storage.getReadUrl === 'function') {
+    try {
+      const signedUrl = await storage.getReadUrl(key, 300);
+      probes.push(await probeMediaUrl('presigned s3', signedUrl, commonHeaders));
+    } catch (e) {
+      probes.push({ label: 'presigned s3', ok: false, error: e?.message || String(e) });
+    }
+  }
+
+  return { key, probes };
+}
+
 // Middleware для tenant-scoped ручек: пускает либо системного админа,
 // либо владельца tenant'а (tenant.owner_id === req.user.id). Кладёт в req:
 //   req.tenant     — объект tenant'а
@@ -404,6 +474,29 @@ module.exports = function makeRouter(db, broadcast) {
       console.error('[/api/media]', key, e.message);
       if (!res.headersSent) res.status(502).end();
     });
+  });
+
+  r.post('/diagnostics/media-image', requireAuth, async (req, res) => {
+    const body = req.body || {};
+    try {
+      const report = {
+        id: uuid(),
+        at: new Date().toISOString(),
+        userId: req.user.id,
+        reason: String(body.reason || 'unknown').slice(0, 80),
+        src: String(body.src || '').slice(0, 500),
+        currentSrc: String(body.currentSrc || '').slice(0, 500),
+        failedUrl: String(body.failedUrl || '').slice(0, 500),
+        page: String(body.page || '').slice(0, 300),
+        userAgent: String(body.userAgent || req.headers['user-agent'] || '').slice(0, 300),
+      };
+      const diagnostics = await buildMediaDiagnostics(req, report);
+      console.warn('[media-diagnostic]', JSON.stringify({ ...report, ...diagnostics }));
+      res.json({ ok: true, id: report.id, key: diagnostics.key || null });
+    } catch (e) {
+      console.error('[media-diagnostic:error]', e);
+      res.status(500).json({ error: 'Diagnostic failed' });
+    }
   });
 
   // ── Avatar endpoint — отдельный endpoint, кешируется браузером на 30 дней ───
