@@ -7,7 +7,7 @@ const contacts = {
   operator: 'Индивидуальный предприниматель Алферов Евгений Александрович',
   inn: '772023445483',
   ogrnip: '324774600516113',
-  email: 'hey_messenger_support_bot в Telegram',
+  email: 'info@hey-messenger.ru',
 };
 
 const termsSections = [
