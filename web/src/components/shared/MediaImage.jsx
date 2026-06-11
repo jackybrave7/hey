@@ -3,6 +3,7 @@ import { androidImageFetchUrls, mediaFallbackUrls, mediaUrl } from '../../lib/me
 
 const androidBlobCache = new Map();
 const diagnosticSent = new Set();
+const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
 function sendMediaDiagnostic({ src, currentSrc, failedUrl, reason }) {
   const key = `${reason}|${src}|${failedUrl || currentSrc || ''}`;
@@ -116,6 +117,7 @@ export function MediaImage({ src, alt = '', style, ...props }) {
           failedUrl: e.currentTarget.currentSrc || current,
           reason: 'img-error',
         });
+        setCurrent(TRANSPARENT_PIXEL);
         props.onError?.(e);
       }}
     />

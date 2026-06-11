@@ -13,12 +13,15 @@ async function streamMedia(key, res, opts = {}) {
     return res.sendFile(localPath, err => { if (err) res.status(404).end(); });
   }
 
-  // Сначала пробуем public URL. Если ACL провайдером игнорируется или бакет
-  // приватный, используем presigned read URL через S3 API.
-  let upstream = await fetch(`${PUBLIC_BASE()}/${key}`);
-  if (!upstream.ok && typeof storage.getReadUrl === 'function') {
+  // В проде S3_PUBLIC_URL_BASE может указывать на same-origin /media, поэтому
+  // для Node-proxy сначала читаем S3 напрямую через presigned URL.
+  let upstream = null;
+  if (typeof storage.getReadUrl === 'function') {
     const signedUrl = await storage.getReadUrl(key, 300);
     upstream = await fetch(signedUrl);
+  }
+  if (!upstream || !upstream.ok) {
+    upstream = await fetch(`${PUBLIC_BASE()}/${key}`);
   }
   if (!upstream.ok) return res.status(upstream.status).end();
   res.set('Cache-Control', 'public, max-age=86400, immutable');
