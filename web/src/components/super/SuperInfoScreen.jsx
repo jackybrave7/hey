@@ -4,17 +4,80 @@ import { heyToast } from '../shared/Toast';
 import HeyLogo from '../HeyLogo';
 import Icon from '../Icon';
 
+const LIMIT_ROWS = [
+  { icon: '✦', label: 'Активные моменты', regular: '1', super: '3' },
+  { icon: 'mic', label: 'Голосовые', regular: 'до 1 мин', super: 'до 5 мин' },
+  { icon: '🖼', label: 'Картинки в чате', regular: 'до 8 МБ', super: 'до 15 МБ' },
+  { icon: '📎', label: 'Файлы в чате', regular: 'до 25 МБ', super: 'до 50 МБ' },
+  { icon: '✍️', label: 'Ссылки в био', regular: '1', super: '5' },
+  { icon: '📌', label: 'Закреплённые чаты', regular: 'до 5', super: 'до 15' },
+  { icon: '👥', label: 'Размер группы', regular: 'до 100', super: 'до 500' },
+];
+
+const SUPER_ONLY = [
+  { icon: '🟢', label: 'Онлайн-статус контактов', super: 'видишь, когда был онлайн' },
+  { icon: '📊', label: 'Аналитика моментов', super: 'кто видел и кто резонирует' },
+];
+
+function LimitCompareRow({ icon, label, regular, super: superVal }) {
+  return (
+    <div style={{
+      background: 'rgba(249,240,240,.05)',
+      borderRadius: 14, padding: '12px 14px',
+      border: '1px solid rgba(249,240,240,.08)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 18, flexShrink: 0, display: 'inline-flex', color: 'rgba(249,240,240,.88)' }}>
+          {icon === 'mic' ? <Icon name="mic" size={18} /> : icon}
+        </span>
+        <span style={{ color: '#F9F0F0', fontSize: 14, fontWeight: 600 }}>{label}</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center' }}>
+        <div style={{
+          textAlign: 'center', padding: '8px 6px', borderRadius: 10,
+          background: 'rgba(249,240,240,.06)', border: '1px solid rgba(249,240,240,.1)',
+        }}>
+          <div style={{ fontSize: 10, color: 'rgba(249,240,240,.55)', marginBottom: 3, fontWeight: 600 }}>
+            Без Super
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(249,240,240,.78)', fontWeight: 600 }}>{regular}</div>
+        </div>
+        <span style={{ color: 'rgba(200,170,255,.7)', fontSize: 16, fontWeight: 700 }}>→</span>
+        <div style={{
+          textAlign: 'center', padding: '8px 6px', borderRadius: 10,
+          background: 'rgba(95, 64, 128,.28)', border: '1px solid rgba(180,140,255,.35)',
+        }}>
+          <div style={{ fontSize: 10, color: 'rgba(220,200,255,.85)', marginBottom: 3, fontWeight: 700 }}>
+            ✦ Super
+          </div>
+          <div style={{ fontSize: 13, color: '#F9F0F0', fontWeight: 700 }}>{superVal}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SuperOnlyRow({ icon, label, super: superVal }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 12,
+      background: 'rgba(95, 64, 128,.18)',
+      borderRadius: 14, padding: '12px 14px',
+      border: '1px solid rgba(180,140,255,.28)',
+    }}>
+      <span style={{ fontSize: 18, flexShrink: 0 }}>{icon}</span>
+      <div>
+        <div style={{ color: '#F9F0F0', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+        <div style={{ fontSize: 12, color: 'rgba(249,240,240,.72)', lineHeight: 1.45 }}>
+          Без Super — нет · ✦ Super — {superVal}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperInfoScreen({ onClose, onInvite }) {
   const { user } = useAuth();
-  const features = [
-    { icon: '✦', text: '3 момента одновременно (вместо 1)' },
-    { icon: 'mic', text: 'Голосовые до 5 минут (вместо 1)' },
-    { icon: '🟢', text: 'Видишь, когда контакт был онлайн' },
-    { icon: '📊', text: 'Детальная аналитика — кто видел и резонирует' },
-    { icon: '🖼', text: 'Картинки до 15 МБ, файлы до 50 МБ' },
-    { icon: '✍️', text: 'Био до 1000 символов и до 5 ссылок' },
-    { icon: '📌', text: 'До 15 закреплённых чатов' },
-  ];
 
   function copyInviteLink() {
     if (!user?.id) {
@@ -29,6 +92,7 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
       heyToast('Не удалось скопировать. Скопируй вручную: ' + link, 'error');
     }
     onClose?.();
+    onInvite?.();
   }
 
   return (
@@ -49,7 +113,6 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
         border: '1px solid rgba(249,240,240,.1)',
         overflow: 'hidden',
       }}>
-        {/* Header */}
         <div style={{
           padding: '28px 24px 20px',
           background: 'linear-gradient(160deg, rgba(95, 64, 128,.35) 0%, rgba(80,40,140,.2) 100%)',
@@ -80,30 +143,30 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
           }}>
             HEY СУПЕР
           </div>
-          <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 14 }}>
-            Когда хочется больше
+          <div style={{ color: 'rgba(249,240,240,.72)', fontSize: 14 }}>
+            Сравнение лимитов с обычным аккаунтом
           </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-          {/* Features list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-            {features.map(({ icon, text }) => (
-              <div key={text} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                background: 'rgba(249,240,240,.05)',
-                borderRadius: 14, padding: '13px 16px',
-                border: '1px solid rgba(249,240,240,.07)',
-              }}>
-                <span style={{ fontSize: 20, flexShrink: 0, display:'inline-flex', color:'rgba(249,240,240,.85)' }}>
-                  {icon === 'mic' ? <Icon name="mic" size={20} /> : icon}
-                </span>
-                <span style={{ color: 'rgba(249,240,240,.85)', fontSize: 14 }}>{text}</span>
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+            {LIMIT_ROWS.map((row) => (
+              <LimitCompareRow key={row.label} {...row} />
             ))}
           </div>
 
-          {/* Referral block */}
+          <div style={{
+            color: 'rgba(249,240,240,.65)', fontSize: 12, fontWeight: 600,
+            marginBottom: 8, textTransform: 'uppercase', letterSpacing: .4,
+          }}>
+            Только в ✦ Super
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+            {SUPER_ONLY.map((row) => (
+              <SuperOnlyRow key={row.label} {...row} />
+            ))}
+          </div>
+
           <div style={{
             background: 'linear-gradient(135deg, rgba(95, 64, 128,.3), rgba(80,40,140,.2))',
             border: '1px solid rgba(180,140,255,.25)',
@@ -114,9 +177,9 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
             <div style={{ color:'#F9F0F0', fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
               Пригласи 3 друзей — получи 3 месяца СУПЕР
             </div>
-            <div style={{ color: 'rgba(249,240,240,.6)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+            <div style={{ color: 'rgba(249,240,240,.75)', fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
               Разовая акция для новых пользователей.<br/>
-              Друг засчитывается когда зарегистрируется по твоей ссылке
+              Друг засчитывается, когда зарегистрируется по твоей ссылке
               и напишет хотя бы одно сообщение.
             </div>
             <button onClick={copyInviteLink} style={{
@@ -127,7 +190,7 @@ export default function SuperInfoScreen({ onClose, onInvite }) {
             }}>
               🔗 Скопировать пригласительную ссылку
             </button>
-            <div style={{ color: 'rgba(249,240,240,.35)', fontSize: 11, marginTop: 12 }}>
+            <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 11, marginTop: 12 }}>
               Прямая покупка появится позже
             </div>
           </div>

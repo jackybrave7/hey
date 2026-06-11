@@ -1,7 +1,6 @@
 // SuperStatusCard.jsx — 4 states + progress bar + super expiry date
 import { useState } from 'react';
 import SuperInfoScreen from './SuperInfoScreen';
-import { useSalesPressure } from '../../lib/publicSettings';
 import HeyLogo from '../HeyLogo';
 
 function fmtDate(ts) {
@@ -14,23 +13,16 @@ function daysLeft(ts) {
 
 export default function SuperStatusCard({ user, onInvite }) {
   const [showInfo, setShowInfo] = useState(false);
-  const salesPressure = useSalesPressure();
 
   const isSuper         = !!user?.is_super;
   const bonusClaimed    = !!user?.super_bonus_claimed;
   const expiresAt       = user?.super_expires_at || null;
-  // invited_total — все зарегистрированные по моей ссылке;
-  // invited_confirmed — из них те кто написал первое сообщение
-  // (только они засчитываются в Super-бонус «3 друзей»).
-  // invited_count алиасит confirmed для обратной совместимости.
+  // invited_total — все зарегистрированные по моей ссылке (как в модалке «Пригласить»);
+  // invited_confirmed — из них те, кто написал первое сообщение (для бонуса СУПЕР).
   const invitedTotal     = user?.invited_total ?? user?.invited_count ?? 0;
-  const invitedConfirmed = user?.invited_confirmed ?? user?.invited_count ?? 0;
-  const invitedCount     = invitedConfirmed;
-  const remainingToSuper = Math.max(0, 3 - invitedConfirmed);
-  // L1 (мягкий): прогресс-бар появляется только начиная с 2/3 — раньше юзер
-  // не должен видеть «давай-давай», пока не близок к цели.
-  // L2 (жёсткий): прогресс с 0/3.
-  const showProgressBar = salesPressure >= 2 ? true : invitedCount >= 2;
+  const invitedConfirmed = user?.invited_confirmed ?? 0;
+  const remainingInvites = Math.max(0, 3 - invitedTotal);
+  const remainingConfirmed = Math.max(0, 3 - invitedConfirmed);
 
   // State A: is_super && !bonus_claimed
   // State B: !is_super && !bonus_claimed
@@ -128,47 +120,52 @@ export default function SuperStatusCard({ user, onInvite }) {
   }
 
   function ProgressBar() {
-    const filled = Math.min(invitedConfirmed / 3, 1);
-    const almostDone = invitedConfirmed === 2;
+    const goal = 3;
+    const filled = Math.min(invitedTotal / goal, 1);
+    const almostDone = invitedTotal === goal - 1;
     return (
       <div style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
-          <div style={{ color: 'rgba(249,240,240,.6)', fontSize: 12 }}>
-            Прогресс: {invitedConfirmed} / 3 друзей
-            {invitedTotal > invitedConfirmed && (
-              <span style={{ color: 'rgba(249,240,240,.4)', marginLeft: 6 }}>
-                · ещё {invitedTotal - invitedConfirmed} зарегистрировались
-              </span>
-            )}
+          <div style={{ color: 'rgba(249,240,240,.78)', fontSize: 12, fontWeight: 600 }}>
+            Прогресс до СУПЕР
           </div>
-          {almostDone ? (
-            <div style={{ color: '#ffa500', fontSize: 12, fontWeight: 600 }}>
-              Остался 1 шаг!
-            </div>
-          ) : remainingToSuper > 0 ? (
-            <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, fontWeight: 600 }}>
-              Осталось: {remainingToSuper}
-            </div>
-          ) : null}
+          <div style={{
+            color: invitedTotal >= goal ? 'rgba(100,240,140,.9)' : 'rgba(200,170,255,.9)',
+            fontSize: 13, fontWeight: 700,
+          }}>
+            {invitedTotal} / {goal}
+          </div>
         </div>
         <div style={{
-          height: 6, borderRadius: 3,
+          height: 8, borderRadius: 4,
           background: 'rgba(249,240,240,.1)',
           overflow: 'hidden',
         }}>
           <div style={{
             height: '100%',
             width: `${filled * 100}%`,
-            borderRadius: 3,
-            background: almostDone
-              ? 'linear-gradient(90deg, #ffa500, #ff6b00)'
-              : 'linear-gradient(90deg, #c8a8ff, #5F4080)',
+            borderRadius: 4,
+            background: invitedTotal >= goal
+              ? 'linear-gradient(90deg, rgba(60,200,100,.8), rgba(100,240,140,.9))'
+              : almostDone
+                ? 'linear-gradient(90deg, #ffa500, #ff6b00)'
+                : 'linear-gradient(90deg, rgba(95, 64, 128,.8), rgba(180,120,255,.9))',
             transition: 'width .3s ease',
           }} />
         </div>
+        <div style={{ color: 'rgba(249,240,240,.62)', fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
+          {invitedTotal >= goal
+            ? '🎉 Три друга по ссылке — бонус СУПЕР активируется после первого сообщения от каждого.'
+            : remainingInvites > 0
+              ? `Пригласите ещё ${remainingInvites} ${remainingInvites === 1 ? 'друга' : 'друзей'} — получите СУПЕР на 3 месяца`
+              : null}
+        </div>
         {invitedTotal > invitedConfirmed && (
-          <div style={{ color: 'rgba(249,240,240,.45)', fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
-            Засчитываются те, кто после регистрации написал хотя бы одно сообщение в HEY.
+          <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
+            Засчитано для бонуса: {invitedConfirmed} / {goal} — друг должен написать хотя бы одно сообщение после регистрации.
+            {remainingConfirmed > 0 && invitedConfirmed < goal && (
+              <span> Осталось подтвердить: {remainingConfirmed}.</span>
+            )}
           </div>
         )}
       </div>
@@ -202,7 +199,7 @@ export default function SuperStatusCard({ user, onInvite }) {
       <>
         <div style={inactiveCardStyle}>
           <InactiveHeader subtitle="До 3 Моментов, длинные голосовые, аналитика" />
-          {showProgressBar && <ProgressBar />}
+          <ProgressBar />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button onClick={onInvite} style={{
               width: '100%', padding: '12px', borderRadius: 12,
