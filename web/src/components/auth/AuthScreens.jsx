@@ -11,6 +11,7 @@ import {
   AuthBrand, FloatingInput, PasswordInput,
   InviteBadge, ForgotPasswordPopup
 } from './AuthComponents';
+import { NoVpnRuNote } from './NoVpnRuNote';
 import { validatePhone, formatPhoneInput, caretAfterNthDigit } from '../../lib/phoneFormat';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
 
@@ -80,7 +81,7 @@ export function HeyScreen() {
       <style>{`
         @keyframes heyFadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         .hey-feat-card { transition: transform .18s, background .18s; }
-        .hey-feat-card:hover { transform: translateY(-3px); background: rgba(249,240,240,.11) !important; }
+        .hey-feat-card:hover { transform: translateY(-3px); background: rgba(249,240,240,.2) !important; }
         .hey-cta-login {
           width:100%; background:#5F4080; border:none; border-radius:26px;
           padding:15px; color:#F9F0F0; font-size:15px; font-weight:700;
@@ -89,11 +90,11 @@ export function HeyScreen() {
         }
         .hey-cta-login:hover { background:#735494; transform:translateY(-1px); box-shadow:0 12px 32px rgba(95, 64, 128,.55); }
         .hey-cta-reg {
-          width:100%; background:rgba(249,240,240,.11); border:1px solid rgba(249,240,240,.28);
-          border-radius:26px; padding:15px; color:#F9F0F0; font-size:15px; font-weight:600;
+          width:100%; background:rgba(249,240,240,.18); border:1.5px solid rgba(249,240,240,.45);
+          border-radius:26px; padding:15px; color:#F9F0F0; font-size:15px; font-weight:700;
           cursor:pointer; font-family:inherit; transition:background .15s;
         }
-        .hey-cta-reg:hover { background:rgba(249,240,240,.2); }
+        .hey-cta-reg:hover { background:rgba(249,240,240,.28); }
       `}</style>
 
       {/* Hero */}
@@ -119,17 +120,23 @@ export function HeyScreen() {
             <HeyLogo size={56} color="#F9F0F0" title="HEY" />
             HEY
           </div>
-          <div style={{fontSize:15, color:'rgba(249,240,240,.7)', fontWeight:400, letterSpacing:.3}}>
+          <div style={{fontSize:15, color:'rgba(249,240,240,.9)', fontWeight:500, letterSpacing:.3}}>
             Мессенджер для тех, кто творит
           </div>
         </div>
 
         <div style={{
-          fontSize:13, color:'rgba(249,240,240,.45)', textAlign:'center',
+          fontSize:13, color:'rgba(249,240,240,.84)', textAlign:'center',
           lineHeight:1.7, maxWidth:260,
           animation:'heyFadeUp .5s ease-out .12s both',
         }}>
           Моменты · Чаты · Контакты без лишнего шума
+        </div>
+        <div style={{
+          marginTop: 14, textAlign: 'center',
+          animation: 'heyFadeUp .5s ease-out .18s both',
+        }}>
+          <NoVpnRuNote />
         </div>
       </div>
 
@@ -141,8 +148,8 @@ export function HeyScreen() {
       }}>
         {features.map((f, i) => (
           <div key={i} className="hey-feat-card" style={{
-            background:'rgba(249,240,240,.07)',
-            border:'1px solid rgba(249,240,240,.12)',
+            background:'rgba(249,240,240,.14)',
+            border:'1px solid rgba(249,240,240,.28)',
             borderRadius:18, padding:'16px 14px',
           }}>
             <div style={{fontSize:26, marginBottom:8, lineHeight:1}}>{f.icon}</div>
@@ -151,7 +158,7 @@ export function HeyScreen() {
               marginBottom:5,
             }}>{f.title}</div>
             <div style={{
-              color:'rgba(249,240,240,.48)', fontSize:12, lineHeight:1.55,
+              color:'rgba(249,240,240,.88)', fontSize:12, lineHeight:1.55,
             }}>{f.desc}</div>
           </div>
         ))}
@@ -170,10 +177,18 @@ export function HeyScreen() {
           Создать аккаунт
         </button>
         <div style={{
-          textAlign:'center', fontSize:12, color:'rgba(249,240,240,.25)',
+          textAlign:'center', fontSize:12, color:'rgba(249,240,240,.78)',
           marginTop:4, lineHeight:1.5,
         }}>
           Вход только по инвайту от участника сообщества
+        </div>
+        <div style={{
+          textAlign:'center', fontSize:12, color:'rgba(249,240,240,.72)',
+          marginTop:8, lineHeight:1.5,
+        }}>
+          <a href="/terms" style={{ color:'#F9F0F0', textDecoration:'underline' }}>Соглашение</a>
+          {' · '}
+          <a href="/privacy" style={{ color:'#F9F0F0', textDecoration:'underline' }}>Персональные данные</a>
         </div>
       </div>
     </div>
@@ -233,6 +248,10 @@ export function LoginScreen() {
       <div style={{ width: '100%', maxWidth: 380 }}>
         <AuthBrand />
 
+        <div style={{ textAlign: 'center', marginBottom: 16, animation: 'authFadeUp .6s ease-out .08s both' }}>
+          <NoVpnRuNote />
+        </div>
+
         <div style={{
           fontSize: 22, fontWeight: 700, textAlign: 'center',
           color:'#F9F0F0', marginBottom: 22,
@@ -259,9 +278,9 @@ export function LoginScreen() {
             <span
               onClick={() => setShowForgot(true)}
               style={{
-                color: 'rgba(249,240,240,.72)', fontSize: 13,
+                color: 'rgba(249,240,240,.9)', fontSize: 13,
                 textDecoration: 'none', cursor: 'pointer',
-                borderBottom: '1px dashed rgba(249,240,240,.4)',
+                borderBottom: '1px dashed rgba(249,240,240,.55)',
                 paddingBottom: 1
               }}
             >
@@ -281,7 +300,7 @@ export function LoginScreen() {
             {loading ? 'Входим…' : 'Войти'}
           </button>
 
-          <div style={{ textAlign: 'center', marginTop: 22, color: 'rgba(249,240,240,.68)', fontSize: 14 }}>
+          <div style={{ textAlign: 'center', marginTop: 22, color: 'rgba(249,240,240,.88)', fontSize: 14 }}>
             Нет аккаунта?{' '}
             <span
               onClick={() => nav('/register')}
@@ -290,6 +309,11 @@ export function LoginScreen() {
             >
               Создать
             </span>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 14, color: 'rgba(249,240,240,.72)', fontSize: 12, lineHeight: 1.5 }}>
+            <a href="/terms" style={{ color:'#F9F0F0', textDecoration:'underline' }}>Соглашение</a>
+            {' · '}
+            <a href="/privacy" style={{ color:'#F9F0F0', textDecoration:'underline' }}>Персональные данные</a>
           </div>
         </div>
 
@@ -304,7 +328,7 @@ export function LoginScreen() {
             { icon: '🔇', text: 'Чаты без рекламы и алгоритмов' },
           ].map(({ icon, text }) => (
             <div key={text} style={{
-              fontSize: 13, color: 'rgba(249,240,240,.62)',
+              fontSize: 13, color: 'rgba(249,240,240,.86)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
             }}>
               <span style={{ fontSize: 14 }}>{icon}</span>{text}
@@ -354,6 +378,7 @@ export function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [err, setErr]           = useState('');
   const [loading, setLoading]   = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [inviter, setInviter]   = useState(null);
   // Шаг подтверждения номера: SMS у нас нет, поэтому перед фактической
   // регистрацией показываем крупный поп-ап с номером и просим
@@ -403,6 +428,7 @@ export function RegisterScreen() {
     const pv = validatePhone(phone);
     if (!pv.ok) { setErr(pv.msg); return; }
     if (password.length < 8) { setErr('Пароль минимум 8 символов'); return; }
+    if (!legalAccepted) { setErr('Нужно принять пользовательское соглашение и политику персональных данных'); return; }
     setConfirmPhone({ display: phone.trim() || pv.normalized, normalized: pv.normalized });
   }
 
@@ -511,11 +537,37 @@ export function RegisterScreen() {
             onChange={handlePhoneChange} autoComplete="tel" />
           <PasswordInput id="reg-pwd" label="Придумай пароль" value={password}
             onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleRegister()} />
+            onKeyDown={e => e.key === 'Enter' && startRegister()} />
 
-          <div style={{ color: 'rgba(249,240,240,.52)', fontSize: 12, margin: '-4px 4px 18px', lineHeight: 1.5 }}>
+          <div style={{ color: 'rgba(249,240,240,.82)', fontSize: 12, margin: '-4px 4px 18px', lineHeight: 1.5 }}>
             Минимум 8 символов. Аватар и день рождения добавишь потом в профиле.
           </div>
+
+          <label style={{
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+            color: 'rgba(249,240,240,.88)', fontSize: 12, lineHeight: 1.55,
+            margin: '0 4px 14px', cursor: 'pointer',
+          }}>
+            <input
+              type="checkbox"
+              checked={legalAccepted}
+              onChange={e => setLegalAccepted(e.target.checked)}
+              style={{ marginTop: 2, accentColor: '#5F4080', flexShrink: 0 }}
+            />
+            <span>
+              Я принимаю{' '}
+              <a href="/terms" target="_blank" rel="noreferrer"
+                style={{ color: '#F9F0F0', fontWeight: 700, textDecoration: 'underline' }}>
+                Пользовательское соглашение
+              </a>
+              {', ознакомлен(а) с '}
+              <a href="/privacy" target="_blank" rel="noreferrer"
+                style={{ color: '#F9F0F0', fontWeight: 700, textDecoration: 'underline' }}>
+                Политикой обработки персональных данных
+              </a>
+              {' '}и даю согласие на обработку персональных данных
+            </span>
+          </label>
 
           {err && (
             <div style={{
@@ -529,7 +581,7 @@ export function RegisterScreen() {
             {loading ? 'Создаём…' : (inviteCode || schoolInvite) ? 'Принять приглашение' : 'Создать аккаунт'}
           </button>
 
-          <div style={{ textAlign: 'center', marginTop: 22, color: 'rgba(249,240,240,.68)', fontSize: 14 }}>
+          <div style={{ textAlign: 'center', marginTop: 22, color: 'rgba(249,240,240,.88)', fontSize: 14 }}>
             Уже есть аккаунт?{' '}
             <span
               onClick={() => nav('/login')}
@@ -562,7 +614,7 @@ export function RegisterScreen() {
               <div style={{ color:'#F9F0F0', fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
                 Подтверди свой номер
               </div>
-              <div style={{ color:'rgba(249,240,240,.6)', fontSize: 13, lineHeight: 1.5 }}>
+              <div style={{ color:'rgba(249,240,240,.86)', fontSize: 13, lineHeight: 1.5 }}>
                 Это твой логин для входа. Изменить его потом нельзя — без поддержки и без потери прогресса.
               </div>
             </div>
@@ -571,7 +623,7 @@ export function RegisterScreen() {
               background:'rgba(95, 64, 128,.18)', border:'1px solid rgba(180,140,220,.4)',
               borderRadius: 16, padding:'20px 18px', marginBottom: 18, textAlign:'center',
             }}>
-              <div style={{ color:'rgba(220,200,255,.7)', fontSize: 11,
+              <div style={{ color:'rgba(220,200,255,.9)', fontSize: 11,
                 textTransform:'uppercase', letterSpacing: .8, marginBottom: 6 }}>
                 Твой телефон
               </div>
@@ -597,7 +649,7 @@ export function RegisterScreen() {
               <button onClick={() => setConfirmPhone(null)} disabled={loading}
                 style={{ flex:1, padding:'13px', borderRadius:14,
                   background:'rgba(249,240,240,.08)', border:'1px solid rgba(249,240,240,.14)',
-                  color:'rgba(249,240,240,.75)', fontSize: 14, fontWeight: 600,
+                  color:'rgba(249,240,240,.92)', fontSize: 14, fontWeight: 600,
                   cursor: loading ? 'wait' : 'pointer', fontFamily:'inherit' }}>
                 Изменить
               </button>
@@ -654,7 +706,7 @@ function InviteOnlyBlock({ onSwitchToLogin }) {
             <div style={{fontWeight:700,color:'#F9F0F0',marginBottom:6}}>
               Сейчас вход только по приглашению
             </div>
-            <div style={{color:'rgba(249,240,240,.7)',fontSize:13}}>
+            <div style={{color:'rgba(249,240,240,.88)',fontSize:13}}>
               Попроси у знакомого, который уже в HEY, ссылку-приглашение —
               откроется страница регистрации с его именем.
             </div>
@@ -672,7 +724,7 @@ function InviteOnlyBlock({ onSwitchToLogin }) {
       {!done ? (
         <>
           <div style={{
-            color:'rgba(249,240,240,.65)',fontSize:13,marginBottom:10,lineHeight:1.5,
+            color:'rgba(249,240,240,.86)',fontSize:13,marginBottom:10,lineHeight:1.5,
           }}>
             Хочешь узнать когда регистрация откроется без приглашения? Оставь email — напишем.
           </div>
@@ -701,13 +753,13 @@ function InviteOnlyBlock({ onSwitchToLogin }) {
         }}>
           <div style={{fontSize:28,marginBottom:8}}>✓</div>
           <div style={{fontWeight:700,marginBottom:4,color:'#F9F0F0'}}>Email добавлен</div>
-          <div style={{color:'rgba(249,240,240,.7)',fontSize:13}}>
+          <div style={{color:'rgba(249,240,240,.88)',fontSize:13}}>
             Напишем когда регистрация откроется.
           </div>
         </div>
       )}
 
-      <div style={{ textAlign:'center', marginTop:22, color:'rgba(249,240,240,.68)', fontSize:14 }}>
+      <div style={{ textAlign:'center', marginTop:22, color:'rgba(249,240,240,.88)', fontSize:14 }}>
         Уже есть аккаунт?{' '}
         <span onClick={onSwitchToLogin}
           style={{ color:'#F9F0F0', fontWeight:700, cursor:'pointer',
@@ -773,7 +825,7 @@ export function PasswordResetScreen() {
             <PasswordInput id="rst-pwd2" label="Повтори пароль"
               value={pwd2} onChange={(e) => setPwd2(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}/>
-            <div style={{ color:'rgba(249,240,240,.52)', fontSize:12, margin:'-4px 4px 18px' }}>
+            <div style={{ color:'rgba(249,240,240,.82)', fontSize:12, margin:'-4px 4px 18px' }}>
               Минимум 8 символов. После смены войди со своим телефоном и новым паролем.
             </div>
             {err && (
@@ -868,7 +920,7 @@ export function WelcomeScreen() {
           Привет, {name}!
         </div>
         <div style={{
-          fontSize: 15, color: 'rgba(249,240,240,.72)', marginBottom: 30, lineHeight: 1.55,
+          fontSize: 15, color: 'rgba(249,240,240,.9)', marginBottom: 30, lineHeight: 1.55,
           animation: 'authFadeUp .5s ease-out .15s both'
         }}>
           Ты в HEY. Что хочешь сделать первым?
@@ -881,15 +933,15 @@ export function WelcomeScreen() {
         }}>
           {steps.map(({ icon, title, sub, action }) => (
             <div key={title} onClick={action} style={{
-              background: 'rgba(249,240,240,.1)',
-              border: '1px solid rgba(249,240,240,.18)',
+              background: 'rgba(249,240,240,.16)',
+              border: '1px solid rgba(249,240,240,.3)',
               borderRadius: 16, padding: '14px 18px',
               display: 'flex', alignItems: 'center', gap: 14,
               cursor: 'pointer', textAlign: 'left',
               transition: 'all .15s'
             }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(249,240,240,.18)'; e.currentTarget.style.transform = 'translateX(2px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(249,240,240,.1)'; e.currentTarget.style.transform = 'none'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(249,240,240,.24)'; e.currentTarget.style.transform = 'translateX(2px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(249,240,240,.16)'; e.currentTarget.style.transform = 'none'; }}
             >
               <div style={{
                 width: 42, height: 42, borderRadius: '50%',
@@ -901,9 +953,9 @@ export function WelcomeScreen() {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color:'#F9F0F0', marginBottom: 2 }}>{title}</div>
-                <div style={{ fontSize: 12, color: 'rgba(249,240,240,.58)' }}>{sub}</div>
+                <div style={{ fontSize: 12, color: 'rgba(249,240,240,.86)' }}>{sub}</div>
               </div>
-              <div style={{ color: 'rgba(249,240,240,.4)', fontSize: 18 }}>›</div>
+              <div style={{ color: 'rgba(249,240,240,.72)', fontSize: 18 }}>›</div>
             </div>
           ))}
         </div>
@@ -914,14 +966,14 @@ export function WelcomeScreen() {
           animation: 'authFadeUp .5s ease-out .3s both'
         }}>
           <button onClick={() => nav('/main')} style={{
-            flex: 1, background: 'rgba(249,240,240,.1)',
-            border: '1px solid rgba(249,240,240,.22)',
+            flex: 1, background: 'rgba(249,240,240,.16)',
+            border: '1px solid rgba(249,240,240,.38)',
             borderRadius: 26, padding: 15, color:'#F9F0F0',
             fontSize: 14, fontWeight: 600, cursor: 'pointer',
             fontFamily: 'inherit', transition: 'background .15s'
           }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(249,240,240,.18)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(249,240,240,.1)'}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(249,240,240,.24)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(249,240,240,.16)'}
           >
             Пропустить
           </button>

@@ -29,4 +29,5 @@ export {
   SplashScreen, HeyScreen, LoginScreen, RegisterScreen,
   PasswordResetScreen, SuccessScreen, WelcomeScreen,
 } from './auth/AuthScreens';
+export { TermsScreen, PrivacyScreen } from './LegalDocs';
 

@@ -6,6 +6,7 @@ import { socket, api } from './api';
 import {
   SplashScreen, HeyScreen, LoginScreen, RegisterScreen, SuccessScreen,
   WelcomeScreen, PasswordResetScreen,
+  TermsScreen, PrivacyScreen,
   MyProfileScreen, ContactsScreen, ConversationsScreen,
   ChatScreen, CallsScreen, CallDetailScreen, SettingsScreen,
   GroupCreateScreen, GroupSettingsScreen,
@@ -340,6 +341,8 @@ export default function App() {
           <Route path="/login"    element={<GuestOnly><LoginScreen/></GuestOnly>}/>
           <Route path="/register" element={<GuestOnly><RegisterScreen/></GuestOnly>}/>
           <Route path="/password-reset" element={<PasswordResetScreen/>}/>
+          <Route path="/terms"    element={<TermsScreen/>}/>
+          <Route path="/privacy"  element={<PrivacyScreen/>}/>
           <Route path="/join"     element={<GuestOnly><JoinScreen/></GuestOnly>}/>
           <Route path="/gjoin/:token" element={<GroupJoinScreen/>}/>
           <Route path="/success"  element={<SuccessScreen/>}/>

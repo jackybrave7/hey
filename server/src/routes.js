@@ -12,6 +12,7 @@ const { parseEmbeddedVideo } = require('./video-embed');
 const storage = require('./storage');
 const awo = require('./awo');
 const push = require('./push');
+const { showVpnNoteFromRequest } = require('./geoHint');
 
 // ── requireAdmin middleware ────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
@@ -209,6 +210,11 @@ function rateLimit(max, windowMs) {
 module.exports = function makeRouter(db, broadcast) {
   const r = express.Router();
   authModule.init(db); // inject DB into auth for block checks
+
+  r.get('/geo/hint', (req, res) => {
+    const hint = showVpnNoteFromRequest(req);
+    res.json({ showVpnNote: hint.show, source: hint.source });
+  });
 
   r.post('/register', rateLimit(5, 15 * 60 * 1000), (req, res) => {
     const { phone, name, password, birthday, avatar, inviteUserId, email, schoolInviteCode, groupInviteToken } = req.body;

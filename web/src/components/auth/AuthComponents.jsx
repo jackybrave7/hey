@@ -90,7 +90,7 @@ export function AuthBrand({ delay = 0 }) {
         <HeyLogo size={52} color="#F9F0F0" title="HEY" />
         HEY
       </div>
-      <div style={{ fontSize: 15, color: 'rgba(249,240,240,.72)', fontWeight: 400, letterSpacing: .3 }}>
+      <div style={{ fontSize: 15, color: 'rgba(249,240,240,.9)', fontWeight: 500, letterSpacing: .3 }}>
         Мессенджер для тех, кто творит
       </div>
     </div>
@@ -232,7 +232,7 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
         ) : (
           <>
             <div style={{
-              color: 'rgba(249,240,240,.7)', fontSize: 13, lineHeight: 1.55,
+              color: 'rgba(249,240,240,.88)', fontSize: 13, lineHeight: 1.55,
               textAlign: 'center', marginBottom: 16,
             }}>
               Если ты указал email в профиле — введи его здесь, и пришлём ссылку для сброса пароля.
@@ -265,7 +265,7 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
 
         <div style={{
           textAlign: 'center', margin: '4px 0 10px',
-          color: 'rgba(249,240,240,.4)', fontSize: 12,
+          color: 'rgba(249,240,240,.75)', fontSize: 12,
         }}>
           или
         </div>
@@ -283,7 +283,7 @@ export function ForgotPasswordPopup({ onClose, tgUsername }) {
           <span style={{ fontSize: 16 }}>✈</span> Восстановить через Telegram-бота
         </a>
         <div style={{ textAlign:'center', marginTop: 8,
-          color:'rgba(249,240,240,.45)', fontSize: 11, lineHeight: 1.5 }}>
+          color:'rgba(249,240,240,.8)', fontSize: 11, lineHeight: 1.5 }}>
           Бот попросит поделиться номером и сразу выдаст разовый пароль.
         </div>
       </div>

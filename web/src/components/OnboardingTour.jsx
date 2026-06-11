@@ -126,7 +126,7 @@ export default function OnboardingTour({ onDone }) {
           style={{
             background:'rgba(0,0,0,.25)', border:'1px solid rgba(249,240,240,.15)',
             borderRadius:50, padding:'7px 14px',
-            color:'rgba(249,240,240,.7)', fontSize:12, fontWeight:600,
+            color:'rgba(249,240,240,.92)', fontSize:12, fontWeight:600,
             cursor:'pointer', backdropFilter:'blur(8px)',
             fontFamily:'inherit',
           }}>

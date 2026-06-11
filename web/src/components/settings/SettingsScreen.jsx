@@ -305,6 +305,14 @@ export function SettingsScreen() {
                 onClick={() => nav('/help')}/>
             </div>
             <div style={dividerStyle}>
+              <Row icon={<Icon name="file" size={18}/>} label="Пользовательское соглашение"
+                sub="Правила использования HEY" onClick={() => nav('/terms')}/>
+            </div>
+            <div style={dividerStyle}>
+              <Row icon={<Icon name="lock" size={18}/>} label="Персональные данные"
+                sub="Политика обработки данных" onClick={() => nav('/privacy')}/>
+            </div>
+            <div style={dividerStyle}>
               <Row icon={<Icon name="chat" size={18}/>} label="Написать разработчику" onClick={() => setShowFeedback(true)}/>
             </div>
             {/* Бизнес-аккаунт: только если у юзера ещё нет approved + он не админ */}
