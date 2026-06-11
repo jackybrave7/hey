@@ -42,6 +42,7 @@ const MessageRow = memo(function MessageRow({
   const showReactBtn = !isOut && !isDeleted
     && (isHovered || (!canHover && tappedReveal) || reactionPickerMsgId === m.id);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
+  const rowBottomGap = hasReactions ? 40 : 14;
   const deletedLabel = isOut
     ? 'Вы удалили сообщение'
     : `${m.sender_name || 'Участник'} удалил(а) сообщение`;
@@ -97,7 +98,9 @@ const MessageRow = memo(function MessageRow({
         // поэтому 36-px смайл-слот вылезает за экран. С width:100% row
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
-        marginBottom: 14, overflow:'visible'}}
+        // Чипы реакций рисуются ниже пузыря absolute'ом, поэтому резервируем
+        // место в строке, чтобы следующее сообщение начиналось после них.
+        marginBottom: rowBottomGap, overflow:'visible'}}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
