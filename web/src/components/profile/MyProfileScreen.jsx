@@ -19,6 +19,7 @@ import MomentDetailPopup from '../moments/MomentDetailPopup';
 import MomentCard from '../moments/MomentCard';
 import { useSalesPressure } from '../../lib/publicSettings';
 import { MediaImage } from '../shared/MediaImage';
+import { ImageLightbox } from '../shared/ImageLightbox';
 
 export function MyProfileScreen() {
   const nav = useNavigate();
@@ -39,6 +40,7 @@ export function MyProfileScreen() {
 
   // Invite link
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [avatarFull, setAvatarFull] = useState(false);
 
   // PWA install — слушаем beforeinstallprompt. На Android Chrome/Edge/Opera
   // событие приходит когда сайт удовлетворяет критериям installable (есть
@@ -296,8 +298,8 @@ export function MyProfileScreen() {
             // Идея — компактный action-bar вместо одной кнопки «Изменить».
             const iconBtn = {
               width: 38, height: 38, borderRadius: '50%',
-              background: 'rgba(249,240,240,.10)',
-              border: '1px solid rgba(249,240,240,.16)',
+              background: 'rgba(22,15,50,.55)',
+              border: '1px solid rgba(249,240,240,.22)',
               color:'#F9F0F0', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               transition: 'background .15s',
@@ -309,16 +311,16 @@ export function MyProfileScreen() {
                   onClick={toggleSaved}
                   title="Поговорить"
                   style={iconBtn}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(249,240,240,.18)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(249,240,240,.10)'}>
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(32,22,68,.78)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(22,15,50,.55)'}>
                   <Icon name="chat" size={17}/>
                 </button>
                 <button
                   onClick={() => nav('/settings')}
                   title="Настройки"
                   style={iconBtn}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(249,240,240,.18)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(249,240,240,.10)'}>
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(32,22,68,.78)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(22,15,50,.55)'}>
                   <Icon name="settings" size={17}/>
                 </button>
                 <button
@@ -351,7 +353,13 @@ export function MyProfileScreen() {
       {/* Avatar + fields. Сверху отступ 28px чтобы между sticky-header'ом
           «Профиль» и аватаркой был воздух — иначе шапка липнет к фото. */}
       <div style={{display:'flex',gap:22,padding:'28px 26px 0',alignItems:'flex-start'}}>
-        <AvatarPicker avatar={avatar} onChange={(url, file) => { setAvatar(url); setAvatarFile(file); }} size={130} disabled={!editing}/>
+        <AvatarPicker
+          avatar={avatar}
+          onChange={(url, file) => { setAvatar(url); setAvatarFile(file); }}
+          onView={() => setAvatarFull(true)}
+          size={130}
+          disabled={!editing}
+        />
 
         <div style={{flex:1,display:'flex',flexDirection:'column',gap:16,paddingTop:8}}>
 
@@ -479,13 +487,14 @@ export function MyProfileScreen() {
           // чтобы взгляд считывал её как «карточку описания», а не сливался
           // с фоном профиля. Тонкая левая полоса добавляет акцент.
           <div style={{
-            color:'rgba(249,240,240,.94)', fontSize:14.5, lineHeight:1.6,
+            color:'#F9F0F0', fontSize:14.5, lineHeight:1.6,
             wordBreak:'break-word', whiteSpace:'pre-wrap',
-            background:'rgba(249,240,240,.055)',
-            border:'1px solid rgba(249,240,240,.10)',
-            borderLeft:'3px solid rgba(180,140,255,.55)',
+            background:'rgba(22,15,50,.62)',
+            border:'1px solid rgba(249,240,240,.2)',
+            borderLeft:'3px solid rgba(180,140,255,.75)',
             borderRadius:12,
             padding:'12px 16px',
+            boxShadow:'0 2px 12px rgba(0,0,0,.12)',
           }}>
             <BioWithLinks text={user.bio}/>
           </div>
@@ -514,32 +523,42 @@ export function MyProfileScreen() {
           <button onClick={onClick} style={{
             display:'flex', alignItems:'center', gap: 14,
             width:'100%', padding:'14px 16px', borderRadius: 16,
-            background: accent ? 'rgba(95, 64, 128,.18)' : 'rgba(249,240,240,.05)',
-            border: accent ? '1px solid rgba(180,140,255,.3)' : '1px solid rgba(249,240,240,.08)',
+            background: accent ? 'rgba(22,15,50,.78)' : 'rgba(22,15,50,.68)',
+            border: accent ? '1px solid rgba(180,140,255,.48)' : '1px solid rgba(249,240,240,.2)',
+            boxShadow: '0 2px 14px rgba(0,0,0,.18)',
             color:'#F9F0F0', cursor:'pointer', textAlign:'left',
-            transition:'background .15s, transform .12s', fontFamily:'inherit',
+            transition:'background .15s, border-color .15s', fontFamily:'inherit',
           }}
-            onMouseEnter={e => e.currentTarget.style.background = accent
-              ? 'rgba(95, 64, 128,.28)' : 'rgba(249,240,240,.09)'}
-            onMouseLeave={e => e.currentTarget.style.background = accent
-              ? 'rgba(95, 64, 128,.18)' : 'rgba(249,240,240,.05)'}>
+            onMouseEnter={e => {
+              e.currentTarget.style.background = accent
+                ? 'rgba(32,22,68,.88)' : 'rgba(32,22,68,.82)';
+              e.currentTarget.style.borderColor = accent
+                ? 'rgba(200,170,255,.58)' : 'rgba(249,240,240,.28)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = accent
+                ? 'rgba(22,15,50,.78)' : 'rgba(22,15,50,.68)';
+              e.currentTarget.style.borderColor = accent
+                ? 'rgba(180,140,255,.48)' : 'rgba(249,240,240,.2)';
+            }}>
             <div style={{
               flexShrink: 0, width: 44, height: 44, borderRadius: 12,
-              background: iconBg || 'rgba(95, 64, 128,.25)',
+              background: iconBg || 'rgba(95, 64, 128,.45)',
+              border: '1px solid rgba(249,240,240,.14)',
               display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize: 22, color:'rgba(220,200,255,.92)',
+              fontSize: 22, color:'#F9F0F0',
             }}>{icon}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color:'#F9F0F0', fontSize: 15, fontWeight: 700 }}>{title}</div>
-              <div style={{ color:'rgba(249,240,240,.5)', fontSize: 12, marginTop: 2,
+              <div style={{ color:'rgba(235,228,245,.82)', fontSize: 12, marginTop: 3,
                 overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {subtitle}
               </div>
             </div>
             {count !== null && count !== undefined && (
-              <span style={{ color:'rgba(249,240,240,.55)', fontSize: 14, fontWeight: 600 }}>{count}</span>
+              <span style={{ color:'rgba(245,238,255,.92)', fontSize: 14, fontWeight: 700 }}>{count}</span>
             )}
-            <span style={{ color:'rgba(249,240,240,.35)', fontSize: 18, marginLeft: 6 }}>›</span>
+            <span style={{ color:'rgba(235,228,245,.72)', fontSize: 18, marginLeft: 6 }}>›</span>
           </button>
         );
 
@@ -547,7 +566,7 @@ export function MyProfileScreen() {
           <div style={{ padding:'18px 26px 0', display:'flex', flexDirection:'column', gap: 12 }}>
             <Card
               icon={<Icon name="archive" size={22}/>}
-              iconBg="rgba(255,200,150,.18)"
+              iconBg="rgba(255,200,150,.32)"
               title="Архив моих моментов"
               subtitle="Прошлые работы и публикации"
               count={archivedCount || null}
@@ -555,7 +574,7 @@ export function MyProfileScreen() {
             />
             <Card
               icon={<Icon name="bookmark" size={22}/>}
-              iconBg="rgba(255,200,120,.22)"
+              iconBg="rgba(255,200,120,.34)"
               title="Поговорить"
               subtitle="Закладки, что меня зацепило"
               // count=0 → не показываем число (как у архива). Раньше
@@ -566,7 +585,7 @@ export function MyProfileScreen() {
             {!superHasInviteCta && (
               <Card
                 icon={<Icon name="link" size={22}/>}
-                iconBg="rgba(180,140,255,.28)"
+                iconBg="rgba(180,140,255,.38)"
                 title={inviteCopied ? '✓ Ссылка скопирована' : 'Пригласить друга'}
                 subtitle="Поделиться ссылкой на HEY"
                 count={null}
@@ -588,7 +607,7 @@ export function MyProfileScreen() {
             {installPrompt && !isStandalone && (
               <Card
                 icon={<Icon name="download" size={22}/>}
-                iconBg="rgba(140,200,140,.28)"
+                iconBg="rgba(140,200,140,.36)"
                 title="Установить как приложение"
                 subtitle="Иконка на главный экран, без бара браузера"
                 count={null}
@@ -606,7 +625,7 @@ export function MyProfileScreen() {
                 style={{ textDecoration:'none' }}>
                 <Card
                   icon={<Icon name="download" size={22}/>}
-                  iconBg="rgba(140,200,140,.28)"
+                  iconBg="rgba(140,200,140,.36)"
                   title="Скачать APK для Android"
                   subtitle="Полноценное приложение, без бара в Опере"
                   count={null}
@@ -1194,6 +1213,15 @@ export function MyProfileScreen() {
       })()}
 
       </div>{/* end 680 inner wrapper */}
+
+      {avatarFull && avatar && (
+        <ImageLightbox
+          urls={[avatar]}
+          index={0}
+          onClose={() => setAvatarFull(false)}
+          zIndex={650}
+        />
+      )}
     </div>
   );
 }

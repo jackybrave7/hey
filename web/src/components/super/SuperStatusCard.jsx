@@ -42,8 +42,9 @@ export default function SuperStatusCard({ user, onInvite }) {
 
   const inactiveCardStyle = {
     ...baseCardStyle,
-    background: 'rgba(22,15,50,.6)',
-    border: '1px solid rgba(249,240,240,.1)',
+    background: 'rgba(22,15,50,.72)',
+    border: '1px solid rgba(249,240,240,.2)',
+    boxShadow: '0 2px 14px rgba(0,0,0,.18)',
   };
 
   function SuperHeader({ subtitle }) {
@@ -84,7 +85,7 @@ export default function SuperStatusCard({ user, onInvite }) {
           <div style={{ color: 'rgba(249,240,240,.85)', fontSize: 16, fontWeight: 700 }}>
             HEY СУПЕР
           </div>
-          <div style={{ color: 'rgba(249,240,240,.4)', fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: 'rgba(235,228,245,.78)', fontSize: 12, marginTop: 2 }}>
             {subtitle}
           </div>
         </div>

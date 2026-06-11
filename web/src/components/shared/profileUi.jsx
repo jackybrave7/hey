@@ -13,7 +13,7 @@ function FieldLine({ value }) {
         letterSpacing:.1,
       }}>{value}</div>
       <div style={{ height:1, width:'100%',
-        background:'rgba(190,160,220,.42)' }}/>
+        background:'rgba(210,185,240,.58)' }}/>
     </div>
   );
 }
@@ -84,10 +84,10 @@ function BioWithLinks({ text }) {
         <a key={i} href={p.t} target="_blank" rel="noopener noreferrer"
           onClick={e => e.stopPropagation()}
           style={{
-            color:'rgba(180,210,255,1)', textDecoration:'underline',
-            textDecorationColor:'rgba(180,210,255,.55)',
-            textUnderlineOffset:2, textDecorationThickness:1,
-            fontWeight:600, wordBreak:'break-all',
+            color:'rgba(200,225,255,1)', textDecoration:'underline',
+            textDecorationColor:'rgba(200,225,255,.75)',
+            textUnderlineOffset:2, textDecorationThickness:1.5,
+            fontWeight:700, wordBreak:'break-all',
           }}>
           {p.t.replace(/^https?:\/\//,'')}
         </a>
