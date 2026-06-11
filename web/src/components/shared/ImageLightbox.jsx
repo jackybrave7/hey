@@ -11,9 +11,14 @@ function clampPan(px, py, imgW, imgH, viewW, viewH) {
   };
 }
 
+const SWIPE_COMMIT_RATIO = 0.22;
+const SWIPE_VELOCITY = 0.35;
+const SLIDE_MS = 320;
+
 /**
  * Просмотр фото: сначала вписывается в экран, повторный тап/клик — натуральный
  * размер с перетаскиванием по деталям в пределах кадра.
+ * Несколько фото — горизонтальная галерея со свайп-анимацией.
  */
 export function ImageLightbox({
   urls,
@@ -28,20 +33,27 @@ export function ImageLightbox({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [viewSize, setViewSize] = useState({ w: 0, h: 0 });
   const [dragging, setDragging] = useState(false);
+  const [dragX, setDragX] = useState(0);
+  const [slideAnim, setSlideAnim] = useState(false);
   const viewportRef = useRef(null);
-  const touchRef = useRef(null);
   const dragRef = useRef(null);
+  const swipeRef = useRef(null);
   const movedRef = useRef(false);
+  const pendingIndexRef = useRef(null);
 
   const total = urls?.length || 0;
   const current = urls?.[index];
   const canPrev = index > 0;
   const canNext = index < total - 1;
+  const gallery = !zoomed && total > 1;
 
   useEffect(() => {
     setZoomed(false);
     setNatural({ w: 0, h: 0 });
     setPan({ x: 0, y: 0 });
+    setDragX(0);
+    setSlideAnim(false);
+    pendingIndexRef.current = null;
   }, [index, current]);
 
   useEffect(() => {
@@ -52,12 +64,32 @@ export function ImageLightbox({
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [zoomed]);
+  }, [zoomed, gallery]);
 
   useEffect(() => {
     if (!zoomed) return;
     setPan(p => clampPan(p.x, p.y, natural.w, natural.h, viewSize.w, viewSize.h));
   }, [zoomed, natural.w, natural.h, viewSize.w, viewSize.h]);
+
+  const finishSlide = useCallback(() => {
+    const target = pendingIndexRef.current;
+    if (target != null && target !== index) onIndexChange?.(target);
+    pendingIndexRef.current = null;
+    setDragX(0);
+    setSlideAnim(false);
+  }, [index, onIndexChange]);
+
+  const animateToIndex = useCallback((targetIndex) => {
+    if (!onIndexChange || targetIndex === index) return;
+    const w = viewSize.w;
+    if (!w) {
+      onIndexChange(targetIndex);
+      return;
+    }
+    pendingIndexRef.current = targetIndex;
+    setSlideAnim(true);
+    setDragX(targetIndex > index ? -w : w);
+  }, [index, onIndexChange, viewSize.w]);
 
   useEffect(() => {
     function onKey(e) {
@@ -70,15 +102,16 @@ export function ImageLightbox({
         onClose?.();
         return;
       }
-      if (zoomed || !onIndexChange) return;
-      if (e.key === 'ArrowLeft' && canPrev) onIndexChange(index - 1);
-      if (e.key === 'ArrowRight' && canNext) onIndexChange(index + 1);
+      if (zoomed || !onIndexChange || slideAnim) return;
+      if (e.key === 'ArrowLeft' && canPrev) animateToIndex(index - 1);
+      if (e.key === 'ArrowRight' && canNext) animateToIndex(index + 1);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [zoomed, canPrev, canNext, index, onClose, onIndexChange]);
+  }, [zoomed, canPrev, canNext, index, onClose, onIndexChange, slideAnim, animateToIndex]);
 
   const toggleZoom = useCallback((e) => {
+    if (movedRef.current) return;
     e?.stopPropagation?.();
     setZoomed(z => {
       if (z) setPan({ x: 0, y: 0 });
@@ -95,22 +128,73 @@ export function ImageLightbox({
     onClose?.();
   }, [zoomed, onClose]);
 
-  const onTouchStart = (e) => {
-    if (zoomed || total <= 1 || e.touches.length !== 1) return;
-    const t = e.touches[0];
-    touchRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  const rubberBand = useCallback((dx) => {
+    if ((dx > 0 && !canPrev) || (dx < 0 && !canNext)) return dx * 0.32;
+    return dx;
+  }, [canPrev, canNext]);
+
+  const onSwipePointerDown = (e) => {
+    if (!gallery || e.button !== 0 || slideAnim) return;
+    movedRef.current = false;
+    swipeRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startDragX: dragX,
+      t: Date.now(),
+      axis: null,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
-  const onTouchEnd = (e) => {
-    if (!touchRef.current || zoomed) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchRef.current.x;
-    const dy = t.clientY - touchRef.current.y;
-    const dt = Date.now() - touchRef.current.t;
-    touchRef.current = null;
-    if (dt > 600 || Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 50) return;
-    if (dx < 0 && canNext) onIndexChange?.(index + 1);
-    else if (dx > 0 && canPrev) onIndexChange?.(index - 1);
+  const onSwipePointerMove = (e) => {
+    const s = swipeRef.current;
+    if (!s || s.pointerId !== e.pointerId) return;
+    const dx = e.clientX - s.startX;
+    const dy = e.clientY - s.startY;
+    if (!s.axis) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      s.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+      if (s.axis !== 'x') {
+        swipeRef.current = null;
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+        return;
+      }
+    }
+    if (s.axis !== 'x') return;
+    e.preventDefault();
+    if (Math.abs(dx) > 8) movedRef.current = true;
+    setDragX(rubberBand(s.startDragX + dx));
+  };
+
+  const onSwipePointerUp = (e) => {
+    const s = swipeRef.current;
+    if (!s || s.pointerId !== e.pointerId) return;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    swipeRef.current = null;
+
+    const dx = e.clientX - s.startX;
+    const dt = Math.max(1, Date.now() - s.t);
+    const w = viewSize.w || viewportRef.current?.clientWidth || 0;
+    const velocity = dx / dt;
+
+    let target = index;
+    if (w && (dx < -w * SWIPE_COMMIT_RATIO || velocity < -SWIPE_VELOCITY) && canNext) {
+      target = index + 1;
+    } else if (w && (dx > w * SWIPE_COMMIT_RATIO || velocity > SWIPE_VELOCITY) && canPrev) {
+      target = index - 1;
+    }
+
+    if (target !== index) {
+      animateToIndex(target);
+      return;
+    }
+
+    if (Math.abs(dragX) > 1) {
+      pendingIndexRef.current = null;
+      setSlideAnim(true);
+      setDragX(0);
+    }
   };
 
   const onPanPointerDown = (e) => {
@@ -174,6 +258,36 @@ export function ImageLightbox({
     justifyContent: 'center',
   };
 
+  const slideStyle = gallery ? {
+    display: 'flex',
+    height: '100%',
+    width: '100%',
+    transform: `translateX(${-index * viewSize.w + dragX}px)`,
+    transition: slideAnim ? `transform ${SLIDE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : 'none',
+    willChange: 'transform',
+  } : null;
+
+  const imageCellStyle = {
+    flex: '0 0 100%',
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    boxSizing: 'border-box',
+  };
+
+  const fittedImageStyle = {
+    maxWidth: '90vw',
+    maxHeight: '80vh',
+    objectFit: 'contain',
+    borderRadius: 14,
+    boxShadow: '0 8px 48px rgba(0,0,0,.6)',
+    cursor: 'zoom-in',
+    userSelect: 'none',
+  };
+
   return (
     <div
       style={{
@@ -186,8 +300,6 @@ export function ImageLightbox({
         flexDirection: 'column',
       }}
       onClick={onBackdropClick}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
     >
       <button
         type="button"
@@ -236,7 +348,7 @@ export function ImageLightbox({
       {!zoomed && canPrev && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onIndexChange?.(index - 1); }}
+          onClick={(e) => { e.stopPropagation(); animateToIndex(index - 1); }}
           style={{ ...navBtn, left: 20 }}
         >
           ‹
@@ -245,7 +357,7 @@ export function ImageLightbox({
       {!zoomed && canNext && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); onIndexChange?.(index + 1); }}
+          onClick={(e) => { e.stopPropagation(); animateToIndex(index + 1); }}
           style={{ ...navBtn, right: 20 }}
         >
           ›
@@ -255,16 +367,16 @@ export function ImageLightbox({
       <div
         ref={viewportRef}
         onClick={(e) => e.stopPropagation()}
-        onPointerDown={zoomed ? onPanPointerDown : undefined}
-        onPointerMove={zoomed ? onPanPointerMove : undefined}
-        onPointerUp={zoomed ? endPan : undefined}
-        onPointerCancel={zoomed ? endPan : undefined}
+        onPointerDown={zoomed ? onPanPointerDown : gallery ? onSwipePointerDown : undefined}
+        onPointerMove={zoomed ? onPanPointerMove : gallery ? onSwipePointerMove : undefined}
+        onPointerUp={zoomed ? endPan : gallery ? onSwipePointerUp : undefined}
+        onPointerCancel={zoomed ? endPan : gallery ? onSwipePointerUp : undefined}
         style={{
           flex: 1,
           minHeight: 0,
           overflow: 'hidden',
           position: 'relative',
-          touchAction: zoomed ? 'none' : 'manipulation',
+          touchAction: gallery ? 'pan-y pinch-zoom' : zoomed ? 'none' : 'manipulation',
           cursor: zoomed ? (dragging ? 'grabbing' : 'grab') : 'default',
         }}
       >
@@ -293,16 +405,33 @@ export function ImageLightbox({
             }}
             draggable={false}
           />
+        ) : gallery ? (
+          <div
+            style={slideStyle}
+            onTransitionEnd={(e) => {
+              if (e.propertyName === 'transform' && slideAnim) finishSlide();
+            }}
+          >
+            {urls.map((url, i) => (
+              <div key={`${url}-${i}`} style={imageCellStyle}>
+                <MediaImage
+                  src={url}
+                  alt=""
+                  onClick={i === index ? toggleZoom : undefined}
+                  onLoad={i === index ? (e) => {
+                    setNatural({
+                      w: e.currentTarget.naturalWidth,
+                      h: e.currentTarget.naturalHeight,
+                    });
+                  } : undefined}
+                  style={fittedImageStyle}
+                  draggable={false}
+                />
+              </div>
+            ))}
+          </div>
         ) : (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '100%',
-            height: '100%',
-            padding: 24,
-            boxSizing: 'border-box',
-          }}>
+          <div style={imageCellStyle}>
             <MediaImage
               src={current}
               alt=""
@@ -313,15 +442,7 @@ export function ImageLightbox({
                   h: e.currentTarget.naturalHeight,
                 });
               }}
-              style={{
-                maxWidth: '90vw',
-                maxHeight: '80vh',
-                objectFit: 'contain',
-                borderRadius: 14,
-                boxShadow: '0 8px 48px rgba(0,0,0,.6)',
-                cursor: 'zoom-in',
-                userSelect: 'none',
-              }}
+              style={fittedImageStyle}
               draggable={false}
             />
           </div>
@@ -354,7 +475,11 @@ export function ImageLightbox({
         zIndex: zIndex + 1,
         whiteSpace: 'nowrap',
       }}>
-        {zoomed ? 'Перетащите · тап без сдвига — уменьшить' : 'Нажмите на фото — полный размер'}
+        {zoomed
+          ? 'Перетащите · тап без сдвига — уменьшить'
+          : total > 1
+            ? 'Свайп влево/вправо · нажмите на фото — полный размер'
+            : 'Нажмите на фото — полный размер'}
       </div>
     </div>
   );
