@@ -87,23 +87,40 @@
 
   <!-- ── Initial loading paint (избегаем белого экрана) ────────────────── -->
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #1a0a30; color: #F9F0F0; }
-    body { font-family: 'Comfortaa', system-ui, -apple-system, sans-serif; }
+    html, body { margin: 0; padding: 0; height: 100%; color: #F9F0F0; }
+    body {
+      font-family: 'Comfortaa', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(180deg, #5F4080 0%, #D0A8A8 66%, #5F4080 100%);
+    }
     #root { min-height: 100vh; }
     .boot-splash {
       position: fixed; inset: 0;
       display: flex; align-items: center; justify-content: center;
-      background: linear-gradient(135deg,#2a1058,#5F4080,#7c45c7);
-      animation: pulse 1.4s ease-in-out infinite;
+      background: linear-gradient(180deg, #5F4080 0%, #D0A8A8 66%, #5F4080 100%);
     }
-    .boot-splash svg { width: 52px; height: 52px; display: block; }
-    @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+    .boot-mark {
+      width: 112px; height: 112px; border-radius: 27px;
+      background: linear-gradient(135deg, #5F4080 0%, #7c45c7 60%, #a87ce4 100%);
+      border: 1px solid rgba(249,240,240,.14);
+      box-shadow: 0 16px 48px rgba(14,8,32,.32);
+      display: flex; align-items: center; justify-content: center;
+      animation: heyBootPulse 1.8s ease-in-out infinite;
+    }
+    .boot-mark svg { width: 60px; height: 60px; display: block; }
+    @keyframes heyBootPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.03); opacity: .92; }
+    }
   </style>
 </head>
 <body>
   <div id="root">
     <div class="boot-splash">
-      <img src="/hey-logo.png" width="52" height="52" alt="" aria-hidden="true" />
+      <div class="boot-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#F9F0F0" d="M30.79,62.65h2.39a.26.26,0,0,0,.26-.21,39,39,0,0,1,29-29,.28.28,0,0,0,.21-.26V30.74a.28.28,0,0,0-.21-.26,39,39,0,0,1-29-28.92.26.26,0,0,0-.26-.21H30.78a.28.28,0,0,0-.27.21,39,39,0,0,1-29,28.91.28.28,0,0,0-.21.27v2.47a.28.28,0,0,0,.21.27,39,39,0,0,1,29,29A.28.28,0,0,0,30.79,62.65Z"/>
+        </svg>
+      </div>
     </div>
   </div>
   <script type="module" src="/src/main.jsx"></script>

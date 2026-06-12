@@ -20,9 +20,9 @@
     "path": "./android.keystore",
     "alias": "hey"
   },
-  "appVersionName": "1.0.0",
-  "appVersionCode": 1,
-  "appVersion": 1,
+  "appVersionName": "1.0.1",
+  "appVersionCode": 2,
+  "appVersion": 2,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://hey-messenger.ru/manifest.webmanifest",

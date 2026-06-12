@@ -43,6 +43,7 @@ import UserGuide from './components/UserGuide';
 import ServerStatusBanner from './components/ServerStatusBanner';
 import { ensurePushIfGranted } from './lib/push';
 import { PublicSettingsProvider } from './lib/publicSettings';
+import { BootScreen } from './components/shared/BootMark';
 
 function useNotifications() {
   const nav = useNavigate();
@@ -113,12 +114,7 @@ function useNotifications() {
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return (
-    <div style={{minHeight:'100vh',background:'var(--grad)',display:'flex',
-      alignItems:'center',justifyContent:'center'}}>
-      <div style={{color:'rgba(249,240,240,.5)',fontSize:16}}>Загрузка…</div>
-    </div>
-  );
+  if (loading) return <BootScreen />;
   return user ? children : <Navigate to="/login" replace/>;
 }
 
@@ -130,12 +126,7 @@ function GuestOnly({ children }) {
 
 function RequireAdmin({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return (
-    <div style={{ minHeight: '100vh', background: 'var(--grad)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 16 }}>Загрузка…</div>
-    </div>
-  );
+  if (loading) return <BootScreen />;
   if (!user) return <Navigate to="/login" replace/>;
   if (!user.is_admin) return <Navigate to="/main" replace/>;
   return children;
@@ -144,12 +135,7 @@ function RequireAdmin({ children }) {
 // Бизнес-юзер ИЛИ админ. Используется для /integrations/*
 function RequireBusinessOrAdmin({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return (
-    <div style={{ minHeight: '100vh', background: 'var(--grad)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 16 }}>Загрузка…</div>
-    </div>
-  );
+  if (loading) return <BootScreen />;
   if (!user) return <Navigate to="/login" replace/>;
   // Доступ к /integrations/awo: системный админ, бизнес-юзер с
   // approved-статусом ИЛИ со-админ хоть какой-то школы (см. /me →

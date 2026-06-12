@@ -5,6 +5,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
 import HeyLogo from '../HeyLogo';
+import BootMark from '../shared/BootMark';
 import Icon from '../Icon';
 import OnboardingTour from '../OnboardingTour';
 import {
@@ -25,20 +26,13 @@ export function SplashScreen() {
     nav(user ? '/main' : '/hey', { replace: true });
   }, [loading, user, nav]);
 
-  // While auth is resolving — show the logo blob without any percentage counter
   return (
-    <div className="screen"
-      style={{justifyContent:'center',alignItems:'center',position:'relative'}}>
-      <div style={{
-        width:220, height:220,
-        background:'radial-gradient(ellipse at 40% 38%, #B8A8CC, #A898BC 45%, #9080AA)',
-        borderRadius:'62% 52% 60% 48% / 55% 62% 46% 60%',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        animation:'blob 4s ease-in-out infinite'
-      }}>
-        <HeyLogo size={88} color="#F9F0F0" title="HEY" />
-      </div>
-      <style>{`@keyframes blob{0%,100%{border-radius:62% 52% 60% 48%/55% 62% 46% 60%}50%{border-radius:52% 66% 52% 58%/66% 50% 56% 48%}}`}</style>
+    <div className="screen" style={{
+      justifyContent: 'center',
+      alignItems: 'center',
+      background: 'linear-gradient(180deg, #5F4080 0%, #D0A8A8 66%, #5F4080 100%)',
+    }}>
+      <BootMark tile={120} logo={64} />
     </div>
   );
 }
