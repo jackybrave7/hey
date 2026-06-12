@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, memo } from 'react';
 import Icon from '../Icon';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
 import { MediaImage } from '../shared/MediaImage';
+import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { AudioPlayer } from './AudioPlayer';
 import HeyLogo from '../HeyLogo';
 import EmbeddedVideoPreview from '../moments/EmbeddedVideoPreview';
@@ -274,28 +275,12 @@ const MessageRow = memo(function MessageRow({
           {m.attachment?.type === 'images' && Array.isArray(m.attachment.urls) && (() => {
             const urls = m.attachment.urls.filter(Boolean).map(mediaUrl);
             if (!urls.length) return null;
-            // Сетка: 1 → одна большая; 2 → две в ряд; 3-4 → 2x2; 5+ → 3 колонки
-            const cols = urls.length === 1 ? 1
-                       : urls.length === 2 ? 2
-                       : urls.length <= 4 ? 2 : 3;
             return (
-              <div style={{
-                display:'grid',
-                gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                gap: 4,
-                marginBottom: m.text ? 6 : 2,
-                maxWidth: 360,
-              }}>
-                {urls.map((u, i) => (
-                  <MediaImage key={i} src={u} alt=""
-                    onClick={() => onLightbox(u, urls)}
-                    style={{
-                      width:'100%', aspectRatio:'1 / 1',
-                      objectFit:'cover', borderRadius:8,
-                      display:'block', cursor:'zoom-in',
-                    }}/>
-                ))}
-              </div>
+              <SquareImageGallery
+                urls={urls}
+                onImageClick={(u, all) => onLightbox(u, all)}
+                style={{ marginBottom: m.text ? 6 : 2 }}
+              />
             );
           })()}
           {m.attachment?.type === 'audio' && (
