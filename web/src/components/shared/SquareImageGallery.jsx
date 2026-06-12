@@ -4,12 +4,37 @@ import { MediaImage } from './MediaImage';
 /**
  * Квадратная галерея: умная сетка с span'ами, контейнер 1:1.
  */
+function GalleryImage({ src, native, onClick, style }) {
+  const imgStyle = {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
+    ...style,
+  };
+  if (native) {
+    return <img src={src} alt="" onClick={onClick} style={imgStyle} draggable={false} />;
+  }
+  return (
+    <MediaImage
+      src={src}
+      alt=""
+      onClick={onClick}
+      style={imgStyle}
+      draggable={false}
+    />
+  );
+}
+
 export function SquareImageGallery({
   urls,
   onImageClick,
   maxWidth = 360,
   gap = 4,
   style,
+  native = false,
+  imageOpacity,
+  renderCellExtra,
 }) {
   const list = (urls || []).filter(Boolean);
   if (!list.length) return null;
@@ -34,6 +59,7 @@ export function SquareImageGallery({
         const url = visible[slot.index];
         if (!url) return null;
         const showOverlay = layout.overlayIndex === slot.index && layout.overlayLabel;
+        const opacity = imageOpacity?.(slot.index);
 
         return (
           <div
@@ -48,16 +74,14 @@ export function SquareImageGallery({
               minHeight: 0,
             }}
           >
-            <MediaImage
+            <GalleryImage
               src={url}
-              alt=""
-              onClick={() => onImageClick?.(url, list, slot.index)}
+              native={native}
+              onClick={onImageClick ? () => onImageClick(url, list, slot.index) : undefined}
               style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
                 cursor: onImageClick ? 'zoom-in' : 'default',
+                opacity: opacity != null ? opacity : 1,
+                transition: opacity != null ? 'opacity .2s' : undefined,
               }}
             />
             {showOverlay && (
@@ -78,6 +102,7 @@ export function SquareImageGallery({
                 {layout.overlayLabel}
               </div>
             )}
+            {renderCellExtra?.(slot.index)}
           </div>
         );
       })}

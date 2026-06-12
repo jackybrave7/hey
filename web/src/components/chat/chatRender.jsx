@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { HEY_EMOJI as HEY_EMOJI_LIST, HEY_EMOJI_SET, emojiUrl } from '../../lib/heyEmoji';
+import { HEY_EMOJI_TOKEN_RE, isHeyEmoji, resolveEmojiName, emojiUrl } from '../../lib/heyEmoji';
 
-const HEY_EMOJI = HEY_EMOJI_LIST;
-const EMOJI_RE = new RegExp('\\[(' + HEY_EMOJI.map(n => n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')\\]', 'g');
+const EMOJI_RE = HEY_EMOJI_TOKEN_RE;
 
 const URL_RE = /https?:\/\/[^\s]+/g;
 
@@ -135,10 +134,11 @@ function renderPreviewWithEmoji(text, iconSize = 14) {
   const out = [];
   let last = 0, m, i = 0;
   while ((m = re.exec(text)) !== null) {
-    if (!HEY_EMOJI_SET.has(m[1])) continue;
+    const em = resolveEmojiName(m[1]);
+    if (!em) continue;
     if (m.index > last) out.push(text.slice(last, m.index));
     out.push(
-      <img key={'e'+(i++)} src={emojiUrl(m[1])} alt={m[1]}
+      <img key={'e'+(i++)} src={emojiUrl(em)} alt={em}
         style={{width:iconSize,height:iconSize,verticalAlign:'-2px',display:'inline-block'}}/>
     );
     last = m.index + m[0].length;
@@ -235,9 +235,10 @@ function renderText(text) {
       );
       last = m.index + m[1].length - tailLen;
       continue;
-    } else if (m[2] && HEY_EMOJI_SET.has(m[2])) {
+    } else if (m[2] && isHeyEmoji(m[2])) {
+      const em = resolveEmojiName(m[2]);
       result.push(
-        <img key={i++} src={emojiUrl(m[2])} alt={m[2]}
+        <img key={i++} src={emojiUrl(em)} alt={em}
           style={{width:24,height:24,verticalAlign:'middle',display:'inline-block',
             filter:'drop-shadow(1px 2px 1px rgba(0,0,0,0.5))'}}/>
       );

@@ -17,7 +17,7 @@
 // после перерисовки восстанавливаем (длина не меняется, т.к. <img> ↔ [name]).
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react';
-import { HEY_EMOJI_SET, emojiUrl } from '../lib/heyEmoji';
+import { isHeyEmoji, resolveEmojiName, emojiUrl } from '../lib/heyEmoji';
 
 const TOKEN_RE = /\[([a-z][a-z 0-9_-]*)\]/gi;
 
@@ -28,8 +28,8 @@ function escapeHTML(s) {
 function tokensToHTML(text) {
   return escapeHTML(text)
     .replace(TOKEN_RE, (m, rawName) => {
-      const name = rawName.toLowerCase();
-      if (HEY_EMOJI_SET.has(name)) {
+      const name = resolveEmojiName(rawName);
+      if (name) {
         return `<img src="${emojiUrl(name)}" alt="[${name}]" data-emoji="${name}" `
              + `draggable="false" contenteditable="false" `
              + `style="width:20px;height:20px;vertical-align:-4px;display:inline-block;`
@@ -205,7 +205,7 @@ const EmojiInput = forwardRef(function EmojiInput(
     TOKEN_RE.lastIndex = 0;
     let m;
     while ((m = TOKEN_RE.exec(text))) {
-      if (HEY_EMOJI_SET.has(m[1].toLowerCase())) { needRewrite = true; break; }
+      if (isHeyEmoji(m[1])) { needRewrite = true; break; }
     }
 
     if (needRewrite) {

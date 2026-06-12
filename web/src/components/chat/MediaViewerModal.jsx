@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { fmtDateTime } from '../../lib/formatTime';
 import Icon from '../Icon';
-import { MediaImage } from '../shared/MediaImage';
 import { ImageLightbox } from '../shared/ImageLightbox';
+import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { fileTypeIcon } from '../../lib/fileTypeIcon';
 import { AudioPlayer } from './AudioPlayer';
 import { URL_RE } from './chatRender';
 
 function MediaViewerModal({ convId, onClose }) {
   const [tab,    setTab]    = useState('images');
-  const [images, setImages] = useState([]);
+  const [imageGroups, setImageGroups] = useState([]); // { message_id, urls: string[] }[]
   const [files,  setFiles]  = useState([]);
   const [audios, setAudios] = useState([]);
   const [links,  setLinks]  = useState([]);
@@ -30,21 +30,19 @@ function MediaViewerModal({ convId, onClose }) {
   useEffect(() => {
     api.getMedia(convId).then(msgs => {
       // Распределяем вложения по категориям
-      const imgs = [], fls = [], auds = [];
+      const groups = [], fls = [], auds = [];
       for (const m of msgs) {
         const a = m.attachment;
         if (!a) continue;
-        if (a.type === 'image' && a.url) imgs.push({ ...m, attachment: a, message_id: m.id });
-        else if (a.type === 'images' && Array.isArray(a.urls)) {
-          a.urls.forEach((u, i) => imgs.push({
-            ...m, id: m.id + '_' + i, message_id: m.id,
-            attachment: { type:'image', url:u },
-          }));
-        }
-        else if (a.type === 'file') fls.push({ ...m, attachment: a });
+        if (a.type === 'image' && a.url) {
+          groups.push({ message_id: m.id, urls: [a.url] });
+        } else if (a.type === 'images' && Array.isArray(a.urls)) {
+          const urls = a.urls.filter(Boolean);
+          if (urls.length) groups.push({ message_id: m.id, urls });
+        } else if (a.type === 'file') fls.push({ ...m, attachment: a });
         else if (a.type === 'audio') auds.push({ ...m, attachment: a });
       }
-      setImages(imgs);
+      setImageGroups(groups);
       setFiles(fls);
       setAudios(auds);
       setLoading(false);
@@ -71,8 +69,12 @@ function MediaViewerModal({ convId, onClose }) {
     borderRadius:20,display:'flex',flexDirection:'column',overflow:'hidden',
     boxShadow:'0 16px 48px rgba(0,0,0,.5)' };
 
+  const imageCount = imageGroups.reduce((n, g) => n + g.urls.length, 0);
+  const flatImageUrls = imageGroups.flatMap(g => g.urls);
+  const flatImageMsgIds = imageGroups.flatMap(g => g.urls.map(() => g.message_id));
+
   const TABS = [
-    ['images', 'image', 'Фото',   images.length],
+    ['images', 'image', 'Фото',   imageCount],
     ['files',  'attach','Файлы',  files.length],
     ['audios', 'mic',   'Аудио',  audios.length],
     ['links',  'link',  'Ссылки', links.length],
@@ -109,23 +111,28 @@ function MediaViewerModal({ convId, onClose }) {
           {loading && <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40}}>Загрузка…</div>}
 
           {!loading && tab==='images' && (
-            images.length === 0
+            imageCount === 0
               ? <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40}}>Нет фото</div>
-              : (() => {
-                  const valid = images.filter(m => m.attachment?.url);
-                  const urls   = valid.map(m => m.attachment.url);
-                  const msgIds = valid.map(m => m.message_id || m.id);
-                  return (
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:4}}>
-                      {valid.map((m, i) => (
-                        <MediaImage key={i} src={m.attachment.url} alt=""
-                          onClick={()=>setLight({ urls, index: i, msgIds })}
-                          style={{width:'100%',aspectRatio:'1',objectFit:'cover',
-                            borderRadius:8,cursor:'zoom-in'}}/>
-                      ))}
-                    </div>
-                  );
-                })()
+              : (
+                <div style={{ display:'flex', flexDirection:'column', gap: 8 }}>
+                  {imageGroups.map((group, gi) => {
+                    const offset = imageGroups.slice(0, gi).reduce((n, g) => n + g.urls.length, 0);
+                    return (
+                      <SquareImageGallery
+                        key={`${group.message_id}-${gi}`}
+                        urls={group.urls}
+                        maxWidth="100%"
+                        gap={3}
+                        onImageClick={(_u, _all, i) => setLight({
+                          urls: flatImageUrls,
+                          index: offset + i,
+                          msgIds: flatImageMsgIds,
+                        })}
+                      />
+                    );
+                  })}
+                </div>
+              )
           )}
 
           {!loading && tab==='files' && (

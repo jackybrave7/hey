@@ -13,7 +13,7 @@ import { heyToast } from '../shared/Toast';
 import Icon from '../Icon';
 import ChatContextMenu from '../chat/ChatContextMenu';
 import HeyLogo from '../HeyLogo';
-import { HEY_EMOJI_SET, emojiUrl } from '../../lib/heyEmoji';
+import { HEY_EMOJI_TOKEN_RE, resolveEmojiName, emojiUrl } from '../../lib/heyEmoji';
 import { mediaUrl } from '../../lib/mediaUrl';
 import { MediaImage } from '../shared/MediaImage';
 import { ImageLightbox } from '../shared/ImageLightbox';
@@ -44,7 +44,7 @@ function trimUrlTail(url) {
 export function TextWithLinks({ text, linkColor = 'rgba(180,140,255,.95)' }) {
   if (!text) return null;
   const URL_RE   = /https?:\/\/[^\s<>"']+/gi;
-  const EMOJI_RE = /\[([a-z][a-z 0-9_-]*)\]/gi;
+  const EMOJI_RE = HEY_EMOJI_TOKEN_RE;
 
   // Сначала разбиваем по URL-ам (как раньше), а в каждом не-URL куске
   // дополнительно разбиваем по эмодзи-токенам. Так оба регэкспа не
@@ -73,8 +73,8 @@ export function TextWithLinks({ text, linkColor = 'rgba(180,140,255,.95)' }) {
     EMOJI_RE.lastIndex = 0;
     while ((mm = EMOJI_RE.exec(chunk)) !== null) {
       if (mm.index > i) out.push({ t: chunk.slice(i, mm.index), kind: 'text' });
-      const name = mm[1].toLowerCase();
-      if (HEY_EMOJI_SET.has(name)) out.push({ name, kind: 'emoji' });
+      const name = resolveEmojiName(mm[1]);
+      if (name) out.push({ name, kind: 'emoji' });
       else out.push({ t: mm[0], kind: 'text' }); // неизвестный — оставляем как было
       i = mm.index + mm[0].length;
     }

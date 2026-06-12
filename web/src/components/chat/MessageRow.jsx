@@ -6,7 +6,7 @@ import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { AudioPlayer } from './AudioPlayer';
 import HeyLogo from '../HeyLogo';
 import EmbeddedVideoPreview from '../moments/EmbeddedVideoPreview';
-import { HEY_EMOJI_SET, emojiUrl } from '../../lib/heyEmoji';
+import { resolveEmojiName, emojiUrl } from '../../lib/heyEmoji';
 import { openUserCard } from '../../lib/openUserCard';
 import GroupInvitePreview from './GroupInvitePreview';
 import { fmtTime } from '../../lib/formatTime';
@@ -388,11 +388,12 @@ const MessageRow = memo(function MessageRow({
             // файл/видео-ссылку, он должен идти обычным инлайн-размером,
             // а не перекрывать вложение.
             const hasAttachment = !!m.attachment || !!m.link_preview;
-            if (single && HEY_EMOJI_SET.has(single[1]) && !hasAttachment) {
+            const loneEmoji = single && resolveEmojiName(single[1]);
+            if (loneEmoji && !hasAttachment) {
               return (
                 <div style={{padding:'4px 0', textAlign: isOut ? 'right' : 'left'}}>
-                  <img src={emojiUrl(single[1])} alt={single[1]}
-                    title={single[1]}
+                  <img src={emojiUrl(loneEmoji)} alt={loneEmoji}
+                    title={loneEmoji}
                     style={{width:72,height:72,display:'inline-block',
                       filter:'drop-shadow(1px 2px 2px rgba(0,0,0,.4))'}}/>
                 </div>

@@ -9,6 +9,7 @@ import { AvatarDisplay } from '../shared/AvatarDisplay';
 import { useConfirm } from '../shared/Confirm';
 import { heyToast } from '../shared/Toast';
 import { MediaImage } from '../shared/MediaImage';
+import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { ImageLightbox } from '../shared/ImageLightbox';
 import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile } from '../../lib/uploadMedia';
 import { fmtTime, fmtDate, fmtLastSeenShort } from '../../lib/formatTime';
@@ -1851,7 +1852,7 @@ export function ChatScreen() {
           style={{
             position: 'absolute',
             right: 18,
-            bottom: imgPreviews.length > 0 ? 180 : 90,
+            bottom: imgPreviews.length > 0 ? 400 : 90,
             width: 44, height: 44, borderRadius: '50%',
             background: 'rgba(60,40,90,.85)',
             backdropFilter: 'blur(10px)',
@@ -1938,7 +1939,7 @@ export function ChatScreen() {
         </div>
       )}
 
-      {/* Image previews bar — до 10 миниатюр в ряд */}
+      {/* Image previews — квадратный коллаж (как в сообщении) */}
       {imgPreviews.length > 0 && (
         <div style={{background:'rgba(95, 64, 128,.45)',flexShrink:0}}>
           <div style={{padding:'10px 14px',maxWidth:680,margin:'0 auto'}}>
@@ -1958,29 +1959,28 @@ export function ChatScreen() {
                 Сбросить
               </button>
             </div>
-            <div style={{display:'flex',gap:6,overflowX:'auto',padding:'2px 0'}}>
-              {imgPreviews.map((p, idx) => (
-                <div key={idx} style={{position:'relative',flexShrink:0}}>
-                  <img src={p.dataUrl} alt=""
-                    style={{height:56,width:56,objectFit:'cover',borderRadius:8,
-                      opacity: p.uploading ? .5 : 1, transition:'opacity .2s',
-                      border:'1px solid rgba(249,240,240,.15)'}}/>
-                  {!p.uploading && (
-                    <button onClick={() => {
-                        try { URL.revokeObjectURL(p.dataUrl); } catch {}
-                        setImgPreviews(prev => prev.filter((_, i) => i !== idx));
-                      }}
-                      style={{
-                        position:'absolute',top:-4,right:-4,width:18,height:18,
-                        borderRadius:'50%',background:'rgba(0,0,0,.85)',
-                        border:'none',color:'#F9F0F0',fontSize:12,cursor:'pointer',
-                        display:'flex',alignItems:'center',justifyContent:'center',
-                        padding:0,lineHeight:1,
-                      }}>✕</button>
-                  )}
-                </div>
-              ))}
-            </div>
+            <SquareImageGallery
+              native
+              urls={imgPreviews.map(p => p.dataUrl)}
+              maxWidth={280}
+              gap={3}
+              imageOpacity={idx => (imgPreviews[idx]?.uploading ? .5 : 1)}
+              renderCellExtra={idx => !imgPreviews[idx]?.uploading ? (
+                <button
+                  onClick={() => {
+                    try { URL.revokeObjectURL(imgPreviews[idx].dataUrl); } catch {}
+                    setImgPreviews(prev => prev.filter((_, i) => i !== idx));
+                  }}
+                  style={{
+                    position: 'absolute', top: 4, right: 4, width: 20, height: 20,
+                    borderRadius: '50%', background: 'rgba(0,0,0,.78)',
+                    border: 'none', color: '#F9F0F0', fontSize: 12, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: 0, lineHeight: 1, zIndex: 2,
+                  }}
+                >✕</button>
+              ) : null}
+            />
           </div>
         </div>
       )}
