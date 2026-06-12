@@ -350,6 +350,8 @@ try { db.exec('ALTER TABLE users ADD COLUMN is_system INTEGER DEFAULT 0'); } cat
 // ── AWO integration migrations ────────────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN email TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_school_account INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN terms_accepted_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN terms_version TEXT'); } catch {}
 try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL"); } catch {}
 
 // Школьные инвайты (для интеграции с АВО)
@@ -566,8 +568,8 @@ const DEFAULT_TENANT_ID = 'tnt_default';
 // ── Users ──────────────────────────────────────────────────────────────────
 
 const stmtInsertUser = db.prepare(
-  `INSERT INTO users (id,phone,name,password,avatar,birthday,created_at,invite_code,referral_by,email)
-   VALUES (@id,@phone,@name,@password,@avatar,@birthday,@created_at,@invite_code,@referral_by,@email)`
+  `INSERT INTO users (id,phone,name,password,avatar,birthday,created_at,invite_code,referral_by,email,terms_accepted_at,terms_version)
+   VALUES (@id,@phone,@name,@password,@avatar,@birthday,@created_at,@invite_code,@referral_by,@email,@terms_accepted_at,@terms_version)`
 );
 const stmtInsertPresence = db.prepare(
   `INSERT INTO presence (user_id,online,last_seen) VALUES (@user_id,0,@last_seen)`
@@ -615,7 +617,7 @@ function resolveInviterByInviteRef(ref) {
   return user;
 }
 
-function createUser({ phone, name, password, birthday, avatar, inviteCode, email }) {
+function createUser({ phone, name, password, birthday, avatar, inviteCode, email, termsAcceptedAt, termsVersion }) {
   const id = uuid();
   const referredBy = inviteCode
     ? (db.prepare('SELECT id FROM users WHERE invite_code=?').get(inviteCode)?.id || null)
@@ -623,7 +625,9 @@ function createUser({ phone, name, password, birthday, avatar, inviteCode, email
   const user = { id, phone, name, password: bcrypt.hashSync(password, 10),
     avatar: avatar || null, birthday: birthday || null, created_at: now(),
     invite_code: makeInviteCode(id), referral_by: referredBy,
-    email: email ? String(email).trim().toLowerCase() : null };
+    email: email ? String(email).trim().toLowerCase() : null,
+    terms_accepted_at: termsAcceptedAt ?? null,
+    terms_version: termsVersion ?? null };
   db.transaction(() => {
     stmtInsertUser.run(user);
     stmtInsertPresence.run({ user_id: id, last_seen: now() });

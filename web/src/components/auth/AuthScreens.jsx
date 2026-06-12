@@ -439,6 +439,7 @@ export function RegisterScreen() {
     try {
       const res = await api.register({
         name: name.trim(), phone: confirmPhone.normalized, password,
+        legalAccepted: true,
         ...(inviteCode    ? { inviteUserId: inviteCode } : {}),
         ...(schoolInvite  ? { schoolInviteCode: schoolInvite.code, email: schoolInvite.email } : {}),
         ...(groupInvite   ? { groupInviteToken: groupInvite.token } : {}),

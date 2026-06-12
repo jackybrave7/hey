@@ -293,27 +293,22 @@ export function MyProfileScreen() {
     <div style={{minHeight:'100vh',background:'var(--grad)',paddingBottom:80}}>
 
       {/* Sticky header */}
-      <div style={{
-        position:'sticky',top:0,zIndex:10,
-        background:'var(--topbar)',backdropFilter:'blur(20px)',
-        borderBottom:'1px solid rgba(249,240,240,.06)',
-      }}>
-        <div style={{maxWidth:680,margin:'0 auto',padding:'14px 20px',
-          display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{color:'#F9F0F0',fontSize:20,fontWeight:800,letterSpacing:-.3,
-            display:'flex',alignItems:'center',gap:8}}>
+      <div className="tab-header">
+        <div className="tab-header-inner">
+          <div className="tab-header-title">
             <Icon name="user" size={20}/> Профиль
           </div>
           {editing ? (
             <div style={{display:'flex',gap:8}}>
               <button onClick={cancelEdit} style={{background:'rgba(249,240,240,.15)',border:'none',
-                borderRadius:50,padding:'7px 16px',color:'#F9F0F0',fontSize:13,cursor:'pointer'}}>
+                borderRadius:50,height:32,padding:'0 16px',color:'#F9F0F0',fontSize:13,cursor:'pointer',
+                display:'inline-flex',alignItems:'center'}}>
                 Отмена
               </button>
               <button onClick={saveProfile} disabled={saving} style={{
-                padding:'7px 18px',borderRadius:50,fontSize:13,fontWeight:700,cursor:'pointer',
+                height:32,padding:'0 18px',borderRadius:50,fontSize:13,fontWeight:700,cursor:'pointer',
                 background: saving ? 'rgba(95, 64, 128,.4)' : 'rgba(95, 64, 128,.85)',
-                border:'none',color:'#F9F0F0'}}>
+                border:'none',color:'#F9F0F0',display:'inline-flex',alignItems:'center'}}>
                 {saving ? '…' : 'Сохранить'}
               </button>
             </div>
@@ -321,7 +316,7 @@ export function MyProfileScreen() {
             // Три круглые иконки: 💜 сохранённые моменты · ⚙ настройки · ✎ редактирование.
             // Идея — компактный action-bar вместо одной кнопки «Изменить».
             const iconBtn = {
-              width: 38, height: 38, borderRadius: '50%',
+              width: 32, height: 32, borderRadius: '50%',
               background: 'rgba(22,15,50,.55)',
               border: '1px solid rgba(249,240,240,.22)',
               color:'#F9F0F0', cursor: 'pointer',

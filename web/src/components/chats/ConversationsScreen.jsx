@@ -338,14 +338,9 @@ export function ConversationsScreen() {
   return (
     <div style={{ minHeight:'100vh', background:'var(--grad)', paddingBottom:80 }}>
       {/* Sticky header */}
-      <div style={{
-        position:'sticky',top:0,zIndex:10,
-        background:'var(--topbar)',backdropFilter:'blur(20px)',
-        borderBottom:'1px solid rgba(249,240,240,.06)',
-      }}>
-        <div style={{maxWidth:680,margin:'0 auto',padding:'16px 20px 12px',
-          display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{color:'#F9F0F0',fontSize:20,fontWeight:800,letterSpacing:-.3,display:'flex',alignItems:'center',gap:8}}>
+      <div className="tab-header">
+        <div className="tab-header-inner">
+          <div className="tab-header-title">
             <Icon name="chat" size={20} /> Чаты
           </div>
           <ChatContextMenu

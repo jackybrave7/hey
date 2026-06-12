@@ -336,26 +336,19 @@ export default function MomentsFeed({ currentUser }) {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--grad)', paddingBottom: 80 }}>
       {/* Sticky header */}
-      <div style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        background: 'var(--topbar)', backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(249,240,240,.06)',
-      }}>
-        <div style={{
-          maxWidth: 680, margin: '0 auto',
-          padding: '16px 20px 12px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ color:'#F9F0F0', fontSize: 20, fontWeight: 800, letterSpacing: -.3, display:'flex', alignItems:'center', gap:10 }}>
-            <HeyLogo size={22} color="#F9F0F0" />
+      <div className="tab-header">
+        <div className="tab-header-inner">
+          <div className="tab-header-title">
+            <HeyLogo size={20} color="#F9F0F0" />
             Моменты
           </div>
           {canAddMore && (
             <button onClick={() => setShowCreate(true)}
               style={{
-                padding: '8px 16px', borderRadius: 50, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                height: 32, padding: '0 14px', borderRadius: 50, fontSize: 13, fontWeight: 700, cursor: 'pointer',
                 background: 'rgba(95, 64, 128,.85)', border: 'none', color:'#F9F0F0',
                 boxShadow: '0 2px 12px rgba(95, 64, 128,.4)', transition: 'all .18s',
+                display: 'inline-flex', alignItems: 'center',
               }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(140,110,220,.9)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(95, 64, 128,.85)'}>

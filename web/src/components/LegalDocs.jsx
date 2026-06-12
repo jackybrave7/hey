@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import HeyLogo from './HeyLogo';
 
 const UPDATED_AT = '11 июня 2026';
+// Версия для аудита согласия — синхронизировать с server/src/legal.js CURRENT_TERMS_VERSION
+export const LEGAL_TERMS_VERSION = '2026-06-11';
 
 const contacts = {
   operator: 'Индивидуальный предприниматель Алферов Евгений Александрович',

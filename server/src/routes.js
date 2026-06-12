@@ -13,6 +13,7 @@ const storage = require('./storage');
 const awo = require('./awo');
 const push = require('./push');
 const { showVpnNoteFromRequest } = require('./geoHint');
+const { CURRENT_TERMS_VERSION } = require('./legal');
 
 // ── requireAdmin middleware ────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
@@ -217,7 +218,7 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   r.post('/register', rateLimit(5, 15 * 60 * 1000), (req, res) => {
-    const { phone, name, password, birthday, avatar, inviteUserId, email, schoolInviteCode, groupInviteToken } = req.body;
+    const { phone, name, password, birthday, avatar, inviteUserId, email, schoolInviteCode, groupInviteToken, legalAccepted } = req.body;
 
     // Если есть groupInviteToken — валидируем заранее и достаём inviterId
     // (он же становится referrer'ом, как обычная invite-ссылка)
@@ -239,6 +240,12 @@ module.exports = function makeRouter(db, broadcast) {
       return res.status(400).json({ error: 'phone, name, password required' });
     if (password.length < 8)
       return res.status(400).json({ error: 'Пароль минимум 8 символов' });
+    if (legalAccepted !== true) {
+      return res.status(400).json({
+        error: 'Нужно принять пользовательское соглашение и политику персональных данных',
+        code: 'LEGAL_REQUIRED',
+      });
+    }
 
     // Школьный инвайт (от АВО) — отдельный канал регистрации, не требует inviteUserId
     let schoolInvite = null;
@@ -274,7 +281,11 @@ module.exports = function makeRouter(db, broadcast) {
     if (finalEmail && db.findUserByEmail(finalEmail))
       return res.status(409).json({ error: 'Email уже зарегистрирован' });
 
-    const user = db.createUser({ phone, name, password, birthday, avatar, email: finalEmail });
+    const user = db.createUser({
+      phone, name, password, birthday, avatar, email: finalEmail,
+      termsAcceptedAt: Date.now(),
+      termsVersion: CURRENT_TERMS_VERSION,
+    });
 
     // Email из АВО-инвайта мы считаем уже подтверждённым (его привязал
     // школьный бизнес-процесс, не самостоятельный пользователь).
