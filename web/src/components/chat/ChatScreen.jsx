@@ -707,7 +707,7 @@ export function ChatScreen() {
           const barW     = 3;
           const gap      = (W - barCount * barW) / (barCount + 1);
           const levels   = waveLevelsRef.current;
-          ctx2d.fillStyle = 'rgba(126,82,168,.92)';
+          ctx2d.fillStyle = 'rgba(249,240,240,.92)';
           for (let i = 0; i < barCount; i++) {
             const binIdx  = Math.floor((i / barCount) * (bufLen * 0.45));
             const raw     = data[binIdx] / 255;
