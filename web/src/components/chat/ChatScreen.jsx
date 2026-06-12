@@ -12,6 +12,7 @@ import { MediaImage } from '../shared/MediaImage';
 import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { ImageLightbox } from '../shared/ImageLightbox';
 import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile } from '../../lib/uploadMedia';
+import { getBlobWaveform } from '../../lib/audioWaveform';
 import { messageConversationId } from '../../lib/messagePreview';
 import { fmtTime, fmtDate, fmtLastSeenShort } from '../../lib/formatTime';
 import { HEY_EMOJI as HEY_EMOJI_LIST, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
@@ -108,6 +109,7 @@ export function ChatScreen() {
   const [voiceBlob,    setVoiceBlob]    = useState(null);
   const [voiceObjUrl,  setVoiceObjUrl]  = useState(null); // object URL for preview player
   const [voiceDuration,setVoiceDuration]= useState(0);     // seconds
+  const [voiceWaveform, setVoiceWaveform] = useState(null);
   const [recTime,      setRecTime]      = useState(0);     // seconds while recording
   const [showVoiceLimit, setShowVoiceLimit] = useState(false);
   const mediaRecorderRef  = useRef(null);
@@ -118,6 +120,28 @@ export function ChatScreen() {
   const waveCanvasRef     = useRef(null);
   const waveRafRef        = useRef(null);
   const waveLevelsRef     = useRef([]);
+
+  const voicePillStyle = {
+    display: 'flex', alignItems: 'center', gap: 10,
+    borderRadius: 26, padding: '8px 12px 8px 14px',
+    background: 'rgba(249,240,240,.10)',
+    border: '1px solid rgba(249,240,240,.18)',
+    backdropFilter: 'blur(10px)',
+    boxShadow: 'inset 0 1px 0 rgba(249,240,240,.08)',
+  };
+  const voiceIconBtn = {
+    width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+    background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.2)',
+    color: 'rgba(249,240,240,.88)', cursor: 'pointer', lineHeight: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+  const voiceStopBtn = {
+    width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+    background: 'rgba(95,64,128,.95)', border: '1.5px solid rgba(72,42,128,.9)',
+    color: '#F9F0F0', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  };
+
   const [firstItemIndex, setFirstItemIndex] = useState(1_000_000); // Virtuoso prepend index
   const virtuosoRef        = useRef();
   const atBottomRef        = useRef(true);  // tracks whether list is scrolled to bottom
@@ -618,7 +642,13 @@ export function ChatScreen() {
 
   async function startRecording() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       recStreamRef.current = stream;
       audioChunksRef.current = [];
 
@@ -637,8 +667,9 @@ export function ChatScreen() {
         setVoiceBlob(blob);
         setVoiceObjUrl(objUrl);
         setVoiceDuration(recTime);
+        setVoiceWaveform(null);
         setVoiceState('preview');
-        // Stop all tracks
+        void getBlobWaveform(blob).then(wf => setVoiceWaveform(wf)).catch(() => {});
         recStreamRef.current?.getTracks().forEach(t => t.stop());
         recStreamRef.current = null;
       };
@@ -659,6 +690,11 @@ export function ChatScreen() {
           waveRafRef.current = requestAnimationFrame(draw);
           const canvas = waveCanvasRef.current;
           if (!canvas) return;
+          const wrap = canvas.parentElement;
+          if (wrap) {
+            const w = Math.max(80, wrap.clientWidth);
+            if (canvas.width !== w) canvas.width = w;
+          }
           const ctx2d = canvas.getContext('2d');
           const W = canvas.width, H = canvas.height;
           const bufLen = analyser.frequencyBinCount;
@@ -667,31 +703,24 @@ export function ChatScreen() {
 
           ctx2d.clearRect(0, 0, W, H);
 
-          const barCount = 34;
-          const barW     = 5;
-          const gap      = Math.max(2, (W - barCount * barW) / (barCount + 1));
+          const barCount = Math.min(44, Math.max(24, Math.floor(W / 5)));
+          const barW     = 3;
+          const gap      = (W - barCount * barW) / (barCount + 1);
           const levels   = waveLevelsRef.current;
-          const t        = performance.now() / 520;
-          const gradient = ctx2d.createLinearGradient(0, 0, W, 0);
-          gradient.addColorStop(0,   'rgba(95,64,128,.62)');
-          gradient.addColorStop(.45, 'rgba(126,82,168,.98)');
-          gradient.addColorStop(1,   'rgba(95,64,128,.72)');
-          ctx2d.fillStyle = gradient;
+          ctx2d.fillStyle = 'rgba(126,82,168,.92)';
           for (let i = 0; i < barCount; i++) {
-            // Sample from lower half of freq bins (voice range)
-            const binIdx  = Math.floor((i / barCount) * (bufLen * 0.5));
+            const binIdx  = Math.floor((i / barCount) * (bufLen * 0.45));
             const raw     = data[binIdx] / 255;
-            const flow    = 0.55 + 0.45 * Math.sin(t + i * 0.42);
-            const target  = Math.min(1, raw * 2.8 + flow * 0.22);
+            const target  = Math.min(1, raw * 3.4 + 0.1);
             const prev    = levels[i] ?? target;
-            const smooth  = prev + (target - prev) * 0.16;
+            const smooth  = prev + (target - prev) * 0.22;
             levels[i] = smooth;
-            const minH    = 8;
-            const barH    = Math.max(minH, smooth * (H - 2));
+            const minH    = 6;
+            const barH    = Math.max(minH, smooth * (H - 4));
             const x       = gap + i * (barW + gap);
             const y       = (H - barH) / 2;
             ctx2d.beginPath();
-            ctx2d.roundRect(x, y, barW, barH, 4);
+            ctx2d.roundRect(x, y, barW, barH, 2);
             ctx2d.fill();
           }
         };
@@ -749,6 +778,7 @@ export function ChatScreen() {
     setVoiceBlob(null);
     setVoiceObjUrl(null);
     setVoiceDuration(0);
+    setVoiceWaveform(null);
     setRecTime(0);
   }
 
@@ -757,7 +787,10 @@ export function ChatScreen() {
     const blob = voiceBlob;
     const dur  = voiceDuration || recTime;
     const objUrl = voiceObjUrl;
-    // Optimistic clear
+    let waveform = voiceWaveform;
+    if (!waveform?.length) {
+      try { waveform = await getBlobWaveform(blob); } catch {}
+    }
     cancelVoice();
     let url;
     try {
@@ -766,7 +799,10 @@ export function ChatScreen() {
       heyToast('Не удалось отправить голосовое: ' + e.message, 'error');
       return;
     }
-    const attachment = { type: 'audio', url, duration: Math.round(dur) };
+    const attachment = {
+      type: 'audio', url, duration: Math.round(dur),
+      ...(waveform?.length && { waveform }),
+    };
     const tempId = 'tmp-' + Date.now();
     pendingBottomScroll.current = true;
     setMessages(prev => [...prev, {
@@ -2333,46 +2369,34 @@ export function ChatScreen() {
 
         {/* ── Voice: recording bar ── */}
         {voiceState === 'recording' && (
-          <div style={{padding:'8px 14px 10px',maxWidth:680,margin:'0 auto'}}>
-            <div style={{
-              display:'flex',alignItems:'center',gap:10,
-              borderRadius:26,padding:'8px 10px 8px 14px',
-              backgroundImage:'url(/input-bg.jpg)',backgroundSize:'cover',backgroundPosition:'center',
-              border:'1px solid rgba(249,240,240,0.5)',
-              boxShadow:'inset 0 1px 0 rgba(249,240,240,0.7), 0 4px 18px rgba(0,0,0,0.15)',
-            }}>
-              {/* Red dot */}
-              <span style={{width:9,height:9,borderRadius:'50%',background:'#e74c3c',flexShrink:0,
-                animation:'pulse 1s ease-in-out infinite',boxShadow:'0 0 6px #e74c3c'}}/>
-              {/* Timer */}
-              <span style={{color:'rgba(249,240,240,.9)',fontSize:14,fontWeight:600,
-                fontVariantNumeric:'tabular-nums',flexShrink:0}}>
+          <div style={{ padding: '6px 12px 14px', maxWidth: 680, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+            <style>{`@keyframes hey-rec-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.9)}}`}</style>
+            <div style={voicePillStyle}>
+              <span style={{
+                width: 9, height: 9, borderRadius: '50%', background: '#e74c3c', flexShrink: 0,
+                animation: 'hey-rec-pulse 1.2s ease-in-out infinite', boxShadow: '0 0 8px rgba(231,76,60,.65)',
+              }}/>
+              <span style={{
+                color: 'rgba(249,240,240,.92)', fontSize: 14, fontWeight: 600,
+                fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36,
+              }}>
                 {fmtRecTime(recTime)}
               </span>
-              {/* Waveform canvas */}
-              <canvas ref={waveCanvasRef} width={160} height={36}
-                style={{flex:1,minWidth:0,height:36,display:'block'}}/>
-              {/* Remaining time for free users */}
-              {!user?.is_super && (
-                <span style={{color:'rgba(255,200,100,.65)',fontSize:11,flexShrink:0}}>
-                  {MAX_VOICE_SEC - recTime}с
-                </span>
-              )}
-              {/* Cancel */}
-              <button onClick={cancelVoice} title="Отменить"
-                style={{width:32,height:32,borderRadius:'50%',flexShrink:0,
-                  background:'rgba(95,64,128,.12)',border:'1.5px solid rgba(95,64,128,.42)',
-                  color:'rgba(95,64,128,.95)',cursor:'pointer',lineHeight:1,
-                  display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Icon name="delete" size={16}/>
+              <div style={{ flex: 1, minWidth: 0, height: 36, display: 'flex', alignItems: 'center' }}>
+                <canvas ref={waveCanvasRef} height={36}
+                  style={{ width: '100%', height: 36, display: 'block' }}/>
+              </div>
+              <span style={{
+                color: 'rgba(249,240,240,.45)', fontSize: 11, flexShrink: 0,
+                fontVariantNumeric: 'tabular-nums',
+              }}>
+                −{fmtRecTime(MAX_VOICE_SEC - recTime)}
+              </span>
+              <button onClick={cancelVoice} title="Отменить" style={voiceIconBtn}>
+                <Icon name="trash" size={16}/>
               </button>
-              {/* Stop → preview */}
-              <button onClick={stopRecording} title="Остановить"
-                style={{width:38,height:38,borderRadius:'50%',flexShrink:0,
-                  background:'rgba(95,64,128,.95)',border:'1.5px solid rgba(95,64,128,.95)',
-                  color:'#F9F0F0',cursor:'pointer',
-                  display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <span style={{width:12,height:12,borderRadius:3,background:'currentColor',display:'block'}}/>
+              <button onClick={stopRecording} title="Остановить" style={voiceStopBtn}>
+                <span style={{ width: 12, height: 12, borderRadius: 2, background: 'currentColor', display: 'block' }}/>
               </button>
             </div>
           </div>
@@ -2380,22 +2404,18 @@ export function ChatScreen() {
 
         {/* ── Voice: preview bar ── */}
         {voiceState === 'preview' && (
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',
-            maxWidth:680,margin:'0 auto'}}>
-            <button onClick={cancelVoice} title="Удалить"
-              style={{width:36,height:36,borderRadius:'50%',flexShrink:0,
-                background:'rgba(249,240,240,.08)',border:'1.5px solid rgba(249,240,240,.24)',
-                color:'rgba(249,240,240,.86)',cursor:'pointer',lineHeight:1,display:'inline-flex',alignItems:'center',justifyContent:'center'}}><Icon name="trash" size={16}/></button>
-            <div style={{flex:1,background:'rgba(249,240,240,.07)',borderRadius:26,
-              padding:'8px 14px',border:'1px solid rgba(249,240,240,.12)'}}>
-              <AudioPlayer url={voiceObjUrl} duration={voiceDuration} isOut={true}/>
+          <div style={{ padding: '6px 12px 14px', maxWidth: 680, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+            <div style={voicePillStyle}>
+              <button onClick={cancelVoice} title="Удалить" style={voiceIconBtn}>
+                <Icon name="trash" size={16}/>
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <AudioPlayer url={voiceObjUrl} duration={voiceDuration} waveform={voiceWaveform} isOut={true}/>
+              </div>
+              <button onClick={sendVoice} title="Отправить" style={voiceStopBtn}>
+                <Icon name="send" size={18}/>
+              </button>
             </div>
-            <button onClick={sendVoice} title="Отправить"
-              style={{width:44,height:44,background:'rgba(95,64,128,.95)',border:'1.5px solid rgba(249,240,240,.16)',
-                borderRadius:'50%',cursor:'pointer',display:'flex',alignItems:'center',
-                justifyContent:'center',flexShrink:0,color:'#F9F0F0'}}>
-              <Icon name="send" size={20}/>
-            </button>
           </div>
         )}
 

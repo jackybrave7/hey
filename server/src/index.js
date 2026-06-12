@@ -139,6 +139,48 @@ function runScheduledDispatcher() {
 setTimeout(runScheduledDispatcher, 5 * 1000);
 setInterval(runScheduledDispatcher, 10 * 1000);
 
+// Плановые сообщения HEY-заведующего — N времени после регистрации.
+function runOnboardingDispatcher() {
+  const ts = Math.floor(Date.now() / 1000);
+  let rules;
+  try { rules = db.getEnabledOnboardingMessages(); }
+  catch (e) { return console.error('[onboarding] poll failed:', e.message); }
+  for (const rule of rules) {
+    let userIds;
+    try {
+      userIds = db.getUsersDueForOnboarding(rule.id, rule.delay_seconds, ts, 40);
+    } catch (e) {
+      console.error('[onboarding] users query failed:', rule.id, e.message);
+      continue;
+    }
+    for (const userId of userIds) {
+      try {
+        db.addSystemContactFor(userId);
+        const conv = db.getOrCreateDirectConversation(userId, db.SYSTEM_USER_ID);
+        const saved = db.createMessage({
+          conversationId: conv.id,
+          senderId: db.SYSTEM_USER_ID,
+          text: rule.text || null,
+          attachment: rule.attachment || null,
+        });
+        db.markOnboardingSent(userId, rule.id);
+        broadcast([userId], {
+          type: 'message:new',
+          message: {
+            ...saved,
+            sender_name: 'HEY-заведующий',
+            conversationId: conv.id,
+          },
+        });
+      } catch (e) {
+        console.error('[onboarding] send failed:', rule.id, userId, e.message);
+      }
+    }
+  }
+}
+setTimeout(runOnboardingDispatcher, 20 * 1000);
+setInterval(runOnboardingDispatcher, 60 * 1000);
+
 // Telegram-бот восстановления пароля. Тихо ничего не делает если
 // TG_SUPPORT_BOT_TOKEN не задан в окружении.
 const { startBot } = require('./tgBot');

@@ -300,15 +300,17 @@ export function MyProfileScreen() {
           </div>
           {editing ? (
             <div style={{display:'flex',gap:8}}>
-              <button onClick={cancelEdit} style={{background:'rgba(249,240,240,.15)',border:'none',
-                borderRadius:50,height:32,padding:'0 16px',color:'#F9F0F0',fontSize:13,cursor:'pointer',
+              <button onClick={cancelEdit} style={{background:'rgba(22,15,50,.55)',border:'1px solid rgba(249,240,240,.28)',
+                borderRadius:50,height:32,padding:'0 16px',color:'#F9F0F0',fontSize:13,fontWeight:600,cursor:'pointer',
                 display:'inline-flex',alignItems:'center'}}>
                 Отмена
               </button>
               <button onClick={saveProfile} disabled={saving} style={{
                 height:32,padding:'0 18px',borderRadius:50,fontSize:13,fontWeight:700,cursor:'pointer',
-                background: saving ? 'rgba(95, 64, 128,.4)' : 'rgba(95, 64, 128,.85)',
-                border:'none',color:'#F9F0F0',display:'inline-flex',alignItems:'center'}}>
+                background: saving ? 'rgba(95, 64, 128,.5)' : 'rgba(75, 48, 108,.95)',
+                border:'1px solid rgba(200,170,255,.45)',
+                boxShadow: saving ? 'none' : '0 2px 10px rgba(0,0,0,.22)',
+                color:'#F9F0F0',display:'inline-flex',alignItems:'center'}}>
                 {saving ? '…' : 'Сохранить'}
               </button>
             </div>
@@ -380,12 +382,12 @@ export function MyProfileScreen() {
           disabled={!editing}
         />
 
-        <div style={{flex:1,display:'flex',flexDirection:'column',gap:16,paddingTop:8}}>
+        <div className={editing ? 'profile-edit-fields' : ''} style={{flex:1,display:'flex',flexDirection:'column',gap:16,paddingTop:8}}>
 
           {/* Имя */}
           {editing ? (
             <div>
-              <div style={{color:'rgba(249,240,240,.6)',fontSize:12,marginBottom:4}}>Имя</div>
+              <div className="profile-field-label">Имя</div>
               <input className="ul-input" value={name} onChange={e=>setName(e.target.value)} placeholder="Имя"/>
             </div>
           ) : (
@@ -399,13 +401,13 @@ export function MyProfileScreen() {
           {/* Телефон — нельзя менять после регистрации */}
           {editing ? (
             <div>
-              <div style={{color:'rgba(249,240,240,.6)',fontSize:12,marginBottom:4}}>
-                Телефон <span style={{opacity:.6,fontSize:11}}>(нельзя изменить)</span>
+              <div className="profile-field-label">
+                Телефон <span style={{opacity:.75,fontSize:11,fontWeight:500}}>(нельзя изменить)</span>
               </div>
               <input className="ul-input" value={user?.phone || ''} readOnly disabled
                 type="tel"
-                style={{opacity:.7, cursor:'not-allowed'}}/>
-              <div style={{color:'rgba(249,240,240,.4)',fontSize:11,marginTop:4,lineHeight:1.4}}>
+                style={{cursor:'not-allowed'}}/>
+              <div className="profile-field-hint">
                 Телефон используется для входа и остаётся как при регистрации.
                 Для смены — напиши в Telegram-бот поддержки.
               </div>
@@ -415,14 +417,14 @@ export function MyProfileScreen() {
           {/* Email — опциональный */}
           {editing ? (
             <div>
-              <div style={{color:'rgba(249,240,240,.6)',fontSize:12,marginBottom:4}}>
-                Email <span style={{opacity:.6,fontSize:11}}>(необязательно)</span>
+              <div className="profile-field-label">
+                Email <span style={{opacity:.75,fontSize:11,fontWeight:500}}>(необязательно)</span>
               </div>
               <input className="ul-input" value={email}
                 onChange={e=>{ setEmail(e.target.value); setEmailErr(''); }}
                 placeholder="you@example.com" type="email"/>
               {emailErr && <div style={{color:'#ffaaaa',fontSize:12,marginTop:4}}>{emailErr}</div>}
-              <div style={{color:'rgba(249,240,240,.4)',fontSize:11,marginTop:4,lineHeight:1.4}}>
+              <div className="profile-field-hint">
                 Нужен для интеграции со школьными курсами (BL School и т.п.).
                 Видишь только ты.
               </div>
@@ -439,7 +441,7 @@ export function MyProfileScreen() {
           {/* Дата рождения */}
           {editing ? (
             <div>
-              <div style={{color:'rgba(249,240,240,.6)',fontSize:12,marginBottom:4}}>Дата рождения</div>
+              <div className="profile-field-label">Дата рождения</div>
               <input className="ul-input" value={birthday}
                 onChange={e=>setBirthday(e.target.value)}
                 placeholder="ГГГГ-ММ-ДД" type="date"
@@ -454,36 +456,27 @@ export function MyProfileScreen() {
       </div>
 
       {/* Bio — full-width row below avatar block */}
-      <div style={{padding:'16px 26px 0'}}>
+      <div className={editing ? 'profile-edit-fields' : ''} style={{padding:'16px 26px 0'}}>
         {editing ? (() => {
           const urls = (bio || '').match(/https?:\/\/\S+/gi) || [];
           const maxLinks = user?.is_super ? 5 : 1;
           const overLimit = urls.length > maxLinks;
           return (
             <div>
-              <div style={{color:'rgba(249,240,240,.6)',fontSize:12,marginBottom:6,display:'flex',justifyContent:'space-between'}}>
+              <div className="profile-field-label" style={{marginBottom:6,display:'flex',justifyContent:'space-between'}}>
                 <span>О себе</span>
-                <span style={{color: bio.length > 180 ? 'rgba(255,180,100,.8)' : 'rgba(249,240,240,.25)'}}>{bio.length}/200</span>
+                <span style={{color: bio.length > 180 ? 'rgba(255,200,120,.95)' : 'rgba(249,240,240,.45)',fontWeight:500}}>{bio.length}/200</span>
               </div>
               <textarea
+                className={`profile-edit-bio${overLimit ? ' over-limit' : ''}`}
                 value={bio}
                 onChange={e => setBio(e.target.value.slice(0, 200))}
                 placeholder="Расскажи о себе — пару строк о том, чем занимаешься…"
                 rows={6}
-                style={{
-                  width:'100%', boxSizing:'border-box',
-                  background:'rgba(249,240,240,.08)',
-                  border: overLimit ? '1px solid rgba(255,120,120,.6)' : '1px solid rgba(249,240,240,.15)',
-                  borderRadius:12, padding:'10px 13px', color:'#F9F0F0', fontSize:14,
-                  fontFamily:'inherit', resize:'none', outline:'none', lineHeight:1.6,
-                  transition:'border-color .15s',
-                }}
-                onFocus={e=>{ if(!overLimit) e.target.style.borderColor='rgba(180,140,220,.6)'; }}
-                onBlur={e=>{ if(!overLimit) e.target.style.borderColor='rgba(249,240,240,.15)'; }}
               />
               <div style={{
-                marginTop:6,fontSize:12,
-                color: overLimit ? 'rgba(255,150,150,1)' : 'rgba(220,210,255,.85)',
+                marginTop:7,fontSize:12,
+                color: overLimit ? 'rgba(255,170,170,1)' : 'rgba(235,225,255,.92)',
                 display:'flex',alignItems:'center',gap:6,
               }}>
                 <span>🔗</span>
@@ -495,7 +488,7 @@ export function MyProfileScreen() {
                 ) : (
                   <span>
                     Ссылок: <strong style={{color:'rgba(200,170,255,1)',fontWeight:800}}>{urls.length} из {maxLinks}</strong>
-                    {!user?.is_super && <span style={{color:'rgba(249,240,240,.55)'}}> · в ✦ Super — до 5</span>}
+                    {!user?.is_super && <span style={{color:'rgba(249,240,240,.65)'}}> · в ✦ Super — до 5</span>}
                   </span>
                 )}
               </div>

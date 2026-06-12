@@ -305,6 +305,27 @@ try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_url TEXT'); } catch {
 try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_name TEXT'); } catch {}
 try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_mime TEXT'); } catch {}
 
+// Плановые сообщения HEY-заведующего — N дней/часов/минут после регистрации.
+try { db.exec(`CREATE TABLE IF NOT EXISTS onboarding_messages (
+  id            TEXT PRIMARY KEY,
+  title         TEXT,
+  delay_days    INTEGER NOT NULL DEFAULT 0,
+  delay_hours   INTEGER NOT NULL DEFAULT 0,
+  delay_minutes INTEGER NOT NULL DEFAULT 0,
+  text          TEXT,
+  attachment    TEXT,
+  enabled       INTEGER NOT NULL DEFAULT 1,
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL
+)`); } catch {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS onboarding_message_sent (
+  user_id  TEXT NOT NULL,
+  rule_id  TEXT NOT NULL,
+  sent_at  INTEGER NOT NULL,
+  PRIMARY KEY (user_id, rule_id)
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_onboarding_sent_rule ON onboarding_message_sent(rule_id)'); } catch {}
+
 // Two-step self-delete: после `DELETE /me` юзер становится `is_deleted=1`,
 // но 30 дней лежит в deletion_grace со снапшотом оригинальных полей.
 // Если за это время кто-то логинится с правильным телефоном+паролем —
@@ -2871,6 +2892,142 @@ function editBroadcast(broadcastId, newText) {
   return info.changes;
 }
 
+// ── Onboarding drip (HEY-заведующий) ─────────────────────────────────────
+function onboardingDelaySeconds({ delay_days, delay_hours, delay_minutes }) {
+  return Math.max(0,
+    (Number(delay_days)    || 0) * 86400 +
+    (Number(delay_hours)   || 0) * 3600 +
+    (Number(delay_minutes) || 0) * 60,
+  );
+}
+
+function _parseOnboardingRow(r) {
+  if (!r) return null;
+  let attachment = null;
+  if (r.attachment) {
+    try { attachment = JSON.parse(r.attachment); } catch {}
+  }
+  return {
+    ...r,
+    enabled: Number(r.enabled) === 1,
+    attachment,
+    delay_seconds: onboardingDelaySeconds(r),
+    sent_count: Number(r.sent_count) || 0,
+  };
+}
+
+function listOnboardingMessages() {
+  const rows = db.prepare(
+    `SELECT o.*,
+            (SELECT COUNT(*) FROM onboarding_message_sent s WHERE s.rule_id = o.id) AS sent_count
+     FROM onboarding_messages o
+     ORDER BY o.delay_days, o.delay_hours, o.delay_minutes, o.created_at`
+  ).all();
+  return rows.map(_parseOnboardingRow);
+}
+
+function getOnboardingMessage(id) {
+  const r = db.prepare(
+    `SELECT o.*,
+            (SELECT COUNT(*) FROM onboarding_message_sent s WHERE s.rule_id = o.id) AS sent_count
+     FROM onboarding_messages o WHERE o.id=?`
+  ).get(id);
+  return _parseOnboardingRow(r);
+}
+
+function createOnboardingMessage({ title, delayDays, delayHours, delayMinutes, text, attachment, enabled }) {
+  const delay_seconds = onboardingDelaySeconds({
+    delay_days: delayDays, delay_hours: delayHours, delay_minutes: delayMinutes,
+  });
+  if (delay_seconds <= 0) throw new Error('Укажите задержку больше 0');
+  const trimmed = (text || '').trim();
+  if (!trimmed && !attachment) throw new Error('Нужен текст или вложение');
+  const id = 'obm_' + uuid().replace(/-/g, '').slice(0, 12);
+  const t = now();
+  db.prepare(
+    `INSERT INTO onboarding_messages
+       (id, title, delay_days, delay_hours, delay_minutes, text, attachment, enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id,
+    title ? String(title).trim().slice(0, 120) : null,
+    Number(delayDays)    || 0,
+    Number(delayHours)   || 0,
+    Number(delayMinutes) || 0,
+    trimmed || null,
+    attachment ? JSON.stringify(attachment) : null,
+    enabled === false ? 0 : 1,
+    t, t,
+  );
+  return getOnboardingMessage(id);
+}
+
+function updateOnboardingMessage(id, patch) {
+  const cur = getOnboardingMessage(id);
+  if (!cur) return null;
+  const delayDays    = patch.delayDays    != null ? Number(patch.delayDays)    || 0 : cur.delay_days;
+  const delayHours   = patch.delayHours   != null ? Number(patch.delayHours)   || 0 : cur.delay_hours;
+  const delayMinutes = patch.delayMinutes != null ? Number(patch.delayMinutes) || 0 : cur.delay_minutes;
+  const delay_seconds = onboardingDelaySeconds({
+    delay_days: delayDays, delay_hours: delayHours, delay_minutes: delayMinutes,
+  });
+  if (delay_seconds <= 0) throw new Error('Укажите задержку больше 0');
+  const text = patch.text !== undefined ? (patch.text || '').trim() : (cur.text || '');
+  const attachment = patch.attachment !== undefined ? patch.attachment : cur.attachment;
+  if (!text && !attachment) throw new Error('Нужен текст или вложение');
+  const enabled = patch.enabled !== undefined ? (patch.enabled ? 1 : 0) : (cur.enabled ? 1 : 0);
+  const title = patch.title !== undefined
+    ? (patch.title ? String(patch.title).trim().slice(0, 120) : null)
+    : cur.title;
+  db.prepare(
+    `UPDATE onboarding_messages
+     SET title=?, delay_days=?, delay_hours=?, delay_minutes=?,
+         text=?, attachment=?, enabled=?, updated_at=?
+     WHERE id=?`
+  ).run(
+    title, delayDays, delayHours, delayMinutes,
+    text || null,
+    attachment ? JSON.stringify(attachment) : null,
+    enabled, now(), id,
+  );
+  return getOnboardingMessage(id);
+}
+
+function deleteOnboardingMessage(id) {
+  db.prepare('DELETE FROM onboarding_message_sent WHERE rule_id=?').run(id);
+  const info = db.prepare('DELETE FROM onboarding_messages WHERE id=?').run(id);
+  return info.changes > 0;
+}
+
+function getEnabledOnboardingMessages() {
+  return db.prepare(
+    `SELECT * FROM onboarding_messages WHERE enabled=1
+     ORDER BY delay_days, delay_hours, delay_minutes, created_at`
+  ).all().map(r => _parseOnboardingRow(r));
+}
+
+function getUsersDueForOnboarding(ruleId, delaySec, ts, limit = 50) {
+  return db.prepare(
+    `SELECT u.id FROM users u
+     WHERE u.is_deleted = 0 AND u.is_blocked = 0
+       AND COALESCE(u.is_system, 0) = 0
+       AND u.id != ?
+       AND u.created_at + ? <= ?
+       AND NOT EXISTS (
+         SELECT 1 FROM onboarding_message_sent s
+         WHERE s.user_id = u.id AND s.rule_id = ?
+       )
+     ORDER BY u.created_at ASC
+     LIMIT ?`
+  ).all(SYSTEM_USER_ID, delaySec, ts, ruleId, limit).map(r => r.id);
+}
+
+function markOnboardingSent(userId, ruleId) {
+  db.prepare(
+    `INSERT OR IGNORE INTO onboarding_message_sent (user_id, rule_id, sent_at) VALUES (?,?,?)`
+  ).run(userId, ruleId, now());
+}
+
 // Search users by name or phone (для контактов; case-insensitive в том числе и для кириллицы)
 // Тестовые юзеры (is_test=1) видны только админам когда включён test_users_enabled.
 function searchUsers(query, excludeUserId) {
@@ -3848,6 +4005,10 @@ module.exports = {
   // System (HEY-заведующий)
   getSystemMoments, getSystemBroadcasts, deleteBroadcast, editBroadcast,
   listOrphanSystemMessages, deleteSystemMessage,
+  listOnboardingMessages, getOnboardingMessage, createOnboardingMessage,
+  updateOnboardingMessage, deleteOnboardingMessage,
+  getEnabledOnboardingMessages, getUsersDueForOnboarding, markOnboardingSent,
+  onboardingDelaySeconds,
   // Admin
   getAdminStats, getAdminUsers, getAdminUserById,
   getAdminGroups, getAdminGroupDetail,

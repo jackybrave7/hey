@@ -2335,6 +2335,83 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getSystemMoments({ status }));
   });
 
+  function validateSystemAttachment(attachment) {
+    if (!attachment) return null;
+    const okType = ['image', 'images', 'audio'].includes(attachment.type);
+    if (!okType) throw new Error('Неверный тип вложения');
+    if (attachment.type === 'image' && !attachment.url) throw new Error('Нет url');
+    if (attachment.type === 'images' && (!Array.isArray(attachment.urls) || !attachment.urls.length)) {
+      throw new Error('Нет urls');
+    }
+    return attachment;
+  }
+
+  // Плановые рассылки HEY-заведующего (по времени с регистрации)
+  r.get('/admin/system/onboarding', requireAdmin, (req, res) => {
+    res.json(db.listOnboardingMessages());
+  });
+
+  r.post('/admin/system/onboarding', requireAdmin, (req, res) => {
+    try {
+      const { title, delayDays, delayHours, delayMinutes, text, attachment, enabled } = req.body;
+      const trimmed = (text || '').trim();
+      if (trimmed.length > 2000) return res.status(400).json({ error: 'Слишком длинно (макс. 2000)' });
+      const att = attachment ? validateSystemAttachment(attachment) : null;
+      const row = db.createOnboardingMessage({
+        title, delayDays, delayHours, delayMinutes,
+        text: trimmed, attachment: att, enabled,
+      });
+      db.logAdminAction?.({
+        adminId: req.user.id,
+        action: 'onboarding_create',
+        reason: `rule=${row.id}; delay=${row.delay_seconds}s`,
+      });
+      res.json(row);
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  r.patch('/admin/system/onboarding/:id', requireAdmin, (req, res) => {
+    try {
+      const patch = {};
+      if (req.body.title !== undefined) patch.title = req.body.title;
+      if (req.body.delayDays !== undefined) patch.delayDays = req.body.delayDays;
+      if (req.body.delayHours !== undefined) patch.delayHours = req.body.delayHours;
+      if (req.body.delayMinutes !== undefined) patch.delayMinutes = req.body.delayMinutes;
+      if (req.body.text !== undefined) {
+        const trimmed = (req.body.text || '').trim();
+        if (trimmed.length > 2000) return res.status(400).json({ error: 'Слишком длинно (макс. 2000)' });
+        patch.text = trimmed;
+      }
+      if (req.body.attachment !== undefined) {
+        patch.attachment = req.body.attachment ? validateSystemAttachment(req.body.attachment) : null;
+      }
+      if (req.body.enabled !== undefined) patch.enabled = !!req.body.enabled;
+      const row = db.updateOnboardingMessage(req.params.id, patch);
+      if (!row) return res.status(404).json({ error: 'Not found' });
+      db.logAdminAction?.({
+        adminId: req.user.id,
+        action: 'onboarding_update',
+        reason: `rule=${req.params.id}`,
+      });
+      res.json(row);
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  r.delete('/admin/system/onboarding/:id', requireAdmin, (req, res) => {
+    const ok = db.deleteOnboardingMessage(req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Not found' });
+    db.logAdminAction?.({
+      adminId: req.user.id,
+      action: 'onboarding_delete',
+      reason: `rule=${req.params.id}`,
+    });
+    res.json({ ok: true });
+  });
+
   r.get('/admin/system/broadcasts', requireAdmin, (req, res) => {
     res.json(db.getSystemBroadcasts({}));
   });

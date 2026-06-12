@@ -19,9 +19,10 @@ export default function AdminSystem() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {[
-          { v: 'broadcast', l: '💬 Рассылка сообщения' },
-          { v: 'moment',    l: '✦ Момент'             },
-          { v: 'manage',    l: '📋 Опубликованное'    },
+          { v: 'broadcast',  l: '💬 Рассылка сообщения' },
+          { v: 'onboarding', l: '⏱ Плановые рассылки'  },
+          { v: 'moment',     l: '✦ Момент'              },
+          { v: 'manage',     l: '📋 Опубликованное'     },
         ].map(t => (
           <button key={t.v} onClick={() => setTab(t.v)}
             style={{
@@ -35,9 +36,10 @@ export default function AdminSystem() {
         ))}
       </div>
 
-      {tab === 'broadcast' && <BroadcastForm/>}
-      {tab === 'moment'    && <MomentForm/>}
-      {tab === 'manage'    && <ManagePublished/>}
+      {tab === 'broadcast'  && <BroadcastForm/>}
+      {tab === 'onboarding' && <OnboardingTab/>}
+      {tab === 'moment'     && <MomentForm/>}
+      {tab === 'manage'     && <ManagePublished/>}
     </div>
   );
 }
@@ -520,6 +522,340 @@ function BroadcastForm() {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Плановые рассылки (после регистрации) ─────────────────────────────
+const QUICK_EMOJIS = ['👋', '✨', '🎉', '💡', '❤️', '🔥', '📎', '🙂'];
+
+function fmtOnboardingDelay(r) {
+  const p = [];
+  if (r.delay_days) p.push(`${r.delay_days} д.`);
+  if (r.delay_hours) p.push(`${r.delay_hours} ч.`);
+  if (r.delay_minutes) p.push(`${r.delay_minutes} мин.`);
+  return p.join(' ') || '—';
+}
+
+function OnboardingTab() {
+  const [rules, setRules]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [title, setTitle]       = useState('');
+  const [delayDays, setDelayDays]     = useState(0);
+  const [delayHours, setDelayHours]   = useState(0);
+  const [delayMinutes, setDelayMinutes] = useState(5);
+  const [text, setText]         = useState('');
+  const [imgs, setImgs]         = useState([]);
+  const [enabled, setEnabled]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [toast, setToast]       = useState('');
+  const [error, setError]       = useState('');
+  const fileRef = useRef();
+  const textRef = useRef();
+  const [customConfirm, confirmModal] = useConfirm();
+  const MAX_IMGS = 10;
+
+  function showMsg(m) { setToast(m); setTimeout(() => setToast(''), 2500); }
+
+  async function load() {
+    setLoading(true);
+    try { setRules(await api.adminSystemListOnboarding()); }
+    catch (e) { showMsg('Ошибка: ' + e.message); }
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function resetForm() {
+    setEditingId(null);
+    setTitle('');
+    setDelayDays(0);
+    setDelayHours(0);
+    setDelayMinutes(5);
+    setText('');
+    imgs.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
+    setImgs([]);
+    setEnabled(true);
+    setError('');
+  }
+
+  function startEdit(r) {
+    setEditingId(r.id);
+    setTitle(r.title || '');
+    setDelayDays(r.delay_days || 0);
+    setDelayHours(r.delay_hours || 0);
+    setDelayMinutes(r.delay_minutes || 0);
+    setText(r.text || '');
+    setEnabled(!!r.enabled);
+    setError('');
+    imgs.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
+    const att = r.attachment;
+    if (att?.type === 'image' && att.url) {
+      setImgs([{ dataUrl: att.url, file: null, uploading: false, url: att.url, existing: true }]);
+    } else if (att?.type === 'images' && att.urls?.length) {
+      setImgs(att.urls.map(u => ({ dataUrl: u, file: null, uploading: false, url: u, existing: true })));
+    } else {
+      setImgs([]);
+    }
+  }
+
+  function insertEmoji(ch) {
+    const ta = textRef.current;
+    if (!ta) { setText(t => (t + ch).slice(0, 2000)); return; }
+    const start = ta.selectionStart ?? text.length;
+    const end = ta.selectionEnd ?? text.length;
+    const next = (text.slice(0, start) + ch + text.slice(end)).slice(0, 2000);
+    setText(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + ch.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  }
+
+  function handleFiles(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    const remaining = MAX_IMGS - imgs.length;
+    if (remaining <= 0) { setError(`Максимум ${MAX_IMGS} картинок`); return; }
+    setError('');
+    const added = [];
+    for (const f of files.slice(0, remaining)) {
+      if (!f.type.startsWith('image/')) { setError(`«${f.name}» не картинка`); continue; }
+      if (f.size > 10 * 1024 * 1024) { setError(`«${f.name}» больше 10 МБ`); continue; }
+      added.push({ dataUrl: previewUrl(f), file: f, uploading: false });
+    }
+    if (added.length) setImgs(prev => [...prev, ...added]);
+  }
+
+  function removeImg(idx) {
+    setImgs(prev => {
+      const item = prev[idx];
+      if (item?.dataUrl && !item.existing) { try { URL.revokeObjectURL(item.dataUrl); } catch {} }
+      return prev.filter((_, i) => i !== idx);
+    });
+  }
+
+  async function buildAttachment() {
+    if (!imgs.length) return null;
+    const urls = [];
+    for (const p of imgs) {
+      if (p.url) { urls.push(p.url); continue; }
+      const res = await uploadMedia(p.file, 'chat-image', {
+        getPresignUrl: api.getPresignUrl,
+        uploadImage: api.uploadImage,
+      });
+      urls.push(res.url);
+    }
+    return urls.length === 1 ? { type: 'image', url: urls[0] } : { type: 'images', urls };
+  }
+
+  async function save() {
+    setError('');
+    const trimmed = text.trim();
+    if (!trimmed && !imgs.length) { setError('Нужен текст или картинка'); return; }
+    const totalDelay = (Number(delayDays) || 0) * 86400
+      + (Number(delayHours) || 0) * 3600
+      + (Number(delayMinutes) || 0) * 60;
+    if (totalDelay <= 0) { setError('Укажите задержку больше 0'); return; }
+    setSaving(true);
+    try {
+      let attachment = null;
+      if (imgs.length) {
+        setImgs(prev => prev.map(p => p.url ? p : ({ ...p, uploading: true })));
+        attachment = await buildAttachment();
+        setImgs(prev => prev.map((p, i) => ({
+          ...p,
+          uploading: false,
+          url: attachment?.type === 'image' ? attachment.url : attachment?.urls?.[i],
+        })));
+      }
+      const payload = {
+        title: title.trim() || null,
+        delayDays: Number(delayDays) || 0,
+        delayHours: Number(delayHours) || 0,
+        delayMinutes: Number(delayMinutes) || 0,
+        text: trimmed,
+        attachment,
+        enabled,
+      };
+      if (editingId) await api.adminSystemUpdateOnboarding(editingId, payload);
+      else await api.adminSystemCreateOnboarding(payload);
+      showMsg(editingId ? '✓ Сохранено' : '✓ Правило создано');
+      resetForm();
+      load();
+    } catch (e) {
+      setError(e.message || 'Ошибка');
+      setImgs(prev => prev.map(p => ({ ...p, uploading: false })));
+    }
+    setSaving(false);
+  }
+
+  async function toggleEnabled(r) {
+    try {
+      await api.adminSystemUpdateOnboarding(r.id, { enabled: !r.enabled });
+      load();
+    } catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+
+  async function removeRule(r) {
+    const ok = await customConfirm(
+      <>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>Удалить правило?</div>
+        <div style={{ color: 'rgba(249,240,240,.6)', fontSize: 13 }}>
+          «{r.title || (r.text || '').slice(0, 60)}» — уже отправлено {r.sent_count} раз.
+        </div>
+      </>,
+      { danger: true, confirmLabel: 'Удалить' },
+    );
+    if (!ok) return;
+    try { await api.adminSystemDeleteOnboarding(r.id); showMsg('✓ Удалено'); load(); }
+    catch (e) { showMsg('Ошибка: ' + e.message); }
+  }
+
+  const canSave = (text.trim().length > 0 || imgs.length > 0) && !saving && !imgs.some(i => i.uploading);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{
+        background: 'rgba(249,240,240,.04)', borderRadius: 14,
+        border: '1px solid rgba(249,240,240,.08)', padding: 20,
+      }}>
+        <div style={{ color: 'rgba(249,240,240,.75)', fontSize: 13, marginBottom: 14, lineHeight: 1.55 }}>
+          Сообщение уйдёт в чат с HEY-заведующим через указанное время после регистрации.
+          Каждому пользователю — один раз. Уже зарегистрированным, у кого срок прошёл, отправится при ближайшей проверке (раз в минуту).
+        </div>
+
+        <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, marginBottom: 6 }}>Название (для себя)</div>
+        <input value={title} onChange={e => setTitle(e.target.value.slice(0, 120))}
+          placeholder="Приветствие через 5 минут"
+          style={{
+            width: '100%', boxSizing: 'border-box', marginBottom: 14,
+            background: 'rgba(0,0,0,.3)', border: '1px solid rgba(249,240,240,.14)',
+            borderRadius: 10, padding: '10px 12px', color: '#F9F0F0', fontSize: 14,
+            fontFamily: 'inherit', outline: 'none',
+          }}/>
+
+        <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, marginBottom: 8 }}>Через сколько после регистрации</div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+          {[
+            { label: 'Дней', val: delayDays, set: setDelayDays, max: 365 },
+            { label: 'Часов', val: delayHours, set: setDelayHours, max: 23 },
+            { label: 'Минут', val: delayMinutes, set: setDelayMinutes, max: 59 },
+          ].map(f => (
+            <label key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 72 }}>
+              <span style={{ fontSize: 11, color: 'rgba(249,240,240,.45)' }}>{f.label}</span>
+              <input type="number" min={0} max={f.max} value={f.val}
+                onChange={e => f.set(Math.max(0, Math.min(f.max, parseInt(e.target.value, 10) || 0)))}
+                style={{
+                  width: 80, background: 'rgba(0,0,0,.3)', border: '1px solid rgba(249,240,240,.14)',
+                  borderRadius: 10, padding: '8px 10px', color: '#F9F0F0', fontSize: 14, fontFamily: 'inherit',
+                }}/>
+            </label>
+          ))}
+        </div>
+
+        <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, marginBottom: 6 }}>Текст сообщения</div>
+        <textarea ref={textRef} value={text} onChange={e => setText(e.target.value.slice(0, 2000))}
+          rows={5} placeholder="Привет! 👋 Рады видеть тебя в HEY…"
+          style={editTextareaStyle}/>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {QUICK_EMOJIS.map(ch => (
+            <button key={ch} type="button" onClick={() => insertEmoji(ch)}
+              style={{
+                width: 34, height: 34, borderRadius: 8, border: '1px solid rgba(249,240,240,.12)',
+                background: 'rgba(249,240,240,.06)', fontSize: 18, cursor: 'pointer', padding: 0,
+              }}>{ch}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(249,240,240,.4)', marginBottom: 10 }}>{text.length} / 2000</div>
+
+        {imgs.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            {imgs.map((p, idx) => (
+              <div key={idx} style={{ position: 'relative' }}>
+                <img src={p.dataUrl} alt="" style={{
+                  width: 64, height: 64, objectFit: 'cover', borderRadius: 10,
+                  opacity: p.uploading ? .5 : 1, border: '1px solid rgba(249,240,240,.15)',
+                }}/>
+                {!p.uploading && (
+                  <button onClick={() => removeImg(idx)} style={{
+                    position: 'absolute', top: -4, right: -4, width: 20, height: 20,
+                    borderRadius: '50%', background: 'rgba(0,0,0,.85)', border: 'none',
+                    color: '#F9F0F0', fontSize: 13, cursor: 'pointer',
+                  }}>✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={() => fileRef.current?.click()} disabled={imgs.length >= MAX_IMGS || saving}
+          style={{
+            padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            border: '1px dashed rgba(180,140,220,.4)', background: 'rgba(95, 64, 128,.08)',
+            color: 'rgba(220,200,255,.85)', fontFamily: 'inherit', marginBottom: 14,
+          }}>
+          📎 Прикрепить картинки (до {MAX_IMGS})
+        </button>
+        <input ref={fileRef} type="file" multiple accept="image/*" onChange={handleFiles} style={{ display: 'none' }}/>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, cursor: 'pointer',
+          color: 'rgba(249,240,240,.75)', fontSize: 13 }}>
+          <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>
+          Правило активно
+        </label>
+
+        {error && (
+          <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 10,
+            background: 'rgba(255,80,80,.15)', color: 'rgba(255,170,170,.98)', fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <BtnPrimary onClick={save} disabled={!canSave}>
+            {saving ? 'Сохранение…' : (editingId ? 'Сохранить правило' : 'Добавить правило')}
+          </BtnPrimary>
+          {editingId && <BtnSecondary onClick={resetForm}>Отмена</BtnSecondary>}
+        </div>
+      </div>
+
+      <Section title={`Активные правила (${rules.length})`}>
+        {loading && <Empty>Загрузка…</Empty>}
+        {!loading && rules.length === 0 && <Empty>Правил пока нет</Empty>}
+        {rules.map(r => (
+          <Card key={r.id}>
+            <Meta>
+              <span style={{
+                background: r.enabled ? 'rgba(60,180,100,.15)' : 'rgba(180,80,80,.15)',
+                color: r.enabled ? 'rgba(120,230,160,.95)' : 'rgba(255,140,140,.95)',
+                borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700,
+              }}>{r.enabled ? 'вкл' : 'выкл'}</span>
+              <Badge>⏱ {fmtOnboardingDelay(r)}</Badge>
+              <Badge>📨 {r.sent_count} отправлено</Badge>
+            </Meta>
+            {r.title && <div style={{ color: 'rgba(220,200,255,.9)', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{r.title}</div>}
+            <Text>{r.text || (r.attachment ? '🖼 с картинкой' : '—')}</Text>
+            <Actions>
+              <BtnSecondary onClick={() => startEdit(r)}>✏ Изменить</BtnSecondary>
+              <BtnSecondary onClick={() => toggleEnabled(r)}>{r.enabled ? 'Выключить' : 'Включить'}</BtnSecondary>
+              <BtnDanger onClick={() => removeRule(r)}>🗑</BtnDanger>
+            </Actions>
+          </Card>
+        ))}
+      </Section>
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(22,15,50,.97)', borderRadius: 50, padding: '10px 20px',
+          color: '#F9F0F0', fontSize: 14, fontWeight: 600, zIndex: 1000,
+          border: '1px solid rgba(249,240,240,.15)',
+        }}>{toast}</div>
+      )}
+      {confirmModal}
     </div>
   );
 }

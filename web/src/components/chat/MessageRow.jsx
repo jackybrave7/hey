@@ -37,13 +37,13 @@ const MessageRow = memo(function MessageRow({
   // На десктопе показываем кнопку по hover, на touch/WebView — по тапу
   // на пузырь. Right-click / long-press открывает меню.
   const [tappedReveal, setTappedReveal] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   const isDeleted = Number(m.is_deleted) === 1;
   const canHover = typeof window !== 'undefined'
     && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
   const showReactBtn = !isOut && !isDeleted
     && (isHovered || (!canHover && tappedReveal) || reactionPickerMsgId === m.id);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
-  const rowBottomGap = hasReactions ? 40 : 14;
   const deletedLabel = isOut
     ? 'Вы удалили сообщение'
     : `${m.sender_name || 'Участник'} удалил(а) сообщение`;
@@ -90,6 +90,13 @@ const MessageRow = memo(function MessageRow({
     hoverOffTimer.current = setTimeout(() => setIsHovered(false), 650);
   };
 
+  const isAudioMsg = m.attachment?.type === 'audio';
+  const bubbleBg = editingMsgId === m.id
+    ? 'rgba(160,120,210,.85)'
+    : audioPlaying && isAudioMsg
+      ? (isOut ? 'rgba(128,92,178,.96)' : 'rgba(255,252,250,.98)')
+      : (isOut ? 'rgba(110,80,155,.70)' : 'rgba(249,240,240,.90)');
+
   return (
     <div
       style={{display:'flex', alignItems:'flex-end', gap:4,
@@ -99,9 +106,7 @@ const MessageRow = memo(function MessageRow({
         // поэтому 36-px смайл-слот вылезает за экран. С width:100% row
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
-        // Чипы реакций рисуются ниже пузыря absolute'ом — резервируем место
-        // padding'ом (не margin: Virtuoso меряет contentRect без margin → дёрганье).
-        paddingBottom: rowBottomGap, overflow:'visible'}}
+        paddingBottom: 14}}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
@@ -154,14 +159,17 @@ const MessageRow = memo(function MessageRow({
             });
           }}
           style={{
-            background: editingMsgId === m.id
-              ? 'rgba(160,120,210,.85)'
-              : isOut ? 'rgba(110,80,155,.70)' : 'rgba(249,240,240,.90)',
+            background: bubbleBg,
             borderRadius: isOut ? '20px 20px 5px 20px' : '20px 20px 20px 5px',
             padding:'10px 13px 6px',
             color: isOut ? '#F9F0F0' : '#2a2040',
             fontSize:14, lineHeight:'1.5',
-            transition:'background .2s',
+            transition:'background .2s, box-shadow .2s',
+            boxShadow: audioPlaying && isAudioMsg
+              ? (isOut
+                ? '0 0 0 1.5px rgba(249,240,240,.42), 0 6px 22px rgba(160,120,220,.42)'
+                : '0 0 0 1.5px rgba(95,64,128,.38), 0 6px 18px rgba(95,64,128,.2)')
+              : 'none',
             // Подстраховка на сам пузырь — даже если родитель почему-то даст
             // больше, сам bubble не вырастет шире.
             maxWidth: '100%',
@@ -287,7 +295,9 @@ const MessageRow = memo(function MessageRow({
             <AudioPlayer
               url={m.attachment.url}
               duration={m.attachment.duration}
+              waveform={m.attachment.waveform}
               isOut={isOut}
+              onPlayingChange={setAudioPlaying}
             />
           )}
           {m.attachment?.type === 'file' && (
@@ -424,10 +434,9 @@ const MessageRow = memo(function MessageRow({
             массива user_id (сервер делает JOIN). */}
         {hasReactions && (
           <div style={{
-            position:'absolute', top:'100%', marginTop:4,
-            ...(isOut ? { right:0 } : { left:0 }),
+            marginTop: 4,
             display:'flex', flexWrap:'wrap', gap:4,
-            maxWidth:'100%', zIndex:2,
+            maxWidth:'100%',
           }}>
             {Object.entries(m.reactions).map(([emoji, reactors]) => {
               // Бэк-compat: если сервер ещё прислал массив строк (старый
