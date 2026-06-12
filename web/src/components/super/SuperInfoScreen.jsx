@@ -1,5 +1,7 @@
 // SuperInfoScreen.jsx — полноэкранный попап с информацией о HEY СУПЕР
 import { useAuth } from '../../AuthContext';
+import { api } from '../../api';
+import { personalInviteUrl } from '../../lib/inviteLink';
 import { heyToast } from '../shared/Toast';
 import HeyLogo from '../HeyLogo';
 import Icon from '../Icon';
@@ -79,14 +81,24 @@ function SuperOnlyRow({ icon, label, super: superVal }) {
 export default function SuperInfoScreen({ onClose, onInvite }) {
   const { user } = useAuth();
 
-  function copyInviteLink() {
+  async function copyInviteLink() {
     if (!user?.id) {
       heyToast('Нужно войти в аккаунт', 'error');
       return;
     }
-    const link = `${window.location.origin}/register?invite=${user.id}`;
+    let code = user.invite_code;
+    if (!code) {
+      try {
+        const r = await api.getInvite();
+        code = r.code;
+      } catch {
+        heyToast('Не удалось получить ссылку', 'error');
+        return;
+      }
+    }
+    const link = personalInviteUrl(code);
     try {
-      navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(link);
       heyToast('✓ Ссылка скопирована — поделись с друзьями', 'success');
     } catch {
       heyToast('Не удалось скопировать. Скопируй вручную: ' + link, 'error');

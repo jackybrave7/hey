@@ -1,12 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../AuthContext';
+import { api } from '../../api';
+import { personalInviteUrl } from '../../lib/inviteLink';
 
 function InviteByPhoneModal({ phone, onClose }) {
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const { user } = useAuth();
+  const [inviteCode, setInviteCode] = useState('');
 
-  const inviteLink = `${location.origin}/register?invite=${user?.id || ''}`;
+  useEffect(() => {
+    if (user?.invite_code) {
+      setInviteCode(user.invite_code);
+      return;
+    }
+    api.getInvite().then(r => setInviteCode(r.code)).catch(() => {});
+  }, [user?.invite_code]);
+
+  const inviteLink = personalInviteUrl(inviteCode);
   const waText = `Привет! Я пользуюсь HEY Messenger — быстрый и стильный мессенджер. Вступай: ${inviteLink}`;
   const waHref = `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(waText)}`;
 

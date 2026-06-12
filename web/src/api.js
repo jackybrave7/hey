@@ -154,8 +154,9 @@ export const api = {
   logCall:  (data) => req('POST', '/calls', data),
 
   // Invite / Referral
-  getInvite:     ()     => req('GET', '/invite'),
-  getInviteInfo: (code) => req('GET', `/invite/${code}`),
+  getInvite:       ()     => req('GET', '/invite'),
+  rotateInvite:    ()     => req('POST', '/invite/rotate'),
+  getInviteInfo:   (code) => req('GET', `/invite/${code}`),
 
   // Feedback
   sendFeedback: (data) => req('POST', '/feedback', data),

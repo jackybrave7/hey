@@ -37,6 +37,7 @@ import BusinessLanding from './components/BusinessLanding';
 import AdminTestUsers from './components/admin/AdminTestUsers';
 import AdminGuide from './components/admin/AdminGuide';
 import JoinScreen from './components/JoinScreen';
+import PersonalInviteJoin from './components/contacts/PersonalInviteJoin';
 import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
 import ServerStatusBanner from './components/ServerStatusBanner';
@@ -343,6 +344,7 @@ export default function App() {
           <Route path="/password-reset" element={<PasswordResetScreen/>}/>
           <Route path="/terms"    element={<TermsScreen/>}/>
           <Route path="/privacy"  element={<PrivacyScreen/>}/>
+          <Route path="/join/:code" element={<GuestOnly><PersonalInviteJoin/></GuestOnly>}/>
           <Route path="/join"     element={<GuestOnly><JoinScreen/></GuestOnly>}/>
           <Route path="/gjoin/:token" element={<GroupJoinScreen/>}/>
           <Route path="/success"  element={<SuccessScreen/>}/>

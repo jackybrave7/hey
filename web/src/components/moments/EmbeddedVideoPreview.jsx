@@ -1,5 +1,5 @@
 // EmbeddedVideoPreview.jsx
-// Video thumbnail → inline iframe player for Moments
+// Video thumbnail → inline iframe player for Moments / chat link previews
 import { useState } from 'react';
 
 function fmtDuration(seconds) {
@@ -26,10 +26,9 @@ function getEmbedUrl(provider, videoId) {
   }
 }
 
-// hideMeta — для моментов: не тащить с видеохостинга title/author/duration,
-// потому что момент — это контент автора, а не пересказ метаданных платформы.
-// onlyTitleMeta — для чата: показываем только title+author, без правой кнопки
-// «↗ YouTube/Vimeo/…», которая дублирует бейдж платформы на самой обложке.
+// hideMeta — для моментов: не тащить с видеохостинга title/author/duration.
+// onlyTitleMeta — для чата: показываем только title+author, без дублирующей
+// кнопки «↗ YouTube/Vimeo/…» на обложке.
 export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = false, onlyTitleMeta = false }) {
   const [playing, setPlaying] = useState(false);
   const [thumbBroken, setThumbBroken] = useState(false);
@@ -39,10 +38,11 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
   const hasThumbnail = !!data.thumbnail_url && !thumbBroken;
   const embedUrl     = getEmbedUrl(data.provider, data.video_id);
   const isCard       = size === 'card';
+  const showFooter   = !isCard && (!hideMeta || playing);
+  const hasMeta      = !!(data.title || data.author || data.duration_seconds);
 
   function play(e) {
     e.stopPropagation();
-    // Card size is too small for inline — open externally
     if (isCard) { window.open(data.url, '_blank', 'noopener'); return; }
     if (embedUrl) setPlaying(true);
     else window.open(data.url, '_blank', 'noopener');
@@ -61,59 +61,42 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
   return (
     <div
       style={{
-        borderRadius: isCard ? 8 : 14,
+        borderRadius: isCard ? 8 : 12,
         overflow: 'hidden',
         background: '#0d0820',
         border: '1px solid rgba(249,240,240,.1)',
         userSelect: 'none',
         flexShrink: 0,
+        width: '100%',
       }}
     >
-      {/* ── Playing: iframe ──────────────────────────────────────────── */}
-      {playing && !isCard ? (
-        <div style={{ position: 'relative' }}>
-          <div style={{ width: '100%', aspectRatio: '16/9' }}>
-            <iframe
-              src={embedUrl}
-              title={data.title || data.provider}
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-            />
-          </div>
-          {/* Controls row */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '7px 12px', background: 'rgba(10,5,30,.92)',
-          }}>
-            <button onClick={stop}
-              style={{
-                background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.15)',
-                borderRadius: 20, padding: '4px 12px', color: 'rgba(249,240,240,.7)',
-                fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
-              }}>
-              ✕ Закрыть плеер
-            </button>
-            <button onClick={openExternal}
-              style={{
-                background: 'none', border: 'none',
-                color: `${p.color}cc`, fontSize: 11, cursor: 'pointer',
-                fontFamily: 'inherit', fontWeight: 600,
-              }}>
-              Открыть на сайте ↗
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* ── Thumbnail ────────────────────────────────────────────────── */
-        <>
+      {/* Фиксированная сцена 16:9 — превью и плеер в одном месте, без скачка */}
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '16/9',
+          background: hasThumbnail && !playing ? 'transparent' : 'linear-gradient(135deg,#1a0840,#2a1060)',
+          overflow: 'hidden',
+        }}
+      >
+        {playing && !isCard && embedUrl ? (
+          <iframe
+            src={embedUrl}
+            title={data.title || data.provider}
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            style={{
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%', border: 'none', display: 'block',
+            }}
+          />
+        ) : (
           <div
             onClick={play}
             title={data.title || 'Смотреть видео'}
             style={{
-              position: 'relative', width: '100%', aspectRatio: '16/9', cursor: 'pointer',
-              background: hasThumbnail ? 'transparent' : 'linear-gradient(135deg,#1a0840,#2a1060)',
-              overflow: 'hidden',
+              position: 'absolute', inset: 0, cursor: 'pointer',
             }}
           >
             {hasThumbnail && (
@@ -121,18 +104,15 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
                 onError={() => setThumbBroken(true)}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
             )}
-            {/* Если обложки нет — показываем мягкий иконку в центре фоном */}
             {!hasThumbnail && (
               <div style={{
-                position:'absolute', top:'50%', left:'50%',
-                transform:'translate(-50%,-50%) translateY(-30px)',
-                fontSize: isCard ? 32 : 56, opacity:.25, color:'#F9F0F0',
-                pointerEvents:'none',
+                position: 'absolute', top: '50%', left: '50%',
+                transform: 'translate(-50%,-50%) translateY(-30px)',
+                fontSize: isCard ? 32 : 56, opacity: .25, color: '#F9F0F0',
+                pointerEvents: 'none',
               }}>🎬</div>
             )}
-            {/* Overlay */}
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.28)' }}/>
-            {/* Play button */}
             <div style={{
               position: 'absolute', top: '50%', left: '50%',
               transform: 'translate(-50%,-50%)',
@@ -141,11 +121,9 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
               background: 'rgba(249,240,240,.18)', backdropFilter: 'blur(6px)',
               border: '2px solid rgba(249,240,240,.55)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: isCard ? 16 : 22, color:'#F9F0F0',
+              fontSize: isCard ? 16 : 22, color: '#F9F0F0',
               boxShadow: '0 4px 20px rgba(0,0,0,.5)',
-              transition: 'transform .15s, background .15s',
             }}>▶</div>
-            {/* Provider badge */}
             <div style={{
               position: 'absolute', bottom: 8, right: 8,
               background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(6px)',
@@ -155,46 +133,82 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
               whiteSpace: 'nowrap',
             }}>{p.label}</div>
           </div>
+        )}
+      </div>
 
-          {/* Info row (full size only) */}
-          {!isCard && !hideMeta && (data.title || data.author || data.duration_seconds) && (
-            <div style={{
-              padding: '10px 14px', background: 'rgba(15,8,32,.9)',
-              display: 'flex', flexDirection: 'column', gap: 3,
-            }}>
-              {data.title && (
-                <div onClick={play} style={{
-                  color: 'rgba(249,240,240,.9)', fontSize: 13, fontWeight: 600,
-                  lineHeight: 1.4, cursor: 'pointer',
-                  overflow: 'hidden', display: '-webkit-box',
-                  WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                }}>{data.title}</div>
-              )}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {data.author && (
-                    <span style={{ color: 'rgba(249,240,240,.45)', fontSize: 11 }}>{data.author}</span>
-                  )}
-                  {data.duration_seconds && (
-                    <span style={{ color: 'rgba(249,240,240,.35)', fontSize: 11 }}>
-                      {fmtDuration(data.duration_seconds)}
-                    </span>
-                  )}
-                </div>
-                {!onlyTitleMeta && (
-                  <button onClick={openExternal}
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: `${p.color}99`, fontSize: 11, fontFamily: 'inherit',
-                      padding: 0, flexShrink: 0,
-                    }}>
-                    ↗ {p.label.replace(/[▶●]\s*/, '')}
-                  </button>
-                )}
-              </div>
+      {/* Нижняя панель одной высоты: метаданные или кнопки плеера */}
+      {showFooter && (
+        <div style={{
+          padding: '10px 14px',
+          background: 'rgba(15,8,32,.9)',
+          minHeight: hasMeta && !hideMeta ? 56 : (playing ? 44 : 0),
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          gap: 6,
+          boxSizing: 'border-box',
+        }}>
+          {!hideMeta && hasMeta && data.title && (
+            <div
+              onClick={playing ? undefined : play}
+              style={{
+                color: 'rgba(249,240,240,.9)', fontSize: 13, fontWeight: 600,
+                lineHeight: 1.35,
+                cursor: playing ? 'default' : 'pointer',
+                overflow: 'hidden', display: '-webkit-box',
+                WebkitLineClamp: playing ? 1 : 2, WebkitBoxOrient: 'vertical',
+              }}
+            >
+              {data.title}
             </div>
           )}
-        </>
+          {playing ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 8,
+            }}>
+              <button onClick={stop}
+                style={{
+                  background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.15)',
+                  borderRadius: 20, padding: '4px 12px', color: 'rgba(249,240,240,.7)',
+                  fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                ✕ Закрыть плеер
+              </button>
+              <button onClick={openExternal}
+                style={{
+                  background: 'none', border: 'none',
+                  color: `${p.color}cc`, fontSize: 11, cursor: 'pointer',
+                  fontFamily: 'inherit', fontWeight: 600,
+                }}>
+                Открыть на сайте ↗
+              </button>
+            </div>
+          ) : !hideMeta && hasMeta ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
+                {data.author && (
+                  <span style={{ color: 'rgba(249,240,240,.45)', fontSize: 11 }}>{data.author}</span>
+                )}
+                {data.duration_seconds && (
+                  <span style={{ color: 'rgba(249,240,240,.35)', fontSize: 11 }}>
+                    {fmtDuration(data.duration_seconds)}
+                  </span>
+                )}
+              </div>
+              {!onlyTitleMeta && (
+                <button onClick={openExternal}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: `${p.color}99`, fontSize: 11, fontFamily: 'inherit',
+                    padding: 0, flexShrink: 0,
+                  }}>
+                  ↗ {p.label.replace(/[▶●]\s*/, '')}
+                </button>
+              )}
+            </div>
+          ) : null}
+        </div>
       )}
     </div>
   );

@@ -110,7 +110,12 @@ export function ConversationsScreen() {
   const requestConvs = convs.filter(c => c.is_request && c.request_from !== user?.id).filter(matchConv);
   const pinnedConvs  = normalConvs.filter(c => c.is_pinned);
   const regularConvs = normalConvs.filter(c => !c.is_pinned);
-  const [pinToast, setPinToast] = useState('');
+  const [pinToast, setPinToast] = useState(null);
+
+  function flashPinToast(payload) {
+    setPinToast(payload);
+    setTimeout(() => setPinToast(null), 2500);
+  }
 
   // Карта convId → conv для быстрого доступа из поисковых результатов
   const convsById = useMemo(() => Object.fromEntries(convs.map(c => [c.id, c])), [convs]);
@@ -119,7 +124,7 @@ export function ConversationsScreen() {
     try {
       await api.archiveConversation(c.id);
       setConvs(prev => prev.filter(x => x.id !== c.id));
-      setPinToast('📦 В архиве');
+      flashPinToast({ text: 'В архиве', iconName: 'archive' });
     } catch (e) { heyToast(e.message || 'Не удалось', 'error'); }
   }
 
@@ -135,7 +140,7 @@ export function ConversationsScreen() {
             return b.last_at - a.last_at;
           });
         });
-        setPinToast('Откреплено');
+        flashPinToast({ text: 'Откреплено', iconName: 'unpin' });
       } else {
         await api.pinConversation(c.id);
         setConvs(prev => {
@@ -145,12 +150,11 @@ export function ConversationsScreen() {
             return b.last_at - a.last_at;
           });
         });
-        setPinToast('📌 Закреплено');
+        flashPinToast({ text: 'Закреплено', iconName: 'pin' });
       }
     } catch(err) {
-      setPinToast(err.message || 'Ошибка');
+      flashPinToast({ text: err.message || 'Ошибка' });
     }
-    setTimeout(() => setPinToast(''), 2500);
   }
 
   function ConvRow({ c, isRequest }) {
@@ -538,13 +542,17 @@ export function ConversationsScreen() {
           position:'fixed',bottom:100,left:'50%',transform:'translateX(-50%)',
           background:'rgba(30,20,60,.95)',backdropFilter:'blur(20px)',
           border:'1px solid rgba(249,240,240,.15)',
-          borderRadius:50,padding:'9px 20px',
+          borderRadius:50,padding:'9px 18px',
           color:'#F9F0F0',fontSize:14,fontWeight:600,
           zIndex:1000,whiteSpace:'nowrap',
           boxShadow:'0 4px 20px rgba(0,0,0,.4)',
           pointerEvents:'none',
+          display:'flex',alignItems:'center',gap:8,
         }}>
-          {pinToast}
+          {pinToast.iconName && (
+            <Icon name={pinToast.iconName} size={16} stroke={2}/>
+          )}
+          {pinToast.text}
         </div>
       )}
 
@@ -769,7 +777,7 @@ function ArchiveListModal({ onClose, onUnarchive }) {
             <div style={{color:'rgba(225,220,245,.7)',textAlign:'center',padding:40,fontSize:14,lineHeight:1.5}}>
               Архив пуст.<br/>
               <span style={{fontSize:12,color:'rgba(225,220,245,.55)'}}>
-                В чатах наведи на строку и нажми 📦 чтобы убрать в архив.
+                В чатах открой меню строки и выбери «В архив».
               </span>
             </div>
           )}

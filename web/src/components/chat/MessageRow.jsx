@@ -385,7 +385,12 @@ const MessageRow = memo(function MessageRow({
             <GroupInvitePreview data={m.link_preview} isOut={isOut}/>
           )}
           {m.link_preview && m.link_preview.type !== 'group_invite' && (
-            <div style={{marginBottom: m.text ? 8 : 0, width: 'min(100%, 360px)'}}>
+            <div style={{
+              marginBottom: m.text ? 8 : 0,
+              marginLeft: -13,
+              marginRight: -13,
+              width: 'calc(100% + 26px)',
+            }}>
               <EmbeddedVideoPreview data={m.link_preview} size="full" hideMeta={false}
                 onlyTitleMeta/>
             </div>

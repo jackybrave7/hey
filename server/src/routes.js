@@ -232,9 +232,9 @@ module.exports = function makeRouter(db, broadcast) {
         }
       }
     }
-    // Если регистрация через group-invite — приравниваем к inviteUserId
-    // (чтобы пройти проверку «только по приглашению» и записался referral)
-    const effectiveInviteUserId = inviteUserId || (groupInvite ? groupInvite.inviterId : null);
+    // inviteUserId в теле — UUID или буквенный invite_code из ссылки.
+    const inviterFromLink = inviteUserId ? db.resolveInviterByInviteRef(inviteUserId) : null;
+    const effectiveInviteUserId = inviterFromLink?.id || (groupInvite ? groupInvite.inviterId : null);
     if (!phone || !name || !password)
       return res.status(400).json({ error: 'phone, name, password required' });
     if (password.length < 8)
@@ -251,6 +251,12 @@ module.exports = function makeRouter(db, broadcast) {
     // Пока открыта регистрация только по инвайту (личному, школьному или групповому)
     const openSignup = process.env.OPEN_SIGNUP === '1';
     if (!openSignup && !effectiveInviteUserId && !schoolInvite) {
+      if (inviteUserId) {
+        return res.status(400).json({
+          error: 'Ссылка-приглашение недействительна или устарела. Попроси новую у друга.',
+          code: 'INVITE_INVALID',
+        });
+      }
       return res.status(403).json({
         error: 'Регистрация пока только по приглашению. Попроси ссылку у знакомых.',
         code: 'INVITE_REQUIRED',
@@ -475,8 +481,8 @@ module.exports = function makeRouter(db, broadcast) {
 
   // Public invite info endpoint (no auth required)
   r.get('/users/:id/invite-info', (req, res) => {
-    const user = db.findUserById(req.params.id);
-    if (!user || user.is_blocked) return res.status(404).json({ error: 'Not found' });
+    const user = db.resolveInviterByInviteRef(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Not found' });
     res.json({ id: user.id, name: user.name, avatar_url: user.avatar || null });
   });
 
@@ -1627,6 +1633,16 @@ module.exports = function makeRouter(db, broadcast) {
     const user  = db.findUserById(req.user.id);
     const count = db.getReferralCount(req.user.id);
     res.json({ code: user.invite_code, referral_count: count });
+  });
+
+  r.post('/invite/rotate', requireAuth, rateLimit(10, 60 * 60 * 1000), (req, res) => {
+    try {
+      const code = db.rotateInviteCode(req.user.id);
+      const count = db.getReferralCount(req.user.id);
+      res.json({ code, referral_count: count });
+    } catch (e) {
+      res.status(500).json({ error: e.message || 'Не удалось обновить ссылку' });
+    }
   });
 
   r.get('/invite/:code', (req, res) => {

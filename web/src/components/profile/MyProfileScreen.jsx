@@ -20,6 +20,7 @@ import MomentCard from '../moments/MomentCard';
 import { useSalesPressure } from '../../lib/publicSettings';
 import { MediaImage } from '../shared/MediaImage';
 import { ImageLightbox } from '../shared/ImageLightbox';
+import { personalInviteUrl } from '../../lib/inviteLink';
 
 export function MyProfileScreen() {
   const nav = useNavigate();
@@ -146,6 +147,26 @@ export function MyProfileScreen() {
     setProfileToast(msg);
     setTimeout(() => setProfileToast(''), 3000);
   };
+
+  async function copyPersonalInviteLink() {
+    let code = user?.invite_code;
+    if (!code) {
+      try {
+        const r = await api.getInvite();
+        code = r.code;
+      } catch {
+        showProfileToast('Не удалось получить ссылку');
+        return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(personalInviteUrl(code));
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2500);
+    } catch {
+      showProfileToast('Не удалось скопировать ссылку');
+    }
+  }
 
   // ── Archive actions ────────────────────────────────────────────────────────
   async function restoreFromArchive(m) {
@@ -279,7 +300,10 @@ export function MyProfileScreen() {
       }}>
         <div style={{maxWidth:680,margin:'0 auto',padding:'14px 20px',
           display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{color:'#F9F0F0',fontSize:20,fontWeight:800,letterSpacing:-.3}}>Профиль</div>
+          <div style={{color:'#F9F0F0',fontSize:20,fontWeight:800,letterSpacing:-.3,
+            display:'flex',alignItems:'center',gap:8}}>
+            <Icon name="user" size={20}/> Профиль
+          </div>
           {editing ? (
             <div style={{display:'flex',gap:8}}>
               <button onClick={cancelEdit} style={{background:'rgba(249,240,240,.15)',border:'none',
@@ -590,13 +614,7 @@ export function MyProfileScreen() {
                 subtitle="Поделиться ссылкой на HEY"
                 count={null}
                 accent={true}
-                onClick={() => {
-                  const link = `${location.origin}/register?invite=${user?.id}`;
-                  navigator.clipboard?.writeText(link).then(() => {
-                    setInviteCopied(true);
-                    setTimeout(() => setInviteCopied(false), 2500);
-                  });
-                }}
+                onClick={copyPersonalInviteLink}
               />
             )}
 
@@ -654,13 +672,7 @@ export function MyProfileScreen() {
                 Раньше висел над «Архив / Поговорить / Пригласить», но
                 юзер просил убрать оттуда — это статус, а не действие,
                 и место ему внизу, после операционных карточек. */}
-            <SuperStatusCard user={user} onInvite={() => {
-              const link = `${location.origin}/register?invite=${user?.id}`;
-              navigator.clipboard?.writeText(link).then(() => {
-                setInviteCopied(true);
-                setTimeout(() => setInviteCopied(false), 2500);
-              });
-            }}/>
+            <SuperStatusCard user={user} onInvite={copyPersonalInviteLink}/>
           </div>
         );
       })()}

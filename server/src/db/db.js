@@ -41,6 +41,7 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS blocks (
 )`); } catch {}
 try { db.exec('ALTER TABLE contacts ADD COLUMN notes TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN invite_code TEXT'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN invite_rotated_at INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN referral_by TEXT'); } catch {}
 try { db.exec(`CREATE TABLE IF NOT EXISTS referrals (
   inviter_id  TEXT NOT NULL,
@@ -572,8 +573,46 @@ const stmtInsertPresence = db.prepare(
   `INSERT INTO presence (user_id,online,last_seen) VALUES (@user_id,0,@last_seen)`
 );
 
+const INVITE_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
 function makeInviteCode(id) {
   return id.replace(/-/g,'').slice(0,10).toUpperCase();
+}
+
+function generateUniqueInviteCode() {
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const bytes = crypto.randomBytes(10);
+    let code = '';
+    for (let i = 0; i < 10; i++) {
+      code += INVITE_CODE_ALPHABET[bytes[i] % INVITE_CODE_ALPHABET.length];
+    }
+    if (!db.prepare('SELECT 1 FROM users WHERE invite_code=?').get(code)) return code;
+  }
+  throw new Error('Не удалось сгенерировать уникальный invite-код');
+}
+
+// Обновляет персональный invite_code. После ротации старый код и
+// ссылки вида /register?invite=UUID перестают работать.
+function rotateInviteCode(userId) {
+  const code = generateUniqueInviteCode();
+  db.prepare('UPDATE users SET invite_code=?, invite_rotated_at=? WHERE id=?')
+    .run(code, now(), userId);
+  return code;
+}
+
+function resolveInviterByInviteRef(ref) {
+  if (!ref || typeof ref !== 'string') return null;
+  const trimmed = ref.trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+  if (isUuid) {
+    const user = findUserById(trimmed);
+    if (!user || user.is_blocked || user.is_deleted) return null;
+    if (user.invite_rotated_at) return null;
+    return user;
+  }
+  const user = findUserByInviteCode(trimmed.toUpperCase());
+  if (!user || user.is_blocked || user.is_deleted) return null;
+  return user;
 }
 
 function createUser({ phone, name, password, birthday, avatar, inviteCode, email }) {
@@ -3761,6 +3800,7 @@ module.exports = {
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes, updateContactNickname,
   getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter,
+  rotateInviteCode, resolveInviterByInviteRef,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   getTotalUnreadFor,
   // AWO integration

@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { personalInviteUrl } from '../../lib/inviteLink';
+import Icon from '../Icon';
 
 function InviteModal({ onClose }) {
   const [info, setInfo]   = useState(null);   // { code, referral_count }
   const [copied, setCopied] = useState(false);
+  const [rotating, setRotating] = useState(false);
 
   useEffect(() => {
     api.getInvite().then(setInfo).catch(console.error);
   }, []);
 
-  const inviteLink = info
-    ? `${location.origin}/join/${info.code}`
-    : '…';
+  const inviteLink = info ? personalInviteUrl(info.code) : '…';
 
   const inviteText = info
-    ? `Привет! Я пользуюсь HEY Messenger — быстрый и стильный мессенджер. Вступай по моей ссылке: ${inviteLink}`
+    ? `Приглашаю тебя в HEY - мессенджер для приватного круга без рекламы: ${inviteLink}`
     : '';
 
   function copy() {
@@ -24,8 +25,26 @@ function InviteModal({ onClose }) {
     });
   }
 
-  const waHref  = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
-  const tgHref  = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('Вступай в HEY Messenger — самый стильный мессенджер!')}`;
+  async function rotateLink() {
+    if (rotating || !info) return;
+    const ok = window.confirm(
+      'Обновить пригласительную ссылку?\n\nСтарая перестанет работать — даже если вы уже отправили её кому-то. Уже приглашённые друзья останутся в статистике.',
+    );
+    if (!ok) return;
+    setRotating(true);
+    try {
+      const next = await api.rotateInvite();
+      setInfo(next);
+      setCopied(false);
+    } catch (e) {
+      window.alert(e.message || 'Не удалось обновить ссылку');
+    } finally {
+      setRotating(false);
+    }
+  }
+
+  const waHref = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
+  const tgHref = `https://t.me/share/url?text=${encodeURIComponent(inviteText)}`;
 
   const referralCount = info?.referral_count ?? 0;
   const goal = 3;
@@ -72,6 +91,24 @@ function InviteModal({ onClose }) {
                   transition:'background .2s',flexShrink:0}}>
                 {copied ? '✓ Скопировано' : 'Копировать'}
               </button>
+            </div>
+            <button
+              type="button"
+              onClick={rotateLink}
+              disabled={rotating || !info}
+              style={{
+                marginTop: 10, width: '100%', padding: '10px 14px', borderRadius: 12,
+                background: 'rgba(249,240,240,.06)', border: '1px solid rgba(249,240,240,.14)',
+                color: 'rgba(235,228,245,.82)', fontSize: 13, fontWeight: 600,
+                cursor: rotating || !info ? 'wait' : 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <Icon name="refresh" size={15}/>
+              {rotating ? 'Обновляем…' : 'Обновить ссылку'}
+            </button>
+            <div style={{ color: 'rgba(249,240,240,.42)', fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
+              Если ссылка ушла не туда — обновите её. Старая перестанет открывать регистрацию.
             </div>
           </div>
 
