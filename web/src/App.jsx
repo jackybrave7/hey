@@ -44,6 +44,11 @@ import ServerStatusBanner from './components/ServerStatusBanner';
 import { ensurePushIfGranted } from './lib/push';
 import { PublicSettingsProvider } from './lib/publicSettings';
 import { BootScreen } from './components/shared/BootMark';
+import {
+  isSystemChatEvent,
+  messageConversationId,
+  messagePreviewText,
+} from './lib/messagePreview';
 
 function useNotifications() {
   const nav = useNavigate();
@@ -57,6 +62,10 @@ function useNotifications() {
       // — для синхронизации delivered/read). Не показываем нотификацию
       // на собственные сообщения.
       if (me?.id && message?.sender_id === me.id) return;
+      // Системные события группы (выход/удаление) — не пушим как «сообщение».
+      if (isSystemChatEvent(message)) return;
+      const convId = messageConversationId(message);
+      if (!convId) return;
       // document.hasFocus() в Опере (и иногда в Firefox/Safari) врёт —
       // возвращает false даже на активной вкладке. Двойная проверка
       // через visibilityState + hasFocus + наличие видимых клиентов SW.
@@ -65,13 +74,13 @@ function useNotifications() {
         ? document.hasFocus() : true;
       if (isVisible && isFocused) return;
       const n = new Notification(message.sender_name || 'HEY', {
-        body: message.text || '📎 Изображение',
-        tag: message.conversationId,
+        body: messagePreviewText(message) || 'Новое сообщение',
+        tag: convId,
       });
       n.onclick = (e) => {
         e.preventDefault();
         window.focus();
-        nav('/chat/' + message.conversationId + '?msg=' + message.id);
+        nav('/chat/' + convId + '?msg=' + message.id);
         n.close();
       };
     });

@@ -7,6 +7,7 @@ import { useConfirm } from '../shared/Confirm';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
 import ChatContextMenu, { AnchoredContextMenu } from '../chat/ChatContextMenu';
 import { renderPreviewWithEmoji } from '../chat/chatRender';
+import { messageConversationId, messagePreviewText } from '../../lib/messagePreview';
 import Highlight from '../shared/Highlight';
 import Icon from '../Icon';
 import { fmtTime } from '../../lib/formatTime';
@@ -25,29 +26,18 @@ export function ConversationsScreen() {
 
   useEffect(() => { reload(); }, []);
   useEffect(() => socket.on('message:new', ({ message }) => {
+    const convId = messageConversationId(message);
+    if (!convId) return;
     setConvs(prev => {
-      const exists = prev.find(c => c.id === message.conversationId);
+      const exists = prev.find(c => c.id === convId);
       if (!exists) { reload(); return prev; }
       return prev
         .map(c => {
-          if (c.id !== message.conversationId) return c;
+          if (c.id !== convId) return c;
           if (c.is_request && c.request_from !== user?.id) return c; // don't update locked request
           return {
             ...c,
-            last_text: (() => {
-              if (message.text) return message.text;
-              // Системное событие группы — генерим читаемое превью.
-              const ev = message.attachment?.system_event;
-              if (ev?.type === 'member_left') {
-                return `${ev.userName || 'Участник'} покинул(а) группу`;
-              }
-              if (ev?.type === 'member_removed') {
-                return ev.byUserName
-                  ? `${ev.byUserName} удалил(а) ${ev.userName || 'участника'}`
-                  : `${ev.userName || 'Участник'} удалён(а) из группы`;
-              }
-              return null;
-            })(),
+            last_text: messagePreviewText(message),
             last_at: message.created_at,
             last_sender_id: message.sender_id,
             last_sender_name: message.sender_name || c.last_sender_name || null,

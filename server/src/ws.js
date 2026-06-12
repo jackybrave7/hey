@@ -22,6 +22,27 @@ function broadcastOnlineContacts(userId, payload) {
   broadcast(owners, payload);
 }
 
+function pushBodyForMessage(text, attachment) {
+  const trimmed = (text || '').trim();
+  if (trimmed) return trimmed.slice(0, 140);
+  const ev = attachment?.system_event;
+  if (ev?.type === 'member_left') {
+    return `${ev.userName || 'Участник'} покинул(а) группу`;
+  }
+  if (ev?.type === 'member_removed') {
+    return ev.byUserName
+      ? `${ev.byUserName} удалил(а) ${ev.userName || 'участника'} из группы`
+      : `${ev.userName || 'Участник'} удалён(а) из группы`;
+  }
+  if (ev) return 'Событие в группе';
+  const a = attachment;
+  if (a?.type === 'image' || a?.type === 'images') return '🖼 Фото';
+  if (a?.type === 'audio') return '🎙 Голосовое сообщение';
+  if (a?.type === 'file') return `📎 ${a.name || 'Файл'}`;
+  if (a?.type === 'moment') return '✨ Момент';
+  return 'Новое сообщение';
+}
+
 module.exports = function setupWS(server) {
   const wss = new WebSocketServer({
     server,
@@ -219,14 +240,7 @@ module.exports = function setupWS(server) {
             const title = isGroup
               ? `${user.name} в «${conv.name || 'группе'}»`
               : (user.name || 'HEY');
-            let body = (text?.trim() || '').slice(0, 140);
-            if (!body) {
-              const a = attachment;
-              body = a?.type === 'image'  || a?.type === 'images' ? '🖼 Фото'
-                   : a?.type === 'audio'  ? '🎙 Голосовое сообщение'
-                   : a?.type === 'file'   ? `📎 ${a.name || 'Файл'}`
-                   : 'Новое сообщение';
-            }
+            const body = pushBodyForMessage(text, attachment);
             const payload = {
               title, body,
               // ?msg=<id> — клиентский ChatScreen прочитает param и сразу

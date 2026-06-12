@@ -301,6 +301,9 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS feedbacks (
   admin_note  TEXT                   -- внутренний комментарий
 )`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_feedbacks_status ON feedbacks(status, created_at DESC)'); } catch {}
+try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_url TEXT'); } catch {}
+try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_name TEXT'); } catch {}
+try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_mime TEXT'); } catch {}
 
 // Two-step self-delete: после `DELETE /me` юзер становится `is_deleted=1`,
 // но 30 дней лежит в deletion_grace со снапшотом оригинальных полей.
@@ -2922,12 +2925,16 @@ function resolveReport(id, adminId, action /* 'resolved' | 'dismissed' */) {
 }
 
 // ── Feedbacks ─────────────────────────────────────────────────────────────
-function createFeedback({ userId, name, phone, type, text }) {
+function createFeedback({ userId, name, phone, type, text, attachmentUrl, attachmentName, attachmentMime }) {
   const id = 'fb_' + uuid().replace(/-/g,'').slice(0,12);
   db.prepare(
-    `INSERT INTO feedbacks (id, user_id, name, phone, type, text, status, created_at)
-     VALUES (?,?,?,?,?,?,'open',?)`
-  ).run(id, userId || null, name || null, phone || null, type || null, text, now());
+    `INSERT INTO feedbacks (id, user_id, name, phone, type, text, attachment_url, attachment_name, attachment_mime, status, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,'open',?)`
+  ).run(
+    id, userId || null, name || null, phone || null, type || null, text,
+    attachmentUrl || null, attachmentName || null, attachmentMime || null,
+    now(),
+  );
   return id;
 }
 

@@ -1071,6 +1071,16 @@ module.exports = function makeRouter(db, broadcast) {
       'moment-audio':  ['audio/mpeg', 'audio/ogg', 'audio/mp4', 'audio/wav', 'audio/webm'],
       'avatar':        ['image/jpeg', 'image/png', 'image/webp'],
       'group-icon':    ['image/jpeg', 'image/png', 'image/webp'],
+      'feedback-attachment': [
+        'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain',
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/octet-stream',
+      ],
     };
     if (!allowed[category]?.includes(contentType))
       return res.status(400).json({ error: 'Unsupported type' });
@@ -1087,6 +1097,7 @@ module.exports = function makeRouter(db, broadcast) {
       'moment-audio':  isSuper ? 30 * MB : 5 * MB,
       'avatar':        2 * MB,
       'group-icon':    2 * MB,
+      'feedback-attachment': 10 * MB,
     };
     const maxBytes = limits[category];
     if (typeof size === 'number' && size > maxBytes) {
@@ -1114,6 +1125,7 @@ module.exports = function makeRouter(db, broadcast) {
       // стабилен по userId, и оба групповых icon начинали ссылаться
       // на одну и ту же ячейку S3 (всегда последняя загрузка).
       'group-icon':   `group-icons/${uuid()}.${ext}`,
+      'feedback-attachment': `feedback/${uuid()}.${ext}`,
     };
     try {
       const result = await storage.getPresignedUploadUrl(keyMap[category], contentType);
@@ -1420,8 +1432,10 @@ module.exports = function makeRouter(db, broadcast) {
         );
         // Удалённого/вышедшего УЖЕ нет в members — поэтому он системку не увидит,
         // и это правильно (у него чат пропадёт из списка).
-        broadcast(members.filter(uid => uid !== req.params.userId),
-          { type: 'message:new', message: sysMsg });
+        broadcast(members.filter(uid => uid !== req.params.userId), {
+          type: 'message:new',
+          message: { ...sysMsg, conversationId: req.params.id },
+        });
       }
 
       broadcast(members, { type: 'group:member_removed', conversationId: req.params.id, userId: req.params.userId });
@@ -1664,14 +1678,23 @@ module.exports = function makeRouter(db, broadcast) {
 
   // ── Feedback ───────────────────────────────────────────────────────────────
   r.post('/feedback', rateLimit(3, 60 * 60 * 1000), optionalAuth, async (req, res) => {
-    const { text, type } = req.body;
-    if (!text?.trim()) return res.status(400).json({ error: 'Текст не может быть пустым' });
+    const { text, type, attachment_url, attachment_name, attachment_mime } = req.body;
+    const trimmed = (text || '').trim();
+    const attUrl = typeof attachment_url === 'string' ? attachment_url.trim() : '';
+    if (!trimmed && !attUrl) return res.status(400).json({ error: 'Нужен текст или вложение' });
 
     const from = req.user
       ? `${req.user.name} (${req.user.phone})`
       : 'Аноним';
     const subject = `HEY Feedback [${type || 'общее'}] от ${from}`;
-    const body = `От: ${from}\nТип: ${type || 'общее'}\n\n${text.trim()}`;
+    const bodyLines = [
+      `От: ${from}`,
+      `Тип: ${type || 'общее'}`,
+      attUrl ? `Вложение: ${attachment_name || 'файл'} (${attUrl})` : null,
+      '',
+      trimmed || '(без текста)',
+    ].filter(l => l !== null);
+    const body = bodyLines.join('\n');
 
     // Кладём в БД (для админки), параллельно в файл (легаси).
     try {
@@ -1680,7 +1703,10 @@ module.exports = function makeRouter(db, broadcast) {
         name:   req.user?.name || null,
         phone:  req.user?.phone || null,
         type:   type || null,
-        text:   text.trim(),
+        text:   trimmed || '',
+        attachmentUrl: attUrl || null,
+        attachmentName: attachment_name || null,
+        attachmentMime: attachment_mime || null,
       });
     } catch (e) { console.error('[FEEDBACK] DB insert failed:', e.message); }
 

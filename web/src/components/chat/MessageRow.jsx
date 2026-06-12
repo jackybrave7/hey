@@ -99,9 +99,9 @@ const MessageRow = memo(function MessageRow({
         // поэтому 36-px смайл-слот вылезает за экран. С width:100% row
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
-        // Чипы реакций рисуются ниже пузыря absolute'ом, поэтому резервируем
-        // место в строке, чтобы следующее сообщение начиналось после них.
-        marginBottom: rowBottomGap, overflow:'visible'}}
+        // Чипы реакций рисуются ниже пузыря absolute'ом — резервируем место
+        // padding'ом (не margin: Virtuoso меряет contentRect без margin → дёрганье).
+        paddingBottom: rowBottomGap, overflow:'visible'}}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.

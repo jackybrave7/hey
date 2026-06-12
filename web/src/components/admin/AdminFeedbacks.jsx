@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api';
 import { useConfirm } from '../shared/Confirm';
 import Icon from '../Icon';
+import { MediaImage } from '../shared/MediaImage';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -18,11 +19,12 @@ const STATUS_LABELS = {
 };
 
 const TYPE_LABELS = {
-  bug:      { label: 'Баг',     icon: 'alert' },
-  idea:     { label: 'Идея',    icon: 'sparkle' },
-  thanks:   { label: 'Спасибо', icon: 'heart' },
-  question: { label: 'Вопрос',  icon: 'help' },
-  other:    { label: 'Общее',   icon: 'mail' },
+  bug:       { label: 'Баг',     icon: 'alert' },
+  idea:      { label: 'Идея',    icon: 'sparkle' },
+  complaint: { label: 'Жалоба',  icon: 'flag' },
+  thanks:    { label: 'Спасибо', icon: 'heart' },
+  question:  { label: 'Вопрос',  icon: 'help' },
+  other:     { label: 'Общее',   icon: 'mail' },
 };
 
 const TABS = [
@@ -170,11 +172,30 @@ export default function AdminFeedbacks() {
                 </div>
 
                 {/* Текст */}
-                <div style={{
-                  background:'rgba(0,0,0,.25)', borderRadius:10, padding:'12px 14px',
-                  color:'rgba(240,235,255,.95)', fontSize:14, lineHeight:1.55,
-                  whiteSpace:'pre-wrap', wordBreak:'break-word', marginBottom:14,
-                }}>{f.text}</div>
+                {f.text ? (
+                  <div style={{
+                    background:'rgba(0,0,0,.25)', borderRadius:10, padding:'12px 14px',
+                    color:'rgba(240,235,255,.95)', fontSize:14, lineHeight:1.55,
+                    whiteSpace:'pre-wrap', wordBreak:'break-word', marginBottom:14,
+                  }}>{f.text}</div>
+                ) : null}
+
+                {f.attachment_url && (
+                  <div style={{ marginBottom:14 }}>
+                    {f.attachment_mime?.startsWith('image/') ? (
+                      <a href={f.attachment_url} target="_blank" rel="noreferrer">
+                        <MediaImage src={f.attachment_url} alt=""
+                          style={{ maxWidth:'100%', maxHeight:280, borderRadius:10,
+                            display:'block', border:'1px solid rgba(249,240,240,.12)' }}/>
+                      </a>
+                    ) : (
+                      <a href={f.attachment_url} target="_blank" rel="noreferrer"
+                        style={{ color:'rgba(180,140,255,.95)', fontSize:13, wordBreak:'break-all' }}>
+                        📎 {f.attachment_name || 'Вложение'}
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 {f.admin_note && (
                   <div style={{

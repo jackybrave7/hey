@@ -19,10 +19,10 @@ export function ToastContainer() {
   }, []);
   if (!items.length) return null;
   const colors = {
-    info:    { bg:'rgba(28,18,58,.98)',  border:'rgba(180,140,220,.3)', text:'rgba(235,225,255,.95)' },
-    success: { bg:'rgba(20,40,30,.98)',  border:'rgba(80,200,140,.4)',  text:'rgba(180,255,210,.98)' },
-    error:   { bg:'rgba(50,20,28,.98)',  border:'rgba(255,100,100,.4)', text:'rgba(255,180,180,.98)' },
-    warning: { bg:'rgba(50,40,18,.98)',  border:'rgba(255,180,80,.4)',  text:'rgba(255,220,150,.98)' },
+    info:    { bg:'rgba(28,18,58,.98)',  border:'rgba(180,140,220,.32)', text:'#F9F0F0' },
+    success: { bg:'rgba(32,22,68,.98)',  border:'rgba(200,170,255,.42)', text:'#F9F0F0' },
+    error:   { bg:'rgba(38,16,36,.98)',  border:'rgba(230,120,150,.38)', text:'#F9F0F0' },
+    warning: { bg:'rgba(38,28,18,.98)',  border:'rgba(230,180,110,.38)', text:'#F9F0F0' },
   };
   return createPortal(
     <div style={{

@@ -185,11 +185,34 @@ export async function uploadAvatar(file, apiFns) {
   return blobToDataUrl(blob);
 }
 
-/**
- * Upload a group icon. Внутри как `uploadAvatar`, но с другой category
- * — на сервере у group-icon уникальный ключ на каждую загрузку, чтобы
- * иконы разных групп не делили один S3-объект.
- */
+/** Вложение к обращению разработчику — картинка (скриншот) или файл до 10 МБ. */
+export async function uploadFeedbackAttachment(file, apiFns) {
+  const isImage = file.type.startsWith('image/');
+  let uploadBlob = file;
+  let contentType = file.type || 'application/octet-stream';
+  if (isImage) {
+    const r = await resizeToBlob(file, 1920, 8 * 1024 * 1024);
+    uploadBlob = r.blob;
+    contentType = r.contentType;
+  }
+  const presign = await apiFns.getPresignUrl('feedback-attachment', contentType, uploadBlob.size);
+  if (presign.uploadUrl) {
+    await putToS3(presign.uploadUrl, uploadBlob, contentType, presign.headers || {});
+    return {
+      url: mediaUrl(presign.publicUrl),
+      name: file.name,
+      mime: contentType,
+    };
+  }
+  if (isImage && apiFns.uploadImage) {
+    const dataUrl = await blobToDataUrl(uploadBlob);
+    const res = await apiFns.uploadImage(dataUrl);
+    return { url: res.url, name: file.name, mime: contentType };
+  }
+  throw new Error('Загрузка вложений недоступна без S3');
+}
+
+/** Как uploadAvatar, но category group-icon — уникальный S3-ключ на каждую загрузку. */
 export async function uploadGroupIcon(file, apiFns) {
   const { blob, contentType } = await resizeToBlob(file, 512);
   const presign = await apiFns.getPresignUrl('group-icon', contentType, blob.size);

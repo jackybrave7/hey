@@ -12,6 +12,7 @@ import { MediaImage } from '../shared/MediaImage';
 import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { ImageLightbox } from '../shared/ImageLightbox';
 import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile } from '../../lib/uploadMedia';
+import { messageConversationId } from '../../lib/messagePreview';
 import { fmtTime, fmtDate, fmtLastSeenShort } from '../../lib/formatTime';
 import { HEY_EMOJI as HEY_EMOJI_LIST, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
 import { openUserCard } from '../../lib/openUserCard';
@@ -128,8 +129,36 @@ export function ChatScreen() {
   const fileInputRef       = useRef();
   const searchRef          = useRef();
   const isInitialLoad      = useRef(true);  // true until first messages batch is rendered
-  const forceScrollBottom  = useRef(false); // true after user sends a message
+  const pendingBottomScroll = useRef(false); // true after user sends a message
+  const smoothScrollUntil  = useRef(0);     // followOutput → 'smooth' only in этом окне
+  const bottomScrollTimers = useRef([]);
+  const scrollTargetTimers = useRef([]);
   const readDebounceTimer  = useRef(null);  // debounce read receipts
+
+  function clearScrollTimers(bucket) {
+    bucket.current.forEach(clearTimeout);
+    bucket.current = [];
+  }
+  function scrollToBottom(behavior = 'auto') {
+    virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior });
+  }
+  function scheduleScrollToBottom({ smooth = false } = {}) {
+    if (smooth) smoothScrollUntil.current = Date.now() + 800;
+    clearScrollTimers(bottomScrollTimers);
+    scrollToBottom(smooth ? 'smooth' : 'auto');
+    // Одна коррекция после layout — вместо 3–4 конкурирующих таймеров.
+    bottomScrollTimers.current.push(setTimeout(() => scrollToBottom('auto'), 400));
+  }
+  function scheduleScrollToMessage(idx, offset) {
+    clearScrollTimers(scrollTargetTimers);
+    const opts = { align: 'start', behavior: 'auto', offset };
+    const run = () => virtuosoRef.current?.scrollToIndex({ index: idx, ...opts });
+    requestAnimationFrame(() => requestAnimationFrame(run));
+    scrollTargetTimers.current.push(
+      setTimeout(run, 250),
+      setTimeout(run, 700),
+    );
+  }
 
   // Подтянуть черновик при смене чата. Если в новом чате draft нет —
   // обнулим инпут (а не унаследуем текст предыдущего диалога).
@@ -252,6 +281,10 @@ export function ChatScreen() {
     setHasMore(true);
     setLoadingMore(false);
     setFirstItemIndex(1_000_000); // reset Virtuoso prepend index on conv change
+    clearScrollTimers(bottomScrollTimers);
+    clearScrollTimers(scrollTargetTimers);
+    smoothScrollUntil.current = 0;
+    pendingBottomScroll.current = false;
     setPinnedMessage(null);
     setGroupInvite(null);
     api.getMessages(convId).then(data => {
@@ -399,31 +432,19 @@ export function ChatScreen() {
         }, 300);
         return;
       }
-      // Несколько попыток: первая сразу, остальные после возможной загрузки картинок
-      const scroll = () => virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'instant' });
-      requestAnimationFrame(scroll);
-      setTimeout(scroll, 150);
-      setTimeout(scroll, 500);
-      setTimeout(scroll, 1200);
+      scheduleScrollToBottom({ smooth: false });
       return;
     }
-    if (forceScrollBottom.current) {
-      forceScrollBottom.current = false;
-      const scroll = (smooth) => virtuosoRef.current?.scrollToIndex({
-        index: 'LAST', behavior: smooth ? 'smooth' : 'auto'
-      });
-      scroll(true);
-      // Повторные попытки — изображения и кастомные превью могут изменить высоту
-      setTimeout(() => scroll(false), 150);
-      setTimeout(() => scroll(false), 500);
-      setTimeout(() => scroll(false), 1200);
+    if (pendingBottomScroll.current) {
+      pendingBottomScroll.current = false;
+      scheduleScrollToBottom({ smooth: true });
     }
   }, [messages, typing]);
 
   // Real-time events
   useEffect(() => {
     const u1 = socket.on('message:new', ({ message }) => {
-      if (message.conversationId !== convId) return;
+      if (messageConversationId(message) !== convId) return;
       setMessages(prev => {
         // Replace optimistic temp message with real one
         if (message.tempId) {
@@ -747,7 +768,7 @@ export function ChatScreen() {
     }
     const attachment = { type: 'audio', url, duration: Math.round(dur) };
     const tempId = 'tmp-' + Date.now();
-    forceScrollBottom.current = true;
+    pendingBottomScroll.current = true;
     setMessages(prev => [...prev, {
       id: tempId, text: null, attachment,
       sender_id: user.id, sender_name: user.name,
@@ -885,7 +906,7 @@ export function ChatScreen() {
 
       const tempId = 'tmp-' + Date.now();
       const reply = replyTo ? makeReplySnippet(replyTo) : null;
-      forceScrollBottom.current = true;
+      pendingBottomScroll.current = true;
       setMessages(prev => [...prev, {
         id: tempId, text: capturedText || null, attachment, sender_id: user.id,
         sender_name: user.name, status: 'sent',
@@ -922,7 +943,7 @@ export function ChatScreen() {
       };
       const tempId = 'tmp-' + Date.now();
       const reply  = replyTo ? makeReplySnippet(replyTo) : null;
-      forceScrollBottom.current = true;
+      pendingBottomScroll.current = true;
       setMessages(prev => [...prev, {
         id: tempId, text: t || null, attachment, sender_id: user.id,
         sender_name: user.name, status:'sent',
@@ -955,7 +976,7 @@ export function ChatScreen() {
     const reply  = replyTo ? makeReplySnippet(replyTo) : null;
     // Если к черновику прицеплен момент — кладём его как attachment.
     const attachment = momentRef ? { type: 'moment', moment: momentRef } : null;
-    forceScrollBottom.current = true;
+    pendingBottomScroll.current = true;
     setMessages(prev => [...prev, {
       id: tempId, text: t, sender_id: user.id,
       sender_name: user.name, status:'sent',
@@ -1108,7 +1129,9 @@ export function ChatScreen() {
       }
       return { ...m, reactions };
     }));
-    setReactionPicker(null);
+    // После pointerDown пикер нельзя снимать синхронно — иначе click
+    // «проваливается» на картинку под пикером и открывает лайтбокс.
+    setTimeout(() => setReactionPicker(null), 0);
     api.toggleReaction(convId, msgId, emoji)
       .then(res => {
         if (res?.reactions) {
@@ -1377,19 +1400,12 @@ export function ChatScreen() {
     setFlashMsgId(targetId);
     setTimeout(() => setFlashMsgId(curr => curr === targetId ? null : curr), 1500);
 
-    const scroll = (opts) => virtuosoRef.current?.scrollToIndex({ index: idx, ...opts });
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      // Сразу — instant, чтобы Virtuoso смонтировал нужные ряды и
-      // начал измерять их высоту.
-      scroll({ align: 'center', behavior: 'auto' });
-      // Серия дозиров — картинки/embed-видео отрисовываются с
-      // задержкой и меняют layout, попутно «уезжая» от исходной
-      // позиции. Подстраиваемся.
-      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 120);
-      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 350);
-      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 800);
-      setTimeout(() => scroll({ align: 'center', behavior: 'auto' }), 1500);
-    }));
+    // start — показываем начало сообщения (важно для длинных закрепов).
+    // offset — не прячем первую строку под плашкой закрепа.
+    // Плашка закрепа — снаружи Virtuoso (между topbar и лентой), offset
+    // внутри списка её не компенсирует. Положительный offset только прячет
+    // начало сообщения («Переслано от…», заголовок и т.п.).
+    scheduleScrollToMessage(idx, 8);
   }, [flatItems, scrollTick]);
 
   // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
@@ -1731,11 +1747,15 @@ export function ChatScreen() {
           data={flatItems}
           computeItemKey={(_index, item) => item.id}
           initialTopMostItemIndex={Math.max(0, flatItems.length - 1)}
+          atBottomThreshold={100}
+          increaseViewportBy={{ top: 300, bottom: 400 }}
           startReached={loadOlder}
           atBottomStateChange={bottom => { atBottomRef.current = bottom; setShowScrollDown(!bottom); }}
           followOutput={(atBottom) => {
-            if (forceScrollBottom.current) return 'smooth';
-            return atBottom ? 'smooth' : false;
+            if (!atBottom) return false;
+            // 'auto' — без анимации при подгрузке картинок/реакций; smooth только
+            // сразу после отправки своего сообщения (короткое окно).
+            return Date.now() < smoothScrollUntil.current ? 'smooth' : 'auto';
           }}
           components={{
             Header: () => loadingMore ? (
@@ -1749,7 +1769,7 @@ export function ChatScreen() {
           }}
           itemContent={(_index, item) => {
             if (item.type === 'date') return (
-              <div style={{display:'flex',justifyContent:'center',margin:'8px 16px'}}>
+              <div style={{display:'flex',justifyContent:'center',padding:'8px 16px'}}>
                 <div style={{background:'rgba(100,72,140,.38)',borderRadius:14,padding:'4px 14px',
                   color:'rgba(249,240,240,.7)',fontSize:13,fontWeight:600}}>
                   {item.label}
@@ -1799,7 +1819,7 @@ export function ChatScreen() {
                 label = item.text || 'Системное событие';
               }
               return (
-                <div style={{display:'flex',justifyContent:'center',margin:'6px 16px'}}>
+                <div style={{display:'flex',justifyContent:'center',padding:'6px 16px'}}>
                   <div style={{background:'rgba(100,72,140,.28)',borderRadius:14,padding:'4px 14px',
                     color:'rgba(249,240,240,.75)',fontSize:12,fontWeight:500,
                     maxWidth:520,textAlign:'center',lineHeight:1.45,
@@ -1844,9 +1864,8 @@ export function ChatScreen() {
       {showScrollDown && flatItems.length > 5 && !(searchMode && searchResults !== null) && (
         <button
           onClick={() => {
-            forceScrollBottom.current = true;
-            virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'smooth' });
-            setTimeout(() => { forceScrollBottom.current = false; }, 500);
+            smoothScrollUntil.current = Date.now() + 800;
+            scheduleScrollToBottom({ smooth: true });
           }}
           aria-label="К последним сообщениям"
           style={{
@@ -2649,7 +2668,10 @@ export function ChatScreen() {
               </div>
             )}
             <button
-              onClick={() => setReactionPicker(p => p ? { ...p, expanded: !p.expanded } : null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setReactionPicker(p => p ? { ...p, expanded: !p.expanded } : null);
+              }}
               title={expanded ? 'Свернуть' : 'Все эмодзи'}
               style={{
                 flexShrink:0, width: 36, height: 36, borderRadius:'50%',
