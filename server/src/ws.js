@@ -229,7 +229,9 @@ module.exports = function setupWS(server) {
               db.updateMessageStatus(saved.id, 'delivered');
               broadcast([user.id], { type: 'message:status', id: saved.id, status: 'delivered' });
             }
-            pushRecipients.push(uid);
+            if (!db.isNotificationsMuted(conversationId, uid)) {
+              pushRecipients.push(uid);
+            }
           });
 
           // Web Push — всегда, SW на клиенте сам подавит дубли

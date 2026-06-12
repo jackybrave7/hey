@@ -1377,6 +1377,7 @@ module.exports = function makeRouter(db, broadcast) {
       id: conv.id, name: conv.name, icon: conv.icon,
       admin_id: conv.admin_id,
       history_visibility: conv.history_visibility || 'all',
+      notifications_muted: db.isNotificationsMuted(req.params.id, req.user.id),
     });
   });
 
@@ -1524,6 +1525,17 @@ module.exports = function makeRouter(db, broadcast) {
       broadcast(members, { type: 'group:updated', conversationId: req.params.id, fields: { history_visibility: value } });
       res.json({ ok: true });
     } catch(e) { res.status(403).json({ error: e.message }); }
+  });
+
+  // Персональное отключение уведомлений по группе (для текущего участника)
+  r.patch('/groups/:id/notifications', requireAuth, (req, res) => {
+    try {
+      const conv = db.getConversationById(req.params.id);
+      if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Not found' });
+      const muted = !!req.body?.muted;
+      db.setNotificationsMuted(req.params.id, req.user.id, muted);
+      res.json({ ok: true, notifications_muted: muted });
+    } catch (e) { res.status(403).json({ error: e.message }); }
   });
 
   // ── Group invite links (admin shares a link, anyone can join) ────────────

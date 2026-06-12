@@ -189,6 +189,8 @@ try { db.exec('ALTER TABLE members ADD COLUMN invited_by TEXT'); } catch {}
 try { db.exec('ALTER TABLE members ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
 // Архив чата — персональный для каждого юзера. NULL = не в архиве.
 try { db.exec('ALTER TABLE members ADD COLUMN archived_at INTEGER'); } catch {}
+// Персональное отключение push/оповещений по чату (для групп и др.)
+try { db.exec('ALTER TABLE members ADD COLUMN notifications_muted INTEGER DEFAULT 0'); } catch {}
 // Видимость истории для добавленных позже: 'all' (по умолчанию) или 'since_joined'
 try { db.exec("ALTER TABLE conversations ADD COLUMN history_visibility TEXT DEFAULT 'all'"); } catch {}
 // Заполняем status для существующих записей (миграция, ОДИН раз — UPDATE no-op если уже 'active')
@@ -1227,6 +1229,20 @@ function setGroupHistoryVisibility(convId, requesterId, value) {
   db.prepare('UPDATE conversations SET history_visibility=? WHERE id=?').run(value, convId);
 }
 
+function isNotificationsMuted(convId, userId) {
+  const row = db.prepare(
+    'SELECT notifications_muted FROM members WHERE conversation_id=? AND user_id=?'
+  ).get(convId, userId);
+  return !!(row?.notifications_muted);
+}
+
+function setNotificationsMuted(convId, userId, muted) {
+  if (!isMember(convId, userId)) throw new Error('Not a member');
+  db.prepare(
+    'UPDATE members SET notifications_muted=? WHERE conversation_id=? AND user_id=?'
+  ).run(muted ? 1 : 0, convId, userId);
+}
+
 // Принять приглашение в группу — переводит запись из pending в active.
 function acceptGroupInvite(convId, userId) {
   const row = db.prepare('SELECT status FROM members WHERE conversation_id=? AND user_id=?')
@@ -1452,7 +1468,7 @@ function getConversationsForUser(userId, opts = {}) {
   const { archived = false } = opts; // false → активные, true → только архивные
   // Включаем и активные, и pending членства — pending покажем как «приглашение»
   const memberRows = db.prepare(
-    'SELECT conversation_id, status, invited_by, archived_at, is_admin FROM members WHERE user_id=?'
+    'SELECT conversation_id, status, invited_by, archived_at, is_admin, notifications_muted FROM members WHERE user_id=?'
   ).all(userId)
     .filter(r => archived ? r.archived_at != null : r.archived_at == null);
   if (!memberRows.length) return [];
@@ -1461,6 +1477,7 @@ function getConversationsForUser(userId, opts = {}) {
     memberRows.map(r => [r.conversation_id, {
       status: r.status || 'active', invited_by: r.invited_by, archived_at: r.archived_at,
       is_admin: !!r.is_admin,
+      notifications_muted: !!r.notifications_muted,
     }])
   );
 
@@ -1635,6 +1652,7 @@ function getConversationsForUser(userId, opts = {}) {
       is_request: isRequest,
       request_from: conv.request_from || null,
       is_pinned: pinnedSet.has(convId),
+      notifications_muted: !!meta.notifications_muted,
       // Для группы — общий пин из conversations; для direct/monolog — личный
       pinned_message_id: conv.type === 'group'
         ? (conv.pinned_message_id || null)
@@ -3951,6 +3969,7 @@ module.exports = {
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,
   joinGroupViaInvite, isGroupAdmin, setMemberAdmin, setGroupHistoryVisibility,
+  isNotificationsMuted, setNotificationsMuted,
   archiveConversation, unarchiveConversation,
   getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,

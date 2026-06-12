@@ -46,7 +46,11 @@ export default function ChatTopBar({
             style={{ cursor: onInfoClick ? 'pointer' : 'default' }}
           >
             <div className="chat-topbar-name-row">
-              <ChatFadeText text={name || 'Диалог'} className="chat-topbar-name" />
+              {isGroup ? (
+                <div className="chat-topbar-name topbar-title-clamp-2">{name || 'Диалог'}</div>
+              ) : (
+                <ChatFadeText text={name || 'Диалог'} className="chat-topbar-name" />
+              )}
               {showPresence && online && <span className="chat-topbar-online-dot" aria-hidden />}
             </div>
             {statusText ? (

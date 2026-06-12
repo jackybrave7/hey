@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
 import { uploadGroupIcon } from '../../lib/uploadMedia';
+import { getPermission } from '../../lib/push';
+import { setConversationMuted } from '../../lib/mutedConversations';
 import { heyToast } from '../shared/Toast';
 import { useConfirm } from '../shared/Confirm';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
@@ -30,6 +32,8 @@ export function GroupSettingsScreen() {
   // поворот, зум, центровка. Раньше группа просто резалась и грузилась
   // как есть — пользователь жаловался на отсутствие контролей.
   const [iconCropFile, setIconCropFile] = useState(null);
+  const [notifMuted, setNotifMuted] = useState(false);
+  const notifGranted = getPermission() === 'granted';
 
   // Любой админ — создатель ИЛИ участник с is_admin=1
   const myMember = members.find(m => m.id === user?.id);
@@ -52,7 +56,12 @@ export function GroupSettingsScreen() {
 
   useEffect(() => {
     api.getGroupInfo(convId).then(c => {
-      if (c) { setInfo(c); setName(c.name || ''); setIcon(c.icon || '👥'); }
+      if (c) {
+        setInfo(c);
+        setName(c.name || '');
+        setIcon(c.icon || '👥');
+        setNotifMuted(!!c.notifications_muted);
+      }
     }).catch(console.error);
     api.getGroupMembers(convId).then(setMembers);
     api.getContacts().then(setContacts);
@@ -70,6 +79,17 @@ export function GroupSettingsScreen() {
       const fresh = await api.getGroupMembers(convId);
       setMembers(fresh);
       heyToast(setTo ? 'Назначен админом' : 'Админ снят', 'success');
+    } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
+  }
+
+  async function toggleGroupNotifications() {
+    const next = !notifMuted;
+    try {
+      await api.setGroupNotificationsMuted(convId, next);
+      setNotifMuted(next);
+      setInfo(prev => ({ ...prev, notifications_muted: next }));
+      setConversationMuted(convId, next);
+      heyToast(next ? 'Уведомления группы отключены' : 'Уведомления группы включены', 'success');
     } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
   }
 
@@ -290,6 +310,62 @@ export function GroupSettingsScreen() {
             </div>
           </div>
         )}
+
+        <div style={{ marginBottom: 18, padding: '14px 16px', borderRadius: 14,
+          background: 'rgba(249,240,240,.05)', border: '1px solid rgba(249,240,240,.1)' }}>
+          <div style={{ color: 'rgba(225,220,245,.85)', fontSize: 12, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: .6, marginBottom: 8,
+            display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="bell" size={14}/> Уведомления
+          </div>
+          {notifGranted ? (
+            <button type="button" onClick={toggleGroupNotifications}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 12, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                background: notifMuted ? 'rgba(249,240,240,.04)' : 'rgba(95, 64, 128,.18)',
+                border: '1px solid ' + (notifMuted ? 'rgba(249,240,240,.08)' : 'rgba(180,140,220,.4)'),
+                color: '#F9F0F0', fontFamily: 'inherit', textAlign: 'left',
+                transition: 'all .12s',
+              }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  {notifMuted ? 'Уведомления группы выключены' : 'Уведомления группы включены'}
+                </div>
+                <div style={{ color: 'rgba(225,220,245,.65)', fontSize: 11, marginTop: 2, lineHeight: 1.45 }}>
+                  {notifMuted
+                    ? 'Push и оповещения по этой группе не приходят. Сообщения в чате остаются.'
+                    : 'Вы получаете push о новых сообщениях в этой группе.'}
+                </div>
+              </div>
+              <span style={{
+                flexShrink: 0, width: 44, height: 26, borderRadius: 13, position: 'relative',
+                background: notifMuted ? 'rgba(249,240,240,.18)' : 'rgba(110,235,150,.55)',
+                border: '1px solid ' + (notifMuted ? 'rgba(249,240,240,.12)' : 'rgba(110,235,150,.45)'),
+                transition: 'background .15s',
+              }}>
+                <span style={{
+                  position: 'absolute', top: 3, left: notifMuted ? 3 : 21,
+                  width: 18, height: 18, borderRadius: '50%', background: '#F9F0F0',
+                  transition: 'left .15s',
+                  boxShadow: '0 1px 4px rgba(0,0,0,.25)',
+                }}/>
+              </span>
+            </button>
+          ) : (
+            <div style={{ color: 'rgba(225,220,245,.7)', fontSize: 12, lineHeight: 1.5 }}>
+              Чтобы отключать уведомления по отдельным группам, сначала включите оповещения в{' '}
+              <button type="button" onClick={() => nav('/settings')}
+                style={{
+                  background: 'none', border: 'none', padding: 0, margin: 0,
+                  color: 'rgba(220,200,255,.95)', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 'inherit', textDecoration: 'underline',
+                }}>
+                Настройках → Оповещения
+              </button>.
+            </div>
+          )}
+        </div>
 
         {/* Members */}
         <div style={{color:'rgba(249,240,240,.5)',fontSize:13,marginBottom:10}}>Участники</div>

@@ -1579,8 +1579,13 @@ export function ChatScreen() {
             }}
             style={{flex:1,marginLeft:8,minWidth:0,
               cursor: (partner.isGroup || partner.id) ? 'pointer' : 'default'}}>
-            <div className="topbar-title" style={{flex:'unset',display:'flex',alignItems:'center',gap:8}}>
-              <span>{partner.name}</span>
+            <div className="topbar-title" style={{
+              flex: 'unset', minWidth: 0,
+              ...(partner.isGroup
+                ? { display: 'block' }
+                : { display: 'flex', alignItems: 'center', gap: 8 }),
+            }}>
+              <span className={partner.isGroup ? 'topbar-title-clamp-2' : undefined}>{partner.name}</span>
               {!!partner.online && !partner.isGroup && !partner.isMonolog && !partner.isSystem && (
                 <span style={{
                   width:9, height:9, borderRadius:'50%',

@@ -137,6 +137,7 @@ export const api = {
   removeGroupMember:(id, userId)        => req('DELETE', `/groups/${id}/members/${userId}`),
   setGroupMemberAdmin:(id, userId, isAdmin) => req('PATCH', `/groups/${id}/members/${userId}/admin`, { is_admin: !!isAdmin }),
   setGroupHistoryVisibility:(id, value) => req('PATCH', `/groups/${id}/history-visibility`, { value }),
+  setGroupNotificationsMuted:(id, muted) => req('PATCH', `/groups/${id}/notifications`, { muted: !!muted }),
   getGroupInfo:     (id)                => req('GET',    `/groups/${id}`),
   acceptGroupInvite:(id)                => req('POST',   `/groups/${id}/accept`),
   declineGroupInvite:(id)               => req('POST',   `/groups/${id}/decline`),

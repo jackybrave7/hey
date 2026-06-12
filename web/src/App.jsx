@@ -42,6 +42,7 @@ import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
 import ServerStatusBanner from './components/ServerStatusBanner';
 import { ensurePushIfGranted } from './lib/push';
+import { isConversationMuted, syncMutedConversations } from './lib/mutedConversations';
 import { PublicSettingsProvider } from './lib/publicSettings';
 import { BootScreen } from './components/shared/BootMark';
 import {
@@ -66,6 +67,7 @@ function useNotifications() {
       if (isSystemChatEvent(message)) return;
       const convId = messageConversationId(message);
       if (!convId) return;
+      if (isConversationMuted(convId)) return;
       // document.hasFocus() в Опере (и иногда в Firefox/Safari) врёт —
       // возвращает false даже на активной вкладке. Двойная проверка
       // через visibilityState + hasFocus + наличие видимых клиентов SW.
@@ -165,7 +167,10 @@ function useUnreadCount() {
   useEffect(() => {
     if (!user) return;
     api.getConversations()
-      .then(convs => setUnread(convs.reduce((s, c) => s + (c.unread_count || 0), 0)))
+      .then(convs => {
+        setUnread(convs.reduce((s, c) => s + (c.unread_count || 0), 0));
+        syncMutedConversations(convs);
+      })
       .catch(() => {});
   }, [user]);
 

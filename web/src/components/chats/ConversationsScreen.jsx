@@ -8,6 +8,7 @@ import { AvatarDisplay } from '../shared/AvatarDisplay';
 import ChatContextMenu, { AnchoredContextMenu } from '../chat/ChatContextMenu';
 import { renderPreviewWithEmoji } from '../chat/chatRender';
 import { messageConversationId, messagePreviewText } from '../../lib/messagePreview';
+import { syncMutedConversations } from '../../lib/mutedConversations';
 import Highlight from '../shared/Highlight';
 import Icon from '../Icon';
 import { fmtTime } from '../../lib/formatTime';
@@ -22,7 +23,10 @@ export function ConversationsScreen() {
   const [requestCardAction, setRequestCardAction] = useState(null); // 'accept' | 'decline' | null
   const [showArchive, setShowArchive] = useState(false);
 
-  const reload = () => api.getConversations().then(setConvs).catch(console.error);
+  const reload = () => api.getConversations().then(cs => {
+    syncMutedConversations(cs);
+    setConvs(cs);
+  }).catch(console.error);
 
   useEffect(() => { reload(); }, []);
   useEffect(() => socket.on('message:new', ({ message }) => {
