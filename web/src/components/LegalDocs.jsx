@@ -12,12 +12,19 @@ const contacts = {
   email: 'info@hey-messenger.ru',
 };
 
+const operatorFooter = [
+  contacts.operator,
+  `ИНН ${contacts.inn}, ОГРНИП ${contacts.ogrnip}`,
+  `Email: ${contacts.email}`,
+  'Сайт: hey-messenger.ru',
+];
+
 const termsSections = [
   {
     title: '1. Общие положения',
     body: [
-      `Настоящее Пользовательское соглашение регулирует использование сервиса HEY Messenger (${contacts.email}): мессенджера, ленты моментов, контактов, групповых чатов и связанных функций.`,
-      `Оператор сервиса: ${contacts.operator}, ИНН ${contacts.inn}, ОГРНИП ${contacts.ogrnip}.`,
+      'Настоящее Пользовательское соглашение регулирует использование сервиса HEY Messenger: мессенджера, ленты моментов, контактов, групповых чатов и связанных функций.',
+      'Сведения об операторе сервиса и контакты для обращений указаны в конце документа.',
       'Используя приложение или создавая аккаунт, пользователь подтверждает, что прочитал соглашение и согласен соблюдать его условия.',
     ],
   },
@@ -68,10 +75,10 @@ const termsSections = [
 
 const privacySections = [
   {
-    title: '1. Кто обрабатывает данные',
+    title: '1. Общие положения',
     body: [
-      `Оператор персональных данных: ${contacts.operator}, ИНН ${contacts.inn}, ОГРНИП ${contacts.ogrnip}.`,
-      `Контакт для обращений: ${contacts.email}.`,
+      'Настоящая политика описывает порядок обработки персональных данных пользователей сервиса HEY Messenger.',
+      'Оператор персональных данных и контакты для обращений по вопросам данных указаны в конце документа.',
     ],
   },
   {
@@ -113,7 +120,7 @@ const privacySections = [
   {
     title: '7. Права пользователя',
     body: [
-      'Пользователь может запросить информацию об обработке данных, исправление данных, удаление аккаунта, отзыв согласия и обращение по вопросам персональных данных через поддержку.',
+      'Пользователь может запросить информацию об обработке данных, исправление данных, удаление аккаунта, отзыв согласия и направить обращение по вопросам персональных данных оператору — контакты указаны в конце документа.',
       'Отзыв согласия может привести к невозможности дальнейшего использования сервиса, если данные нужны для работы аккаунта.',
     ],
   },
@@ -181,7 +188,7 @@ function LegalPage({ title, subtitle, sections }) {
             paddingBottom: 18,
             borderBottom: '1px solid rgba(249,240,240,.14)',
           }}>
-            Редакция от {UPDATED_AT}. Сервис HEY Messenger ({contacts.email}).
+            Редакция от {UPDATED_AT}. Сервис HEY Messenger.
           </div>
 
           {sections.map((section) => (
@@ -204,11 +211,25 @@ function LegalPage({ title, subtitle, sections }) {
             marginTop: 28,
             paddingTop: 18,
             borderTop: '1px solid rgba(249,240,240,.14)',
-            color: 'rgba(249,240,240,.8)',
-            fontSize: 13,
-            lineHeight: 1.6,
           }}>
-            {contacts.operator}. ИНН {contacts.inn}, ОГРНИП {contacts.ogrnip}. По вопросам документов: {contacts.email}.
+            <div style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: '#F9F0F0',
+              marginBottom: 10,
+            }}>
+              Реквизиты и контакты оператора
+            </div>
+            {operatorFooter.map((line) => (
+              <div key={line} style={{
+                color: 'rgba(249,240,240,.88)',
+                fontSize: 13,
+                lineHeight: 1.65,
+                marginBottom: 4,
+              }}>
+                {line}
+              </div>
+            ))}
           </div>
         </div>
       </div>
