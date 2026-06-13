@@ -96,6 +96,7 @@ const MessageRow = memo(function MessageRow({
     : audioPlaying && isAudioMsg
       ? (isOut ? 'rgba(128,92,178,.96)' : 'rgba(255,252,250,.98)')
       : (isOut ? 'rgba(110,80,155,.70)' : 'rgba(249,240,240,.90)');
+  const reactionSlotH = isDeleted ? 0 : 26;
 
   return (
     <div
@@ -136,6 +137,10 @@ const MessageRow = memo(function MessageRow({
         onMouseEnter={keepHovered}
         onMouseMove={keepHovered}
         onMouseLeave={releaseHovered}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', gap: 4,
+          maxWidth: '100%', minWidth: 0,
+        }}>
         <div
           key={isFlashing ? 'flash-' + m.id : m.id}
           className={isFlashing ? 'hey-flash' : ''}
@@ -423,22 +428,60 @@ const MessageRow = memo(function MessageRow({
           </div>
         </div>
 
-        {/* Reaction chips. Логика отображения:
-            • Single reactor — показываем только эмодзи (для группы рядом
-              мини-аватар автора реакции, для direct/monolog даже его не
-              надо — собеседник известен).
-            • В группе с несколькими reactor'ами — стек до 3 мини-аватарок
-              + «+N» если больше.
-            • В direct с несколькими — только цифра-счётчик.
-            Реакторы теперь приходят как [{id,name,avatar},...] вместо
-            массива user_id (сервер делает JOIN). */}
-        {hasReactions && (
+        {!isOut && !isDeleted && (
           <div style={{
+            width: 36, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+            onMouseEnter={keepHovered}
+            onMouseMove={keepHovered}
+            onMouseLeave={releaseHovered}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const rect = e.currentTarget.getBoundingClientRect();
+                if (tapRevealTimer.current) {
+                  clearTimeout(tapRevealTimer.current);
+                  tapRevealTimer.current = null;
+                }
+                setTappedReveal(false);
+                onSetReactionPicker(p => p?.msgId === m.id ? null
+                  : { msgId: m.id, x: rect.left + rect.width / 2, y: rect.top });
+              }}
+              className="hey-react-btn"
+              data-react-btn
+              data-hovered={showReactBtn ? 'y' : 'n'}
+              title="Реакция"
+              style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: 'rgba(60,40,100,.92)',
+                border: '1px solid rgba(160,130,210,.6)',
+                padding: 0,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                cursor: showReactBtn ? 'pointer' : 'default',
+                boxShadow: '0 2px 10px rgba(0,0,0,.4)',
+                opacity: showReactBtn ? 1 : 0,
+                pointerEvents: showReactBtn ? 'auto' : 'none',
+                transition: 'opacity .15s',
+                animation: showReactBtn ? 'heyReactBtnIn .15s ease-out' : 'none',
+              }}>
+              <Icon name="smile" size={18} />
+            </button>
+          </div>
+        )}
+        </div>
+
+        {/* Слот под реакции фиксированной высоты — чипы ниже пузыря, без
+            налезания; высота строки не меняется при постановке реакции. */}
+        {reactionSlotH > 0 && (
+          <div style={{
+            minHeight: reactionSlotH,
             marginTop: 4,
-            display:'flex', flexWrap:'wrap', gap:4,
-            maxWidth:'100%',
+            display: 'flex', flexWrap: 'wrap', gap: 4,
+            justifyContent: isOut ? 'flex-end' : 'flex-start',
+            maxWidth: '100%',
           }}>
-            {Object.entries(m.reactions).map(([emoji, reactors]) => {
+            {hasReactions && Object.entries(m.reactions).map(([emoji, reactors]) => {
               // Бэк-compat: если сервер ещё прислал массив строк (старый
               // формат) — конвертим на лету в объекты-заглушки. Дополнительно
               // фильтруем null/undefined элементы, чтобы JSX не упал на r.id.
@@ -498,58 +541,6 @@ const MessageRow = memo(function MessageRow({
           </div>
         )}
       </div>
-
-      {/* Зарезервированный 36-px слот для smile-кнопки реакции (только
-          для входящих). Слот существует ВСЕГДА — поэтому хит-зона row'а
-          включает кнопку, и при ховере она не «мерцает» когда мышь
-          переходит из пузыря в саму кнопку. layout shift тоже отсутствует,
-          потому что слот зарезервирован независимо от состояния hover.
-          На исходящих не рисуем — ставить реакцию на свои бессмысленно. */}
-      {!isOut && !isDeleted && (
-        <div style={{
-          width: 36, flexShrink: 0, alignSelf: 'flex-end',
-          marginBottom: 4, display:'flex', alignItems:'center', justifyContent:'center',
-        }}
-          onMouseEnter={keepHovered}
-          onMouseMove={keepHovered}
-          onMouseLeave={releaseHovered}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              const rect = e.currentTarget.getBoundingClientRect();
-              if (tapRevealTimer.current) {
-                clearTimeout(tapRevealTimer.current);
-                tapRevealTimer.current = null;
-              }
-              setTappedReveal(false);
-              onSetReactionPicker(p => p?.msgId === m.id ? null
-                : { msgId: m.id, x: rect.left + rect.width/2, y: rect.top });
-            }}
-            className="hey-react-btn"
-            data-react-btn
-            data-hovered={showReactBtn ? 'y' : 'n'}
-            title="Реакция"
-            style={{
-              width: 32, height: 32, borderRadius:'50%',
-              background:'rgba(60,40,100,.92)',
-              border:'1px solid rgba(160,130,210,.6)',
-              padding: 0,
-              display:'inline-flex', alignItems:'center', justifyContent:'center',
-              cursor: showReactBtn ? 'pointer' : 'default',
-              boxShadow:'0 2px 10px rgba(0,0,0,.4)',
-              opacity: showReactBtn ? 1 : 0,
-              pointerEvents: showReactBtn ? 'auto' : 'none',
-              transition: 'opacity .15s',
-              animation: showReactBtn ? 'heyReactBtnIn .15s ease-out' : 'none',
-            }}>
-            <Icon name="smile" size={18} />
-          </button>
-        </div>
-      )}
-
-      {/* На свои сообщения реакцию не ставят — кнопку-инициатор для
-          исходящих не показываем. (Реакции от других на наше сообщение
-          по-прежнему отрисуются как чипы.) */}
     </div>
   );
 }, (prev, next) =>
