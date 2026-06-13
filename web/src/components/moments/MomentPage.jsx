@@ -88,7 +88,7 @@ function MomentPageLegacy() {
   const isMine = moment?.user_id === user?.id;
   const REACTIONS = [
     { id: 'see',      label: 'Вижу',       iconName: 'eye' },
-    { id: 'resonate', label: 'Резонирует', iconName: 'sparkle' },
+    { id: 'resonate', label: 'Резонирует', iconName: 'waves' },
     { id: 'talk',     label: 'Поговорить', iconName: 'chat' },
   ];
 
@@ -220,7 +220,7 @@ function MomentPageLegacy() {
               <div style={{ background:'rgba(249,240,240,.06)', borderRadius:14, padding:'12px 16px',
                 display:'flex', gap:20 }}>
                 <span style={{ color:'rgba(249,240,240,.6)', fontSize:14, display:'inline-flex', alignItems:'center', gap:6 }}><Icon name="eye"     size={14}/>{moment.views || 0}</span>
-                <span style={{ color:'rgba(249,240,240,.6)', fontSize:14, display:'inline-flex', alignItems:'center', gap:6 }}><Icon name="sparkle" size={14}/>{moment.stats?.resonate || 0} резонирует</span>
+                <span style={{ color:'rgba(249,240,240,.6)', fontSize:14, display:'inline-flex', alignItems:'center', gap:6 }}><Icon name="waves" size={14}/>{moment.stats?.resonate || 0} резонирует</span>
                 <span style={{ color:'rgba(249,240,240,.6)', fontSize:14, display:'inline-flex', alignItems:'center', gap:6 }}><Icon name="chat"    size={14}/>{moment.stats?.talk || 0}</span>
               </div>
             ) : user ? (

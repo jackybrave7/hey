@@ -589,6 +589,9 @@ const DEFAULT_TENANT_ID = 'tnt_default';
   } catch (e) {
     console.warn('[multi-tenant] не удалось создать default tenant:', e.message);
   }
+  try { backfillSchoolReferrals(); } catch (e) {
+    console.warn('[referral] school backfill failed:', e.message);
+  }
 })();
 
 // ── Users ──────────────────────────────────────────────────────────────────
@@ -677,6 +680,43 @@ function markReferralFromInviter(inviterId, inviteeId) {
     db.prepare('UPDATE users SET referral_by=? WHERE id=? AND (referral_by IS NULL OR referral_by="")')
       .run(inviterId, inviteeId);
   })();
+}
+
+/** Засчитать ученика школе (tenant → account_id / system_school_bl). */
+function creditSchoolReferral(tenantId, userId) {
+  if (!userId) return;
+  const schoolId = getSchoolUserId(tenantId);
+  if (schoolId) markReferralFromInviter(schoolId, userId);
+}
+
+/** Одноразовый дозаполнитель: школьные инвайты + AWO webhook для уже существующих. */
+function backfillSchoolReferrals() {
+  let n = 0;
+  const invites = db.prepare(
+    `SELECT used_by_user_id, tenant_id FROM school_invites WHERE used_by_user_id IS NOT NULL`
+  ).all();
+  for (const r of invites) {
+    const schoolId = getSchoolUserId(r.tenant_id);
+    if (!schoolId) continue;
+    const had = db.prepare('SELECT 1 FROM referrals WHERE inviter_id=? AND invitee_id=?')
+      .get(schoolId, r.used_by_user_id);
+    if (!had) { markReferralFromInviter(schoolId, r.used_by_user_id); n++; }
+  }
+  const awoRows = db.prepare(
+    `SELECT email, tenant_id FROM awo_processed
+     WHERE result IN ('user_exists_added_to_chat', 'user_exists', 'user_exists_already_in_chat')
+       AND email IS NOT NULL AND email != ''`
+  ).all();
+  for (const r of awoRows) {
+    const u = findUserByEmail(r.email);
+    if (!u) continue;
+    const schoolId = getSchoolUserId(r.tenant_id);
+    if (!schoolId) continue;
+    const had = db.prepare('SELECT 1 FROM referrals WHERE inviter_id=? AND invitee_id=?')
+      .get(schoolId, u.id);
+    if (!had) { markReferralFromInviter(schoolId, u.id); n++; }
+  }
+  if (n > 0) console.log(`[referral] backfilled ${n} school referral(s)`);
 }
 
 function getReferralCount(userId) {
@@ -2583,7 +2623,7 @@ function getSavedMoments(userId) {
   return _withStatsBatch(rows.map(_parseMoment));
 }
 
-function getMomentReactorsList(momentId) {
+function getMomentReactorsList(momentId, viewerId) {
   // Реакции (resonate, talk) — moment_reactions имеет UNIQUE(moment_id, user_id),
   // но на всякий случай дедуплицируем по (user_id, reaction)
   const reactions = db.prepare(
@@ -2611,7 +2651,17 @@ function getMomentReactorsList(momentId) {
      GROUP BY mv.user_id
      ORDER BY created_at DESC`
   ).all(momentId, ...(reactedPh ? Array.from(reactedUserIds) : []));
-  return normalizeAvatars([...reactions, ...views]);
+  const list = normalizeAvatars([...reactions, ...views]);
+  if (!viewerId || !list.length) return list;
+  const ids = [...new Set(list.map(r => r.id))];
+  const ph = ids.map(() => '?').join(',');
+  const nickMap = {};
+  db.prepare(
+    `SELECT contact_id, nickname FROM contacts
+     WHERE owner_id=? AND contact_id IN (${ph})
+       AND nickname IS NOT NULL AND nickname != ''`
+  ).all(viewerId, ...ids).forEach(r => { nickMap[r.contact_id] = r.nickname; });
+  return list.map(r => ({ ...r, nickname: nickMap[r.id] ?? null }));
 }
 
 function makeUserSuper(userId) { db.prepare('UPDATE users SET is_super=1 WHERE id=?').run(userId); }
@@ -3986,7 +4036,7 @@ module.exports = {
   setOnline, getPresence,
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes, updateContactNickname,
-  getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter,
+  getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter, creditSchoolReferral,
   rotateInviteCode, resolveInviterByInviteRef,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   getTotalUnreadFor,

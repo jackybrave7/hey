@@ -331,6 +331,9 @@ module.exports = function makeRouter(db, broadcast) {
       // выполняются от лица этого tenant'а.
       const inviteTenantId = schoolInvite.tenant_id || db.DEFAULT_TENANT_ID;
       try { db.markSchoolInviteUsed(schoolInvite.code, user.id); } catch (e) { console.error('[school-invite]', e.message); }
+      try { db.creditSchoolReferral(inviteTenantId, user.id); } catch (e) {
+        console.warn('[referral] school credit failed:', e.message);
+      }
       try {
         const school = db.getSchoolAccount(inviteTenantId);
         if (school) {
@@ -1842,7 +1845,7 @@ module.exports = function makeRouter(db, broadcast) {
     if (!m) return res.status(404).json({ error: 'Not found' });
     if (m.user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     if (!req.user.is_super) return res.status(403).json({ error: 'Super required' });
-    res.json(db.getMomentReactorsList(req.params.id));
+    res.json(db.getMomentReactorsList(req.params.id, req.user.id));
   });
 
   // Один момент
@@ -3050,6 +3053,9 @@ module.exports = function makeRouter(db, broadcast) {
       : (phone ? db.findUserByPhone(phone) : null);
     if (existing) {
       let extraResult = 'user_exists';
+      try { db.creditSchoolReferral(tenantId, existing.id); } catch (e) {
+        console.warn('[referral] school credit failed:', e.message);
+      }
       if (goods) {
         const chatId = db.getChatForCourse(goods, tenantId);
         if (chatId) {

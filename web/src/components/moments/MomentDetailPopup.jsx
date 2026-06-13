@@ -114,7 +114,7 @@ export function TextWithLinks({ text, linkColor = 'rgba(180,140,255,.95)' }) {
 // ── Reactors list modal — кто отреагировал (Super-функция) ──────────────
 const REACTION_META = {
   see:      { iconName: 'eye',     title: 'Просмотры'  },
-  resonate: { iconName: 'sparkle', title: 'Резонирует' },
+  resonate: { iconName: 'waves', title: 'Резонирует' },
   talk:     { iconName: 'chat',    title: 'Поговорить' },
 };
 
@@ -127,7 +127,7 @@ function ReactorsModal({ filter, reactors, loading, onClose, onOpenUser }) {
       .filter(r => r.reaction === filter)
       .filter(r => seen.has(r.id) ? false : (seen.add(r.id), true));
   })();
-  const meta = REACTION_META[filter] || { iconName: 'sparkle', title: 'Отклик' };
+  const meta = REACTION_META[filter] || { iconName: 'info', title: 'Отклик' };
 
   function fmtTime(ts) {
     if (!ts) return '';
@@ -197,13 +197,19 @@ function ReactorsModal({ filter, reactors, loading, onClose, onOpenUser }) {
                 border:'1px solid rgba(249,240,240,.1)'}}>
                 {r.avatar
                   ? <img src={r.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
-                  : (r.name||'?')[0].toUpperCase()}
+                  : (r.nickname || r.name || '?')[0].toUpperCase()}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{color:'#F9F0F0',fontSize:14,fontWeight:600,
                   overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                  {r.name || 'Без имени'}
+                  {r.nickname || r.name || 'Без имени'}
                 </div>
+                {r.nickname && (
+                  <div style={{color:'rgba(249,240,240,.45)',fontSize:11,marginTop:1,
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {r.name}
+                  </div>
+                )}
                 <div style={{color:'rgba(249,240,240,.35)',fontSize:11}}>
                   {fmtTime(r.created_at)}
                 </div>
@@ -336,7 +342,7 @@ function ReportModal({ targetType, targetId, onClose, onSent }) {
 
 const REACTIONS = [
   { id: 'see',       label: 'Вижу',       iconName: 'eye' },
-  { id: 'resonate',  label: 'Резонирует', iconName: 'sparkle' },
+  { id: 'resonate',  label: 'Резонирует', iconName: 'waves' },
   { id: 'talk',      label: 'Поговорить', iconName: 'chat' },
 ];
 
@@ -816,7 +822,7 @@ export default function MomentDetailPopup({
                       // тап показывает список юзеров с переходом в их
                       // карточки (как у резонирует / поговорить).
                       { key: 'see',      iconName: 'eye',     count: moment.views || 0,           label: 'просмотры'   },
-                      { key: 'resonate', iconName: 'sparkle', count: moment.stats?.resonate || 0, label: 'резонирует' },
+                      { key: 'resonate', iconName: 'waves', count: moment.stats?.resonate || 0, label: 'резонирует' },
                       { key: 'talk',     iconName: 'chat',    count: moment.stats?.talk || 0,     label: 'поговорить' },
                     ].map(stat => (
                       <button key={stat.key}
@@ -852,7 +858,7 @@ export default function MomentDetailPopup({
                       display:'flex',gap:20,
                       cursor: salesPressure >= 2 ? 'pointer' : 'default'}}>
                     <span style={{color:'rgba(249,240,240,.6)',fontSize:14,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="eye"     size={14}/>{moment.views || 0}</span>
-                    <span style={{color:'rgba(249,240,240,.6)',fontSize:14,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="sparkle" size={14}/>{moment.stats?.resonate || 0}</span>
+                    <span style={{color:'rgba(249,240,240,.6)',fontSize:14,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="waves" size={14}/>{moment.stats?.resonate || 0}</span>
                     <span style={{color:'rgba(249,240,240,.6)',fontSize:14,display:'inline-flex',alignItems:'center',gap:6}}><Icon name="chat"    size={14}/>{moment.stats?.talk || 0}</span>
                     {salesPressure >= 2 && (
                       <span style={{marginLeft:'auto',color:'rgba(249,240,240,.25)',fontSize:12}}>кто? ›</span>

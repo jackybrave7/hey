@@ -296,7 +296,7 @@ export default function AdminMoments() {
                   <td style={{ ...cell, textAlign: 'center' }}>{m.views}</td>
                   <td style={{ ...cell, textAlign: 'center' }}>
                     <div style={{ fontSize: 11 }}>
-                      {m.stats?.see || 0} 👁 · {m.stats?.resonate || 0} ✨ · {m.stats?.talk || 0} 🤝
+                      {m.stats?.see || 0} 👁 · {m.stats?.resonate || 0} 〰️ · {m.stats?.talk || 0} 🤝
                     </div>
                   </td>
                   <td style={cell}>{fmtDate(m.created_at)}</td>

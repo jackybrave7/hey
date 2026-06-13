@@ -10,7 +10,7 @@ import { MediaImage } from '../shared/MediaImage';
 // Раньше показывали россыпь эмодзи (👁 ✨ 🤝) по тотал-счётчикам, что
 // читалось как «у меня 2 реакции» когда было видно несколько значков.
 // Теперь показываем ОДИН монохромный значок собственной реакции.
-const MY_RX_ICON = { see: 'eye', resonate: 'sparkle', talk: 'chat' };
+const MY_RX_ICON = { see: 'eye', resonate: 'waves', talk: 'chat' };
 const MY_RX_LABEL = { see: 'Вижу', resonate: 'Резонирует', talk: 'Поговорить' };
 
 function fmtTime(ts) {
@@ -302,7 +302,7 @@ export default function MomentCard({ moment, isMine, onClick, bare }) {
           fontSize:11,color:'rgba(249,240,240,.85)',
         }}>
           {moment.views > 0          && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye"     size={12}/>{moment.views}</span>}
-          {moment.stats?.resonate > 0 && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="sparkle" size={12}/>{moment.stats.resonate}</span>}
+          {moment.stats?.resonate > 0 && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="waves" size={12}/>{moment.stats.resonate}</span>}
           {moment.stats?.talk > 0     && <span style={{display:'inline-flex',alignItems:'center',gap:4}}><Icon name="chat"    size={12}/>{moment.stats.talk}</span>}
         </div>
       )}

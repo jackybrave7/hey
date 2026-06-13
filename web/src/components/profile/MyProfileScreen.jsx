@@ -752,7 +752,7 @@ export function MyProfileScreen() {
                         </div>
                         <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
                           <span style={{fontSize:11,color:'rgba(249,240,240,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye"     size={12}/>{active.views || 0}</span>
-                          <span style={{fontSize:11,color:'rgba(249,240,240,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="sparkle" size={12}/>{active.stats?.resonate || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(249,240,240,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="waves" size={12}/>{active.stats?.resonate || 0}</span>
                           <span style={{fontSize:11,color:'rgba(249,240,240,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="chat"    size={12}/>{active.stats?.talk || 0}</span>
                         </div>
                         <button onClick={async e => {
@@ -821,7 +821,7 @@ export function MyProfileScreen() {
                         </div>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:'auto'}}>
                           <span style={{fontSize:11,color:'rgba(249,240,240,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="eye"     size={12}/>{m.views || 0}</span>
-                          <span style={{fontSize:11,color:'rgba(249,240,240,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="sparkle" size={12}/>{m.stats?.resonate || 0}</span>
+                          <span style={{fontSize:11,color:'rgba(249,240,240,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="waves" size={12}/>{m.stats?.resonate || 0}</span>
                           <span style={{fontSize:11,color:'rgba(249,240,240,.4)',display:'inline-flex',alignItems:'center',gap:4}}><Icon name="chat"    size={12}/>{m.stats?.talk || 0}</span>
                         </div>
                         <div style={{color:'rgba(249,240,240,.3)',fontSize:11,
