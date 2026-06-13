@@ -146,7 +146,7 @@ function ManagePublished() {
     <div style={{display:'flex',flexDirection:'column',gap:24}}>
       {/* Моменты */}
       <Section title={`✦ Моменты от HEY-заведующего (${moments.length})`}>
-        {moments.length === 0 && <Empty>Ничего не опубликовано</Empty>}
+        {moments.length === 0 && <Empty>Нет активных моментов — создайте во вкладке «✦ Момент»</Empty>}
         {moments.map(m => (
           <Card key={m.id}>
             {editingMomentId === m.id ? (
@@ -186,9 +186,16 @@ function ManagePublished() {
                 )}
                 <Text>{m.text}</Text>
                 <Actions>
-                  <BtnSecondary onClick={() => { setEditingMomentId(m.id); setEditText(m.text || ''); }}>
-                    ✏ Изменить
-                  </BtnSecondary>
+                  {m.status === 'active' && (
+                    <BtnSecondary onClick={() => { setEditingMomentId(m.id); setEditText(m.text || ''); }}>
+                      ✏ Изменить
+                    </BtnSecondary>
+                  )}
+                  {m.status === 'archived' && (
+                    <BtnSecondary onClick={() => { setEditingMomentId(m.id); setEditText(m.text || ''); }}>
+                      ✏ Изменить (архив)
+                    </BtnSecondary>
+                  )}
                   <BtnDanger onClick={() => deleteMoment(m)}>🗑 Удалить</BtnDanger>
                 </Actions>
               </>

@@ -515,6 +515,20 @@ const SYSTEM_AVATAR  = '/favicon.svg'; // лого HEY как аватар се�
   }
 })();
 
+// Чаты с HEY-заведующим не должны быть request-lock — иначе пропадают из списка.
+try {
+  const fixed = db.prepare(
+    `UPDATE conversations SET request_from = NULL
+     WHERE type = 'direct' AND request_from IS NOT NULL
+       AND id IN (SELECT conversation_id FROM members WHERE user_id = ?)`
+  ).run(SYSTEM_USER_ID);
+  if (fixed.changes > 0) {
+    console.log(`[system-chat] cleared request_from on ${fixed.changes} HEY-заведующий dialog(s)`);
+  }
+} catch (e) {
+  console.warn('[system-chat] request_from cleanup failed:', e.message);
+}
+
 function now() { return Math.floor(Date.now() / 1000); }
 
 // ── School (BL School) inviter account ──────────────────────────────────────
@@ -1353,8 +1367,10 @@ function searchAllMessages(userId, query) {
 }
 
 function getOrCreateDirectConversation(userId1, userId2) {
-  // Self-chat — «Монолог»: пользователь пишет сам себе
+  // Self-chat — «Монолог»: пользователь пишет самому себе
   if (userId1 === userId2) return getOrCreateSelfChat(userId1);
+
+  const involvesSystem = userId1 === SYSTEM_USER_ID || userId2 === SYSTEM_USER_ID;
 
   const existing = db.prepare(
     `SELECT c.id, c.request_from FROM conversations c
@@ -1364,13 +1380,23 @@ function getOrCreateDirectConversation(userId1, userId2) {
      AND (SELECT COUNT(*) FROM members WHERE conversation_id=c.id)=2
      LIMIT 1`
   ).get(userId1, userId2);
-  if (existing) return existing;
+  if (existing) {
+    // Чат с HEY-заведующим не должен попадать в request-lock — иначе
+    // он пропадает из списка чатов (request_from = userId → ни normal, ни requests).
+    if (involvesSystem && existing.request_from) {
+      db.prepare('UPDATE conversations SET request_from=NULL WHERE id=?').run(existing.id);
+      return { id: existing.id, request_from: null };
+    }
+    return existing;
+  }
 
   // Request-lock: срабатывает, если отправитель (userId1) НЕ в контактах
-  // у получателя (userId2). Обратная связь не важна — наличие получателя
-  // в контактах у отправителя ничего не говорит о согласии получателя.
-  const u1inU2 = !!db.prepare('SELECT 1 FROM contacts WHERE owner_id=? AND contact_id=?').get(userId2, userId1);
-  const requestFrom = u1inU2 ? null : userId1;
+  // у получателя (userId2). Для системного аккаунта не применяем.
+  let requestFrom = null;
+  if (!involvesSystem) {
+    const u1inU2 = !!db.prepare('SELECT 1 FROM contacts WHERE owner_id=? AND contact_id=?').get(userId2, userId1);
+    requestFrom = u1inU2 ? null : userId1;
+  }
 
   const id = uuid();
   db.transaction(() => {
@@ -2889,10 +2915,18 @@ function getAdminGroupDetail(convId) {
 }
 
 // ── Системные публикации HEY-заведующего ────────────────────────────────
-function getSystemMoments({ status = 'all', limit = 100 } = {}) {
-  const where = status === 'all' ? '' : 'AND m.status = ?';
+function getSystemMoments({ status = 'published', limit = 100 } = {}) {
   const params = [SYSTEM_USER_ID];
-  if (status !== 'all') params.push(status);
+  let where;
+  if (status === 'all') {
+    where = '';
+  } else if (status === 'published') {
+    // Для админки «Опубликованное» — без soft-deleted мусора.
+    where = "AND m.status IN ('active', 'archived')";
+  } else {
+    where = 'AND m.status = ?';
+    params.push(status);
+  }
   params.push(limit);
   const rows = db.prepare(
     `SELECT m.*

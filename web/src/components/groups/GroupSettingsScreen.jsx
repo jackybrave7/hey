@@ -318,51 +318,50 @@ export function GroupSettingsScreen() {
             display: 'flex', alignItems: 'center', gap: 6 }}>
             <Icon name="bell" size={14}/> Уведомления
           </div>
-          {notifGranted ? (
-            <button type="button" onClick={toggleGroupNotifications}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: 12, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                background: notifMuted ? 'rgba(249,240,240,.04)' : 'rgba(95, 64, 128,.18)',
-                border: '1px solid ' + (notifMuted ? 'rgba(249,240,240,.08)' : 'rgba(180,140,220,.4)'),
-                color: '#F9F0F0', fontFamily: 'inherit', textAlign: 'left',
-                transition: 'all .12s',
-              }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>
-                  {notifMuted ? 'Уведомления группы выключены' : 'Уведомления группы включены'}
-                </div>
-                <div style={{ color: 'rgba(225,220,245,.65)', fontSize: 11, marginTop: 2, lineHeight: 1.45 }}>
-                  {notifMuted
-                    ? 'Push и оповещения по этой группе не приходят. Сообщения в чате остаются.'
-                    : 'Вы получаете push о новых сообщениях в этой группе.'}
-                </div>
+          <button type="button" onClick={toggleGroupNotifications}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+              background: notifMuted ? 'rgba(249,240,240,.04)' : 'rgba(95, 64, 128,.18)',
+              border: '1px solid ' + (notifMuted ? 'rgba(249,240,240,.08)' : 'rgba(180,140,220,.4)'),
+              color: '#F9F0F0', fontFamily: 'inherit', textAlign: 'left',
+              transition: 'all .12s',
+            }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                {notifMuted ? 'Уведомления группы выключены' : 'Уведомления группы включены'}
               </div>
+              <div style={{ color: 'rgba(225,220,245,.65)', fontSize: 11, marginTop: 2, lineHeight: 1.45 }}>
+                {notifMuted
+                  ? 'Push и оповещения по этой группе не приходят. Сообщения в чате остаются.'
+                  : 'Вы получаете push о новых сообщениях в этой группе.'}
+              </div>
+            </div>
+            <span style={{
+              flexShrink: 0, width: 44, height: 26, borderRadius: 13, position: 'relative',
+              background: notifMuted ? 'rgba(249,240,240,.18)' : 'rgba(110,235,150,.55)',
+              border: '1px solid ' + (notifMuted ? 'rgba(249,240,240,.12)' : 'rgba(110,235,150,.45)'),
+              transition: 'background .15s',
+            }}>
               <span style={{
-                flexShrink: 0, width: 44, height: 26, borderRadius: 13, position: 'relative',
-                background: notifMuted ? 'rgba(249,240,240,.18)' : 'rgba(110,235,150,.55)',
-                border: '1px solid ' + (notifMuted ? 'rgba(249,240,240,.12)' : 'rgba(110,235,150,.45)'),
-                transition: 'background .15s',
-              }}>
-                <span style={{
-                  position: 'absolute', top: 3, left: notifMuted ? 3 : 21,
-                  width: 18, height: 18, borderRadius: '50%', background: '#F9F0F0',
-                  transition: 'left .15s',
-                  boxShadow: '0 1px 4px rgba(0,0,0,.25)',
-                }}/>
-              </span>
-            </button>
-          ) : (
-            <div style={{ color: 'rgba(225,220,245,.7)', fontSize: 12, lineHeight: 1.5 }}>
-              Чтобы отключать уведомления по отдельным группам, сначала включите оповещения в{' '}
+                position: 'absolute', top: 3, left: notifMuted ? 3 : 21,
+                width: 18, height: 18, borderRadius: '50%', background: '#F9F0F0',
+                transition: 'left .15s',
+                boxShadow: '0 1px 4px rgba(0,0,0,.25)',
+              }}/>
+            </span>
+          </button>
+          {!notifGranted && (
+            <div style={{ color: 'rgba(225,220,245,.55)', fontSize: 11, lineHeight: 1.45, marginTop: 10 }}>
+              Push сейчас выключен в браузере. Настройка сохранится — когда включите оповещения в{' '}
               <button type="button" onClick={() => nav('/settings')}
                 style={{
                   background: 'none', border: 'none', padding: 0, margin: 0,
                   color: 'rgba(220,200,255,.95)', cursor: 'pointer', fontFamily: 'inherit',
                   fontSize: 'inherit', textDecoration: 'underline',
                 }}>
-                Настройках → Оповещения
-              </button>.
+                Настройках
+              </button>, эта группа уже будет {notifMuted ? 'без уведомлений' : 'с уведомлениями'}.
             </div>
           )}
         </div>

@@ -6,11 +6,17 @@ import { trimUrlTail } from '../chat/chatRender';
 function FieldLine({ value }) {
   // Чуть жирнее значение + более явная подчёркивающая линия — чтобы строки
   // контактов читались как «данные», а не сливались с фоном профиля.
+  const isEmail = typeof value === 'string' && value.includes('@');
   return (
-    <div>
+    <div style={{ minWidth: 0, width: '100%' }}>
       <div style={{
-        color:'#F9F0F0', fontSize:17, fontWeight:500, paddingBottom:5,
+        color:'#F9F0F0',
+        fontSize: isEmail ? 15 : 17,
+        fontWeight:500, paddingBottom:5,
         letterSpacing:.1,
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere',
+        lineHeight: 1.35,
       }}>{value}</div>
       <div style={{ height:1, width:'100%',
         background:'rgba(210,185,240,.58)' }}/>

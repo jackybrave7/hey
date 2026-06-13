@@ -2346,7 +2346,7 @@ module.exports = function makeRouter(db, broadcast) {
 
   // ── HEY-заведующий: чтение моментов и рассылок (admin only) ────────────
   r.get('/admin/system/moments', requireAdmin, (req, res) => {
-    const status = req.query.status || 'all';
+    const status = req.query.status || 'published';
     res.json(db.getSystemMoments({ status }));
   });
 

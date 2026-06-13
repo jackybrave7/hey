@@ -373,7 +373,7 @@ export function MyProfileScreen() {
 
       {/* Avatar + fields. Сверху отступ 28px чтобы между sticky-header'ом
           «Профиль» и аватаркой был воздух — иначе шапка липнет к фото. */}
-      <div style={{display:'flex',gap:22,padding:'28px 26px 0',alignItems:'flex-start'}}>
+      <div style={{display:'flex',gap:22,padding:'28px 26px 0',alignItems:'flex-start',minWidth:0}}>
         <AvatarPicker
           avatar={avatar}
           onChange={(url, file) => { setAvatar(url); setAvatarFile(file); }}
@@ -382,7 +382,7 @@ export function MyProfileScreen() {
           disabled={!editing}
         />
 
-        <div className={editing ? 'profile-edit-fields' : ''} style={{flex:1,display:'flex',flexDirection:'column',gap:16,paddingTop:8}}>
+        <div className={editing ? 'profile-edit-fields' : ''} style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:16,paddingTop:8}}>
 
           {/* Имя */}
           {editing ? (
@@ -393,7 +393,8 @@ export function MyProfileScreen() {
           ) : (
             // Имя — главный акцент шапки профиля: крупный жирный белый.
             <div style={{color:'#F9F0F0',fontSize:24,fontWeight:800,lineHeight:1.15,
-              letterSpacing:-.3,paddingBottom:4,marginTop:-4}}>
+              letterSpacing:-.3,paddingBottom:4,marginTop:-4,
+              wordBreak:'break-word',overflowWrap:'anywhere'}}>
               {name || '—'}
             </div>
           )}
