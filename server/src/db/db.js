@@ -603,9 +603,6 @@ const DEFAULT_TENANT_ID = 'tnt_default';
   } catch (e) {
     console.warn('[multi-tenant] не удалось создать default tenant:', e.message);
   }
-  try { backfillSchoolReferrals(); } catch (e) {
-    console.warn('[referral] school backfill failed:', e.message);
-  }
 })();
 
 // ── Users ──────────────────────────────────────────────────────────────────
@@ -733,15 +730,93 @@ function backfillSchoolReferrals() {
   if (n > 0) console.log(`[referral] backfilled ${n} school referral(s)`);
 }
 
-function getReferralCount(userId) {
-  return db.prepare('SELECT COUNT(*) as c FROM referrals WHERE inviter_id=?').get(userId)?.c ?? 0;
+/** Засчитать пригласившего в группу (members.invited_by). */
+function creditGroupInviterReferral(convId, userId) {
+  if (!convId || !userId) return;
+  const row = db.prepare(
+    `SELECT invited_by FROM members
+     WHERE conversation_id=? AND user_id=? AND invited_by IS NOT NULL AND invited_by != ?`
+  ).get(convId, userId, userId);
+  if (row?.invited_by) markReferralFromInviter(row.invited_by, userId);
 }
 
-// Возвращает { total, confirmed } — приглашённые этим юзером (зарегистрированы
-// по его ссылке) и из них подтвердившиеся (написали первое сообщение).
+/** Дозаполнитель: групповые приглашения (ссылка / добавление в группу). */
+function backfillGroupInviteReferrals() {
+  let n = 0;
+  const rows = db.prepare(
+    `SELECT m.user_id, m.invited_by
+     FROM members m
+     JOIN users u ON u.id = m.user_id
+     JOIN users inv ON inv.id = m.invited_by
+     WHERE m.invited_by IS NOT NULL AND m.invited_by != m.user_id
+       AND m.status IN ('active', 'pending')
+       AND u.is_deleted = 0 AND u.is_blocked = 0
+       AND inv.is_deleted = 0 AND inv.is_blocked = 0
+       AND COALESCE(inv.is_system, 0) = 0
+       AND NOT EXISTS (SELECT 1 FROM referrals r WHERE r.invitee_id = m.user_id)
+       AND m.rowid = (
+         SELECT m2.rowid FROM members m2
+         WHERE m2.user_id = m.user_id
+           AND m2.invited_by IS NOT NULL AND m2.invited_by != m2.user_id
+         ORDER BY m2.joined_at ASC LIMIT 1
+       )`
+  ).all();
+  for (const r of rows) {
+    markReferralFromInviter(r.invited_by, r.user_id);
+    n++;
+  }
+  const byReferralField = db.prepare(
+    `SELECT id, referral_by FROM users
+     WHERE referral_by IS NOT NULL AND referral_by != ''
+       AND is_deleted = 0 AND is_blocked = 0
+       AND NOT EXISTS (SELECT 1 FROM referrals r WHERE r.invitee_id = users.id)`
+  ).all();
+  for (const u of byReferralField) {
+    markReferralFromInviter(u.referral_by, u.id);
+    n++;
+  }
+  if (n > 0) console.log(`[referral] backfilled ${n} group/personal referral(s)`);
+}
+
+// Идемпотентный дозаполнитель referrals — на каждом старте сервера.
+// Раньше вызывался только при первом создании default tenant и на проде
+// с уже существующим tenant никогда не отрабатывал.
+(function runReferralBackfillOnStartup() {
+  try { backfillSchoolReferrals(); } catch (e) {
+    console.warn('[referral] school backfill failed:', e.message);
+  }
+  try { backfillGroupInviteReferrals(); } catch (e) {
+    console.warn('[referral] group backfill failed:', e.message);
+  }
+})();
+
+function getReferralCount(userId) {
+  return getInvitedCounts(userId).total;
+}
+
+// Возвращает { total, confirmed } — приглашённые этим юзером:
+// личные/групповые (referrals) + ученики школ, владельцем которых он является.
 function getInvitedCounts(userId) {
-  const total     = db.prepare('SELECT COUNT(*) as c FROM referrals WHERE inviter_id=?').get(userId)?.c ?? 0;
-  const confirmed = db.prepare('SELECT COUNT(*) as c FROM referrals WHERE inviter_id=? AND confirmed_at IS NOT NULL').get(userId)?.c ?? 0;
+  const total = db.prepare(
+    `SELECT COUNT(*) AS c FROM (
+       SELECT invitee_id AS id FROM referrals WHERE inviter_id = ?
+       UNION
+       SELECT si.used_by_user_id AS id FROM school_invites si
+       INNER JOIN tenants t ON t.id = si.tenant_id
+       WHERE t.owner_id = ? AND si.used_by_user_id IS NOT NULL
+     )`
+  ).get(userId, userId)?.c ?? 0;
+  const confirmed = db.prepare(
+    `SELECT COUNT(*) AS c FROM (
+       SELECT invitee_id AS id FROM referrals
+       WHERE inviter_id = ? AND confirmed_at IS NOT NULL
+       UNION
+       SELECT si.used_by_user_id AS id FROM school_invites si
+       INNER JOIN tenants t ON t.id = si.tenant_id
+       INNER JOIN referrals r ON r.invitee_id = si.used_by_user_id AND r.confirmed_at IS NOT NULL
+       WHERE t.owner_id = ? AND si.used_by_user_id IS NOT NULL
+     )`
+  ).get(userId, userId)?.c ?? 0;
   return { total, confirmed };
 }
 
@@ -2934,7 +3009,7 @@ function getSystemMoments({ status = 'published', limit = 100 } = {}) {
      WHERE m.user_id = ? ${where}
      ORDER BY m.created_at DESC LIMIT ?`
   ).all(...params);
-  return rows.map(_parseMoment);
+  return _withStatsBatch(rows.map(_parseMoment));
 }
 
 // Группирует системные сообщения по broadcast_id: возвращает уникальные рассылки
@@ -3291,8 +3366,22 @@ function getAdminUsers({ search, filter } = {}) {
             p.online, p.last_seen,
             SUM(CASE WHEN m.status='active'   THEN 1 ELSE 0 END) AS active_moments,
             SUM(CASE WHEN m.status!='deleted' THEN 1 ELSE 0 END) AS total_moments,
-            (SELECT COUNT(*) FROM referrals r WHERE r.inviter_id=u.id)                                      AS invited_total,
-            (SELECT COUNT(*) FROM referrals r WHERE r.inviter_id=u.id AND r.confirmed_at IS NOT NULL)       AS invited_confirmed
+            (SELECT COUNT(*) FROM (
+               SELECT r.invitee_id AS id FROM referrals r WHERE r.inviter_id = u.id
+               UNION
+               SELECT si.used_by_user_id AS id FROM school_invites si
+               INNER JOIN tenants t ON t.id = si.tenant_id
+               WHERE t.owner_id = u.id AND si.used_by_user_id IS NOT NULL
+             ))                                                                                      AS invited_total,
+            (SELECT COUNT(*) FROM (
+               SELECT r.invitee_id AS id FROM referrals r
+               WHERE r.inviter_id = u.id AND r.confirmed_at IS NOT NULL
+               UNION
+               SELECT si.used_by_user_id AS id FROM school_invites si
+               INNER JOIN tenants t ON t.id = si.tenant_id
+               INNER JOIN referrals r2 ON r2.invitee_id = si.used_by_user_id AND r2.confirmed_at IS NOT NULL
+               WHERE t.owner_id = u.id AND si.used_by_user_id IS NOT NULL
+             ))                                                                                      AS invited_confirmed
      FROM users u
      LEFT JOIN presence p  ON p.user_id=u.id
      LEFT JOIN moments  m  ON m.user_id=u.id
@@ -3308,8 +3397,22 @@ function getAdminUserById(id) {
     `SELECT u.*, p.online, p.last_seen,
             (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status!='deleted') AS total_moments,
             (SELECT COUNT(*) FROM moment_reactions mr JOIN moments m ON m.id=mr.moment_id WHERE m.user_id=u.id) AS total_reactions_received,
-            (SELECT COUNT(*) FROM referrals r WHERE r.inviter_id=u.id)                                AS invited_total,
-            (SELECT COUNT(*) FROM referrals r WHERE r.inviter_id=u.id AND r.confirmed_at IS NOT NULL) AS invited_confirmed,
+            (SELECT COUNT(*) FROM (
+               SELECT r.invitee_id AS id FROM referrals r WHERE r.inviter_id = u.id
+               UNION
+               SELECT si.used_by_user_id AS id FROM school_invites si
+               INNER JOIN tenants t ON t.id = si.tenant_id
+               WHERE t.owner_id = u.id AND si.used_by_user_id IS NOT NULL
+             ))                                                                                AS invited_total,
+            (SELECT COUNT(*) FROM (
+               SELECT r.invitee_id AS id FROM referrals r
+               WHERE r.inviter_id = u.id AND r.confirmed_at IS NOT NULL
+               UNION
+               SELECT si.used_by_user_id AS id FROM school_invites si
+               INNER JOIN tenants t ON t.id = si.tenant_id
+               INNER JOIN referrals r2 ON r2.invitee_id = si.used_by_user_id AND r2.confirmed_at IS NOT NULL
+               WHERE t.owner_id = u.id AND si.used_by_user_id IS NOT NULL
+             ))                                                                                AS invited_confirmed,
             (SELECT inv.name FROM users inv WHERE inv.id = u.referral_by)                             AS invited_by_name
      FROM users u
      LEFT JOIN presence p ON p.user_id=u.id
@@ -3325,11 +3428,22 @@ function getAdminUserById(id) {
      WHERE r.inviter_id = ?
      ORDER BY r.created_at DESC`
   ).all(id).map(r => ({ ...r, is_blocked: !!r.is_blocked }));
+  const schoolInvitees = db.prepare(
+    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+            COALESCE(si.used_at, si.created_at) AS invited_at,
+            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+     FROM school_invites si
+     JOIN tenants t ON t.id = si.tenant_id
+     JOIN users inv ON inv.id = si.used_by_user_id
+     WHERE t.owner_id = ? AND si.used_by_user_id IS NOT NULL
+       AND si.used_by_user_id NOT IN (SELECT invitee_id FROM referrals WHERE inviter_id = ?)
+     ORDER BY invited_at DESC`
+  ).all(id, id).map(r => ({ ...r, is_blocked: !!r.is_blocked }));
   return {
     ...safe,
     online: !!safe.online, is_admin: !!safe.is_admin, is_super: !!safe.is_super,
     is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password,
-    invitees,
+    invitees: [...invitees, ...schoolInvitees],
   };
 }
 
@@ -3497,7 +3611,7 @@ function _grantReferralCredit(inviterId) {
   const inviter = findUserById(inviterId);
   const count = getInvitedCounts(inviterId).confirmed;
   db.prepare('UPDATE users SET invited_count=? WHERE id=?').run(count, inviterId);
-  const result = { superGranted: false, newBadge: null, invitedCount: count };
+  const result = { superGranted: false, invitedCount: count };
 
   // 3-й приглашённый — разовый бонус 3 мес СУПЕР
   if (count >= 3 && !inviter.super_bonus_claimed) {
@@ -3507,22 +3621,6 @@ function _grantReferralCredit(inviterId) {
     result.superExpiresAt = expiresAt;
   }
 
-  // Ачивки
-  const achievements = JSON.parse(inviter.achievements || '[]');
-  const milestones = [
-    { count: 5,  key: 'connector',          label: 'Связной' },
-    { count: 10, key: 'circle_keeper',       label: 'Хранитель круга' },
-    { count: 25, key: 'community_founder',   label: 'Основатель сообщества' },
-  ];
-  for (const m of milestones) {
-    if (count === m.count && !achievements.includes(m.key)) {
-      achievements.push(m.key);
-      result.newBadge = m;
-    }
-  }
-  if (result.newBadge) {
-    db.prepare("UPDATE users SET achievements=? WHERE id=?").run(JSON.stringify(achievements), inviterId);
-  }
   return result;
 }
 
@@ -3530,7 +3628,7 @@ function _grantReferralCredit(inviterId) {
 // (запись о рефералке создаётся в createUser, зачёт идёт только после первого
 // сообщения через confirmReferralIfPending).
 function processReferral(/* inviterId */) {
-  return { superGranted: false, newBadge: null, invitedCount: 0 };
+  return { superGranted: false, invitedCount: 0 };
 }
 
 // Если у приглашённого ещё нет confirmed_at — отмечает реферала подтверждённым
@@ -4070,7 +4168,7 @@ module.exports = {
   setOnline, getPresence,
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes, updateContactNickname,
-  getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter, creditSchoolReferral,
+  getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter, creditSchoolReferral, creditGroupInviterReferral,
   rotateInviteCode, resolveInviterByInviteRef,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   getTotalUnreadFor,

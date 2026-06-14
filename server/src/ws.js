@@ -206,14 +206,6 @@ module.exports = function setupWS(server) {
                 kind: 'super_granted',
               });
             }
-            if (referralResult?.credit?.newBadge) {
-              broadcast([referralResult.inviterId], {
-                type: 'system:notification',
-                text: `🏅 Получен значок «${referralResult.credit.newBadge.label}» за ${referralResult.credit.newBadge.count} приглашённых.`,
-                kind: 'badge_granted',
-                badge: referralResult.credit.newBadge.key,
-              });
-            }
           } catch (e) { console.error('[REFERRAL_CONFIRM]', e.message); }
 
           // Push шлём ВСЕМ получателям (кроме отправителя). Service Worker

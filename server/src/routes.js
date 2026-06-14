@@ -1476,6 +1476,9 @@ module.exports = function makeRouter(db, broadcast) {
   r.post('/groups/:id/accept', requireAuth, (req, res) => {
     try {
       const r2 = db.acceptGroupInvite(req.params.id, req.user.id);
+      try { db.creditGroupInviterReferral(req.params.id, req.user.id); } catch (e) {
+        console.warn('[referral] group accept credit failed:', e.message);
+      }
       const members = db.getConversationMembers(req.params.id);
       // Уведомляем активных участников — у них в списке появится новый участник
       broadcast(members, { type: 'group:member_added', conversationId: req.params.id, userId: req.user.id });
@@ -1607,6 +1610,9 @@ module.exports = function makeRouter(db, broadcast) {
     }
     try {
       const result = db.joinGroupViaInvite(conv.id, req.user.id, data.inviterId);
+      try { db.creditGroupInviterReferral(conv.id, req.user.id); } catch (e) {
+        console.warn('[referral] group invite credit failed:', e.message);
+      }
       // Приглашающего сразу в контакты к новичку
       try { db.addContact(req.user.id, data.inviterId, null); } catch {}
       // Уведомить участников и нового юзера о появлении чата

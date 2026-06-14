@@ -255,13 +255,12 @@ function GlobalHandlers() {
     };
   }, [logout]);
 
-  // System notifications: Super granted, badge awarded
+  // System notifications: Super granted
   useEffect(() => {
     return socket.on('system:notification', ({ text, kind }) => {
       setSysToast(text);
       setTimeout(() => setSysToast(''), 5000);
-      // Refresh user data so SuperStatusCard updates immediately
-      if (kind === 'super_granted' || kind === 'badge_granted') {
+      if (kind === 'super_granted') {
         api.getMe().then(u => setUser && setUser(u)).catch(() => {});
       }
     });

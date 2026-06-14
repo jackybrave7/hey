@@ -13,7 +13,6 @@ import Icon from '../Icon';
 import HeyLogo from '../HeyLogo';
 import MoodEmoji from '../moments/MoodEmoji';
 import SuperStatusCard from '../super/SuperStatusCard';
-import AchievementBadges from '../super/AchievementBadges';
 import OnboardingTour from '../OnboardingTour';
 import MomentDetailPopup from '../moments/MomentDetailPopup';
 import MomentCard from '../moments/MomentCard';
@@ -513,13 +512,6 @@ export function MyProfileScreen() {
           </div>
         ) : null}
       </div>
-
-      {/* Achievement badges остаются вверху рядом с инфо */}
-      {!editing && (
-        <div style={{padding:'16px 26px 0'}}>
-          <AchievementBadges achievements={user?.achievements} />
-        </div>
-      )}
 
       {/* Sections: SUPER banner + три карточки (Архив / Сохранённые / Пригласить) */}
       {!editing && (() => {

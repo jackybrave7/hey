@@ -5,7 +5,6 @@ import { useAuth } from '../../AuthContext';
 import { heyToast } from '../shared/Toast';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
 import { BioWithLinks } from '../shared/profileUi';
-import AchievementBadges from '../super/AchievementBadges';
 import MomentDetailPopup from '../moments/MomentDetailPopup';
 import MomentCard from '../moments/MomentCard';
 import Icon from '../Icon';
@@ -145,7 +144,6 @@ export function PublicProfileScreen() {
                 В HEY с {new Date(profile.created_at * 1000).toLocaleDateString('ru',{month:'long',year:'numeric'})}
               </div>
             )}
-            <AchievementBadges achievements={profile?.achievements} />
           </div>
         </div>
 

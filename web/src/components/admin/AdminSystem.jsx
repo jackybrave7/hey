@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 import { useConfirm } from '../shared/Confirm';
+import Icon from '../Icon';
 
 export default function AdminSystem() {
   const [tab, setTab] = useState('broadcast'); // 'broadcast' | 'moment'
@@ -48,14 +49,14 @@ export default function AdminSystem() {
 function ManagePublished() {
   const [moments, setMoments]       = useState([]);
   const [broadcasts, setBroadcasts] = useState([]);
-  // Прочие сообщения от заведующего, не привязанные к рассылке
-  // (например тестовые/ручные сообщения админа в конкретный чат).
-  const [orphans, setOrphans]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [editingMomentId, setEditingMomentId] = useState(null);
   const [editingBroadcastId, setEditingBroadcastId] = useState(null);
   const [editText, setEditText]     = useState('');
   const [toast, setToast]           = useState('');
+  const [reactorsModal, setReactorsModal] = useState(null); // { momentId, filter }
+  const [reactors, setReactors]     = useState(null);
+  const [reactorsLoading, setReactorsLoading] = useState(false);
   const [customConfirm, confirmModal] = useConfirm();
 
   function showMsg(m) { setToast(m); setTimeout(() => setToast(''), 2500); }
@@ -63,31 +64,27 @@ function ManagePublished() {
   async function load() {
     setLoading(true);
     try {
-      const [ms, bs, os] = await Promise.all([
+      const [ms, bs] = await Promise.all([
         api.adminSystemListMoments(),
         api.adminSystemListBroadcasts(),
-        api.adminSystemListOrphans(),
       ]);
       setMoments(ms);
       setBroadcasts(bs);
-      setOrphans(os);
     } catch (e) { showMsg('Ошибка: ' + e.message); }
     setLoading(false);
   }
 
-  async function deleteOrphan(m) {
-    const ok = await customConfirm(
-      <>
-        <div style={{fontWeight:600,marginBottom:8}}>Удалить сообщение?</div>
-        <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:6}}>
-          Только у одного получателя {m.recipient_name ? `(${m.recipient_name})` : ''}.
-        </div>
-      </>,
-      { danger: true, confirmLabel: 'Удалить' }
-    );
-    if (!ok) return;
-    try { await api.adminSystemDeleteMessage(m.id); showMsg('✓ Удалено'); load(); }
-    catch (e) { showMsg('Ошибка: ' + e.message); }
+  async function openReactors(momentId, filter) {
+    setReactorsModal({ momentId, filter });
+    setReactors(null);
+    setReactorsLoading(true);
+    try {
+      setReactors(await api.getMomentReactors(momentId));
+    } catch (e) {
+      showMsg('Ошибка: ' + e.message);
+      setReactorsModal(null);
+    }
+    setReactorsLoading(false);
   }
 
   useEffect(() => { load(); }, []);
@@ -185,6 +182,11 @@ function ManagePublished() {
                   }}/>
                 )}
                 <Text>{m.text}</Text>
+                <MomentReactionBar
+                  views={m.views || 0}
+                  stats={m.stats}
+                  onOpen={(filter) => openReactors(m.id, filter)}
+                />
                 <Actions>
                   {m.status === 'active' && (
                     <BtnSecondary onClick={() => { setEditingMomentId(m.id); setEditText(m.text || ''); }}>
@@ -203,24 +205,6 @@ function ManagePublished() {
           </Card>
         ))}
       </Section>
-
-      {/* Прочие сообщения (не рассылки) */}
-      {orphans.length > 0 && (
-        <Section title={`💌 Прямые сообщения от заведующего (${orphans.length})`}>
-          {orphans.map(m => (
-            <Card key={m.id}>
-              <Meta>
-                <span>{fmtDate(m.created_at)}</span>
-                <Badge>→ {m.recipient_name || m.recipient_phone || 'неизвестно'}</Badge>
-              </Meta>
-              <Text>{m.text || '(пустое сообщение)'}</Text>
-              <Actions>
-                <BtnDanger onClick={() => deleteOrphan(m)}>🗑 Удалить</BtnDanger>
-              </Actions>
-            </Card>
-          ))}
-        </Section>
-      )}
 
       {/* Рассылки */}
       <Section title={`💬 Рассылки сообщений (${broadcasts.length})`}>
@@ -266,12 +250,158 @@ function ManagePublished() {
           border:'1px solid rgba(249,240,240,.15)', boxShadow:'0 4px 20px rgba(0,0,0,.5)',
         }}>{toast}</div>
       )}
+      {reactorsModal && (
+        <AdminReactorsModal
+          filter={reactorsModal.filter}
+          reactors={reactors}
+          loading={reactorsLoading}
+          onClose={() => { setReactorsModal(null); setReactors(null); }}
+        />
+      )}
       {confirmModal}
     </div>
   );
 }
 
 // Маленькие хелперы для секции
+const REACTION_META = {
+  see:      { iconName: 'eye',   title: 'Просмотры'  },
+  resonate: { iconName: 'waves', title: 'Резонирует' },
+  talk:     { iconName: 'chat',  title: 'Поговорить' },
+};
+
+function MomentReactionBar({ views, stats, onOpen }) {
+  const items = [
+    { key: 'see',      iconName: 'eye',   count: views || 0,                  label: 'просмотры'   },
+    { key: 'resonate', iconName: 'waves', count: stats?.resonate || 0,        label: 'резонирует' },
+    { key: 'talk',     iconName: 'chat',  count: stats?.talk || 0,            label: 'поговорить' },
+  ];
+  return (
+    <div style={{
+      background:'rgba(249,240,240,.04)', borderRadius:12, padding:8,
+      display:'flex', gap:4, marginBottom:10,
+      border:'1px solid rgba(249,240,240,.06)',
+    }}>
+      {items.map(stat => (
+        <button key={stat.key}
+          onClick={() => stat.count > 0 && onOpen(stat.key)}
+          disabled={stat.count === 0}
+          title={stat.label}
+          style={{
+            flex:1, padding:'8px 6px', borderRadius:10,
+            background: stat.count > 0 ? 'rgba(249,240,240,.04)' : 'transparent',
+            border:'1px solid ' + (stat.count > 0 ? 'rgba(249,240,240,.08)' : 'transparent'),
+            color: stat.count > 0 ? 'rgba(249,240,240,.85)' : 'rgba(249,240,240,.3)',
+            cursor: stat.count > 0 ? 'pointer' : 'default',
+            fontFamily:'inherit',
+            display:'flex', flexDirection:'column', alignItems:'center', gap:2,
+          }}>
+          <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',height:18}}>
+            <Icon name={stat.iconName} size={17}/>
+          </span>
+          <span style={{fontSize:15,fontWeight:700,lineHeight:1}}>{stat.count}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AdminReactorsModal({ filter, reactors, loading, onClose }) {
+  const meta = REACTION_META[filter] || { iconName: 'info', title: 'Отклик' };
+  const list = !reactors ? [] : (() => {
+    const seen = new Set();
+    return reactors
+      .filter(r => r.reaction === filter)
+      .filter(r => seen.has(r.id) ? false : (seen.add(r.id), true));
+  })();
+
+  function fmtTime(ts) {
+    if (!ts) return '';
+    const diff = (Date.now() - ts * 1000) / 1000;
+    if (diff < 60)    return 'только что';
+    if (diff < 3600)  return Math.floor(diff/60) + ' мин';
+    if (diff < 86400) return Math.floor(diff/3600) + ' ч';
+    return new Date(ts*1000).toLocaleDateString('ru', { day:'numeric', month:'short' });
+  }
+
+  return (
+    <div onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position:'fixed', inset:0, zIndex:10000,
+        background:'rgba(0,0,0,.6)', backdropFilter:'blur(10px)',
+        display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+      }}>
+      <div style={{
+        background:'rgba(22,15,50,.98)', borderRadius:18,
+        width:'min(94vw, 420px)', maxHeight:'80vh', display:'flex', flexDirection:'column',
+        border:'1px solid rgba(249,240,240,.1)',
+        boxShadow:'0 20px 60px rgba(0,0,0,.65)',
+      }}>
+        <div style={{padding:'16px 20px 14px',borderBottom:'1px solid rgba(249,240,240,.08)',
+          display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+          <span style={{display:'inline-flex',alignItems:'center',color:'rgba(249,240,240,.9)'}}>
+            <Icon name={meta.iconName} size={22}/>
+          </span>
+          <div style={{flex:1}}>
+            <div style={{color:'#F9F0F0',fontSize:16,fontWeight:700}}>{meta.title}</div>
+            <div style={{color:'rgba(249,240,240,.45)',fontSize:12,marginTop:2}}>
+              {loading ? 'Загрузка…' : `${list.length} ${list.length === 1 ? 'человек' : 'человек'}`}
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',color:'rgba(249,240,240,.4)',
+              fontSize:24,cursor:'pointer',lineHeight:1,padding:0}}>×</button>
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:'8px 10px 14px'}}>
+          {loading && (
+            <div style={{color:'rgba(249,240,240,.4)',textAlign:'center',padding:'40px 20px',fontSize:14}}>
+              Загрузка…
+            </div>
+          )}
+          {!loading && list.length === 0 && (
+            <div style={{color:'rgba(249,240,240,.4)',textAlign:'center',padding:'40px 20px',fontSize:14}}>
+              Пока никого
+            </div>
+          )}
+          {!loading && list.map(r => (
+            <div key={r.id + r.reaction}
+              style={{
+                display:'flex', alignItems:'center', gap:12,
+                padding:'10px 12px', borderRadius:12, marginBottom:4,
+                background:'rgba(249,240,240,.03)',
+              }}>
+              <div style={{width:38,height:38,borderRadius:'50%',flexShrink:0,
+                background:'rgba(180,140,220,.3)',overflow:'hidden',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:14,color:'#F9F0F0',fontWeight:700,
+                border:'1px solid rgba(249,240,240,.1)'}}>
+                {r.avatar
+                  ? <img src={r.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                  : (r.nickname || r.name || '?')[0].toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{color:'#F9F0F0',fontSize:14,fontWeight:600,
+                  overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {r.nickname || r.name || 'Без имени'}
+                </div>
+                {r.nickname && (
+                  <div style={{color:'rgba(249,240,240,.45)',fontSize:11,marginTop:1,
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {r.name}
+                  </div>
+                )}
+                <div style={{color:'rgba(249,240,240,.35)',fontSize:11}}>
+                  {fmtTime(r.created_at)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children }) {
   return (
     <div>
