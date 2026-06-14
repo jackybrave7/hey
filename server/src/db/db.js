@@ -778,15 +778,37 @@ function backfillGroupInviteReferrals() {
   if (n > 0) console.log(`[referral] backfilled ${n} group/personal referral(s)`);
 }
 
+/** Проставить confirmed_at тем, кто уже писал сообщения, но флаг не успел записаться
+ *  (реферал создан backfill'ом после первого сообщения и т.п.). */
+function backfillReferralConfirmations() {
+  const rows = db.prepare(
+    `SELECT r.invitee_id,
+            (SELECT MIN(m.created_at) FROM messages m WHERE m.sender_id = r.invitee_id) AS first_msg
+     FROM referrals r
+     WHERE r.confirmed_at IS NULL
+       AND EXISTS (SELECT 1 FROM messages m WHERE m.sender_id = r.invitee_id)`
+  ).all();
+  if (!rows.length) return;
+  const stmt = db.prepare(
+    'UPDATE referrals SET confirmed_at=? WHERE invitee_id=? AND confirmed_at IS NULL'
+  );
+  let n = 0;
+  for (const r of rows) {
+    if (r.first_msg) { stmt.run(r.first_msg, r.invitee_id); n++; }
+  }
+  if (n > 0) console.log(`[referral] backfilled ${n} confirmation(s)`);
+}
+
 // Идемпотентный дозаполнитель referrals — на каждом старте сервера.
-// Раньше вызывался только при первом создании default tenant и на проде
-// с уже существующим tenant никогда не отрабатывал.
 (function runReferralBackfillOnStartup() {
   try { backfillSchoolReferrals(); } catch (e) {
     console.warn('[referral] school backfill failed:', e.message);
   }
   try { backfillGroupInviteReferrals(); } catch (e) {
     console.warn('[referral] group backfill failed:', e.message);
+  }
+  try { backfillReferralConfirmations(); } catch (e) {
+    console.warn('[referral] confirm backfill failed:', e.message);
   }
 })();
 
@@ -860,15 +882,26 @@ function sqlInvitedIdsForAdminUser() {
 
 const _invitedCountParams = (userId) => Array(7).fill(userId);
 
+// Подтверждён = есть confirmed_at в referrals ИЛИ юзер уже отправлял сообщения.
+function sqlInviteeIsConfirmed(idExpr) {
+  return `(
+    EXISTS (SELECT 1 FROM referrals r WHERE r.invitee_id = ${idExpr} AND r.confirmed_at IS NOT NULL)
+    OR EXISTS (SELECT 1 FROM messages m WHERE m.sender_id = ${idExpr})
+  )`;
+}
+
+const INVITEE_CONFIRMED_AT_SQL = `
+  COALESCE(
+    (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id),
+    (SELECT MIN(m.created_at) FROM messages m WHERE m.sender_id = inv.id)
+  )`;
+
 // Возвращает { total, confirmed } — все каналы приглашения.
 function getInvitedCounts(userId) {
   const idsSql = sqlInvitedIdsForUser('?');
   const total = db.prepare(`SELECT COUNT(*) AS c FROM (${idsSql})`).get(..._invitedCountParams(userId))?.c ?? 0;
   const confirmed = db.prepare(
-    `SELECT COUNT(*) AS c FROM (${idsSql}) x
-     WHERE EXISTS (
-       SELECT 1 FROM referrals r WHERE r.invitee_id = x.id AND r.confirmed_at IS NOT NULL
-     )`
+    `SELECT COUNT(*) AS c FROM (${idsSql}) x WHERE ${sqlInviteeIsConfirmed('x.id')}`
   ).get(..._invitedCountParams(userId))?.c ?? 0;
   return { total, confirmed };
 }
@@ -886,7 +919,8 @@ function getAdminInviteesList(userId) {
   };
   const direct = db.prepare(
     `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
-            r.created_at AS invited_at, r.confirmed_at
+            r.created_at AS invited_at,
+            ${INVITEE_CONFIRMED_AT_SQL} AS confirmed_at
      FROM referrals r JOIN users inv ON inv.id = r.invitee_id
      WHERE r.inviter_id = ?
      ORDER BY r.created_at DESC`
@@ -894,7 +928,7 @@ function getAdminInviteesList(userId) {
   const schoolRows = db.prepare(
     `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
             COALESCE(si.used_at, si.created_at) AS invited_at,
-            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+            ${INVITEE_CONFIRMED_AT_SQL} AS confirmed_at
      FROM school_invites si
      JOIN tenants t ON t.id = si.tenant_id
      JOIN users inv ON inv.id = si.used_by_user_id
@@ -903,7 +937,8 @@ function getAdminInviteesList(userId) {
   ).all(userId, userId);
   const schoolAcct = db.prepare(
     `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
-            r.created_at AS invited_at, r.confirmed_at
+            r.created_at AS invited_at,
+            ${INVITEE_CONFIRMED_AT_SQL} AS confirmed_at
      FROM referrals r
      JOIN tenants t ON t.owner_id = ?
      JOIN users inv ON inv.id = r.invitee_id
@@ -913,7 +948,7 @@ function getAdminInviteesList(userId) {
   const fromMembers = db.prepare(
     `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
             m.joined_at AS invited_at,
-            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+            ${INVITEE_CONFIRMED_AT_SQL} AS confirmed_at
      FROM members m
      JOIN users inv ON inv.id = m.user_id
      WHERE m.invited_by = ? AND m.status IN ('active','pending') AND inv.is_deleted = 0
@@ -922,7 +957,7 @@ function getAdminInviteesList(userId) {
   const fromReferralBy = db.prepare(
     `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
             inv.created_at AS invited_at,
-            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+            ${INVITEE_CONFIRMED_AT_SQL} AS confirmed_at
      FROM users inv
      WHERE inv.referral_by = ? AND inv.is_deleted = 0
      ORDER BY inv.created_at DESC`
@@ -930,7 +965,7 @@ function getAdminInviteesList(userId) {
   const fromAwo = db.prepare(
     `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
             ap.processed_at AS invited_at,
-            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+            ${INVITEE_CONFIRMED_AT_SQL} AS confirmed_at
      FROM awo_processed ap
      JOIN users inv ON inv.email = ap.email COLLATE NOCASE
      JOIN tenants t ON t.id = ap.tenant_id
@@ -3501,9 +3536,7 @@ function getAdminUsers({ search, filter } = {}) {
             (SELECT COUNT(*) FROM (
                ${sqlInvitedIdsForAdminUser()}
              ) x
-             WHERE EXISTS (
-               SELECT 1 FROM referrals r WHERE r.invitee_id = x.id AND r.confirmed_at IS NOT NULL
-             ))                                                                                      AS invited_confirmed
+             WHERE ${sqlInviteeIsConfirmed('x.id')})                                                                                      AS invited_confirmed
      FROM users u
      LEFT JOIN presence p  ON p.user_id=u.id
      LEFT JOIN moments  m  ON m.user_id=u.id
@@ -3525,9 +3558,7 @@ function getAdminUserById(id) {
             (SELECT COUNT(*) FROM (
                ${sqlInvitedIdsForAdminUser()}
              ) x
-             WHERE EXISTS (
-               SELECT 1 FROM referrals r WHERE r.invitee_id = x.id AND r.confirmed_at IS NOT NULL
-             ))                                                                                AS invited_confirmed,
+             WHERE ${sqlInviteeIsConfirmed('x.id')})                                                                                AS invited_confirmed,
             (SELECT inv.name FROM users inv WHERE inv.id = u.referral_by)                             AS invited_by_name
      FROM users u
      LEFT JOIN presence p ON p.user_id=u.id
@@ -3731,11 +3762,33 @@ function processReferral(/* inviterId */) {
 // и засчитывает inviter'у. Идемпотентно (повторные вызовы — no-op).
 // Вызывается из ws.js при отправке первого сообщения пользователем.
 function confirmReferralIfPending(inviteeId) {
-  const ref = db.prepare(
+  let ref = db.prepare(
     'SELECT inviter_id, confirmed_at FROM referrals WHERE invitee_id=?'
   ).get(inviteeId);
+  // Реферал мог не успеть записаться (backfill позже) — восстанавливаем из
+  // referral_by или самого раннего invited_by в группах.
+  if (!ref) {
+    const u = findUserById(inviteeId);
+    if (u?.referral_by) {
+      markReferralFromInviter(u.referral_by, inviteeId);
+    } else {
+      const m = db.prepare(
+        `SELECT invited_by FROM members
+         WHERE user_id=? AND invited_by IS NOT NULL AND invited_by != user_id
+         ORDER BY joined_at ASC LIMIT 1`
+      ).get(inviteeId);
+      if (m?.invited_by) markReferralFromInviter(m.invited_by, inviteeId);
+    }
+    ref = db.prepare(
+      'SELECT inviter_id, confirmed_at FROM referrals WHERE invitee_id=?'
+    ).get(inviteeId);
+  }
   if (!ref || ref.confirmed_at) return null;
-  db.prepare('UPDATE referrals SET confirmed_at=? WHERE invitee_id=?').run(now(), inviteeId);
+  const firstMsg = db.prepare(
+    'SELECT MIN(created_at) AS t FROM messages WHERE sender_id=?'
+  ).get(inviteeId)?.t;
+  db.prepare('UPDATE referrals SET confirmed_at=? WHERE invitee_id=?')
+    .run(firstMsg || now(), inviteeId);
   return { inviterId: ref.inviter_id, credit: _grantReferralCredit(ref.inviter_id) };
 }
 
