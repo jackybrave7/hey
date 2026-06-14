@@ -794,30 +794,158 @@ function getReferralCount(userId) {
   return getInvitedCounts(userId).total;
 }
 
-// Возвращает { total, confirmed } — приглашённые этим юзером:
-// личные/групповые (referrals) + ученики школ, владельцем которых он является.
+// Школьный аккаунт tenant'а (для атрибуции учеников владельцу школы).
+const SCHOOL_INVITER_FOR_TENANT_SQL = `
+  CASE
+    WHEN t.account_id IS NOT NULL
+         AND EXISTS (SELECT 1 FROM users su WHERE su.id = t.account_id AND su.is_blocked = 0)
+    THEN t.account_id
+    ELSE 'system_school_bl'
+  END`;
+
+// Все invitee_id, которых юзер привёл (личные, групповые, школьные, AWO).
+function sqlInvitedIdsForUser(param = '?') {
+  return `
+    SELECT invitee_id AS id FROM referrals WHERE inviter_id = ${param}
+    UNION
+    SELECT si.used_by_user_id AS id FROM school_invites si
+    INNER JOIN tenants t ON t.id = si.tenant_id
+    WHERE (t.owner_id = ${param} OR t.account_id = ${param}) AND si.used_by_user_id IS NOT NULL
+    UNION
+    SELECT r.invitee_id AS id FROM referrals r
+    INNER JOIN tenants t ON t.owner_id = ${param}
+    WHERE r.inviter_id = (${SCHOOL_INVITER_FOR_TENANT_SQL})
+    UNION
+    SELECT m.user_id AS id FROM members m
+    INNER JOIN users mu ON mu.id = m.user_id
+    WHERE m.invited_by = ${param} AND m.status IN ('active','pending') AND mu.is_deleted = 0
+    UNION
+    SELECT u2.id FROM users u2
+    WHERE u2.referral_by = ${param} AND u2.is_deleted = 0
+    UNION
+    SELECT u3.id FROM awo_processed ap
+    INNER JOIN users u3 ON u3.email = ap.email COLLATE NOCASE
+    INNER JOIN tenants t ON t.id = ap.tenant_id
+    WHERE t.owner_id = ${param} AND u3.is_deleted = 0
+      AND ap.result IN ('user_exists_added_to_chat','user_exists','user_exists_already_in_chat')
+  `;
+}
+
+function sqlInvitedIdsForAdminUser() {
+  return `
+    SELECT r.invitee_id AS id FROM referrals r WHERE r.inviter_id = u.id
+    UNION
+    SELECT si.used_by_user_id AS id FROM school_invites si
+    INNER JOIN tenants t ON t.id = si.tenant_id
+    WHERE (t.owner_id = u.id OR t.account_id = u.id) AND si.used_by_user_id IS NOT NULL
+    UNION
+    SELECT r2.invitee_id AS id FROM referrals r2
+    INNER JOIN tenants t ON t.owner_id = u.id
+    WHERE r2.inviter_id = (${SCHOOL_INVITER_FOR_TENANT_SQL})
+    UNION
+    SELECT m.user_id AS id FROM members m
+    INNER JOIN users mu ON mu.id = m.user_id
+    WHERE m.invited_by = u.id AND m.status IN ('active','pending') AND mu.is_deleted = 0
+    UNION
+    SELECT u2.id FROM users u2
+    WHERE u2.referral_by = u.id AND u2.is_deleted = 0
+    UNION
+    SELECT u3.id FROM awo_processed ap
+    INNER JOIN users u3 ON u3.email = ap.email COLLATE NOCASE
+    INNER JOIN tenants t ON t.id = ap.tenant_id
+    WHERE t.owner_id = u.id AND u3.is_deleted = 0
+      AND ap.result IN ('user_exists_added_to_chat','user_exists','user_exists_already_in_chat')
+  `;
+}
+
+const _invitedCountParams = (userId) => Array(7).fill(userId);
+
+// Возвращает { total, confirmed } — все каналы приглашения.
 function getInvitedCounts(userId) {
-  const total = db.prepare(
-    `SELECT COUNT(*) AS c FROM (
-       SELECT invitee_id AS id FROM referrals WHERE inviter_id = ?
-       UNION
-       SELECT si.used_by_user_id AS id FROM school_invites si
-       INNER JOIN tenants t ON t.id = si.tenant_id
-       WHERE t.owner_id = ? AND si.used_by_user_id IS NOT NULL
-     )`
-  ).get(userId, userId)?.c ?? 0;
+  const idsSql = sqlInvitedIdsForUser('?');
+  const total = db.prepare(`SELECT COUNT(*) AS c FROM (${idsSql})`).get(..._invitedCountParams(userId))?.c ?? 0;
   const confirmed = db.prepare(
-    `SELECT COUNT(*) AS c FROM (
-       SELECT invitee_id AS id FROM referrals
-       WHERE inviter_id = ? AND confirmed_at IS NOT NULL
-       UNION
-       SELECT si.used_by_user_id AS id FROM school_invites si
-       INNER JOIN tenants t ON t.id = si.tenant_id
-       INNER JOIN referrals r ON r.invitee_id = si.used_by_user_id AND r.confirmed_at IS NOT NULL
-       WHERE t.owner_id = ? AND si.used_by_user_id IS NOT NULL
+    `SELECT COUNT(*) AS c FROM (${idsSql}) x
+     WHERE EXISTS (
+       SELECT 1 FROM referrals r WHERE r.invitee_id = x.id AND r.confirmed_at IS NOT NULL
      )`
-  ).get(userId, userId)?.c ?? 0;
+  ).get(..._invitedCountParams(userId))?.c ?? 0;
   return { total, confirmed };
+}
+
+function getAdminInviteesList(userId) {
+  const seen = new Set();
+  const push = (rows) => {
+    const out = [];
+    for (const r of rows) {
+      if (!r?.id || seen.has(r.id)) continue;
+      seen.add(r.id);
+      out.push({ ...r, is_blocked: !!r.is_blocked });
+    }
+    return out;
+  };
+  const direct = db.prepare(
+    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+            r.created_at AS invited_at, r.confirmed_at
+     FROM referrals r JOIN users inv ON inv.id = r.invitee_id
+     WHERE r.inviter_id = ?
+     ORDER BY r.created_at DESC`
+  ).all(userId);
+  const schoolRows = db.prepare(
+    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+            COALESCE(si.used_at, si.created_at) AS invited_at,
+            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+     FROM school_invites si
+     JOIN tenants t ON t.id = si.tenant_id
+     JOIN users inv ON inv.id = si.used_by_user_id
+     WHERE (t.owner_id = ? OR t.account_id = ?) AND si.used_by_user_id IS NOT NULL
+     ORDER BY invited_at DESC`
+  ).all(userId, userId);
+  const schoolAcct = db.prepare(
+    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+            r.created_at AS invited_at, r.confirmed_at
+     FROM referrals r
+     JOIN tenants t ON t.owner_id = ?
+     JOIN users inv ON inv.id = r.invitee_id
+     WHERE r.inviter_id = (${SCHOOL_INVITER_FOR_TENANT_SQL})
+     ORDER BY r.created_at DESC`
+  ).all(userId);
+  const fromMembers = db.prepare(
+    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+            m.joined_at AS invited_at,
+            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+     FROM members m
+     JOIN users inv ON inv.id = m.user_id
+     WHERE m.invited_by = ? AND m.status IN ('active','pending') AND inv.is_deleted = 0
+     ORDER BY m.joined_at DESC`
+  ).all(userId);
+  const fromReferralBy = db.prepare(
+    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+            inv.created_at AS invited_at,
+            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+     FROM users inv
+     WHERE inv.referral_by = ? AND inv.is_deleted = 0
+     ORDER BY inv.created_at DESC`
+  ).all(userId);
+  const fromAwo = db.prepare(
+    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+            ap.processed_at AS invited_at,
+            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
+     FROM awo_processed ap
+     JOIN users inv ON inv.email = ap.email COLLATE NOCASE
+     JOIN tenants t ON t.id = ap.tenant_id
+     WHERE t.owner_id = ? AND inv.is_deleted = 0
+       AND ap.result IN ('user_exists_added_to_chat','user_exists','user_exists_already_in_chat')
+     ORDER BY ap.processed_at DESC`
+  ).all(userId);
+  return [
+    ...push(direct),
+    ...push(schoolRows),
+    ...push(schoolAcct),
+    ...push(fromMembers),
+    ...push(fromReferralBy),
+    ...push(fromAwo),
+  ];
 }
 
 function findUserByInviteCode(code) {
@@ -1275,6 +1403,7 @@ function addGroupMember(convId, requesterId, userId) {
   db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at,status,invited_by)
      VALUES (?,?,?,'pending',?)`)
     .run(convId, userId, now(), requesterId);
+  try { markReferralFromInviter(requesterId, userId); } catch {}
   return { alreadyMember: false, status: 'pending' };
 }
 
@@ -3367,20 +3496,13 @@ function getAdminUsers({ search, filter } = {}) {
             SUM(CASE WHEN m.status='active'   THEN 1 ELSE 0 END) AS active_moments,
             SUM(CASE WHEN m.status!='deleted' THEN 1 ELSE 0 END) AS total_moments,
             (SELECT COUNT(*) FROM (
-               SELECT r.invitee_id AS id FROM referrals r WHERE r.inviter_id = u.id
-               UNION
-               SELECT si.used_by_user_id AS id FROM school_invites si
-               INNER JOIN tenants t ON t.id = si.tenant_id
-               WHERE t.owner_id = u.id AND si.used_by_user_id IS NOT NULL
+               ${sqlInvitedIdsForAdminUser()}
              ))                                                                                      AS invited_total,
             (SELECT COUNT(*) FROM (
-               SELECT r.invitee_id AS id FROM referrals r
-               WHERE r.inviter_id = u.id AND r.confirmed_at IS NOT NULL
-               UNION
-               SELECT si.used_by_user_id AS id FROM school_invites si
-               INNER JOIN tenants t ON t.id = si.tenant_id
-               INNER JOIN referrals r2 ON r2.invitee_id = si.used_by_user_id AND r2.confirmed_at IS NOT NULL
-               WHERE t.owner_id = u.id AND si.used_by_user_id IS NOT NULL
+               ${sqlInvitedIdsForAdminUser()}
+             ) x
+             WHERE EXISTS (
+               SELECT 1 FROM referrals r WHERE r.invitee_id = x.id AND r.confirmed_at IS NOT NULL
              ))                                                                                      AS invited_confirmed
      FROM users u
      LEFT JOIN presence p  ON p.user_id=u.id
@@ -3398,20 +3520,13 @@ function getAdminUserById(id) {
             (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status!='deleted') AS total_moments,
             (SELECT COUNT(*) FROM moment_reactions mr JOIN moments m ON m.id=mr.moment_id WHERE m.user_id=u.id) AS total_reactions_received,
             (SELECT COUNT(*) FROM (
-               SELECT r.invitee_id AS id FROM referrals r WHERE r.inviter_id = u.id
-               UNION
-               SELECT si.used_by_user_id AS id FROM school_invites si
-               INNER JOIN tenants t ON t.id = si.tenant_id
-               WHERE t.owner_id = u.id AND si.used_by_user_id IS NOT NULL
+               ${sqlInvitedIdsForAdminUser()}
              ))                                                                                AS invited_total,
             (SELECT COUNT(*) FROM (
-               SELECT r.invitee_id AS id FROM referrals r
-               WHERE r.inviter_id = u.id AND r.confirmed_at IS NOT NULL
-               UNION
-               SELECT si.used_by_user_id AS id FROM school_invites si
-               INNER JOIN tenants t ON t.id = si.tenant_id
-               INNER JOIN referrals r2 ON r2.invitee_id = si.used_by_user_id AND r2.confirmed_at IS NOT NULL
-               WHERE t.owner_id = u.id AND si.used_by_user_id IS NOT NULL
+               ${sqlInvitedIdsForAdminUser()}
+             ) x
+             WHERE EXISTS (
+               SELECT 1 FROM referrals r WHERE r.invitee_id = x.id AND r.confirmed_at IS NOT NULL
              ))                                                                                AS invited_confirmed,
             (SELECT inv.name FROM users inv WHERE inv.id = u.referral_by)                             AS invited_by_name
      FROM users u
@@ -3420,30 +3535,11 @@ function getAdminUserById(id) {
   ).get(id);
   if (!u) return null;
   const { password: _, ...safe } = u;
-  // Список приглашённых юзеров для подробной карточки
-  const invitees = db.prepare(
-    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
-            r.created_at AS invited_at, r.confirmed_at
-     FROM referrals r JOIN users inv ON inv.id = r.invitee_id
-     WHERE r.inviter_id = ?
-     ORDER BY r.created_at DESC`
-  ).all(id).map(r => ({ ...r, is_blocked: !!r.is_blocked }));
-  const schoolInvitees = db.prepare(
-    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
-            COALESCE(si.used_at, si.created_at) AS invited_at,
-            (SELECT confirmed_at FROM referrals WHERE invitee_id = inv.id) AS confirmed_at
-     FROM school_invites si
-     JOIN tenants t ON t.id = si.tenant_id
-     JOIN users inv ON inv.id = si.used_by_user_id
-     WHERE t.owner_id = ? AND si.used_by_user_id IS NOT NULL
-       AND si.used_by_user_id NOT IN (SELECT invitee_id FROM referrals WHERE inviter_id = ?)
-     ORDER BY invited_at DESC`
-  ).all(id, id).map(r => ({ ...r, is_blocked: !!r.is_blocked }));
   return {
     ...safe,
     online: !!safe.online, is_admin: !!safe.is_admin, is_super: !!safe.is_super,
     is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password,
-    invitees: [...invitees, ...schoolInvitees],
+    invitees: getAdminInviteesList(id),
   };
 }
 

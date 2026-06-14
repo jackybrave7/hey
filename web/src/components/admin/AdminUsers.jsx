@@ -184,7 +184,7 @@ export default function AdminUsers() {
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('total_moments')}>Моменты{sortIcon('total_moments')}</th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}}
                   onClick={() => toggleSort('invited_total')}
-                  title="Пригласил всего (подтверждённых — написали первое сообщение)">
+                  title="Пригласил: личная ссылка, группы, школа (AWO). В скобках — написали первое сообщение">
                   Привёл{sortIcon('invited_total')}
                 </th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('created_at')}>Зарегистрирован{sortIcon('created_at')}</th>

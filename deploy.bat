@@ -24,9 +24,10 @@ git add -A
 git diff --cached --quiet
 if errorlevel 1 (
     git commit -m "deploy: %date% %time%"
-    git -c http.sslVerify=false push
+    call :git_push_retry
     if errorlevel 1 (
-        echo ERROR: git push failed
+        echo ERROR: git push failed after retries
+        echo Check internet/DNS and run: git push
         pause
         exit /b 1
     )
@@ -62,3 +63,16 @@ echo.
 echo === Done! http://72.56.16.44 ===
 echo.
 pause
+exit /b 0
+
+:git_push_retry
+git -c http.sslVerify=false push
+if not errorlevel 1 exit /b 0
+echo WARN: push failed, retry in 5s...
+timeout /t 5 /nobreak >nul
+git -c http.sslVerify=false push
+if not errorlevel 1 exit /b 0
+echo WARN: push failed again, retry in 15s...
+timeout /t 15 /nobreak >nul
+git -c http.sslVerify=false push
+exit /b %errorlevel%
