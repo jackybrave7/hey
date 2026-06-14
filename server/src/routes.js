@@ -124,6 +124,12 @@ function s3DeleteEnabled() {
   return process.env.S3_SWEEP_ALLOW_DELETE === '1';
 }
 
+// Ручное удаление из админ-галереи — только confirm-токен + requireAdmin.
+// Авто-sweep по-прежнему требует S3_SWEEP_ALLOW_DELETE=1.
+function adminManualS3DeleteAllowed(req, expected) {
+  return hasS3DeleteConfirmation(req, expected);
+}
+
 function hasS3DeleteConfirmation(req, expected) {
   return req.body?.confirm === expected || req.query?.confirm === expected;
 }
@@ -2281,12 +2287,9 @@ module.exports = function makeRouter(db, broadcast) {
   r.delete('/admin/s3/object', requireAdmin, async (req, res) => {
     const key = req.body?.key || req.query?.key;
     if (!key) return res.status(400).json({ error: 'key required' });
-    if (!s3DeleteEnabled() || !hasS3DeleteConfirmation(req, 'DELETE_S3_OBJECT')) {
+    if (!adminManualS3DeleteAllowed(req, 'DELETE_S3_OBJECT')) {
       return res.status(403).json({
-        error: 'S3 delete disabled',
-        dryRun: true,
-        allowDelete: false,
-        requiredEnv: 'S3_SWEEP_ALLOW_DELETE=1',
+        error: 'Подтверждение удаления не получено',
         requiredConfirm: 'DELETE_S3_OBJECT',
         key,
       });
@@ -2307,15 +2310,11 @@ module.exports = function makeRouter(db, broadcast) {
     const keys = Array.isArray(req.body?.keys) ? req.body.keys.filter(k => typeof k === 'string' && k) : [];
     if (!keys.length) return res.status(400).json({ error: 'keys required' });
     if (keys.length > 1000) return res.status(400).json({ error: 'максимум 1000 ключей за раз' });
-    if (!s3DeleteEnabled() || !hasS3DeleteConfirmation(req, 'DELETE_S3_OBJECTS')) {
+    if (!adminManualS3DeleteAllowed(req, 'DELETE_S3_OBJECTS')) {
       return res.status(403).json({
-        error: 'S3 bulk delete disabled',
-        dryRun: true,
-        allowDelete: false,
-        requiredEnv: 'S3_SWEEP_ALLOW_DELETE=1',
+        error: 'Подтверждение удаления не получено',
         requiredConfirm: 'DELETE_S3_OBJECTS',
         requested: keys.length,
-        wouldDelete: keys.length,
         deleted: 0,
         errors: 0,
         failed: [],
