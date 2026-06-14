@@ -79,7 +79,7 @@ export default function AdminUsers() {
 
   // id'ы которые реально можно выделить и применить действие — без self и без админов
   const selectableIds = useMemo(
-    () => sortedUsers.filter(u => !u.is_admin).map(u => u.id),
+    () => sortedUsers.filter(u => !u.is_admin && !u.is_super_admin).map(u => u.id),
     [sortedUsers]
   );
   const headerCheckState = useMemo(() => {
@@ -188,12 +188,17 @@ export default function AdminUsers() {
                   Привёл{sortIcon('invited_total')}
                 </th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('created_at')}>Зарегистрирован{sortIcon('created_at')}</th>
+                <th style={{...hcell, cursor:'pointer', userSelect:'none', textAlign:'center'}}
+                  onClick={() => toggleSort('push_devices')}
+                  title="Браузерные push-уведомления (Web Push)">
+                  Push{sortIcon('push_devices')}
+                </th>
                 <th style={hcell}>Статус</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 && (
-                <tr><td colSpan={7} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
+                <tr><td colSpan={8} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
                   Пусто
                 </td></tr>
               )}
@@ -204,7 +209,7 @@ export default function AdminUsers() {
                   onMouseEnter={e => e.currentTarget.style.background = bulk.has(u.id) ? 'rgba(95, 64, 128,.16)' : 'rgba(249,240,240,.04)'}
                   onMouseLeave={e => e.currentTarget.style.background = bulk.has(u.id) ? 'rgba(95, 64, 128,.10)' : 'transparent'}>
                   <td style={cell} onClick={(e) => e.stopPropagation()}>
-                    {u.is_admin
+                    {u.is_admin || u.is_super_admin
                       ? <span style={{ color:'rgba(249,240,240,.2)', fontSize: 11 }}>—</span>
                       : <Checkbox checked={bulk.has(u.id)} onClick={() => bulk.toggle(u.id)} title="Выделить"/>}
                   </td>
@@ -227,7 +232,8 @@ export default function AdminUsers() {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ color:'#F9F0F0', fontWeight: 600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{u.name}</div>
                         <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-                          {u.is_admin && <span style={{ color: 'rgba(180,140,255,.8)', fontSize: 11 }}>admin</span>}
+                          {u.is_super_admin && <span style={{ color: 'rgba(255,220,140,.95)', fontSize: 11 }}>суперадмин</span>}
+                          {u.is_admin && !u.is_super_admin && <span style={{ color: 'rgba(180,140,255,.8)', fontSize: 11 }}>admin</span>}
                           {u.is_super && (
                             <span style={{ color: 'rgba(255,200,80,.9)', fontSize: 11 }}
                               title={u.super_expires_at
@@ -259,6 +265,21 @@ export default function AdminUsers() {
                     ) : <span style={{color:'rgba(249,240,240,.25)'}}>—</span>}
                   </td>
                   <td style={cell}>{fmtDate(u.created_at)}</td>
+                  <td style={{ ...cell, textAlign: 'center' }}>
+                    {u.push_enabled ? (
+                      <span title={`Push включён · ${u.push_devices} ${u.push_devices === 1 ? 'устройство' : 'устройств'}`}
+                        style={{ display:'inline-flex', alignItems:'center', gap:5,
+                          color:'rgba(110,235,150,.95)', fontSize:12, fontWeight:600 }}>
+                        <Icon name="bell" size={14}/> {u.push_devices}
+                      </span>
+                    ) : (
+                      <span title="Push не подключён (нет подписки в браузере)"
+                        style={{ display:'inline-flex', alignItems:'center', gap:5,
+                          color:'rgba(249,240,240,.25)', fontSize:12 }}>
+                        <Icon name="bell-off" size={14}/> —
+                      </span>
+                    )}
+                  </td>
                   <td style={cell}>
                     {u.is_blocked ? (
                       <span style={{ color: 'rgba(255,100,100,.9)', fontSize: 12, fontWeight: 600,

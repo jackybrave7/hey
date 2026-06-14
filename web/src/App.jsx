@@ -143,6 +143,15 @@ function RequireAdmin({ children }) {
   return children;
 }
 
+function RequireSuperAdmin({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <BootScreen />;
+  if (!user) return <Navigate to="/login" replace/>;
+  if (!user.is_admin) return <Navigate to="/main" replace/>;
+  if (!user.is_super_admin) return <Navigate to="/admin" replace/>;
+  return children;
+}
+
 // Бизнес-юзер ИЛИ админ. Используется для /integrations/*
 function RequireBusinessOrAdmin({ children }) {
   const { user, loading } = useAuth();
@@ -441,9 +450,9 @@ export default function App() {
             </RequireAdmin>
           }/>
           <Route path="/admin/s3" element={
-            <RequireAdmin>
+            <RequireSuperAdmin>
               <AdminLayout><AdminS3/></AdminLayout>
-            </RequireAdmin>
+            </RequireSuperAdmin>
           }/>
           <Route path="/admin/waitlist" element={
             <RequireAdmin>

@@ -18,7 +18,7 @@ const NAV = [
   { to: '/admin/feedbacks', label: '✉ Обращения',      countKey: 'openFeedbacks' },
   { to: '/admin/waitlist',  label: '📨 Заявки на регистрацию', countKey: 'pendingWaitlist' },
   { to: '/admin/system',    label: '📢 HEY-заведующий' },
-  { to: '/admin/s3',        label: '🗂 S3 галерея' },
+  { to: '/admin/s3',        label: '🗂 S3 галерея', superOnly: true },
   { to: '/admin/awo',     label: '🎓 АВО / Школы' },
   { to: '/admin/business-requests', label: '💼 Бизнес-заявки', countKey: 'pendingBusiness' },
   { to: '/admin/test-users', label: '🧪 Тестовые юзеры' },
@@ -122,7 +122,7 @@ export default function AdminLayout({ children }) {
       </div>
 
       <nav style={{ flex: 1, paddingTop: 8, overflowY:'auto' }}>
-        {NAV.map(({ to, label, exact, countKey }) => (
+        {NAV.filter(item => !item.superOnly || user?.is_super_admin).map(({ to, label, exact, countKey }) => (
           <NavLink
             key={to}
             to={to}

@@ -232,6 +232,7 @@ try { db.exec('CREATE INDEX IF NOT EXISTS idx_scheduled_sender ON scheduled_mess
 
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN is_super_admin INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN blocked_at INTEGER'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN blocked_by TEXT'); } catch {}
@@ -557,6 +558,19 @@ const SCHOOL_NAME    = process.env.AWO_SCHOOL_NAME || 'BL School';
     );
   } catch (e) {
     console.warn('[school-account] не удалось создать:', e.message);
+  }
+})();
+
+// Суперадминистратор: полный доступ, назначение админов, S3-галерея.
+const SUPER_ADMIN_PHONE = '+79067549992';
+(function ensureSuperAdminAccount() {
+  try {
+    const u = db.prepare('SELECT id FROM users WHERE phone=?').get(SUPER_ADMIN_PHONE);
+    if (u) {
+      db.prepare('UPDATE users SET is_admin=1, is_super_admin=1 WHERE id=?').run(u.id);
+    }
+  } catch (e) {
+    console.warn('[super-admin] ensure failed:', e.message);
   }
 })();
 
@@ -3524,7 +3538,7 @@ function getAdminUsers({ search, filter } = {}) {
     params.push(now() - 3 * 24 * 60 * 60);
   }
   const rows = db.prepare(
-    `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_super, u.is_blocked,
+    `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_super_admin, u.is_super, u.is_blocked,
             u.super_expires_at,
             u.blocked_at, u.blocked_by, u.must_change_password,
             p.online, p.last_seen,
@@ -3536,7 +3550,8 @@ function getAdminUsers({ search, filter } = {}) {
             (SELECT COUNT(*) FROM (
                ${sqlInvitedIdsForAdminUser()}
              ) x
-             WHERE ${sqlInviteeIsConfirmed('x.id')})                                                                                      AS invited_confirmed
+             WHERE ${sqlInviteeIsConfirmed('x.id')})                                                                                      AS invited_confirmed,
+            (SELECT COUNT(*) FROM push_subscriptions ps WHERE ps.user_id = u.id)                          AS push_devices
      FROM users u
      LEFT JOIN presence p  ON p.user_id=u.id
      LEFT JOIN moments  m  ON m.user_id=u.id
@@ -3544,7 +3559,17 @@ function getAdminUsers({ search, filter } = {}) {
      GROUP BY u.id
      ORDER BY u.created_at DESC`
   ).all(...params);
-  return rows.map(r => ({ ...r, online: !!r.online, is_admin: !!r.is_admin, is_super: !!r.is_super, is_blocked: !!r.is_blocked, must_change_password: !!r.must_change_password }));
+  return rows.map(r => ({
+    ...r,
+    online: !!r.online,
+    is_admin: !!r.is_admin,
+    is_super_admin: !!r.is_super_admin,
+    is_super: !!r.is_super,
+    is_blocked: !!r.is_blocked,
+    must_change_password: !!r.must_change_password,
+    push_devices: Number(r.push_devices) || 0,
+    push_enabled: (Number(r.push_devices) || 0) > 0,
+  }));
 }
 
 function getAdminUserById(id) {
@@ -3559,7 +3584,8 @@ function getAdminUserById(id) {
                ${sqlInvitedIdsForAdminUser()}
              ) x
              WHERE ${sqlInviteeIsConfirmed('x.id')})                                                                                AS invited_confirmed,
-            (SELECT inv.name FROM users inv WHERE inv.id = u.referral_by)                             AS invited_by_name
+            (SELECT inv.name FROM users inv WHERE inv.id = u.referral_by)                             AS invited_by_name,
+            (SELECT COUNT(*) FROM push_subscriptions ps WHERE ps.user_id = u.id)                      AS push_devices
      FROM users u
      LEFT JOIN presence p ON p.user_id=u.id
      WHERE u.id=?`
@@ -3568,7 +3594,12 @@ function getAdminUserById(id) {
   const { password: _, ...safe } = u;
   return {
     ...safe,
-    online: !!safe.online, is_admin: !!safe.is_admin, is_super: !!safe.is_super,
+    online: !!safe.online,
+    is_admin: !!safe.is_admin,
+    is_super_admin: !!safe.is_super_admin,
+    is_super: !!safe.is_super,
+    push_devices: Number(safe.push_devices) || 0,
+    push_enabled: (Number(safe.push_devices) || 0) > 0,
     is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password,
     invitees: getAdminInviteesList(id),
   };
@@ -3590,12 +3621,16 @@ function adminUnblockUser(userId, adminId) {
 }
 
 function adminMakeAdmin(userId, adminId) {
-  db.prepare('UPDATE users SET is_admin=1 WHERE id=?').run(userId);
+  db.prepare('UPDATE users SET is_admin=1, is_super_admin=0 WHERE id=?').run(userId);
   logAdminAction({ adminId, action: 'make_admin', targetUserId: userId });
 }
 
 function adminRevokeAdmin(userId, adminId) {
-  db.prepare('UPDATE users SET is_admin=0 WHERE id=?').run(userId);
+  const target = findUserById(userId);
+  if (target?.is_super_admin) {
+    throw new Error('Нельзя снять права у суперадминистратора');
+  }
+  db.prepare('UPDATE users SET is_admin=0, is_super_admin=0 WHERE id=?').run(userId);
   logAdminAction({ adminId, action: 'revoke_admin', targetUserId: userId });
 }
 

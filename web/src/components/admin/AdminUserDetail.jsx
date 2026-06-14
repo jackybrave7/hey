@@ -177,6 +177,7 @@ export default function AdminUserDetail() {
   if (!user)   return <div style={{ padding: 32, color: 'rgba(249,240,240,.4)' }}>Не найдено</div>;
 
   const isSelf = me?.id === user.id;
+  const iAmSuperAdmin = !!me?.is_super_admin;
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 700 }}>
@@ -205,7 +206,9 @@ export default function AdminUserDetail() {
         <div>
           <h1 style={{ color:'#F9F0F0', fontSize: 22, fontWeight: 800, margin: 0 }}>
             {user.name}
-            {user.is_admin && <span style={{ marginLeft: 8, fontSize: 13, color: 'rgba(180,140,255,.8)',
+            {user.is_super_admin && <span style={{ marginLeft: 8, fontSize: 13, color: 'rgba(255,220,140,.95)',
+              background: 'rgba(200,140,40,.22)', borderRadius: 6, padding: '2px 8px' }}>суперадмин</span>}
+            {user.is_admin && !user.is_super_admin && <span style={{ marginLeft: 8, fontSize: 13, color: 'rgba(180,140,255,.8)',
               background: 'rgba(95, 64, 128,.2)', borderRadius: 6, padding: '2px 8px' }}>admin</span>}
             {user.is_super && <span style={{ marginLeft: 8, fontSize: 13, color: 'rgba(255,200,80,.9)',
               background: 'rgba(255,180,50,.12)', borderRadius: 6, padding: '2px 8px' }}>⭐ super</span>}
@@ -256,6 +259,13 @@ export default function AdminUserDetail() {
           user.is_blocked
             ? `Заблокирован ${fmtDate(user.blocked_at)}`
             : (user.online ? 'Онлайн' : `Был(а) ${fmtDate(user.last_seen)}`)
+        } />
+        <Row label="Push-уведомления" value={
+          user.push_enabled
+            ? <span style={{ color:'rgba(110,235,150,.95)', fontWeight:600 }}>
+                включены · {user.push_devices} {user.push_devices === 1 ? 'устройство' : 'устройств'}
+              </span>
+            : <span style={{ color:'rgba(249,240,240,.4)' }}>не подключены</span>
         } />
         <Row label="✦ Super" value={
           !user.is_super
@@ -356,11 +366,13 @@ export default function AdminUserDetail() {
           )
         )}
 
-        {!isSelf && (
+        {iAmSuperAdmin && !isSelf && (
           user.is_admin ? (
-            <button onClick={handleRevokeAdmin} style={btnStyle('rgba(255,200,50,.2)')}>
-              👑 Снять admin
-            </button>
+            !user.is_super_admin ? (
+              <button onClick={handleRevokeAdmin} style={btnStyle('rgba(255,200,50,.2)')}>
+                👑 Снять admin
+              </button>
+            ) : null
           ) : (
             <button onClick={handleMakeAdmin} style={btnStyle('rgba(95, 64, 128,.3)')}>
               👑 Назначить admin

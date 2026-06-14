@@ -26,6 +26,15 @@ function requireAdmin(req, res, next) {
   });
 }
 
+function requireSuperAdmin(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (!req.adminUser?.is_super_admin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    next();
+  });
+}
+
 // Middleware: проверяет что юзер — бизнес-аккаунт (approved) или админ.
 // Используется для входа в AWO-функционал (управление школами).
 function requireBusinessOrAdmin(req, res, next) {
@@ -466,7 +475,16 @@ module.exports = function makeRouter(db, broadcast) {
     const token = signToken({ id: user.id, phone: user.phone, name: user.name });
     setSessionCookie(res, token);
     const { password: _, ...safe } = user;
-    res.json({ token, user: safe, restored });
+    res.json({
+      token,
+      user: {
+        ...safe,
+        is_admin: !!safe.is_admin,
+        is_super_admin: !!safe.is_super_admin,
+        is_super: !!safe.is_super,
+      },
+      restored,
+    });
   });
 
   // Logout — очищает cookie-сессию (JWT в localStorage клиент чистит сам)
@@ -626,6 +644,9 @@ module.exports = function makeRouter(db, broadcast) {
     const inv = db.getInvitedCounts(user.id);
     res.json({
       ...safe, achievements,
+      is_admin: !!safe.is_admin,
+      is_super_admin: !!safe.is_super_admin,
+      is_super: !!safe.is_super,
       tenants_accessible: tenantsAccessible,
       invited_total: inv.total,
       invited_confirmed: inv.confirmed,
@@ -2225,7 +2246,7 @@ module.exports = function makeRouter(db, broadcast) {
   // флаг orphan (на него не ссылается ни одно живое сообщение/момент/аватар).
   // Возвращаем url (публичный, через S3_PUBLIC_URL_BASE) — для админа этого
   // достаточно, presign не нужен.
-  r.get('/admin/s3/list', requireAdmin, async (req, res) => {
+  r.get('/admin/s3/list', requireSuperAdmin, async (req, res) => {
     try {
       const prefixes = ['chat/', 'moments/', 'avatars/', 'group-icons/'];
       const base = (process.env.S3_PUBLIC_URL_BASE || 'https://s3.twcstorage.ru/heymessenger').replace(/\/$/, '');
@@ -2284,7 +2305,7 @@ module.exports = function makeRouter(db, broadcast) {
   // Удалить один объект по ключу (для разовых ручных правок). Без проверки
   // ссылок — админ берёт ответственность сам. Если в БД есть живое
   // сообщение/момент/аватар на этот ключ — превью у юзера сломается.
-  r.delete('/admin/s3/object', requireAdmin, async (req, res) => {
+  r.delete('/admin/s3/object', requireSuperAdmin, async (req, res) => {
     const key = req.body?.key || req.query?.key;
     if (!key) return res.status(400).json({ error: 'key required' });
     if (!adminManualS3DeleteAllowed(req, 'DELETE_S3_OBJECT')) {
@@ -2306,7 +2327,7 @@ module.exports = function makeRouter(db, broadcast) {
   // Пакетное удаление. Принимает { keys: [...] }. Идёт последовательно,
   // чтобы не упереться в rate-limit S3-провайдера; собирает per-key
   // ok/error для отчёта в UI.
-  r.post('/admin/s3/objects/delete', requireAdmin, async (req, res) => {
+  r.post('/admin/s3/objects/delete', requireSuperAdmin, async (req, res) => {
     const keys = Array.isArray(req.body?.keys) ? req.body.keys.filter(k => typeof k === 'string' && k) : [];
     if (!keys.length) return res.status(400).json({ error: 'keys required' });
     if (keys.length > 1000) return res.status(400).json({ error: 'максимум 1000 ключей за раз' });
@@ -2329,7 +2350,7 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ requested: keys.length, deleted, errors, failed });
   });
 
-  r.post('/admin/system/s3-sweep', requireAdmin, async (req, res) => {
+  r.post('/admin/system/s3-sweep', requireSuperAdmin, async (req, res) => {
     try {
       const minAgeHours = parseInt(req.query.minAgeHours);
       const allowDelete = s3DeleteEnabled() && hasS3DeleteConfirmation(req, 'DELETE_S3_ORPHANS');
@@ -2674,7 +2695,7 @@ module.exports = function makeRouter(db, broadcast) {
     const user = db.findUserById(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
     if (user.id === req.user.id) return res.status(400).json({ error: 'Нельзя удалить свой аккаунт через админку' });
-    if (user.is_admin)             return res.status(400).json({ error: 'Сначала снимите права администратора' });
+    if (user.is_admin || user.is_super_admin) return res.status(400).json({ error: 'Сначала снимите права администратора' });
     db.deleteUserAccount(req.params.id);
     if (db.logAdminAction) db.logAdminAction({
       adminId: req.user.id,
@@ -2685,19 +2706,25 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
-  r.post('/admin/users/:id/make-admin', requireAdmin, (req, res) => {
+  r.post('/admin/users/:id/make-admin', requireSuperAdmin, (req, res) => {
     const user = db.findUserById(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
+    if (user.is_blocked) return res.status(400).json({ error: 'Пользователь заблокирован' });
     db.adminMakeAdmin(req.params.id, req.user.id);
     res.json({ ok: true });
   });
 
-  r.post('/admin/users/:id/revoke-admin', requireAdmin, (req, res) => {
+  r.post('/admin/users/:id/revoke-admin', requireSuperAdmin, (req, res) => {
     const user = db.findUserById(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
     if (user.id === req.user.id) return res.status(400).json({ error: 'Cannot revoke your own admin' });
-    db.adminRevokeAdmin(req.params.id, req.user.id);
-    res.json({ ok: true });
+    if (user.is_super_admin) return res.status(400).json({ error: 'Нельзя снять права у суперадминистратора' });
+    try {
+      db.adminRevokeAdmin(req.params.id, req.user.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
   });
 
   r.post('/admin/users/:id/make-super', requireAdmin, (req, res) => {
@@ -2800,6 +2827,9 @@ module.exports = function makeRouter(db, broadcast) {
     const target = db.findUserById(req.params.id);
     if (!target) return res.status(404).json({ error: 'Not found' });
     if (target.id === req.user.id) return res.status(400).json({ error: 'Нельзя удалить себя' });
+    if (target.is_admin || target.is_super_admin) {
+      return res.status(400).json({ error: 'Сначала снимите права администратора' });
+    }
     try {
       const { s3Keys, s3Prefixes } = db.hardDeleteUserAccount(req.params.id);
       for (const k of s3Keys)     { try { await storage.deleteFile(k); }   catch (e) { console.error('[hard-delete user S3 key]', e.message); } }
@@ -2843,7 +2873,7 @@ module.exports = function makeRouter(db, broadcast) {
       const u = db.findUserById(id);
       if (!u) throw new Error('Not found');
       if (u.id === req.user.id) throw new Error('Нельзя применить к себе');
-      if ((action === 'delete' || action === 'hard_delete') && u.is_admin) {
+      if ((action === 'delete' || action === 'hard_delete') && (u.is_admin || u.is_super_admin)) {
         throw new Error('Сначала снимите права администратора');
       }
       if (action === 'block')   return db.adminBlockUser(id, req.user.id, reason);
