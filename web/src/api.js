@@ -219,6 +219,7 @@ export const api = {
   adminSystemMoment:       (data)          => req('POST',   '/admin/system/moment', data),
   adminSystemBroadcast:    (text, attachment) => req('POST', '/admin/system/broadcast', { text, attachment }),
   adminSystemListMoments:  ()              => req('GET',    '/admin/system/moments'),
+  adminSystemMomentReactors: (id)           => req('GET',    `/admin/system/moments/${id}/reactors`),
   adminSystemListBroadcasts: ()            => req('GET',    '/admin/system/broadcasts'),
   adminSystemEditMoment:   (id, data)      => req('PATCH',  `/admin/system/moments/${id}`, data),
   adminSystemDeleteMoment: (id)            => req('DELETE', `/admin/system/moments/${id}`),

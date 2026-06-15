@@ -447,18 +447,24 @@ export default function MomentDetailPopup({
   // кто-то поставил «резонирует» — пока не закроет/откроет.
   useEffect(() => {
     if (!moment?.id) return;
-    const off = socket.on('moment:reaction', ({ momentId }) => {
-      if (momentId !== moment.id) return;
-      api.getMoment(momentId).then(fresh => {
+    const refresh = () => {
+      api.getMoment(moment.id).then(fresh => {
         if (fresh) setMoment(prev => prev?.id === fresh.id ? { ...prev, ...fresh } : prev);
       }).catch(() => {});
-      // Список реакторов (для авторов в Super) тоже актуализируем.
       const mine = moment.user_id === currentUser?.id;
       if (mine && moment.author_is_super) {
         api.getMomentReactors(moment.id).then(setReactors).catch(() => {});
       }
+    };
+    const offRx   = socket.on('moment:reaction', ({ momentId }) => {
+      if (momentId !== moment.id) return;
+      refresh();
     });
-    return () => off();
+    const offView = socket.on('moment:view', ({ momentId }) => {
+      if (momentId !== moment.id) return;
+      refresh();
+    });
+    return () => { offRx(); offView(); };
   }, [moment?.id, moment?.user_id, moment?.author_is_super, currentUser?.id]);
 
   const goPrev = useCallback(() => { if (canPrev) setIdx(i => i - 1); }, [canPrev]);

@@ -707,6 +707,61 @@ function markReferralFromInviter(inviterId, inviteeId) {
   })();
 }
 
+function inviteeHasReferralAttribution(inviteeId) {
+  if (db.prepare('SELECT 1 FROM referrals WHERE invitee_id=?').get(inviteeId)) return true;
+  const u = findUserById(inviteeId);
+  return !!(u?.referral_by);
+}
+
+function inviteeHasAnyInviterSignal(inviteeId) {
+  if (inviteeHasReferralAttribution(inviteeId)) return true;
+  return !!db.prepare(
+    `SELECT 1 FROM members
+     WHERE user_id=? AND invited_by IS NOT NULL AND invited_by != user_id
+     LIMIT 1`
+  ).get(inviteeId);
+}
+
+/** Записать «привёл», если у invitee ещё нет атрибуции (ссылка / группа / контакт). */
+function attributeReferralIfUnassigned(inviterId, inviteeId) {
+  if (!inviterId || !inviteeId || inviterId === inviteeId) return false;
+  if (inviteeHasAnyInviterSignal(inviteeId)) return false;
+  markReferralFromInviter(inviterId, inviteeId);
+  return true;
+}
+
+/** Дозаполнить referrals для одного inviter из members / referral_by. */
+function backfillInviterReferrals(inviterId) {
+  if (!inviterId) return 0;
+  let n = 0;
+  const members = db.prepare(
+    `SELECT user_id FROM members
+     WHERE invited_by=? AND status IN ('active','pending')`
+  ).all(inviterId);
+  for (const m of members) {
+    const had = db.prepare(
+      'SELECT 1 FROM referrals WHERE inviter_id=? AND invitee_id=?'
+    ).get(inviterId, m.user_id);
+    if (!had) { markReferralFromInviter(inviterId, m.user_id); n++; }
+  }
+  const byField = db.prepare(
+    'SELECT id FROM users WHERE referral_by=? AND is_deleted=0'
+  ).all(inviterId);
+  for (const u of byField) {
+    const had = db.prepare(
+      'SELECT 1 FROM referrals WHERE inviter_id=? AND invitee_id=?'
+    ).get(inviterId, u.id);
+    if (!had) { markReferralFromInviter(inviterId, u.id); n++; }
+  }
+  const contacts = db.prepare(
+    'SELECT contact_id AS id FROM contacts WHERE owner_id=?'
+  ).all(inviterId);
+  for (const c of contacts) {
+    if (attributeReferralIfUnassigned(inviterId, c.id)) n++;
+  }
+  return n;
+}
+
 /** Засчитать ученика школе (tenant → account_id / system_school_bl). */
 function creditSchoolReferral(tenantId, userId) {
   if (!userId) return;
@@ -1424,7 +1479,10 @@ function createGroup({ creatorId, name, icon, memberIds }) {
     // Остальные — pending (ждут подтверждения)
     const insInvited = db.prepare(`INSERT OR IGNORE INTO members
       (conversation_id,user_id,joined_at,status,invited_by) VALUES (?,?,?,'pending',?)`);
-    invitees.forEach(uid => insInvited.run(id, uid, t, creatorId));
+    invitees.forEach(uid => {
+      insInvited.run(id, uid, t, creatorId);
+      try { markReferralFromInviter(creatorId, uid); } catch {}
+    });
   })();
   return { id, invitedIds: invitees };
 }
@@ -1469,6 +1527,7 @@ function joinGroupViaInvite(convId, userId, invitedBy) {
     // pending → переводим в active
     db.prepare(`UPDATE members SET status='active', joined_at=? WHERE conversation_id=? AND user_id=?`)
       .run(now(), convId, userId);
+    try { markReferralFromInviter(invitedBy || conv.admin_id, userId); } catch {}
     return { alreadyActive: false, fromPending: true };
   }
   // Лимит размера группы.
@@ -1478,6 +1537,7 @@ function joinGroupViaInvite(convId, userId, invitedBy) {
   db.prepare(`INSERT INTO members (conversation_id,user_id,joined_at,status,invited_by)
      VALUES (?,?,?,'active',?)`)
     .run(convId, userId, now(), invitedBy || conv.admin_id);
+  try { markReferralFromInviter(invitedBy || conv.admin_id, userId); } catch {}
   return { alreadyActive: false, fromPending: false };
 }
 
@@ -2888,12 +2948,18 @@ function _withStatsBatch(moments) {
   });
   viewRows.forEach(r => { viewMap[r.moment_id] = r.cnt; });
 
-  return moments.map(m => ({
-    ...m,
-    stats:          rxMap[m.id]   ?? { see: 0, resonate: 0, talk: 0 },
-    views:          viewMap[m.id] ?? 0,
-    author_is_super: !!(m.author_is_super), // already JOINed in the SELECT below
-  }));
+  return moments.map(m => {
+    const stats = rxMap[m.id] ?? { see: 0, resonate: 0, talk: 0 };
+    const passiveViews = viewMap[m.id] ?? 0;
+    // «Вижу» хранится в moment_reactions и исключается из passiveViews —
+    // для UI складываем, чтобы счётчик глаза = все, кто увидел момент.
+    return {
+      ...m,
+      stats,
+      views: passiveViews + stats.see,
+      author_is_super: !!(m.author_is_super),
+    };
+  });
 }
 
 // ── Saved moments (talk reaction = bookmark) ──────────────────────────────────
@@ -3099,6 +3165,12 @@ function getDisciplinesCloud(userId) {
 }
 
 // ── Admin ──────────────────────────────────────────────────────────────────
+
+function getAdminIds() {
+  return db.prepare(
+    "SELECT id FROM users WHERE is_admin=1 AND is_blocked=0 AND is_deleted=0"
+  ).all().map(r => r.id);
+}
 
 function getAdminStats() {
   const users   = db.prepare('SELECT COUNT(*) as c FROM users WHERE is_deleted = 0').get().c;
@@ -3580,6 +3652,9 @@ function getAdminUsers({ search, filter } = {}) {
 }
 
 function getAdminUserById(id) {
+  try { backfillInviterReferrals(id); } catch (e) {
+    console.warn('[referral] inviter backfill failed:', e.message);
+  }
   const u = db.prepare(
     `SELECT u.*, p.online, p.last_seen,
             (SELECT COUNT(*) FROM moments WHERE user_id=u.id AND status!='deleted') AS total_moments,
@@ -4359,7 +4434,9 @@ module.exports = {
   setOnline, getPresence,
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes, updateContactNickname,
-  getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter, creditSchoolReferral, creditGroupInviterReferral,
+  getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter,
+  attributeReferralIfUnassigned, backfillInviterReferrals,
+  creditSchoolReferral, creditGroupInviterReferral,
   rotateInviteCode, resolveInviterByInviteRef,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   getTotalUnreadFor,
@@ -4402,7 +4479,7 @@ module.exports = {
   getEnabledOnboardingMessages, getUsersDueForOnboarding, markOnboardingSent,
   onboardingDelaySeconds,
   // Admin
-  getAdminStats, getAdminUsers, getAdminUserById,
+  getAdminStats, getAdminIds, getAdminUsers, getAdminUserById,
   getAdminGroups, getAdminGroupDetail,
   adminResetPassword, adminBlockUser, adminUnblockUser,
   adminMakeAdmin, adminRevokeAdmin, makeUserSuper, revokeUserSuper,

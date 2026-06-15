@@ -78,6 +78,32 @@ export function ConversationsScreen() {
   const [searchMsgs, setSearchMsgs] = useState(null); // null | array
   const [searchLoading, setSearchLoading] = useState(false);
 
+  function closeChatsSearch() {
+    setSearch('');
+    setSearchOpen(false);
+  }
+
+  // Тап/клик в пустое место — закрыть поиск (как эмодзи-клавиатура в чате).
+  useEffect(() => {
+    if (!searchOpen) return;
+    const close = (e) => {
+      if (e.target.closest('[data-chats-search-ui]')) return;
+      if (e.target.closest('[data-conv-row]')) return;
+      if (e.target.closest('[data-search-msg-row]')) return;
+      if (e.target.closest('button, input, textarea, a, [data-chats-menu]')) return;
+      closeChatsSearch();
+    };
+    const t = setTimeout(() => {
+      document.addEventListener('mousedown', close);
+      document.addEventListener('touchstart', close, { passive: true });
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [searchOpen]);
+
   useEffect(() => {
     const q = search.trim();
     if (q.length < 2) { setSearchMsgs(null); return; }
@@ -162,6 +188,7 @@ export function ConversationsScreen() {
     }
 
     async function handleRowClick() {
+      closeChatsSearch();
       if (isRequest) {
         if (!c.partner_id) { nav(`/chat/${c.id}`); return; }
         setRequestCardLoading(true);
@@ -182,6 +209,7 @@ export function ConversationsScreen() {
     return (
       <>
       <div
+        data-conv-row
         onClick={(e) => {
           if (longPressFired.current) {
             longPressFired.current = false;
@@ -348,7 +376,7 @@ export function ConversationsScreen() {
               { label:'Архив', iconName:'archive', onClick: () => setShowArchive(true) },
             ]}
             trigger={
-              <div className="topbar-dots">
+              <div className="topbar-dots" data-chats-menu>
                 {[0,1,2].map(i => <div key={i} className="topbar-dot"/>)}
               </div>
             }
@@ -360,13 +388,13 @@ export function ConversationsScreen() {
 
         {/* Поиск по чатам и сообщениям — показывается по клику в три точки */}
         {searchOpen && (
-        <div style={{padding:'12px 20px',position:'relative'}}>
+        <div data-chats-search-ui style={{padding:'12px 20px',position:'relative'}}>
           <input
             id="hey-chats-search"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Поиск по чатам, сообщениям"
-            onKeyDown={e => { if (e.key === 'Escape') { setSearch(''); setSearchOpen(false); } }}
+            onKeyDown={e => { if (e.key === 'Escape') closeChatsSearch(); }}
             style={{
               width:'100%', boxSizing:'border-box',
               background:'rgba(249,240,240,.08)', border:'1px solid rgba(249,240,240,.14)',
@@ -378,7 +406,7 @@ export function ConversationsScreen() {
             onBlur={e=>e.target.style.borderColor='rgba(249,240,240,.14)'}
           />
           {/* Кнопка закрыть поиск целиком */}
-          <button onClick={() => { setSearch(''); setSearchOpen(false); }}
+          <button onClick={closeChatsSearch}
             title="Закрыть поиск"
             style={{
               position:'absolute',right:30,top:'50%',transform:'translateY(-50%)',
@@ -423,7 +451,11 @@ export function ConversationsScreen() {
                   const c = convsById[m.conversation_id];
                   if (!c) return null;
                   return (
-                    <div key={m.id} onClick={() => nav(`/chat/${c.id}`)}
+                    <div key={m.id} data-search-msg-row onClick={() => {
+                        closeChatsSearch();
+                        setConvs(prev => prev.map(x => x.id === c.id ? { ...x, unread_count: 0 } : x));
+                        nav(`/chat/${m.conversation_id}?msg=${encodeURIComponent(m.id)}`);
+                      }}
                       style={{
                         display:'flex',alignItems:'flex-start',gap:12,padding:'10px 20px',
                         cursor:'pointer',borderBottom:'1px solid rgba(249,240,240,.04)',

@@ -1,6 +1,6 @@
 // AdminSystem.jsx — публикации от лица HEY-заведующего
 import { useState, useEffect, useRef } from 'react';
-import { api } from '../../api';
+import { api, socket } from '../../api';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 import { useConfirm } from '../shared/Confirm';
 import Icon from '../Icon';
@@ -79,7 +79,7 @@ function ManagePublished() {
     setReactors(null);
     setReactorsLoading(true);
     try {
-      setReactors(await api.getMomentReactors(momentId));
+      setReactors(await api.adminSystemMomentReactors(momentId));
     } catch (e) {
       showMsg('Ошибка: ' + e.message);
       setReactorsModal(null);
@@ -88,6 +88,18 @@ function ManagePublished() {
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    function refreshStats({ momentId }) {
+      if (!momentId) return;
+      api.adminSystemListMoments()
+        .then(ms => setMoments(ms))
+        .catch(() => {});
+    }
+    const offView = socket.on('moment:view', refreshStats);
+    const offRx   = socket.on('moment:reaction', refreshStats);
+    return () => { offView(); offRx(); };
+  }, []);
 
   if (loading) return <div style={{padding:20,color:'rgba(249,240,240,.5)'}}>Загрузка…</div>;
 

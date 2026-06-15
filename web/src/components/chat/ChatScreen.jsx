@@ -135,6 +135,11 @@ export function ChatScreen() {
   const [accepting,    setAccepting]    = useState(false);
   const [declining,    setDeclining]    = useState(false);
   const [reactionPicker,setReactionPicker] = useState(null); // { msgId, x, y }
+  const blockLightboxUntil = useRef(0);
+  // pointerdown на эмодзи вызывает toggle → ре-рендер → локальный
+  // handledPointerDown в Item сбрасывается → click снимает реакцию обратно.
+  const reactionPickPointerRef = useRef(false);
+  const lastToggleRxnRef = useRef({ key: '', at: 0 });
   const [flashMsgId,    setFlashMsgId]    = useState(null);  // id сообщения, которое подсвечивается
   const [customConfirm, confirmModal] = useConfirm();
   const [isContact,    setIsContact]    = useState(false); // is partner in my contacts?
@@ -270,7 +275,10 @@ export function ChatScreen() {
   // Закрытие пикера реакций — bubble-phase click (не capture: иначе
   // document-listener успевает размонтировать пикер до onClick на эмодзи).
   useEffect(() => {
-    if (!reactionPicker) return;
+    if (!reactionPicker) {
+      reactionPickPointerRef.current = false;
+      return;
+    }
     const close = (e) => {
       if (!e.target.closest('[data-reaction-picker], [data-react-btn]')) setReactionPicker(null);
     };
@@ -1246,6 +1254,11 @@ export function ChatScreen() {
 
   const toggleReaction = useCallback((msgId, emoji) => {
     if (!user?.id || !convId || !msgId || !emoji) return;
+    const dedupeKey = `${msgId}:${emoji}`;
+    const now = Date.now();
+    if (lastToggleRxnRef.current.key === dedupeKey
+        && now - lastToggleRxnRef.current.at < 500) return;
+    lastToggleRxnRef.current = { key: dedupeKey, at: now };
     const uid = user.id;
     setMessages(prev => prev.map(m => {
       if (m.id !== msgId) return m;
@@ -1265,9 +1278,10 @@ export function ChatScreen() {
       }
       return { ...m, reactions };
     }));
-    // После pointerDown пикер нельзя снимать синхронно — иначе click
-    // «проваливается» на картинку под пикером и открывает лайтбокс.
-    setTimeout(() => setReactionPicker(null), 0);
+    // После выбора эмодзи пикер нельзя снимать сразу — на мобилках
+    // синтетический click «пробивает» на картинку под пикером.
+    blockLightboxUntil.current = Date.now() + 450;
+    setTimeout(() => setReactionPicker(null), 350);
     api.toggleReaction(convId, msgId, emoji)
       .then(res => {
         if (res?.reactions) {
@@ -1363,6 +1377,26 @@ export function ChatScreen() {
     setSearchQuery('');
     setSearchResults(null);
   }
+
+  // Тап в пустое место — закрыть поиск в переписке.
+  useEffect(() => {
+    if (!searchMode) return;
+    const close = (e) => {
+      if (e.target.closest('[data-chat-search-ui]')) return;
+      if (e.target.closest('[data-chat-search-hit]')) return;
+      if (e.target.closest('button, input, textarea, a, [data-chat-menu]')) return;
+      closeSearch();
+    };
+    const t = setTimeout(() => {
+      document.addEventListener('mousedown', close);
+      document.addEventListener('touchstart', close, { passive: true });
+    }, 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [searchMode]);
 
   async function handleAddContact() {
     if (!partner.id) return;
@@ -1547,6 +1581,7 @@ export function ChatScreen() {
   // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
   const handleOpenMenu  = useCallback((e, m) => openMsgMenu(e, m), []);
   const handleLightbox  = useCallback((src, urls) => {
+    if (Date.now() < blockLightboxUntil.current) return;
     if (Array.isArray(urls) && urls.length > 1) {
       const idx = Math.max(0, urls.indexOf(src));
       setLightbox({ urls, index: idx });
@@ -1768,7 +1803,7 @@ export function ChatScreen() {
 
       {/* Search bar */}
       {searchMode && (
-        <div style={{ background:'rgba(60,45,90,.8)', flexShrink:0 }}>
+        <div data-chat-search-ui style={{ background:'rgba(60,45,90,.8)', flexShrink:0 }}>
           <div style={{maxWidth:680,margin:'0 auto',display:'flex',alignItems:'center',gap:8,padding:'8px 14px'}}>
             <input ref={searchRef} value={searchQuery}
               onChange={e=>handleSearch(e.target.value)}
@@ -1791,12 +1826,9 @@ export function ChatScreen() {
             : searchResults.map(m => (
                 <div
                   key={m.id}
+                  data-chat-search-hit
                   onClick={() => {
-                    // Закрываем поиск и переходим к сообщению в чате
-                    setSearchMode(false);
-                    setSearchQuery('');
-                    setSearchResults(null);
-                    // Даём Virtuoso перерисоваться, потом скроллим
+                    closeSearch();
                     setTimeout(() => {
                       window.dispatchEvent(new CustomEvent('hey:scroll-to-msg', { detail: m.id }));
                     }, 50);
@@ -2108,8 +2140,8 @@ export function ChatScreen() {
                 {imgPreviews.some(p => p.uploading)
                   ? (editingMsg ? 'Сохранение…' : 'Отправка…')
                   : editingMsg
-                    ? `Редактирование · ${imgPreviews.length} ${imgPreviews.length === 1 ? 'картинка' : 'картинки'}${imgPreviews.length > 1 ? ' · перетащи для порядка' : ''}`
-                    : `${imgPreviews.length} ${imgPreviews.length === 1 ? 'картинка' : 'картинки'}${imgPreviews.length > 1 ? ' · перетащи для порядка' : ''} · добавь подпись или нажми ➤`}
+                    ? `Редактирование · ${imgPreviews.length} ${imgPreviews.length === 1 ? 'картинка' : 'картинки'}${imgPreviews.length > 1 ? ' · удержи и перетащи' : ''}`
+                    : `${imgPreviews.length} ${imgPreviews.length === 1 ? 'картинка' : 'картинки'}${imgPreviews.length > 1 ? ' · удержи и перетащи' : ''} · добавь подпись или нажми ➤`}
               </span>
               <button onClick={() => {
                   if (editingMsg) { cancelEdit(); return; }
@@ -2133,6 +2165,7 @@ export function ChatScreen() {
               imageOpacity={idx => (imgPreviews[idx]?.uploading ? .5 : 1)}
               renderCellExtra={idx => !imgPreviews[idx]?.uploading ? (
                 <button
+                  data-no-reorder
                   onClick={() => {
                     try { URL.revokeObjectURL(imgPreviews[idx].dataUrl); } catch {}
                     setImgPreviews(prev => prev.filter((_, i) => i !== idx));
@@ -2729,7 +2762,6 @@ export function ChatScreen() {
 
         const Item = (name) => {
           const isActive = myReaction === name;
-          let handledPointerDown = false;
           const select = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -2738,12 +2770,12 @@ export function ChatScreen() {
           return (
             <button key={name}
               onPointerDown={(e) => {
-                handledPointerDown = true;
+                reactionPickPointerRef.current = true;
                 select(e);
               }}
               onClick={(e) => {
-                if (handledPointerDown) {
-                  handledPointerDown = false;
+                if (reactionPickPointerRef.current) {
+                  reactionPickPointerRef.current = false;
                   e.preventDefault();
                   e.stopPropagation();
                   return;
@@ -2768,8 +2800,15 @@ export function ChatScreen() {
         };
 
         return (
+          <>
+          <div
+            aria-hidden
+            style={{ position: 'fixed', inset: 0, zIndex: 299 }}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); setReactionPicker(null); }}
+          />
           <div data-reaction-picker
-            onPointerDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onClick={(e) => e.stopPropagation()}
             style={{position:'fixed', left:x, top:y, zIndex:300,
               width: PICKER_W,
@@ -2817,6 +2856,7 @@ export function ChatScreen() {
               }}>⌃</span>
             </button>
           </div>
+          </>
         );
       })()}
 

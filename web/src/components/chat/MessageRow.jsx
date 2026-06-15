@@ -96,7 +96,6 @@ const MessageRow = memo(function MessageRow({
     : audioPlaying && isAudioMsg
       ? (isOut ? 'rgba(128,92,178,.96)' : 'rgba(255,252,250,.98)')
       : (isOut ? 'rgba(110,80,155,.70)' : 'rgba(249,240,240,.90)');
-  const reactionSlotH = isDeleted ? 0 : 26;
 
   return (
     <div
@@ -107,7 +106,7 @@ const MessageRow = memo(function MessageRow({
         // поэтому 36-px смайл-слот вылезает за экран. С width:100% row
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
-        paddingBottom: 14}}
+        paddingBottom: 6}}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
@@ -279,7 +278,14 @@ const MessageRow = memo(function MessageRow({
             );
             return (
               <MediaImage src={src} alt=""
-                onClick={() => onLightbox(src, [src])}
+                onClick={(e) => {
+                  if (reactionPickerMsgId === m.id) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                  }
+                  onLightbox(src, [src]);
+                }}
                 style={{maxWidth:'100%',maxHeight:300,borderRadius:10,
                   display:'block',marginBottom: m.text ? 6 : 2,
                   cursor:'zoom-in'}}/>
@@ -291,7 +297,10 @@ const MessageRow = memo(function MessageRow({
             return (
               <SquareImageGallery
                 urls={urls}
-                onImageClick={(u, all) => onLightbox(u, all)}
+                onImageClick={(u, all) => {
+                  if (reactionPickerMsgId === m.id) return;
+                  onLightbox(u, all);
+                }}
                 style={{ marginBottom: m.text ? 6 : 2 }}
               />
             );
@@ -471,17 +480,15 @@ const MessageRow = memo(function MessageRow({
         )}
         </div>
 
-        {/* Слот под реакции фиксированной высоты — чипы ниже пузыря, без
-            налезания; высота строки не меняется при постановке реакции. */}
-        {reactionSlotH > 0 && (
+        {/* Реакции в потоке — под пузырём, сдвигают следующие сообщения вниз */}
+        {hasReactions && (
           <div style={{
-            minHeight: reactionSlotH,
             marginTop: 4,
             display: 'flex', flexWrap: 'wrap', gap: 4,
             justifyContent: isOut ? 'flex-end' : 'flex-start',
             maxWidth: '100%',
           }}>
-            {hasReactions && Object.entries(m.reactions).map(([emoji, reactors]) => {
+            {Object.entries(m.reactions).map(([emoji, reactors]) => {
               // Бэк-compat: если сервер ещё прислал массив строк (старый
               // формат) — конвертим на лету в объекты-заглушки. Дополнительно
               // фильтруем null/undefined элементы, чтобы JSX не упал на r.id.
@@ -495,7 +502,10 @@ const MessageRow = memo(function MessageRow({
               const visible = showAvatars ? list.slice(0, 3) : [];
               const extra = showAvatars ? Math.max(0, total - visible.length) : 0;
               return (
-                <button key={emoji} onClick={() => onToggleReaction(m.id, emoji)}
+                <button key={emoji} onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleReaction(m.id, emoji);
+                }}
                   title={emoji + (total > 1 ? ` · ${total}` : '')}
                   style={{
                     background: iReacted ? 'rgba(130,100,190,.6)' : 'rgba(249,240,240,.18)',

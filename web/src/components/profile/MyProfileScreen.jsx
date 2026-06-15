@@ -18,8 +18,74 @@ import MomentDetailPopup from '../moments/MomentDetailPopup';
 import MomentCard from '../moments/MomentCard';
 import { useSalesPressure } from '../../lib/publicSettings';
 import { MediaImage } from '../shared/MediaImage';
+import { mediaUrl } from '../../lib/mediaUrl';
 import { ImageLightbox } from '../shared/ImageLightbox';
 import { personalInviteUrl } from '../../lib/inviteLink';
+
+function ArchiveMomentThumb({ m }) {
+  const hasImg = m.media_url && m.media_type === 'image';
+  const isVideo = m.media_url && m.media_type === 'video';
+  const isAudio = m.media_url && m.media_type === 'audio';
+  const embed = m.embedded_video;
+
+  if (hasImg) {
+    return (
+      <MediaImage src={m.media_url} alt=""
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+          objectFit: 'cover', objectPosition: m.media_position || '50% 50%' }}/>
+    );
+  }
+  if (isVideo) {
+    return (
+      <>
+        <video src={mediaUrl(m.media_url)} muted playsInline preload="metadata"
+          onContextMenu={e => e.preventDefault()}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: m.media_position || '50% 50%' }}/>
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          width: 40, height: 40, borderRadius: '50%',
+          background: 'rgba(249,240,240,.92)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 14, color: '#2a1a3e',
+          boxShadow: '0 4px 14px rgba(0,0,0,.4)',
+          zIndex: 2, pointerEvents: 'none',
+        }}>▶</div>
+      </>
+    );
+  }
+  if (isAudio) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(135deg,#1a0a38,#2a1858)',
+        fontSize: 44, color: 'rgba(249,240,240,.7)' }}>🎵</div>
+    );
+  }
+  if (embed?.thumbnail_url) {
+    return (
+      <>
+        <MediaImage src={embed.thumbnail_url} alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}/>
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.22)', pointerEvents: 'none' }}/>
+      </>
+    );
+  }
+  if (embed) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(135deg,#1e0a40,#4a1a80,#7030b0)',
+        fontSize: 36, opacity: .5 }}>🎬</div>
+    );
+  }
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex',
+      alignItems: 'center', justifyContent: 'center' }}>
+      <MoodEmoji type={m.mood_emoji || 'calm'} size={64}/>
+    </div>
+  );
+}
 
 export function MyProfileScreen() {
   const nav = useNavigate();
@@ -1087,10 +1153,7 @@ export function MyProfileScreen() {
                   }
                   return (
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:10}}>
-                      {filtered.map(m => {
-                        const hasImg  = m.media_url && m.media_type === 'image';
-                        const isAudio = m.media_url && m.media_type === 'audio';
-                        return (
+                      {filtered.map(m => (
                           <div key={m.id} onClick={() => setArchiveSelected(m)}
                             style={{
                               position:'relative', aspectRatio:'1/1',
@@ -1100,22 +1163,7 @@ export function MyProfileScreen() {
                             }}
                             onMouseEnter={e=>{ e.currentTarget.style.transform='scale(1.02)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,.4)'; }}
                             onMouseLeave={e=>{ e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.boxShadow='none'; }}>
-                            {/* Background */}
-                            {hasImg ? (
-                              <MediaImage src={m.media_url} alt=""
-                                style={{position:'absolute',inset:0,width:'100%',height:'100%',
-                                  objectFit:'cover',objectPosition: m.media_position || '50% 50%'}}/>
-                            ) : isAudio ? (
-                              <div style={{position:'absolute',inset:0,display:'flex',
-                                alignItems:'center',justifyContent:'center',
-                                background:'linear-gradient(135deg,#1a0a38,#2a1858)',
-                                fontSize:44,color:'rgba(249,240,240,.7)'}}>🎵</div>
-                            ) : (
-                              <div style={{position:'absolute',inset:0,display:'flex',
-                                alignItems:'center',justifyContent:'center'}}>
-                                <MoodEmoji type={m.mood_emoji || 'calm'} size={64}/>
-                              </div>
-                            )}
+                            <ArchiveMomentThumb m={m} />
                             {/* Bottom overlay: title + actions */}
                             <div style={{
                               position:'absolute',left:0,right:0,bottom:0,
@@ -1152,8 +1200,7 @@ export function MyProfileScreen() {
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
+                      ))}
                     </div>
                   );
                 })()}

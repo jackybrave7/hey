@@ -227,6 +227,15 @@ module.exports = function makeRouter(db, broadcast) {
   const r = express.Router();
   authModule.init(db); // inject DB into auth for block checks
 
+  // Моменты HEY-заведующего: WS-апдейты счётчиков шлём и админам в админке.
+  function momentStatsNotifyIds(moment, extraUserIds = []) {
+    const ids = new Set([moment.user_id, ...extraUserIds]);
+    if (moment.user_id === db.SYSTEM_USER_ID) {
+      db.getAdminIds().forEach(id => ids.add(id));
+    }
+    return [...ids];
+  }
+
   r.get('/geo/hint', (req, res) => {
     const hint = showVpnNoteFromRequest(req);
     res.json({ showVpnNote: hint.show, source: hint.source });
@@ -300,6 +309,7 @@ module.exports = function makeRouter(db, broadcast) {
       phone, name, password, birthday, avatar, email: finalEmail,
       termsAcceptedAt: Date.now(),
       termsVersion: CURRENT_TERMS_VERSION,
+      inviteCode: inviterFromLink?.invite_code || undefined,
     });
 
     // Email из АВО-инвайта мы считаем уже подтверждённым (его привязал
@@ -972,6 +982,7 @@ module.exports = function makeRouter(db, broadcast) {
         return res.status(409).json({ error: e.message });
       }
     }
+    try { db.attributeReferralIfUnassigned(req.user.id, target.id); } catch {}
     const { password, ...safe } = target;
     res.json({ ...safe, nickname });
   });
@@ -2054,7 +2065,7 @@ module.exports = function makeRouter(db, broadcast) {
 
     // Notify author + сам реагирующий (у него может быть второе устройство /
     // вторая вкладка — там реакция должна тоже подсветиться).
-    broadcast([m.user_id, req.user.id], {
+    broadcast(momentStatsNotifyIds(m, [req.user.id]), {
       type: 'moment:reaction',
       momentId: req.params.id,
       userId: req.user.id,
@@ -2069,7 +2080,7 @@ module.exports = function makeRouter(db, broadcast) {
     const m = db.getMomentById(req.params.id);
     db.deleteMomentReaction(req.params.id, req.user.id);
     if (m) {
-      broadcast([m.user_id, req.user.id], {
+      broadcast(momentStatsNotifyIds(m, [req.user.id]), {
         type: 'moment:reaction',
         momentId: req.params.id,
         userId: req.user.id,
@@ -2400,6 +2411,14 @@ module.exports = function makeRouter(db, broadcast) {
     res.json(db.getSystemMoments({ status }));
   });
 
+  r.get('/admin/system/moments/:id/reactors', requireAdmin, (req, res) => {
+    const m = db.getMomentById(req.params.id);
+    if (!m || m.user_id !== db.SYSTEM_USER_ID) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    res.json(db.getMomentReactorsList(req.params.id, req.user.id));
+  });
+
   function validateSystemAttachment(attachment) {
     if (!attachment) return null;
     const okType = ['image', 'images', 'audio'].includes(attachment.type);
@@ -2594,7 +2613,7 @@ module.exports = function makeRouter(db, broadcast) {
     const m = db.getMomentById(req.params.id);
     if (!m || m.status !== 'active') return res.status(404).json({ error: 'Not found' });
     db.addMomentView(req.params.id, req.user.id);
-    broadcast([m.user_id], { type: 'moment:view', momentId: req.params.id, userId: req.user.id });
+    broadcast(momentStatsNotifyIds(m), { type: 'moment:view', momentId: req.params.id, userId: req.user.id });
     res.json({ ok: true });
   });
 
