@@ -1231,7 +1231,31 @@ module.exports = function makeRouter(db, broadcast) {
     if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Not a member' });
     if (db.now() - m.created_at > 24 * 60 * 60)
       return res.status(403).json({ error: 'Редактировать можно только в течение 24 часов' });
-    const updated = db.editMessage(req.params.msgId, req.body.text?.trim());
+    const { text, attachment } = req.body || {};
+    const patch = {};
+    if (text !== undefined) patch.text = (text == null ? '' : String(text)).trim() || null;
+    if (attachment !== undefined) {
+      if (!attachment || typeof attachment !== 'object') {
+        return res.status(400).json({ error: 'Некорректное вложение' });
+      }
+      if (attachment.type === 'image') {
+        if (!attachment.url || typeof attachment.url !== 'string') {
+          return res.status(400).json({ error: 'Некорректное вложение' });
+        }
+      } else if (attachment.type === 'images') {
+        if (!Array.isArray(attachment.urls) || !attachment.urls.length
+          || attachment.urls.some(u => typeof u !== 'string' || !u)) {
+          return res.status(400).json({ error: 'Некорректное вложение' });
+        }
+      } else {
+        return res.status(400).json({ error: 'Можно менять только картинки' });
+      }
+      patch.attachment = attachment;
+    }
+    if (!Object.keys(patch).length) {
+      return res.status(400).json({ error: 'Нечего обновлять' });
+    }
+    const updated = db.editMessage(req.params.msgId, patch);
     broadcast(db.getConversationMembers(req.params.id), { type: 'message:edited', message: updated });
     res.json(updated);
   });

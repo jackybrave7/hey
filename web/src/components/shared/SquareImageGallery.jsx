@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { squareGalleryLayout } from '../../lib/squareGalleryLayout';
 import { MediaImage } from './MediaImage';
 
@@ -35,12 +36,22 @@ export function SquareImageGallery({
   native = false,
   imageOpacity,
   renderCellExtra,
+  reorderable = false,
+  onReorder,
+  cellReorderable,
 }) {
+  const [dragFrom, setDragFrom] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
   const list = (urls || []).filter(Boolean);
   if (!list.length) return null;
 
   const layout = squareGalleryLayout(list.length);
   const visible = layout.overlayIndex != null ? list.slice(0, layout.visibleCount) : list;
+
+  function canDragCell(idx) {
+    if (!reorderable || list.length < 2) return false;
+    return cellReorderable ? cellReorderable(idx) : true;
+  }
 
   return (
     <div
@@ -60,10 +71,40 @@ export function SquareImageGallery({
         if (!url) return null;
         const showOverlay = layout.overlayIndex === slot.index && layout.overlayLabel;
         const opacity = imageOpacity?.(slot.index);
+        const draggable = canDragCell(slot.index);
+        const isDragging = dragFrom === slot.index;
+        const isDropTarget = dragOver === slot.index && dragFrom != null && dragFrom !== slot.index;
 
         return (
           <div
             key={slot.index}
+            draggable={draggable}
+            onDragStart={(e) => {
+              if (!draggable) { e.preventDefault(); return; }
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', String(slot.index));
+              setDragFrom(slot.index);
+            }}
+            onDragOver={(e) => {
+              if (!reorderable || dragFrom == null) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              setDragOver(slot.index);
+            }}
+            onDragLeave={() => {
+              setDragOver(curr => (curr === slot.index ? null : curr));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const from = Number(e.dataTransfer.getData('text/plain'));
+              if (Number.isFinite(from) && from !== slot.index) onReorder?.(from, slot.index);
+              setDragFrom(null);
+              setDragOver(null);
+            }}
+            onDragEnd={() => {
+              setDragFrom(null);
+              setDragOver(null);
+            }}
             style={{
               gridColumn: `${slot.col} / span ${slot.colSpan}`,
               gridRow: `${slot.row} / span ${slot.rowSpan}`,
@@ -72,6 +113,11 @@ export function SquareImageGallery({
               borderRadius: 8,
               minWidth: 0,
               minHeight: 0,
+              cursor: draggable ? (isDragging ? 'grabbing' : 'grab') : undefined,
+              opacity: isDragging ? 0.45 : 1,
+              outline: isDropTarget ? '2px solid rgba(180,140,255,.95)' : 'none',
+              outlineOffset: -2,
+              transition: 'opacity .15s',
             }}
           >
             <GalleryImage

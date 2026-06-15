@@ -33,6 +33,39 @@ import { fileTypeIcon, AttachmentPreview } from '../../lib/fileTypeIcon';
 
 const HEY_EMOJI = HEY_EMOJI_LIST;
 
+function isImageAttachment(att) {
+  return att?.type === 'image' || att?.type === 'images';
+}
+
+function reorderArray(arr, from, to) {
+  const next = [...arr];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+function imgPreviewsFromAttachment(att) {
+  if (!att) return [];
+  if (att.type === 'image' && att.url) {
+    return [{ dataUrl: att.url, file: null, uploading: false, url: att.url, existing: true }];
+  }
+  if (att.type === 'images' && att.urls?.length) {
+    return att.urls.map(u => ({ dataUrl: u, file: null, uploading: false, url: u, existing: true }));
+  }
+  return [];
+}
+
+function releaseBlobPreviews(previews) {
+  (previews || []).forEach(p => {
+    if (p.file) { try { URL.revokeObjectURL(p.dataUrl); } catch {} }
+  });
+}
+
+function attachmentFromUrls(urls) {
+  if (!urls.length) return null;
+  return urls.length === 1 ? { type: 'image', url: urls[0] } : { type: 'images', urls };
+}
+
 export function ChatScreen() {
   const nav = useNavigate();
   const location = useLocation();
@@ -54,6 +87,7 @@ export function ChatScreen() {
   // Бэкап текущего черновика на время правки чужого сообщения, чтобы
   // отмена / отправка правки не затёрла то, что пользователь набирал.
   const savedDraftRef = useRef('');
+  const savedImgDraftRef = useRef([]);
   // Контекст-меню кнопки «Отправить» — правый клик/long-press открывает
   // вариант «📅 Отправить позже…». scheduleOpen — модалка с date-time.
   // scheduled — список запланированных сообщений для индикатора над инпутом.
@@ -208,10 +242,10 @@ export function ChatScreen() {
   // Сохраняем картинки/файл в module Map при любом изменении. Это даёт
   // переживание ChatScreen unmount/remount при навигации.
   useEffect(() => {
-    if (!convId) return;
+    if (!convId || editingMsg) return;
     if (imgPreviews.length) chatImgDrafts.set(convId, imgPreviews);
     else                    chatImgDrafts.delete(convId);
-  }, [imgPreviews, convId]);
+  }, [imgPreviews, convId, editingMsg]);
 
   useEffect(() => {
     if (!convId) return;
@@ -513,8 +547,14 @@ export function ChatScreen() {
       }
     });
     const u7 = socket.on('message:edited', ({ message }) => {
-      if (message.conversation_id === convId)
-        setMessages(prev => prev.map(m => m.id === message.id ? { ...m, text: message.text, edited_at: message.edited_at } : m));
+      if (message.conversation_id === convId) {
+        setMessages(prev => prev.map(m => m.id === message.id
+          ? { ...m, text: message.text, attachment: message.attachment, edited_at: message.edited_at }
+          : m));
+        setPinnedMessage(p => p && p.id === message.id
+          ? { ...p, text: message.text, attachment: message.attachment, edited_at: message.edited_at }
+          : p);
+      }
     });
     const u8 = socket.on('message:deleted', ({ message, messageId, hard, conversationId: cid }) => {
       if (cid !== convId) return;
@@ -830,6 +870,8 @@ export function ChatScreen() {
   // Разделяет: изображения → в preview-бар (галерея до 10), прочие
   // (видео/аудио/документы) → в filePreview (один файл, одно сообщение).
   async function addFilesToComposer(files) {
+    if (editingMsg && !isImageAttachment(editingMsg.attachment)) return;
+
     const images = files.filter(f => f.type.startsWith('image/'));
     const others = files.filter(f => !f.type.startsWith('image/'));
 
@@ -855,6 +897,10 @@ export function ChatScreen() {
     }
 
     if (others.length) {
+      if (editingMsg) {
+        heyToast('При редактировании можно добавлять только картинки', 'warning');
+        return;
+      }
       if (filePreview) {
         heyToast('Файл уже выбран — отправь или удали его', 'warning');
         return;
@@ -911,8 +957,65 @@ export function ChatScreen() {
     return { attachment: null, kind: null };
   }
 
+  async function resolvePreviewUrls(previews) {
+    return Promise.all(previews.map(async (p) => {
+      if (p.existing && p.url) return p.url;
+      if (p.file) {
+        const r = await uploadMedia(p.file, 'chat-image', {
+          getPresignUrl: api.getPresignUrl,
+          uploadImage:   api.uploadImage,
+        });
+        return r.url;
+      }
+      return p.dataUrl;
+    }));
+  }
+
+  function reorderImgPreviews(from, to) {
+    if (from === to) return;
+    setImgPreviews(prev => reorderArray(prev, from, to));
+  }
+
   async function send() {
     const t = text.trim();
+
+    if (editingMsg) {
+      if (isImageAttachment(editingMsg.attachment)) {
+        if (!imgPreviews.length) {
+          heyToast('Нужна хотя бы одна картинка', 'warning');
+          return;
+        }
+        if (imgPreviews.some(p => p.uploading)) return;
+        setImgPreviews(prev => prev.map(p => ({ ...p, uploading: true })));
+        try {
+          const urls = await resolvePreviewUrls(imgPreviews);
+          const attachment = attachmentFromUrls(urls);
+          const updated = await api.editMessage(convId, editingMsg.id, { text: t || null, attachment });
+          setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m));
+          setPinnedMessage(p => p && p.id === updated.id ? { ...p, ...updated } : p);
+          releaseBlobPreviews(imgPreviews);
+          setImgPreviews(savedImgDraftRef.current);
+          savedImgDraftRef.current = [];
+          setEditingMsg(null);
+          setText(savedDraftRef.current);
+          savedDraftRef.current = '';
+        } catch (e) {
+          heyToast(e.message || 'Не удалось сохранить', 'error');
+          setImgPreviews(prev => prev.map(p => ({ ...p, uploading: false })));
+        }
+        return;
+      }
+      api.editMessage(convId, editingMsg.id, { text: t })
+        .then(updated => {
+          setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, text: updated.text, edited_at: updated.edited_at } : m));
+          setPinnedMessage(p => p && p.id === updated.id ? { ...p, text: updated.text, edited_at: updated.edited_at } : p);
+        })
+        .catch(e => heyToast(e.message, 'error'));
+      setEditingMsg(null);
+      setText(savedDraftRef.current);
+      savedDraftRef.current = '';
+      return;
+    }
 
     if (imgPreviews.length > 0) {
       if (imgPreviews.some(p => p.uploading)) return;
@@ -996,18 +1099,6 @@ export function ChatScreen() {
     // Если момент прицеплен — можно отправить и пустым текстом.
     if (!t && !momentRef) return;
 
-    if (editingMsg) {
-      api.editMessage(convId, editingMsg.id, t)
-        .then(updated => setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, text: updated.text, edited_at: updated.edited_at } : m)))
-        .catch(e => heyToast(e.message, 'error'));
-      setEditingMsg(null);
-      // После завершения правки возвращаем тот черновик собеседнику,
-      // который был до старта правки (а не очищаем безусловно).
-      setText(savedDraftRef.current);
-      savedDraftRef.current = '';
-      return;
-    }
-
     const tempId = 'tmp-' + Date.now();
     const reply  = replyTo ? makeReplySnippet(replyTo) : null;
     // Если к черновику прицеплен момент — кладём его как attachment.
@@ -1063,19 +1154,28 @@ export function ChatScreen() {
   }
 
   function startEdit(msg) {
-    // Запоминаем текущий черновик чтобы вернуть после отмены/окончания правки.
     savedDraftRef.current = text;
+    savedImgDraftRef.current = imgPreviews;
     setEditingMsg(msg);
-    setText(msg.text);
+    setText(msg.text || '');
+    setReplyTo(null);
+    setFilePreview(null);
+    if (isImageAttachment(msg.attachment)) {
+      setImgPreviews(imgPreviewsFromAttachment(msg.attachment));
+    } else {
+      setImgPreviews([]);
+    }
     setMsgMenu(null);
     setTimeout(() => textareaRef.current?.focus(), 50);
   }
 
   function cancelEdit() {
+    releaseBlobPreviews(imgPreviews);
     setEditingMsg(null);
-    // Восстанавливаем то, что пользователь набирал собеседнику до правки.
     setText(savedDraftRef.current);
+    setImgPreviews(savedImgDraftRef.current);
     savedDraftRef.current = '';
+    savedImgDraftRef.current = [];
   }
 
   async function deleteMsg(msg) {
@@ -2006,17 +2106,20 @@ export function ChatScreen() {
             <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
               <span style={{color:'rgba(249,240,240,.85)',fontSize:13,fontWeight:600,flex:1}}>
                 {imgPreviews.some(p => p.uploading)
-                  ? 'Отправка…'
-                  : `${imgPreviews.length} ${imgPreviews.length === 1 ? 'картинка' : 'картинки'} · добавь подпись или нажми ➤`}
+                  ? (editingMsg ? 'Сохранение…' : 'Отправка…')
+                  : editingMsg
+                    ? `Редактирование · ${imgPreviews.length} ${imgPreviews.length === 1 ? 'картинка' : 'картинки'}${imgPreviews.length > 1 ? ' · перетащи для порядка' : ''}`
+                    : `${imgPreviews.length} ${imgPreviews.length === 1 ? 'картинка' : 'картинки'}${imgPreviews.length > 1 ? ' · перетащи для порядка' : ''} · добавь подпись или нажми ➤`}
               </span>
               <button onClick={() => {
+                  if (editingMsg) { cancelEdit(); return; }
                   imgPreviews.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
                   setImgPreviews([]);
                 }}
                 disabled={imgPreviews.some(p => p.uploading)}
                 style={{background:'none',border:'none',color:'rgba(249,240,240,.7)',
                   fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
-                Сбросить
+                {editingMsg ? 'Отмена' : 'Сбросить'}
               </button>
             </div>
             <SquareImageGallery
@@ -2024,6 +2127,9 @@ export function ChatScreen() {
               urls={imgPreviews.map(p => p.dataUrl)}
               maxWidth={280}
               gap={3}
+              reorderable={imgPreviews.length > 1}
+              onReorder={reorderImgPreviews}
+              cellReorderable={idx => !imgPreviews[idx]?.uploading}
               imageOpacity={idx => (imgPreviews[idx]?.uploading ? .5 : 1)}
               renderCellExtra={idx => !imgPreviews[idx]?.uploading ? (
                 <button
@@ -2102,15 +2208,14 @@ export function ChatScreen() {
       })()}
 
       {/* Edit banner */}
-      {editingMsg && (
+      {editingMsg && !imgPreviews.length && (
         <div style={{background:'rgba(95, 64, 128,.5)',flexShrink:0,overflow:'hidden'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,padding:'6px 14px',
-            // Та же ширина что и у reply-banner / пузырей — в одну сетку.
             maxWidth: 540, margin:'0 auto', minWidth:0}}>
             <span style={{color:'rgba(249,240,240,.85)',display:'inline-flex',flexShrink:0}}><Icon name="pencil" size={15}/></span>
             <span style={{flex:1,minWidth:0,color:'rgba(249,240,240,.8)',fontSize:13,
               overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-              {editingMsg.text}
+              {editingMsg.text || 'Редактирование сообщения'}
             </span>
             <button onClick={cancelEdit}
               style={{background:'none',border:'none',color:'rgba(249,240,240,.6)',
@@ -2718,7 +2823,8 @@ export function ChatScreen() {
       {msgMenu && (() => {
         const isOwn   = msgMenu.msg.sender_id === user?.id;
         const canEdit = isOwn && !msgMenu.msg.is_deleted
-          && (Date.now()/1000 - msgMenu.msg.created_at) < 24*60*60 && !!msgMenu.msg.text;
+          && (Date.now()/1000 - msgMenu.msg.created_at) < 24*60*60
+          && (!!msgMenu.msg.text || isImageAttachment(msgMenu.msg.attachment));
         const canPin  = partner.isGroup ? !!partner.myIsGroupAdmin : true;
         const isPinned = pinnedMessage && pinnedMessage.id === msgMenu.msg.id;
         const canCopy = !!msgMenu.msg.text && !msgMenu.msg.is_deleted;

@@ -2455,11 +2455,18 @@ function clearConversationMessages(convId) {
   db.prepare('DELETE FROM messages WHERE conversation_id=?').run(convId);
 }
 
-function editMessage(id, text) {
+function editMessage(id, { text, attachment } = {}) {
+  const cur = getMessageById(id);
+  if (!cur) return null;
   const ts = now();
+  const newText = text !== undefined ? (text || null) : cur.text;
+  let newAttachmentJson = cur.attachment != null ? JSON.stringify(cur.attachment) : null;
+  if (attachment !== undefined) {
+    newAttachmentJson = attachment ? JSON.stringify(attachment) : null;
+  }
   db.prepare(
-    'UPDATE messages SET text=?, edited_at=? WHERE id=? AND (is_deleted IS NULL OR is_deleted = 0)'
-  ).run(text, ts, id);
+    'UPDATE messages SET text=?, attachment=?, edited_at=? WHERE id=? AND (is_deleted IS NULL OR is_deleted = 0)'
+  ).run(newText, newAttachmentJson, ts, id);
   return getMessageById(id);
 }
 
