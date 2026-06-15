@@ -284,6 +284,7 @@ const MessageRow = memo(function MessageRow({
                     e.stopPropagation();
                     return;
                   }
+                  e.stopPropagation();
                   onLightbox(src, [src]);
                 }}
                 style={{maxWidth:'100%',maxHeight:300,borderRadius:10,
