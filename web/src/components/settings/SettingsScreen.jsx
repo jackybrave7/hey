@@ -9,6 +9,7 @@ import TopBar from '../shared/TopBar';
 import Icon from '../Icon';
 import FeedbackModal from './FeedbackModal';
 import BlacklistModal from './BlacklistModal';
+import AndroidAppDownloadModal from './AndroidAppDownloadModal';
 
 export function SettingsScreen() {
   const nav = useNavigate();
@@ -16,7 +17,12 @@ export function SettingsScreen() {
   const [customConfirm, confirmModal] = useConfirm();
   const [showBlacklist, setShowBlacklist] = useState(false);
   const [showFeedback,  setShowFeedback]  = useState(false);
+  const [showAndroidApp, setShowAndroidApp] = useState(false);
   const [showNotif,     setShowNotif]     = useState(false);
+  const [isStandalone] = useState(() =>
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  );
   const [notifPerm, setNotifPerm] = useState(() =>
     'Notification' in window ? Notification.permission : 'unsupported'
   );
@@ -45,10 +51,11 @@ export function SettingsScreen() {
       if (showPwdModal)      { setShowPwdModal(false);      return; }
       if (showBlacklist)     { setShowBlacklist(false);     return; }
       if (showFeedback)      { setShowFeedback(false);      return; }
+      if (showAndroidApp)    { setShowAndroidApp(false);    return; }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showDeleteAccount, showPwdModal, showBlacklist, showFeedback]);
+  }, [showDeleteAccount, showPwdModal, showBlacklist, showFeedback, showAndroidApp]);
 
   async function submitDeleteAccount() {
     setDeleteErr('');
@@ -339,6 +346,12 @@ export function SettingsScreen() {
                 }
                 onClick={() => nav('/business')}/>
             )}
+            {!isStandalone && (
+              <Row icon={<Icon name="download" size={18}/>}
+                label="Скачать приложение для Android"
+                sub="Бета — удобнее на телефоне и с уведомлениями"
+                onClick={() => setShowAndroidApp(true)}/>
+            )}
           </div>
         </div>
 
@@ -387,6 +400,7 @@ export function SettingsScreen() {
 
       {showBlacklist && <BlacklistModal onClose={() => setShowBlacklist(false)} />}
       {showFeedback  && <FeedbackModal  onClose={() => setShowFeedback(false)}  />}
+      {showAndroidApp && <AndroidAppDownloadModal onClose={() => setShowAndroidApp(false)} />}
 
       {confirmModal}
 
