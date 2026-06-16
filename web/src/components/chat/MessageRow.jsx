@@ -13,6 +13,7 @@ import { fmtTime } from '../../lib/formatTime';
 import { fileTypeIcon, AttachmentPreview } from '../../lib/fileTypeIcon';
 import { mediaUrl } from '../../lib/mediaUrl';
 import { messageDeletedLabel, messageDeletedPreview } from '../../lib/messagePreview';
+import { renderPreviewWithEmoji } from './chatRender';
 
 function rxSig(reactions) {
   if (!reactions || !Object.keys(reactions).length) return '0';
