@@ -42,6 +42,7 @@ import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
 import ServerStatusBanner from './components/ServerStatusBanner';
 import { ensurePushIfGranted } from './lib/push';
+import { installAndroidExternalLinkHandler } from './lib/openExternalUrl';
 import { isConversationMuted, setConversationMuted, syncMutedConversations } from './lib/mutedConversations';
 import {
   isConversationArchived,
@@ -285,6 +286,9 @@ function GlobalHandlers() {
   useEffect(() => {
     if (user?.id) ensurePushIfGranted();
   }, [user?.id]);
+
+  // Android TWA: внешние ссылки — в системный браузер, не в Custom Tabs.
+  useEffect(() => installAndroidExternalLinkHandler(), []);
 
   // Слушаем сообщение от service worker — клик по push-уведомлению должен
   // привести нас на нужный URL в SPA.

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { HEY_EMOJI_TOKEN_RE, isHeyEmoji, resolveEmojiName, emojiUrl } from '../../lib/heyEmoji';
+import { openExternalUrl } from '../../lib/openExternalUrl';
 
 const EMOJI_RE = HEY_EMOJI_TOKEN_RE;
 
@@ -45,10 +46,10 @@ function ChatVideoCard({ url }) {
   function play(e) {
     e.stopPropagation();
     if (embedSrc) setPlaying(true);
-    else window.open(url, '_blank', 'noopener');
+    else openExternalUrl(url);
   }
   function stop(e) { e.stopPropagation(); setPlaying(false); }
-  function ext(e)  { e.stopPropagation(); window.open(url, '_blank', 'noopener'); }
+  function ext(e)  { e.stopPropagation(); openExternalUrl(url); }
 
   return (
     <div style={{

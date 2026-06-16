@@ -1,6 +1,7 @@
 // EmbeddedVideoPreview.jsx
 // Video thumbnail → inline iframe player for Moments / chat link previews
 import { useState } from 'react';
+import { openExternalUrl } from '../../lib/openExternalUrl';
 
 function fmtDuration(seconds) {
   if (!seconds) return null;
@@ -43,9 +44,9 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
 
   function play(e) {
     e.stopPropagation();
-    if (isCard) { window.open(data.url, '_blank', 'noopener'); return; }
+    if (isCard) { openExternalUrl(data.url); return; }
     if (embedUrl) setPlaying(true);
-    else window.open(data.url, '_blank', 'noopener');
+    else openExternalUrl(data.url);
   }
 
   function stop(e) {
@@ -55,7 +56,7 @@ export default function EmbeddedVideoPreview({ data, size = 'full', hideMeta = f
 
   function openExternal(e) {
     e.stopPropagation();
-    window.open(data.url, '_blank', 'noopener');
+    openExternalUrl(data.url);
   }
 
   return (
