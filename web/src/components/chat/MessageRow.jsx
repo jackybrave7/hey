@@ -105,7 +105,7 @@ const MessageRow = memo(function MessageRow({
         // поэтому 36-px смайл-слот вылезает за экран. С width:100% row
         // знает рамки и flex-shrink правильно ужимает пузырь.
         width:'100%', minWidth:0, boxSizing:'border-box',
-        paddingBottom: 6}}
+        paddingBottom: 10}}
       onContextMenu={(e) => onOpenMenu(e, m)}>
 
       {/* Аватар отправителя — только в группах для входящих сообщений.
@@ -483,7 +483,8 @@ const MessageRow = memo(function MessageRow({
         {/* Реакции в потоке — под пузырём, сдвигают следующие сообщения вниз */}
         {hasReactions && (
           <div style={{
-            marginTop: 4,
+            marginTop: 6,
+            marginBottom: 2,
             display: 'flex', flexWrap: 'wrap', gap: 4,
             justifyContent: isOut ? 'flex-end' : 'flex-start',
             maxWidth: '100%',
