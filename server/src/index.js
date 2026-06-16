@@ -162,6 +162,7 @@ function runOnboardingDispatcher() {
           senderId: db.SYSTEM_USER_ID,
           text: rule.text || null,
           attachment: rule.attachment || null,
+          onboardingRuleId: rule.id,
         });
         db.markOnboardingSent(userId, rule.id);
         broadcast([userId], {

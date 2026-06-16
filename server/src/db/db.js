@@ -329,6 +329,8 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS onboarding_message_sent (
   PRIMARY KEY (user_id, rule_id)
 )`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_onboarding_sent_rule ON onboarding_message_sent(rule_id)'); } catch {}
+try { db.exec('ALTER TABLE messages ADD COLUMN onboarding_rule_id TEXT'); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_messages_onboarding_rule ON messages(onboarding_rule_id)'); } catch {}
 
 // Two-step self-delete: после `DELETE /me` юзер становится `is_deleted=1`,
 // но 30 дней лежит в deletion_grace со снапшотом оригинальных полей.
@@ -2230,7 +2232,7 @@ function getMessages(convId, before, limit = 50, requesterId = null) {
 }
 
 function createMessage({ conversationId, senderId, text, attachment, replyToId, broadcastId,
-  forwardedFromUserId, forwardedFromMessageId, linkPreview }) {
+  forwardedFromUserId, forwardedFromMessageId, linkPreview, onboardingRuleId }) {
   const msg = { id: uuid(), conversation_id: conversationId, sender_id: senderId,
     text: text || null,
     attachment: attachment ? JSON.stringify(attachment) : null,
@@ -2238,13 +2240,14 @@ function createMessage({ conversationId, senderId, text, attachment, replyToId, 
     status: 'sent', created_at: now(), edited_at: null,
     reply_to_id: replyToId || null,
     broadcast_id: broadcastId || null,
+    onboarding_rule_id: onboardingRuleId || null,
     forwarded_from_user_id: forwardedFromUserId || null,
     forwarded_from_message_id: forwardedFromMessageId || null };
   db.prepare(
     `INSERT INTO messages (id,conversation_id,sender_id,text,attachment,link_preview,status,created_at,
-                           reply_to_id,broadcast_id,forwarded_from_user_id,forwarded_from_message_id)
+                           reply_to_id,broadcast_id,onboarding_rule_id,forwarded_from_user_id,forwarded_from_message_id)
      VALUES (@id,@conversation_id,@sender_id,@text,@attachment,@link_preview,@status,@created_at,
-             @reply_to_id,@broadcast_id,@forwarded_from_user_id,@forwarded_from_message_id)`
+             @reply_to_id,@broadcast_id,@onboarding_rule_id,@forwarded_from_user_id,@forwarded_from_message_id)`
   ).run(msg);
   const parsed = _parseMsg(msg);
   if (parsed && parsed.reply_to_id) parsed.reply_to = _replySnippet(parsed.reply_to_id);
@@ -3300,12 +3303,18 @@ function getSystemMoments({ status = 'published', limit = 100 } = {}) {
 function getSystemBroadcasts({ limit = 50 } = {}) {
   return db.prepare(
     `SELECT broadcast_id AS id, MAX(created_at) AS sent_at,
-            COUNT(*) AS recipients, MAX(text) AS text
+            COUNT(*) AS recipients,
+            SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) AS read_count,
+            MAX(text) AS text
      FROM messages
      WHERE sender_id = ? AND broadcast_id IS NOT NULL
      GROUP BY broadcast_id
      ORDER BY sent_at DESC LIMIT ?`
-  ).all(SYSTEM_USER_ID, limit);
+  ).all(SYSTEM_USER_ID, limit).map(r => ({
+    ...r,
+    recipients: Number(r.recipients) || 0,
+    read_count: Number(r.read_count) || 0,
+  }));
 }
 
 function deleteBroadcast(broadcastId) {
@@ -3373,13 +3382,16 @@ function _parseOnboardingRow(r) {
     attachment,
     delay_seconds: onboardingDelaySeconds(r),
     sent_count: Number(r.sent_count) || 0,
+    read_count: Number(r.read_count) || 0,
   };
 }
 
 function listOnboardingMessages() {
   const rows = db.prepare(
     `SELECT o.*,
-            (SELECT COUNT(*) FROM onboarding_message_sent s WHERE s.rule_id = o.id) AS sent_count
+            (SELECT COUNT(*) FROM onboarding_message_sent s WHERE s.rule_id = o.id) AS sent_count,
+            (SELECT COUNT(*) FROM messages m
+             WHERE m.onboarding_rule_id = o.id AND m.status = 'read') AS read_count
      FROM onboarding_messages o
      ORDER BY o.delay_days, o.delay_hours, o.delay_minutes, o.created_at`
   ).all();
@@ -3389,7 +3401,9 @@ function listOnboardingMessages() {
 function getOnboardingMessage(id) {
   const r = db.prepare(
     `SELECT o.*,
-            (SELECT COUNT(*) FROM onboarding_message_sent s WHERE s.rule_id = o.id) AS sent_count
+            (SELECT COUNT(*) FROM onboarding_message_sent s WHERE s.rule_id = o.id) AS sent_count,
+            (SELECT COUNT(*) FROM messages m
+             WHERE m.onboarding_rule_id = o.id AND m.status = 'read') AS read_count
      FROM onboarding_messages o WHERE o.id=?`
   ).get(id);
   return _parseOnboardingRow(r);
@@ -3487,6 +3501,54 @@ function markOnboardingSent(userId, ruleId) {
     `INSERT OR IGNORE INTO onboarding_message_sent (user_id, rule_id, sent_at) VALUES (?,?,?)`
   ).run(userId, ruleId, now());
 }
+
+/** Проставляет onboarding_rule_id на уже отправленные системные сообщения. */
+function backfillOnboardingRuleOnMessages() {
+  const stale = db.prepare(
+    `SELECT s.user_id, s.rule_id, s.sent_at FROM onboarding_message_sent s
+     WHERE NOT EXISTS (
+       SELECT 1 FROM messages m
+       WHERE m.onboarding_rule_id = s.rule_id
+         AND m.sender_id = ?
+         AND m.conversation_id IN (
+           SELECT mb.conversation_id FROM members mb WHERE mb.user_id = s.user_id
+         )
+     )`
+  ).all(SYSTEM_USER_ID);
+  if (!stale.length) return;
+  const findMsg = db.prepare(
+    `SELECT m.id FROM messages m
+     WHERE m.sender_id = ?
+       AND m.onboarding_rule_id IS NULL
+       AND m.conversation_id IN (
+         SELECT mb.conversation_id FROM members mb
+         WHERE mb.user_id = ?
+           AND EXISTS (
+             SELECT 1 FROM members mb2
+             WHERE mb2.conversation_id = mb.conversation_id AND mb2.user_id = ?
+           )
+       )
+       AND m.created_at BETWEEN ? AND ?
+     ORDER BY ABS(m.created_at - ?)
+     LIMIT 1`
+  );
+  const upd = db.prepare('UPDATE messages SET onboarding_rule_id=? WHERE id=?');
+  let n = 0;
+  for (const row of stale) {
+    const hit = findMsg.get(
+      SYSTEM_USER_ID, row.user_id, SYSTEM_USER_ID,
+      row.sent_at - 300, row.sent_at + 300, row.sent_at,
+    );
+    if (hit) { upd.run(row.rule_id, hit.id); n++; }
+  }
+  if (n > 0) console.log(`[onboarding] backfilled rule_id on ${n} message(s)`);
+}
+
+(function runOnboardingBackfillOnStartup() {
+  try { backfillOnboardingRuleOnMessages(); } catch (e) {
+    console.warn('[onboarding] rule backfill failed:', e.message);
+  }
+})();
 
 // Search users by name or phone (для контактов; case-insensitive в том числе и для кириллицы)
 // Тестовые юзеры (is_test=1) видны только админам когда включён test_users_enabled.

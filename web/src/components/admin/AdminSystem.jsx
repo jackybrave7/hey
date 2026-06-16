@@ -279,6 +279,7 @@ function ManagePublished() {
                 <Meta>
                   <span>{fmtDate(b.sent_at)}</span>
                   <Badge>📨 {b.recipients} получателей</Badge>
+                  <Badge>👁 {b.read_count ?? 0} прочитано</Badge>
                 </Meta>
                 <Text>{b.text}</Text>
                 <Actions>
@@ -1015,6 +1016,7 @@ function OnboardingTab() {
               }}>{r.enabled ? 'вкл' : 'выкл'}</span>
               <Badge>⏱ {fmtOnboardingDelay(r)}</Badge>
               <Badge>📨 {r.sent_count} отправлено</Badge>
+              <Badge>👁 {r.read_count ?? 0} прочитано</Badge>
             </Meta>
             {r.title && <div style={{ color: 'rgba(235,220,255,.98)', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{r.title}</div>}
             <Text>{r.text || (r.attachment ? '🖼 с картинкой' : '—')}</Text>
