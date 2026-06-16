@@ -487,7 +487,7 @@ db.prepare(`
 // Создаётся один раз, если ещё нет в БД. Используется для сервисных уведомлений.
 // Юзеры не могут отправлять ему сообщения, но могут получать.
 const SYSTEM_USER_ID = 'system_hey_official';
-const SYSTEM_AVATAR  = '/favicon.svg'; // лого HEY как аватар сервисного аккаунта
+const SYSTEM_AVATAR  = '/icon-app.svg'; // актуальная иконка HEY (PWA / Android)
 
 (function ensureSystemUser() {
   const existing = db.prepare('SELECT id, avatar FROM users WHERE id=?').get(SYSTEM_USER_ID);

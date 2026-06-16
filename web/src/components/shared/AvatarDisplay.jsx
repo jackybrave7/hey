@@ -1,7 +1,31 @@
 // web/src/components/shared/AvatarDisplay.jsx
 import { mediaUrl as toMediaUrl } from '../../lib/mediaUrl';
+import HeyLogo from '../HeyLogo';
+
+const SYSTEM_AVATAR_PATHS = new Set([
+  '/favicon.svg', '/icon-app.svg', '/hey-logo.svg', '/icon-source.svg', '/logo-mark.svg',
+]);
+
+function isHeyManagerAvatar(avatar, name) {
+  const path = avatar?.split('?')[0];
+  if (path && SYSTEM_AVATAR_PATHS.has(path)) return true;
+  return name === 'HEY-заведующий';
+}
 
 export function AvatarDisplay({ avatar, name, size = 52, fontSize = 20, radius = '50%', style = {} }) {
+  if (isHeyManagerAvatar(avatar, name)) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: radius,
+        background: 'linear-gradient(135deg, #5F4080 0%, #7c45c7 60%, #a87ce4 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, overflow: 'hidden', ...style,
+      }}>
+        <HeyLogo size={Math.round(size * 0.52)} color="#F9F0F0" title="HEY" />
+      </div>
+    );
+  }
+
   const letter = (name || '?')[0].toUpperCase();
   const isImg  = avatar && (avatar.startsWith('/') || avatar.startsWith('http') || avatar.startsWith('data:'));
   const isEmoji = avatar && avatar.length <= 4 && !isImg;
