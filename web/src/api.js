@@ -4,20 +4,38 @@ import { rewriteMediaDeep } from './lib/mediaUrl';
 const BASE = '/api';
 const REQUEST_TIMEOUT_MS = 15000; // 15с — отсечка «сервер не отвечает»
 
+let lastOkAt = 0;
+
 function getToken() {
   return localStorage.getItem('hey_token');
 }
 
+async function serverReachable() {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000);
+    const r = await fetch(`${BASE}/health`, { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(t);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Простой сигнал о проблемах со связью — слушает ServerStatusBanner.
 // reason: 'timeout' (запрос > 15с) | 'network' (fetch вообще упал) | '5xx'
-function notifyServerIssue(reason) {
+async function notifyServerIssue(reason) {
+  // Если другой запрос только что прошёл — не показываем ложный баннер.
+  if (Date.now() - lastOkAt < 2500) return;
+  if (await serverReachable()) return;
   try { window.dispatchEvent(new CustomEvent('hey:server-issue', { detail: reason })); } catch {}
 }
 function notifyServerOk() {
+  lastOkAt = Date.now();
   try { window.dispatchEvent(new CustomEvent('hey:server-ok')); } catch {}
 }
 
-async function req(method, path, body) {
+async function req(method, path, body, attempt = 0) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort('timeout'), REQUEST_TIMEOUT_MS);
   let res;
@@ -33,19 +51,23 @@ async function req(method, path, body) {
     });
   } catch (e) {
     clearTimeout(timer);
-    // AbortError при таймауте, TypeError при сетевой ошибке
-    if (e?.name === 'AbortError') {
-      notifyServerIssue('timeout');
+    const isTimeout = e?.name === 'AbortError';
+    const canRetry = attempt < 1 && method === 'GET';
+    if (canRetry) {
+      await new Promise(r => setTimeout(r, 400));
+      return req(method, path, body, attempt + 1);
+    }
+    if (isTimeout) {
+      await notifyServerIssue('timeout');
       throw new Error('Сервер не отвечает');
     }
-    notifyServerIssue('network');
+    await notifyServerIssue('network');
     throw new Error('Нет связи с сервером');
   }
   clearTimeout(timer);
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    // Dispatch special events for specific error codes
     if (err.code === 'BLOCKED') {
       localStorage.removeItem('hey_token');
       window.dispatchEvent(new CustomEvent('hey:blocked'));
@@ -53,9 +75,15 @@ async function req(method, path, body) {
     if (err.code === 'MUST_CHANGE_PASSWORD') {
       window.dispatchEvent(new CustomEvent('hey:must-change-password'));
     }
-    // 5xx — баннер. 4xx — не баннер, это валидная бизнес-ошибка.
-    if (res.status >= 500) notifyServerIssue('5xx');
-    else notifyServerOk(); // 4xx значит сервер живой
+    if (res.status >= 500) {
+      if (attempt < 1 && method === 'GET') {
+        await new Promise(r => setTimeout(r, 400));
+        return req(method, path, body, attempt + 1);
+      }
+      await notifyServerIssue('5xx');
+    } else {
+      notifyServerOk();
+    }
     throw new Error(err.error || `HTTP ${res.status}`);
   }
   notifyServerOk();
