@@ -169,6 +169,7 @@ try { db.exec('ALTER TABLE messages ADD COLUMN forwarded_from_message_id TEXT');
 try { db.exec('ALTER TABLE messages ADD COLUMN link_preview TEXT'); } catch {}              // JSON c metadata видео-ссылки (YouTube/Vimeo/RuTube/Kinescope)
 try { db.exec('ALTER TABLE messages ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE messages ADD COLUMN deleted_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE messages ADD COLUMN deleted_by_id TEXT'); } catch {}
 
 // Кеш og-tags / oEmbed для линк-превью. Если url-fetch успешен — кладём сюда,
 // а в новых сообщениях достаём из кеша. TTL ~7 дней (mark fetched_at и сверяем).
@@ -1162,7 +1163,17 @@ function getContacts(ownerId) {
   // списка чатов или из публикаций); юзер не должен иметь возможность
   // его «удалить» или путаться рядом с реальными контактами.
   const rows = db.prepare(
-    `SELECT u.*, c.nickname, c.notes, p.online, p.last_seen
+    `SELECT u.*, c.nickname, c.notes, p.online, p.last_seen,
+            (SELECT MAX(msg.created_at)
+             FROM messages msg
+             WHERE msg.conversation_id = (
+               SELECT c2.id FROM conversations c2
+               JOIN members ma ON ma.conversation_id = c2.id AND ma.user_id = c.owner_id
+               JOIN members mb ON mb.conversation_id = c2.id AND mb.user_id = c.contact_id
+               WHERE c2.type = 'direct'
+                 AND (SELECT COUNT(*) FROM members WHERE conversation_id = c2.id) = 2
+               LIMIT 1
+             )) AS last_chat_at
      FROM contacts c
      JOIN users u ON u.id = c.contact_id
      LEFT JOIN presence p ON p.user_id = c.contact_id
@@ -1603,6 +1614,13 @@ function isNotificationsMuted(convId, userId) {
   return !!(row?.notifications_muted);
 }
 
+function isConversationArchived(convId, userId) {
+  const row = db.prepare(
+    'SELECT archived_at FROM members WHERE conversation_id=? AND user_id=?'
+  ).get(convId, userId);
+  return row?.archived_at != null;
+}
+
 function setNotificationsMuted(convId, userId, muted) {
   if (!isMember(convId, userId)) throw new Error('Not a member');
   db.prepare(
@@ -1832,7 +1850,8 @@ function getUnreadCounts(userId, convIds) {
 // пользователь активный участник.
 function getTotalUnreadFor(userId) {
   const convIds = db.prepare(
-    `SELECT conversation_id FROM members WHERE user_id=? AND status='active'`
+    `SELECT conversation_id FROM members
+     WHERE user_id=? AND status='active' AND archived_at IS NULL`
   ).all(userId).map(r => r.conversation_id);
   if (!convIds.length) return 0;
   const ph = convIds.map(() => '?').join(',');
@@ -1912,6 +1931,7 @@ function getConversationsForUser(userId, opts = {}) {
   const lastMap = {}; // convId -> { text, created_at, sender_id, sender_name }
   db.prepare(
     `SELECT m.conversation_id, m.text, m.attachment, m.created_at, m.sender_id, m.is_deleted,
+            m.deleted_by_id,
             u.name AS sender_name
      FROM messages m
      JOIN (
@@ -1924,9 +1944,13 @@ function getConversationsForUser(userId, opts = {}) {
   ).all(...convIds)
     .forEach(r => {
       if (Number(r.is_deleted) === 1) {
-        r.text = r.sender_id === userId
-          ? 'Вы удалили сообщение'
-          : `${r.sender_name || 'Участник'} удалил(а) сообщение`;
+        if (r.deleted_by_id && r.deleted_by_id !== r.sender_id) {
+          r.text = 'Удалено администратором группы';
+        } else {
+          r.text = r.sender_id === userId
+            ? 'Вы удалили сообщение'
+            : `${r.sender_name || 'Участник'} удалил(а) сообщение`;
+        }
         r.attachment = null;
       }
       // Если последнее сообщение — системное событие группы, генерим читаемое превью.
@@ -2135,7 +2159,7 @@ function _parseMsg(m) {
 function _replySnippet(replyToId) {
   if (!replyToId) return null;
   const r = db.prepare(
-    `SELECT m.id, m.sender_id, m.text, m.attachment, m.is_deleted, u.name AS sender_name
+    `SELECT m.id, m.sender_id, m.text, m.attachment, m.is_deleted, m.deleted_by_id, u.name AS sender_name
      FROM messages m JOIN users u ON u.id=m.sender_id
      WHERE m.id=?`
   ).get(replyToId);
@@ -2144,6 +2168,7 @@ function _replySnippet(replyToId) {
     return {
       id: r.id, sender_id: r.sender_id, sender_name: r.sender_name,
       text: null, attachment_type: 'deleted', attachment_url: null, is_deleted: true,
+      deleted_by_id: r.deleted_by_id || null,
     };
   }
   let attType = null, attUrl = null;
@@ -2676,17 +2701,18 @@ async function sweepOrphanS3Media(storage, opts = {}) {
   return { dryRun, scanned, deleted, wouldDelete, skippedYoung, skippedLive, errors };
 }
 
-function deleteMessage(id, storage) {
-  const row = db.prepare('SELECT attachment, is_deleted FROM messages WHERE id=?').get(id);
+function deleteMessage(id, storage, deletedBy = null) {
+  const row = db.prepare('SELECT sender_id, attachment, is_deleted FROM messages WHERE id=?').get(id);
   if (!row || Number(row.is_deleted) === 1) return getMessageById(id);
   const keys = _attachmentS3Keys(row.attachment);
+  const deleter = deletedBy || row.sender_id;
   db.prepare('UPDATE conversations SET pinned_message_id=NULL WHERE pinned_message_id=?').run(id);
   db.prepare('DELETE FROM personal_message_pins WHERE message_id=?').run(id);
   const ts = now();
   db.prepare(
-    `UPDATE messages SET is_deleted=1, deleted_at=?, text=NULL, attachment=NULL,
+    `UPDATE messages SET is_deleted=1, deleted_at=?, deleted_by_id=?, text=NULL, attachment=NULL,
             link_preview=NULL, edited_at=NULL WHERE id=?`
-  ).run(ts, id);
+  ).run(ts, deleter, id);
   _cleanupS3Keys(storage, keys, id);
   return getMessageById(id);
 }
@@ -4417,7 +4443,7 @@ module.exports = {
   createGroup, updateGroup, addGroupMember, removeGroupMember, getGroupMembers,
   acceptGroupInvite, declineGroupInvite, isPendingMember, getInviterForPendingMember,
   joinGroupViaInvite, isGroupAdmin, setMemberAdmin, setGroupHistoryVisibility,
-  isNotificationsMuted, setNotificationsMuted,
+  isNotificationsMuted, setNotificationsMuted, isConversationArchived,
   archiveConversation, unarchiveConversation,
   getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,

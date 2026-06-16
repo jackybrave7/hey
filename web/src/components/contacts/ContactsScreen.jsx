@@ -13,6 +13,39 @@ import ImportContactsModal from './ImportContactsModal';
 import InviteModal from './InviteModal';
 import InviteByPhoneModal from './InviteByPhoneModal';
 import Icon from '../Icon';
+import { TabHeaderTitle } from '../shared/TabHeaderTitle';
+
+const CONTACTS_SORT_KEY = 'hey:contacts-sort';
+
+function loadContactsSort() {
+  try {
+    const v = localStorage.getItem(CONTACTS_SORT_KEY);
+    return v === 'alpha' ? 'alpha' : 'chat';
+  } catch {
+    return 'chat';
+  }
+}
+
+function contactDisplayName(c) {
+  return (c.nickname || c.name || '').trim();
+}
+
+function sortContacts(list, mode) {
+  const copy = [...list];
+  if (mode === 'chat') {
+    copy.sort((a, b) => {
+      const ta = a.last_chat_at || 0;
+      const tb = b.last_chat_at || 0;
+      if (tb !== ta) return tb - ta;
+      return contactDisplayName(a).localeCompare(contactDisplayName(b), 'ru', { sensitivity: 'base' });
+    });
+  } else {
+    copy.sort((a, b) =>
+      contactDisplayName(a).localeCompare(contactDisplayName(b), 'ru', { sensitivity: 'base' })
+    );
+  }
+  return copy;
+}
 
 export function ContactsScreen() {
   const nav = useNavigate();
@@ -24,7 +57,13 @@ export function ContactsScreen() {
   const [card,          setCard]          = useState(null);
   const [showImport,    setShowImport]    = useState(false);
   const [showInvite,    setShowInvite]    = useState(false);
+  const [sortMode,      setSortMode]      = useState(loadContactsSort);
   const [customConfirm, confirmModal]     = useConfirm();
+
+  function setContactsSort(mode) {
+    setSortMode(mode);
+    try { localStorage.setItem(CONTACTS_SORT_KEY, mode); } catch {}
+  }
 
   useEffect(() => {
     api.getContacts().then(setContacts).catch(console.error);
@@ -88,7 +127,10 @@ export function ContactsScreen() {
 
   const isBlockedId = (id) => blocked.some(b => b.id === id);
   // Показываем только незаблокированных
-  const visibleContacts = contacts.filter(c => !isBlockedId(c.id));
+  const visibleContacts = sortContacts(
+    contacts.filter(c => !isBlockedId(c.id)),
+    sortMode,
+  );
 
   return (
     <div style={{
@@ -100,13 +142,23 @@ export function ContactsScreen() {
       {/* Sticky header — full-width bg, content limited to 680 */}
       <div className="tab-header">
         <div className="tab-header-inner">
-          <div className="tab-header-title">
+          <TabHeaderTitle>
             <Icon name="users" size={20}/> Контакты
-          </div>
+          </TabHeaderTitle>
           <ChatContextMenu
             ariaLabel="Меню контактов"
             items={[
-              { label: 'Импорт контактов', icon: <Icon name="download" size={15}/>, onClick: () => setShowImport(true) },
+              {
+                label: sortMode === 'chat' ? '✓ Сортировать по общению' : 'Сортировать по общению',
+                icon: <Icon name="chat" size={15}/>,
+                onClick: () => setContactsSort('chat'),
+              },
+              {
+                label: sortMode === 'alpha' ? '✓ Сортировать по алфавиту' : 'Сортировать по алфавиту',
+                icon: <Icon name="users" size={15}/>,
+                onClick: () => setContactsSort('alpha'),
+              },
+              { label: 'Импорт контактов', icon: <Icon name="download" size={15}/>, separatorBefore: true, onClick: () => setShowImport(true) },
               { label: 'Пригласить друга', icon: <Icon name="share" size={15}/>, onClick: () => setShowInvite(true) },
             ]}
             trigger={

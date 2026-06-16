@@ -6,9 +6,11 @@ import { heyToast } from '../shared/Toast';
 import { useConfirm } from '../shared/Confirm';
 import { AvatarDisplay } from '../shared/AvatarDisplay';
 import ChatContextMenu, { AnchoredContextMenu } from '../chat/ChatContextMenu';
+import { TabHeaderTitle } from '../shared/TabHeaderTitle';
 import { renderPreviewWithEmoji } from '../chat/chatRender';
 import { messageConversationId, messagePreviewText } from '../../lib/messagePreview';
 import { syncMutedConversations } from '../../lib/mutedConversations';
+import { setConversationArchived, isConversationArchived } from '../../lib/archivedConversations';
 import Highlight from '../shared/Highlight';
 import Icon from '../Icon';
 import { fmtTime } from '../../lib/formatTime';
@@ -32,6 +34,7 @@ export function ConversationsScreen() {
   useEffect(() => socket.on('message:new', ({ message }) => {
     const convId = messageConversationId(message);
     if (!convId) return;
+    if (isConversationArchived(convId)) return;
     setConvs(prev => {
       const exists = prev.find(c => c.id === convId);
       if (!exists) { reload(); return prev; }
@@ -143,6 +146,7 @@ export function ConversationsScreen() {
   async function archive(c) {
     try {
       await api.archiveConversation(c.id);
+      setConversationArchived(c.id, true);
       setConvs(prev => prev.filter(x => x.id !== c.id));
       flashPinToast({ text: 'В архиве', iconName: 'archive' });
     } catch (e) { heyToast(e.message || 'Не удалось', 'error'); }
@@ -362,9 +366,9 @@ export function ConversationsScreen() {
       {/* Sticky header */}
       <div className="tab-header">
         <div className="tab-header-inner">
-          <div className="tab-header-title">
+          <TabHeaderTitle>
             <Icon name="chat" size={20} /> Чаты
-          </div>
+          </TabHeaderTitle>
           <ChatContextMenu
             ariaLabel="Меню чатов"
             items={[
@@ -745,6 +749,7 @@ function ArchiveListModal({ onClose, onUnarchive }) {
     setBusy(true);
     try {
       await api.unarchiveConversation(c.id);
+      setConversationArchived(c.id, false);
       setList(prev => prev.filter(x => x.id !== c.id));
       onUnarchive?.(c);
       heyToast('Восстановлено', 'success');

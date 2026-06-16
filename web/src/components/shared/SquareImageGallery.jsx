@@ -9,7 +9,7 @@ const MOVE_CANCEL_PX = 10;
  * Квадратная галерея: умная сетка с span'ами, контейнер 1:1.
  * reorderable: desktop — HTML5 DnD, mobile — long-press + touch drag.
  */
-function GalleryImage({ src, native, onClick, style, passPointerToParent }) {
+function GalleryImage({ src, native, onClick, onPointerDown, style, passPointerToParent }) {
   const imgStyle = {
     width: '100%',
     height: '100%',
@@ -21,13 +21,14 @@ function GalleryImage({ src, native, onClick, style, passPointerToParent }) {
     ...style,
   };
   if (native) {
-    return <img src={src} alt="" onClick={onClick} style={imgStyle} draggable={false} />;
+    return <img src={src} alt="" onClick={onClick} onPointerDown={onPointerDown} style={imgStyle} draggable={false} />;
   }
   return (
     <MediaImage
       src={src}
       alt=""
       onClick={onClick}
+      onPointerDown={onPointerDown}
       style={imgStyle}
       draggable={false}
     />
@@ -239,6 +240,7 @@ export function SquareImageGallery({
                 e.stopPropagation();
                 onImageClick(url, list, slot.index);
               } : undefined}
+              onPointerDown={onImageClick ? (e) => e.stopPropagation() : undefined}
               style={{
                 cursor: onImageClick ? 'zoom-in' : 'default',
                 opacity: opacity != null ? opacity : 1,

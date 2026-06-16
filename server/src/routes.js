@@ -1059,10 +1059,18 @@ module.exports = function makeRouter(db, broadcast) {
     if (!db.isMember(req.params.id, req.user.id))
       return res.status(403).json({ error: 'Forbidden' });
     db.archiveConversation(req.params.id, req.user.id);
+    broadcast([req.user.id], {
+      type: 'conversation:archived',
+      conversationId: req.params.id,
+    });
     res.json({ ok: true });
   });
   r.delete('/conversations/:id/archive', requireAuth, (req, res) => {
     db.unarchiveConversation(req.params.id, req.user.id);
+    broadcast([req.user.id], {
+      type: 'conversation:unarchived',
+      conversationId: req.params.id,
+    });
     res.json({ ok: true });
   });
 
@@ -1275,17 +1283,23 @@ module.exports = function makeRouter(db, broadcast) {
     const m = db.getMessageById(req.params.msgId);
     if (!m) return res.status(404).json({ error: 'Not found' });
     if (Number(m.is_deleted) === 1) return res.status(400).json({ error: 'Сообщение уже удалено' });
-    if (m.sender_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
     if (!db.isMember(req.params.id, req.user.id)) return res.status(403).json({ error: 'Not a member' });
     const conv = db.getConversationById(req.params.id);
+    const isOwn = m.sender_id === req.user.id;
     if (conv?.type === 'monolog') {
+      if (!isOwn) return res.status(403).json({ error: 'Forbidden' });
       const deleted = db.hardDeleteMessage(req.params.msgId, storage);
       broadcast(db.getConversationMembers(req.params.id), {
         type: 'message:deleted', messageId: req.params.msgId, hard: true, conversationId: req.params.id,
       });
       return res.json(deleted);
     }
-    const tombstone = db.deleteMessage(req.params.msgId, storage);
+    if (!isOwn) {
+      if (conv?.type !== 'group' || !db.isGroupAdmin(req.params.id, req.user.id)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+    const tombstone = db.deleteMessage(req.params.msgId, storage, req.user.id);
     broadcast(db.getConversationMembers(req.params.id), {
       type: 'message:deleted', message: tombstone, conversationId: req.params.id,
     });
@@ -1602,6 +1616,11 @@ module.exports = function makeRouter(db, broadcast) {
       if (!conv || conv.type !== 'group') return res.status(404).json({ error: 'Not found' });
       const muted = !!req.body?.muted;
       db.setNotificationsMuted(req.params.id, req.user.id, muted);
+      broadcast([req.user.id], {
+        type: 'conversation:notifications_muted',
+        conversationId: req.params.id,
+        muted,
+      });
       res.json({ ok: true, notifications_muted: muted });
     } catch (e) { res.status(403).json({ error: e.message }); }
   });

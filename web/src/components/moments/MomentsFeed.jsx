@@ -12,6 +12,7 @@ import SuperMomentGallery from './SuperMomentGallery';
 import SuperInfoScreen from '../super/SuperInfoScreen';
 import { useSalesPressure } from '../../lib/publicSettings';
 import HeyLogo from '../HeyLogo';
+import { TabHeaderTitle } from '../shared/TabHeaderTitle';
 
 export default function MomentsFeed({ currentUser }) {
   const salesPressure = useSalesPressure();
@@ -338,10 +339,10 @@ export default function MomentsFeed({ currentUser }) {
       {/* Sticky header */}
       <div className="tab-header">
         <div className="tab-header-inner">
-          <div className="tab-header-title">
+          <TabHeaderTitle>
             <HeyLogo size={20} color="#F9F0F0" />
             Моменты
-          </div>
+          </TabHeaderTitle>
           {canAddMore && (
             <button onClick={() => setShowCreate(true)}
               style={{

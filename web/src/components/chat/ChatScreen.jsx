@@ -13,7 +13,8 @@ import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { ImageLightbox } from '../shared/ImageLightbox';
 import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile } from '../../lib/uploadMedia';
 import { getBlobWaveform } from '../../lib/audioWaveform';
-import { messageConversationId } from '../../lib/messagePreview';
+import { messageConversationId, messageDeletedLabel, messageDeletedPreview } from '../../lib/messagePreview';
+import { setConversationArchived } from '../../lib/archivedConversations';
 import { fmtTime, fmtDate, fmtLastSeenShort } from '../../lib/formatTime';
 import { HEY_EMOJI as HEY_EMOJI_LIST, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
 import { openUserCard } from '../../lib/openUserCard';
@@ -454,6 +455,8 @@ export function ChatScreen() {
   useEffect(() => {
     function onKey(e) {
       if (e.key !== 'Escape') return;
+      // Лайтбокс сам: Esc → уменьшить / закрыть (capture в ImageLightbox).
+      if (lightbox) return;
       // Приоритет от самого «верхнего» к нижнему
       if (showMedia)             { setShowMedia(false);          return; }
       if (msgMenu)               { setMsgMenu(null);             return; }
@@ -1424,6 +1427,7 @@ export function ChatScreen() {
       { label: 'Вернуть из архива',      iconName: 'archive', onClick: async () => {
         try {
           await api.unarchiveConversation(convId);
+          setConversationArchived(convId, false);
           heyToast('Чат восстановлен', 'success');
           setPartner(p => ({ ...p, isArchived: false }));
         } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
@@ -1432,6 +1436,7 @@ export function ChatScreen() {
       { label: 'В архив',                iconName: 'archive', onClick: async () => {
         try {
           await api.archiveConversation(convId);
+          setConversationArchived(convId, true);
           heyToast('В архиве', 'success');
           nav('/chats');
         } catch (e) { heyToast(e.message || 'Ошибка', 'error'); }
@@ -1580,10 +1585,12 @@ export function ChatScreen() {
 
   // Stable callbacks for MessageRow (avoid re-renders from parent re-binding)
   const handleOpenMenu  = useCallback((e, m) => openMsgMenu(e, m), []);
-  const handleLightbox  = useCallback((src, urls) => {
+  const handleLightbox  = useCallback((src, urls, startIndex) => {
     if (Date.now() < blockLightboxUntil.current) return;
     if (Array.isArray(urls) && urls.length > 1) {
-      const idx = Math.max(0, urls.indexOf(src));
+      const idx = Number.isFinite(startIndex)
+        ? Math.max(0, Math.min(urls.length - 1, startIndex))
+        : Math.max(0, urls.indexOf(src));
       setLightbox({ urls, index: idx });
     } else {
       setLightbox({ urls: [src], index: 0 });
@@ -1755,9 +1762,7 @@ export function ChatScreen() {
         const canUnpin = partner.isGroup ? !!partner.myIsGroupAdmin : true;
         const pinnedDeleted = !!pinnedMessage.is_deleted;
         const pinnedText = pinnedDeleted
-          ? (pinnedMessage.sender_id === user?.id
-              ? 'Вы удалили сообщение'
-              : `${pinnedMessage.sender_name || 'Участник'} удалил(а) сообщение`)
+          ? messageDeletedLabel(pinnedMessage, user?.id)
           : (pinnedMessage.text || '');
         const pinnedAtt = !pinnedDeleted && !pinnedText && pinnedMessage.attachment
           ? pinnedMessage.attachment : null;
@@ -2189,7 +2194,9 @@ export function ChatScreen() {
         const isOwnReply = replyTo.sender_id === user?.id;
         const att = replyTo.attachment;
         const replyDeleted = !!replyTo.is_deleted;
-        let preview = replyDeleted ? 'Удалённое сообщение' : (replyTo.text || '').slice(0, 120);
+        let preview = replyDeleted
+          ? (messageDeletedPreview(replyTo) || 'Удалённое сообщение')
+          : (replyTo.text || '').slice(0, 120);
         let thumbUrl = null;
         if (!replyDeleted && att?.type === 'image')  thumbUrl = att.url;
         if (!replyDeleted && att?.type === 'images') thumbUrl = (att.urls && att.urls[0]) || null;
@@ -2866,6 +2873,8 @@ export function ChatScreen() {
           && (Date.now()/1000 - msgMenu.msg.created_at) < 24*60*60
           && (!!msgMenu.msg.text || isImageAttachment(msgMenu.msg.attachment));
         const canPin  = partner.isGroup ? !!partner.myIsGroupAdmin : true;
+        const canDelete = !msgMenu.msg.is_deleted
+          && (isOwn || (partner.isGroup && !!partner.myIsGroupAdmin));
         const isPinned = pinnedMessage && pinnedMessage.id === msgMenu.msg.id;
         const canCopy = !!msgMenu.msg.text && !msgMenu.msg.is_deleted;
         const copyText = () => {
@@ -2880,7 +2889,13 @@ export function ChatScreen() {
           canPin && !isPinned && { label:'Закрепить', icon: iconEl('pin'), onClick: () => pinMsg(msgMenu.msg) },
           canPin &&  isPinned && { label:'Открепить', icon: iconEl('unpin'), onClick: () => unpinMsg() },
           canEdit && { label:'Редактировать', icon: iconEl('pencil'), onClick: () => startEdit(msgMenu.msg) },
-          isOwn && !msgMenu.msg.is_deleted && { label:'Удалить', iconName:'delete', danger:true, separatorBefore:true, onClick: () => deleteMsg(msgMenu.msg) },
+          canDelete && {
+            label: isOwn ? 'Удалить' : 'Удалить сообщение',
+            iconName: 'delete',
+            danger: true,
+            separatorBefore: true,
+            onClick: () => deleteMsg(msgMenu.msg),
+          },
         ].filter(Boolean);
         return (
           <AnchoredContextMenu

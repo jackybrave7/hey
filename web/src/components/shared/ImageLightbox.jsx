@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { MediaImage } from './MediaImage';
 
 function clampPan(px, py, imgW, imgH, viewW, viewH) {
@@ -56,15 +56,23 @@ export function ImageLightbox({
     pendingIndexRef.current = null;
   }, [index, current]);
 
+  const measureViewport = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    setViewSize({ w: el.clientWidth, h: el.clientHeight });
+  }, []);
+
+  useLayoutEffect(() => {
+    measureViewport();
+  }, [measureViewport, zoomed, gallery, current]);
+
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
-    const update = () => setViewSize({ w: el.clientWidth, h: el.clientHeight });
-    update();
-    const ro = new ResizeObserver(update);
+    const ro = new ResizeObserver(measureViewport);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [zoomed, gallery]);
+  }, [measureViewport, zoomed, gallery]);
 
   useEffect(() => {
     if (!zoomed) return;
@@ -79,9 +87,13 @@ export function ImageLightbox({
     setSlideAnim(false);
   }, [index, onIndexChange]);
 
+  const viewportWidth = useCallback(() => {
+    return viewSize.w || viewportRef.current?.clientWidth || 0;
+  }, [viewSize.w]);
+
   const animateToIndex = useCallback((targetIndex) => {
     if (!onIndexChange || targetIndex === index) return;
-    const w = viewSize.w;
+    const w = viewportWidth();
     if (!w) {
       onIndexChange(targetIndex);
       return;
@@ -89,32 +101,47 @@ export function ImageLightbox({
     pendingIndexRef.current = targetIndex;
     setSlideAnim(true);
     setDragX(targetIndex > index ? -w : w);
-  }, [index, onIndexChange, viewSize.w]);
+  }, [index, onIndexChange, viewportWidth]);
 
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape') {
-        if (zoomed) {
-          setZoomed(false);
-          setPan({ x: 0, y: 0 });
-          return;
-        }
-        onClose?.();
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (zoomed) {
+        setZoomed(false);
+        setPan({ x: 0, y: 0 });
         return;
       }
+      onClose?.();
+    }
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [zoomed, onClose]);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       if (zoomed || !onIndexChange || slideAnim) return;
       if (e.key === 'ArrowLeft' && canPrev) animateToIndex(index - 1);
       if (e.key === 'ArrowRight' && canNext) animateToIndex(index + 1);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [zoomed, canPrev, canNext, index, onClose, onIndexChange, slideAnim, animateToIndex]);
+  }, [zoomed, canPrev, canNext, index, onIndexChange, slideAnim, animateToIndex]);
 
   const toggleZoom = useCallback((e) => {
     if (movedRef.current) return;
     e?.stopPropagation?.();
     setZoomed(z => {
-      if (z) setPan({ x: 0, y: 0 });
+      if (!z) {
+        const img = viewportRef.current?.querySelector('img');
+        if (img?.naturalWidth) {
+          setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+        }
+      } else {
+        setPan({ x: 0, y: 0 });
+      }
       return !z;
     });
   }, []);
@@ -143,8 +170,8 @@ export function ImageLightbox({
       startDragX: dragX,
       t: Date.now(),
       axis: null,
+      onImage: !!e.target?.closest?.('img'),
     };
-    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const onSwipePointerMove = (e) => {
@@ -157,9 +184,9 @@ export function ImageLightbox({
       s.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
       if (s.axis !== 'x') {
         swipeRef.current = null;
-        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
         return;
       }
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
     }
     if (s.axis !== 'x') return;
     e.preventDefault();
@@ -174,8 +201,9 @@ export function ImageLightbox({
     swipeRef.current = null;
 
     const dx = e.clientX - s.startX;
+    const dy = e.clientY - s.startY;
     const dt = Math.max(1, Date.now() - s.t);
-    const w = viewSize.w || viewportRef.current?.clientWidth || 0;
+    const w = viewportWidth();
     const velocity = dx / dt;
 
     let target = index;
@@ -186,6 +214,7 @@ export function ImageLightbox({
     }
 
     if (target !== index) {
+      movedRef.current = false;
       animateToIndex(target);
       return;
     }
@@ -195,6 +224,12 @@ export function ImageLightbox({
       setSlideAnim(true);
       setDragX(0);
     }
+
+    // pointer capture на viewport блокирует onPointerUp у <img> — зумим тут
+    if (!movedRef.current && s.onImage && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+      toggleZoom(e);
+    }
+    movedRef.current = false;
   };
 
   const onPanPointerDown = (e) => {
@@ -237,6 +272,12 @@ export function ImageLightbox({
     if (wasTap) toggleZoom(e);
   };
 
+  const syncNaturalFromImg = useCallback((e) => {
+    const img = e?.currentTarget;
+    if (!img?.naturalWidth) return;
+    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+  }, []);
+
   if (!current) return null;
 
   const navBtn = {
@@ -258,29 +299,42 @@ export function ImageLightbox({
     justifyContent: 'center',
   };
 
+  const slidePct = total > 0 ? 100 / total : 100;
   const slideStyle = gallery ? {
     display: 'flex',
     height: '100%',
-    width: '100%',
-    transform: `translateX(${-index * viewSize.w + dragX}px)`,
+    width: `${total * 100}%`,
+    transform: `translateX(calc(-${index * slidePct}% + ${dragX}px))`,
     transition: slideAnim ? `transform ${SLIDE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : 'none',
     willChange: 'transform',
   } : null;
 
-  const imageCellStyle = {
-    flex: '0 0 100%',
+  const imageCellStyle = gallery ? {
+    flex: `0 0 ${slidePct}%`,
+    width: `${slidePct}%`,
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    boxSizing: 'border-box',
+    minWidth: 0,
+  } : {
     width: '100%',
     height: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 12,
     boxSizing: 'border-box',
+    minWidth: 0,
   };
 
   const fittedImageStyle = {
-    maxWidth: '90vw',
-    maxHeight: '80vh',
+    maxWidth: '100%',
+    maxHeight: '100%',
+    width: 'auto',
+    height: 'auto',
     objectFit: 'contain',
     borderRadius: 14,
     boxShadow: '0 8px 48px rgba(0,0,0,.6)',
@@ -380,16 +434,12 @@ export function ImageLightbox({
           cursor: zoomed ? (dragging ? 'grabbing' : 'grab') : 'default',
         }}
       >
-        {zoomed && natural.w > 0 ? (
+        {zoomed ? (
+          natural.w > 0 ? (
           <MediaImage
             src={current}
             alt=""
-            onLoad={(e) => {
-              setNatural({
-                w: e.currentTarget.naturalWidth,
-                h: e.currentTarget.naturalHeight,
-              });
-            }}
+            onLoad={syncNaturalFromImg}
             style={{
               position: 'absolute',
               left: '50%',
@@ -405,6 +455,17 @@ export function ImageLightbox({
             }}
             draggable={false}
           />
+          ) : (
+            <div style={imageCellStyle}>
+              <MediaImage
+                src={current}
+                alt=""
+                onLoad={syncNaturalFromImg}
+                style={fittedImageStyle}
+                draggable={false}
+              />
+            </div>
+          )
         ) : gallery ? (
           <div
             style={slideStyle}
@@ -417,13 +478,7 @@ export function ImageLightbox({
                 <MediaImage
                   src={url}
                   alt=""
-                  onClick={i === index ? toggleZoom : undefined}
-                  onLoad={i === index ? (e) => {
-                    setNatural({
-                      w: e.currentTarget.naturalWidth,
-                      h: e.currentTarget.naturalHeight,
-                    });
-                  } : undefined}
+                  onLoad={i === index ? syncNaturalFromImg : undefined}
                   style={fittedImageStyle}
                   draggable={false}
                 />
@@ -436,12 +491,7 @@ export function ImageLightbox({
               src={current}
               alt=""
               onClick={toggleZoom}
-              onLoad={(e) => {
-                setNatural({
-                  w: e.currentTarget.naturalWidth,
-                  h: e.currentTarget.naturalHeight,
-                });
-              }}
+              onLoad={syncNaturalFromImg}
               style={fittedImageStyle}
               draggable={false}
             />

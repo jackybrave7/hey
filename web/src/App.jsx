@@ -42,7 +42,13 @@ import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
 import ServerStatusBanner from './components/ServerStatusBanner';
 import { ensurePushIfGranted } from './lib/push';
-import { isConversationMuted, syncMutedConversations } from './lib/mutedConversations';
+import { isConversationMuted, setConversationMuted, syncMutedConversations } from './lib/mutedConversations';
+import {
+  isConversationArchived,
+  setConversationArchived,
+  syncArchivedConversations,
+  onArchivedConversationsChange,
+} from './lib/archivedConversations';
 import { PublicSettingsProvider } from './lib/publicSettings';
 import { BootScreen } from './components/shared/BootMark';
 import {
@@ -53,9 +59,47 @@ import {
 
 function useNotifications() {
   const nav = useNavigate();
+  const location = useLocation();
   const { user: me } = useAuth();
-  // 1) Inline-Notification (вкладка открыта, но не в фокусе) — клик
-  //    фокусирует окно и SPA-навигирует в чат с сообщением.
+
+  // Список заглушённых чатов — сразу при логине. Раньше sync жил только в
+  // useUnreadCount внутри WithBottomNav, а /chat/:id рендерится без него —
+  // после F5 mute в памяти терялся и inline-notification снова показывался.
+  useEffect(() => {
+    if (!me?.id) return;
+    Promise.all([
+      api.getConversations(),
+      api.getArchivedConversations(),
+    ])
+      .then(([active, archived]) => {
+        syncMutedConversations(active);
+        syncArchivedConversations(archived);
+      })
+      .catch(() => {});
+  }, [me?.id]);
+
+  useEffect(() => {
+    return socket.on('conversation:archived', ({ conversationId }) => {
+      if (conversationId) setConversationArchived(conversationId, true);
+    });
+  }, []);
+
+  useEffect(() => {
+    return socket.on('conversation:unarchived', ({ conversationId }) => {
+      if (conversationId) setConversationArchived(conversationId, false);
+    });
+  }, []);
+
+  useEffect(() => {
+    return socket.on('conversation:notifications_muted', ({ conversationId, muted }) => {
+      if (conversationId) setConversationMuted(conversationId, !!muted);
+    });
+  }, []);
+
+  // 1) Inline-Notification — только когда вкладка видна, но не в фокусе
+  //    (другое окно поверх). Если вкладка скрыта/свёрнута — уведомление
+  //    приходит через Web Push + Service Worker; второй new Notification()
+  //    из WS давал дубль («Имя в группе» + «Имя»).
   useEffect(() => {
     return socket.on('message:new', ({ message }) => {
       if (Notification?.permission !== 'granted') return;
@@ -68,13 +112,13 @@ function useNotifications() {
       const convId = messageConversationId(message);
       if (!convId) return;
       if (isConversationMuted(convId)) return;
-      // document.hasFocus() в Опере (и иногда в Firefox/Safari) врёт —
-      // возвращает false даже на активной вкладке. Двойная проверка
-      // через visibilityState + hasFocus + наличие видимых клиентов SW.
+      if (isConversationArchived(convId)) return;
+      // Уже в этом чате — не дублируем системное уведомление.
+      if (location.pathname === `/chat/${convId}`) return;
       const isVisible = document.visibilityState === 'visible';
       const isFocused = (typeof document.hasFocus === 'function')
         ? document.hasFocus() : true;
-      if (isVisible && isFocused) return;
+      if (!isVisible || isFocused) return;
       const n = new Notification(message.sender_name || 'HEY', {
         body: messagePreviewText(message) || 'Новое сообщение',
         tag: convId,
@@ -86,7 +130,7 @@ function useNotifications() {
         n.close();
       };
     });
-  }, [nav, me?.id]);
+  }, [nav, me?.id, location.pathname]);
 
   // 2) Регистрируем SW ASAP — это критерий «installable» для Android Chrome
   //    (без зарегистрированного SW не появится prompt установки PWA). Раньше
@@ -175,18 +219,28 @@ function useUnreadCount() {
 
   useEffect(() => {
     if (!user) return;
-    api.getConversations()
-      .then(convs => {
-        setUnread(convs.reduce((s, c) => s + (c.unread_count || 0), 0));
-        syncMutedConversations(convs);
-      })
-      .catch(() => {});
+    const refresh = () => {
+      Promise.all([
+        api.getConversations(),
+        api.getArchivedConversations(),
+      ])
+        .then(([active, archived]) => {
+          syncMutedConversations(active);
+          syncArchivedConversations(archived);
+          setUnread(active.reduce((s, c) => s + (c.unread_count || 0), 0));
+        })
+        .catch(() => {});
+    };
+    refresh();
+    return onArchivedConversationsChange(refresh);
   }, [user]);
 
   useEffect(() => {
     return socket.on('message:new', ({ message }) => {
       if (message.sender_id === user?.id) return;
       if (location.pathname === '/chats') return;
+      const convId = messageConversationId(message);
+      if (convId && isConversationArchived(convId)) return;
       setUnread(n => n + 1);
     });
   }, [user?.id, location.pathname]);

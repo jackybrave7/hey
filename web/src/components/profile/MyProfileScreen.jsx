@@ -20,6 +20,7 @@ import { useSalesPressure } from '../../lib/publicSettings';
 import { MediaImage } from '../shared/MediaImage';
 import { mediaUrl } from '../../lib/mediaUrl';
 import { ImageLightbox } from '../shared/ImageLightbox';
+import { TabHeaderTitle } from '../shared/TabHeaderTitle';
 import { personalInviteUrl } from '../../lib/inviteLink';
 
 function ArchiveMomentThumb({ m }) {
@@ -360,9 +361,9 @@ export function MyProfileScreen() {
       {/* Sticky header */}
       <div className="tab-header">
         <div className="tab-header-inner">
-          <div className="tab-header-title">
+          <TabHeaderTitle>
             <Icon name="user" size={20}/> Профиль
-          </div>
+          </TabHeaderTitle>
           {editing ? (
             <div style={{display:'flex',gap:8}}>
               <button onClick={cancelEdit} style={{background:'rgba(22,15,50,.55)',border:'1px solid rgba(249,240,240,.28)',

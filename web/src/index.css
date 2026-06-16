@@ -132,6 +132,13 @@ html, body, #root {
   align-items: center;
   gap: 8px;
   line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity .12s;
+}
+.tab-header-title:active {
+  opacity: .82;
 }
 .back-btn {
   width: 44px;

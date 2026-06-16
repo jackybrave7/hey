@@ -221,7 +221,8 @@ module.exports = function setupWS(server) {
               db.updateMessageStatus(saved.id, 'delivered');
               broadcast([user.id], { type: 'message:status', id: saved.id, status: 'delivered' });
             }
-            if (!db.isNotificationsMuted(conversationId, uid)) {
+            if (!db.isNotificationsMuted(conversationId, uid)
+              && !db.isConversationArchived(conversationId, uid)) {
               pushRecipients.push(uid);
             }
           });

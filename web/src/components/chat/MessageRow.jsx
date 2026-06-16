@@ -12,7 +12,7 @@ import GroupInvitePreview from './GroupInvitePreview';
 import { fmtTime } from '../../lib/formatTime';
 import { fileTypeIcon, AttachmentPreview } from '../../lib/fileTypeIcon';
 import { mediaUrl } from '../../lib/mediaUrl';
-import { renderPreviewWithEmoji } from './chatRender';
+import { messageDeletedLabel, messageDeletedPreview } from '../../lib/messagePreview';
 
 function rxSig(reactions) {
   if (!reactions || !Object.keys(reactions).length) return '0';
@@ -44,9 +44,7 @@ const MessageRow = memo(function MessageRow({
   const showReactBtn = !isOut && !isDeleted
     && (isHovered || (!canHover && tappedReveal) || reactionPickerMsgId === m.id);
   const hasReactions = m.reactions && Object.keys(m.reactions).length > 0;
-  const deletedLabel = isOut
-    ? 'Вы удалили сообщение'
-    : `${m.sender_name || 'Участник'} удалил(а) сообщение`;
+  const deletedLabel = messageDeletedLabel(m, currentUserId);
 
   useEffect(() => () => {
     if (hoverOffTimer.current) clearTimeout(hoverOffTimer.current);
@@ -152,7 +150,7 @@ const MessageRow = memo(function MessageRow({
             if (isOut || canHover) return;
             const sel = window.getSelection?.();
             if (sel && sel.toString().length > 0) return;
-            if (e.target.closest && e.target.closest('a,button,img[role="button"]')) return;
+            if (e.target.closest && e.target.closest('a,button,img,[data-gallery-index]')) return;
             setTappedReveal(v => {
               const next = !v;
               if (!next && tapRevealTimer.current) {
@@ -258,7 +256,7 @@ const MessageRow = memo(function MessageRow({
                     overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                   }}>
                     {m.reply_to.is_deleted || attType === 'deleted'
-                      ? 'Удалённое сообщение'
+                      ? (messageDeletedPreview(m.reply_to) || 'Удалённое сообщение')
                       : previewText
                         ? renderPreviewWithEmoji(previewText)
                         : attType
@@ -298,9 +296,9 @@ const MessageRow = memo(function MessageRow({
             return (
               <SquareImageGallery
                 urls={urls}
-                onImageClick={(u, all) => {
+                onImageClick={(u, all, idx) => {
                   if (reactionPickerMsgId === m.id) return;
-                  onLightbox(u, all);
+                  onLightbox(u, all, idx);
                 }}
                 style={{ marginBottom: m.text ? 6 : 2 }}
               />
