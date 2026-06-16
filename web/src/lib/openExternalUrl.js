@@ -1,7 +1,9 @@
-import { detectInstalledAppKind } from './appClient';
-
-export function isAndroidInstalledApp() {
-  return detectInstalledAppKind() === 'android';
+function isAndroidInstalledApp() {
+  if (typeof window === 'undefined') return false;
+  const standalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  if (!standalone) return false;
+  return /Android/i.test(navigator.userAgent || '');
 }
 
 /** Открыть http(s)-ссылку: в TWA — системный браузер, иначе новая вкладка. */
