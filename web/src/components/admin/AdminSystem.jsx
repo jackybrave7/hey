@@ -5,14 +5,51 @@ import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
 import { useConfirm } from '../shared/Confirm';
 import Icon from '../Icon';
 
+// Повышенный контраст для админки на тёмном фоне
+const UI = {
+  text: '#F9F0F0',
+  muted: 'rgba(249,240,240,.82)',
+  sub: 'rgba(249,240,240,.68)',
+  faint: 'rgba(249,240,240,.55)',
+  panelBg: 'rgba(249,240,240,.10)',
+  cardBg: 'rgba(249,240,240,.12)',
+  border: 'rgba(249,240,240,.24)',
+  borderSoft: 'rgba(249,240,240,.18)',
+  inputBg: 'rgba(0,0,0,.48)',
+  inputBorder: 'rgba(249,240,240,.30)',
+  tabActiveBg: 'rgba(95, 64, 128,.9)',
+  tabInactiveBg: 'rgba(249,240,240,.14)',
+  tabInactiveText: 'rgba(249,240,240,.88)',
+  sectionTitle: 'rgba(249,240,240,.92)',
+};
+
+const panelStyle = {
+  background: UI.panelBg,
+  borderRadius: 14,
+  border: `1px solid ${UI.border}`,
+  padding: 20,
+};
+
+const attachBtnStyle = {
+  padding: '8px 14px',
+  borderRadius: 10,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  border: '1px dashed rgba(180,140,220,.55)',
+  background: 'rgba(95, 64, 128,.16)',
+  color: 'rgba(235,220,255,.98)',
+  fontFamily: 'inherit',
+};
+
 export default function AdminSystem() {
   const [tab, setTab] = useState('broadcast'); // 'broadcast' | 'moment'
   return (
     <div style={{ padding: '28px 32px', maxWidth: 720 }}>
-      <h1 style={{ color:'#F9F0F0', fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
+      <h1 style={{ color: UI.text, fontSize: 24, fontWeight: 800, marginBottom: 8 }}>
         📢 HEY-заведующий
       </h1>
-      <p style={{ color: 'rgba(249,240,240,.45)', fontSize: 13, marginTop: 0, marginBottom: 24 }}>
+      <p style={{ color: UI.muted, fontSize: 13, marginTop: 0, marginBottom: 24, lineHeight: 1.55 }}>
         Публикуй моменты и рассылай сообщения от лица сервисного аккаунта.
         Юзеры не смогут ответить — это односторонний канал.
       </p>
@@ -28,9 +65,11 @@ export default function AdminSystem() {
           <button key={t.v} onClick={() => setTab(t.v)}
             style={{
               padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', border: 'none',
-              background: tab === t.v ? 'rgba(95, 64, 128,.7)' : 'rgba(249,240,240,.08)',
-              color: tab === t.v ? '#F9F0F0' : 'rgba(249,240,240,.6)',
+              cursor: 'pointer',
+              border: tab === t.v ? '1px solid rgba(180,140,220,.45)' : `1px solid ${UI.borderSoft}`,
+              background: tab === t.v ? UI.tabActiveBg : UI.tabInactiveBg,
+              color: tab === t.v ? UI.text : UI.tabInactiveText,
+              boxShadow: tab === t.v ? '0 2px 10px rgba(95,64,128,.35)' : 'none',
             }}>
             {t.l}
           </button>
@@ -101,13 +140,13 @@ function ManagePublished() {
     return () => { offView(); offRx(); };
   }, []);
 
-  if (loading) return <div style={{padding:20,color:'rgba(249,240,240,.5)'}}>Загрузка…</div>;
+  if (loading) return <div style={{padding:20,color:UI.muted}}>Загрузка…</div>;
 
   async function deleteMoment(m) {
     const ok = await customConfirm(
       <>
         <div style={{fontWeight:600,marginBottom:8}}>Удалить момент?</div>
-        <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:6}}>
+        <div style={{color:UI.sub,fontSize:13,marginBottom:6}}>
           «{(m.text || '').slice(0, 120)}{(m.text || '').length > 120 ? '…' : ''}»
         </div>
         <div style={{color:'rgba(255,180,180,.7)',fontSize:12}}>Это действие необратимо.</div>
@@ -128,7 +167,7 @@ function ManagePublished() {
     const ok = await customConfirm(
       <>
         <div style={{fontWeight:600,marginBottom:8}}>Удалить рассылку?</div>
-        <div style={{color:'rgba(249,240,240,.6)',fontSize:13,marginBottom:6}}>
+        <div style={{color:UI.sub,fontSize:13,marginBottom:6}}>
           У всех получателей — это <strong>{b.recipients}</strong> чатов.
         </div>
         <div style={{color:'rgba(255,180,180,.7)',fontSize:12}}>Это действие необратимо.</div>
@@ -178,7 +217,7 @@ function ManagePublished() {
                   <img src={m.media_url} alt="" style={{
                     maxWidth: 220, maxHeight: 220, borderRadius: 10,
                     objectFit: 'cover', display: 'block', marginBottom: 10,
-                    border: '1px solid rgba(249,240,240,.08)',
+                    border: `1px solid ${UI.borderSoft}`,
                   }}/>
                 )}
                 {m.media_url && m.media_type === 'video' && (
@@ -225,7 +264,7 @@ function ManagePublished() {
           <Card key={b.id}>
             {editingBroadcastId === b.id ? (
               <>
-                <div style={{ color:'rgba(255,200,120,.85)', fontSize:12, marginBottom:8 }}>
+                <div style={{ color:'rgba(255,210,140,.95)', fontSize:12, marginBottom:8, fontWeight:600 }}>
                   ⚠ Изменение текста применится у всех {b.recipients} получателей
                 </div>
                 <textarea value={editText} onChange={e=>setEditText(e.target.value.slice(0, 2000))}
@@ -259,7 +298,7 @@ function ManagePublished() {
           position:'fixed', bottom:30, left:'50%', transform:'translateX(-50%)',
           background:'rgba(22,15,50,.97)', borderRadius:50, padding:'10px 20px',
           color:'#F9F0F0', fontSize:14, fontWeight:600, zIndex:1000,
-          border:'1px solid rgba(249,240,240,.15)', boxShadow:'0 4px 20px rgba(0,0,0,.5)',
+          border:`1px solid ${UI.border}`,
         }}>{toast}</div>
       )}
       {reactorsModal && (
@@ -290,9 +329,9 @@ function MomentReactionBar({ views, stats, onOpen }) {
   ];
   return (
     <div style={{
-      background:'rgba(249,240,240,.04)', borderRadius:12, padding:8,
+      background: UI.panelBg, borderRadius: 12, padding: 8,
       display:'flex', gap:4, marginBottom:10,
-      border:'1px solid rgba(249,240,240,.06)',
+      border:`1px solid ${UI.borderSoft}`,
     }}>
       {items.map(stat => (
         <button key={stat.key}
@@ -301,9 +340,9 @@ function MomentReactionBar({ views, stats, onOpen }) {
           title={stat.label}
           style={{
             flex:1, padding:'8px 6px', borderRadius:10,
-            background: stat.count > 0 ? 'rgba(249,240,240,.04)' : 'transparent',
-            border:'1px solid ' + (stat.count > 0 ? 'rgba(249,240,240,.08)' : 'transparent'),
-            color: stat.count > 0 ? 'rgba(249,240,240,.85)' : 'rgba(249,240,240,.3)',
+            background: stat.count > 0 ? 'rgba(249,240,240,.10)' : 'transparent',
+            border:'1px solid ' + (stat.count > 0 ? UI.borderSoft : 'transparent'),
+            color: stat.count > 0 ? UI.text : UI.faint,
             cursor: stat.count > 0 ? 'pointer' : 'default',
             fontFamily:'inherit',
             display:'flex', flexDirection:'column', alignItems:'center', gap:2,
@@ -346,32 +385,32 @@ function AdminReactorsModal({ filter, reactors, loading, onClose }) {
       <div style={{
         background:'rgba(22,15,50,.98)', borderRadius:18,
         width:'min(94vw, 420px)', maxHeight:'80vh', display:'flex', flexDirection:'column',
-        border:'1px solid rgba(249,240,240,.1)',
+        border:`1px solid ${UI.border}`,
         boxShadow:'0 20px 60px rgba(0,0,0,.65)',
       }}>
-        <div style={{padding:'16px 20px 14px',borderBottom:'1px solid rgba(249,240,240,.08)',
+        <div style={{padding:'16px 20px 14px',borderBottom:`1px solid ${UI.borderSoft}`,
           display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-          <span style={{display:'inline-flex',alignItems:'center',color:'rgba(249,240,240,.9)'}}>
+          <span style={{display:'inline-flex',alignItems:'center',color:UI.text}}>
             <Icon name={meta.iconName} size={22}/>
           </span>
           <div style={{flex:1}}>
-            <div style={{color:'#F9F0F0',fontSize:16,fontWeight:700}}>{meta.title}</div>
-            <div style={{color:'rgba(249,240,240,.45)',fontSize:12,marginTop:2}}>
+            <div style={{color:UI.text,fontSize:16,fontWeight:700}}>{meta.title}</div>
+            <div style={{color:UI.sub,fontSize:12,marginTop:2}}>
               {loading ? 'Загрузка…' : `${list.length} ${list.length === 1 ? 'человек' : 'человек'}`}
             </div>
           </div>
           <button onClick={onClose}
-            style={{background:'none',border:'none',color:'rgba(249,240,240,.4)',
+            style={{background:'none',border:'none',color:UI.sub,
               fontSize:24,cursor:'pointer',lineHeight:1,padding:0}}>×</button>
         </div>
         <div style={{flex:1,overflowY:'auto',padding:'8px 10px 14px'}}>
           {loading && (
-            <div style={{color:'rgba(249,240,240,.4)',textAlign:'center',padding:'40px 20px',fontSize:14}}>
+            <div style={{color:UI.muted,textAlign:'center',padding:'40px 20px',fontSize:14}}>
               Загрузка…
             </div>
           )}
           {!loading && list.length === 0 && (
-            <div style={{color:'rgba(249,240,240,.4)',textAlign:'center',padding:'40px 20px',fontSize:14}}>
+            <div style={{color:UI.muted,textAlign:'center',padding:'40px 20px',fontSize:14}}>
               Пока никого
             </div>
           )}
@@ -380,29 +419,30 @@ function AdminReactorsModal({ filter, reactors, loading, onClose }) {
               style={{
                 display:'flex', alignItems:'center', gap:12,
                 padding:'10px 12px', borderRadius:12, marginBottom:4,
-                background:'rgba(249,240,240,.03)',
+                background: UI.cardBg,
+                border: `1px solid ${UI.borderSoft}`,
               }}>
               <div style={{width:38,height:38,borderRadius:'50%',flexShrink:0,
-                background:'rgba(180,140,220,.3)',overflow:'hidden',
+                background:'rgba(180,140,220,.4)',overflow:'hidden',
                 display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:14,color:'#F9F0F0',fontWeight:700,
-                border:'1px solid rgba(249,240,240,.1)'}}>
+                fontSize:14,color:UI.text,fontWeight:700,
+                border:`1px solid ${UI.borderSoft}`}}>
                 {r.avatar
                   ? <img src={r.avatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                   : (r.nickname || r.name || '?')[0].toUpperCase()}
               </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{color:'#F9F0F0',fontSize:14,fontWeight:600,
+                <div style={{color:UI.text,fontSize:14,fontWeight:600,
                   overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                   {r.nickname || r.name || 'Без имени'}
                 </div>
                 {r.nickname && (
-                  <div style={{color:'rgba(249,240,240,.45)',fontSize:11,marginTop:1,
+                  <div style={{color:UI.sub,fontSize:11,marginTop:1,
                     overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                     {r.name}
                   </div>
                 )}
-                <div style={{color:'rgba(249,240,240,.35)',fontSize:11}}>
+                <div style={{color:UI.faint,fontSize:11}}>
                   {fmtTime(r.created_at)}
                 </div>
               </div>
@@ -418,8 +458,8 @@ function Section({ title, children }) {
   return (
     <div>
       <div style={{
-        color:'rgba(249,240,240,.7)', fontSize:13, fontWeight:700, textTransform:'uppercase',
-        letterSpacing:.8, marginBottom:10, paddingLeft:2,
+        color: UI.sectionTitle, fontSize: 13, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: .8, marginBottom: 10, paddingLeft: 2,
       }}>{title}</div>
       <div style={{display:'flex',flexDirection:'column',gap:10}}>{children}</div>
     </div>
@@ -428,17 +468,17 @@ function Section({ title, children }) {
 function Card({ children }) {
   return (
     <div style={{
-      background:'rgba(249,240,240,.05)', border:'1px solid rgba(249,240,240,.08)',
-      borderRadius:14, padding:'14px 16px',
+      background: UI.cardBg, border: `1px solid ${UI.border}`,
+      borderRadius: 14, padding: '14px 16px',
     }}>{children}</div>
   );
 }
 function Meta({ children }) {
   return <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,
-    color:'rgba(249,240,240,.5)',fontSize:12}}>{children}</div>;
+    color:UI.sub,fontSize:12}}>{children}</div>;
 }
 function Text({ children }) {
-  return <div style={{color:'rgba(249,240,240,.9)',fontSize:14,lineHeight:1.5,
+  return <div style={{color:UI.text,fontSize:14,lineHeight:1.5,
     marginBottom:12,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{children}</div>;
 }
 function Actions({ children }) {
@@ -446,36 +486,41 @@ function Actions({ children }) {
 }
 function Status({ status }) {
   const map = {
-    active:   { bg:'rgba(60,180,100,.15)',  color:'rgba(120,230,160,.95)', label:'активен' },
-    archived: { bg:'rgba(180,140,90,.15)',  color:'rgba(230,200,140,.95)', label:'архив'   },
-    deleted:  { bg:'rgba(180,80,80,.15)',   color:'rgba(255,140,140,.95)', label:'удалён'  },
+    active:   { bg:'rgba(60,180,100,.28)',  color:'rgba(150,255,190,.98)', label:'активен' },
+    archived: { bg:'rgba(180,140,90,.28)',  color:'rgba(255,220,150,.98)', label:'архив'   },
+    deleted:  { bg:'rgba(180,80,80,.28)',   color:'rgba(255,160,160,.98)', label:'удалён'  },
   };
   const s = map[status] || map.active;
   return <span style={{background:s.bg,color:s.color,borderRadius:6,padding:'2px 8px',fontSize:11,fontWeight:700}}>{s.label}</span>;
 }
 function Badge({ children }) {
-  return <span style={{background:'rgba(249,240,240,.08)',borderRadius:6,padding:'2px 8px',fontSize:11}}>{children}</span>;
+  return <span style={{
+    background:'rgba(249,240,240,.14)', color: UI.muted,
+    borderRadius:6, padding:'2px 8px', fontSize:11, fontWeight:600,
+    border:`1px solid ${UI.borderSoft}`,
+  }}>{children}</span>;
 }
 function Empty({ children }) {
-  return <div style={{padding:'20px',textAlign:'center',color:'rgba(249,240,240,.35)',fontSize:13,
-    background:'rgba(249,240,240,.03)',borderRadius:12,border:'1px dashed rgba(249,240,240,.08)'}}>{children}</div>;
+  return <div style={{padding:'20px',textAlign:'center',color:UI.muted,fontSize:13,
+    background:UI.panelBg,borderRadius:12,border:`1px dashed ${UI.border}`}}>{children}</div>;
 }
 function BtnSecondary({ children, ...p }) {
   return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer',
-    border:'1px solid rgba(249,240,240,.15)',background:'rgba(249,240,240,.05)',color:'#F9F0F0',fontFamily:'inherit'}}>{children}</button>;
+    border:`1px solid ${UI.border}`,background:'rgba(249,240,240,.10)',color:UI.text,fontFamily:'inherit'}}>{children}</button>;
 }
 function BtnPrimary({ children, ...p }) {
   return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',
-    border:'none',background:'rgba(95, 64, 128,.85)',color:'#F9F0F0',fontFamily:'inherit'}}>{children}</button>;
+    border:'none',background:'rgba(95, 64, 128,.92)',color:UI.text,fontFamily:'inherit',
+    boxShadow:'0 2px 10px rgba(95,64,128,.35)'}}>{children}</button>;
 }
 function BtnDanger({ children, ...p }) {
   return <button {...p} style={{padding:'7px 14px',borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer',
-    border:'1px solid rgba(255,80,80,.35)',background:'rgba(255,80,80,.12)',color:'rgba(255,170,170,.95)',fontFamily:'inherit'}}>{children}</button>;
+    border:'1px solid rgba(255,100,100,.55)',background:'rgba(255,80,80,.22)',color:'rgba(255,190,190,.98)',fontFamily:'inherit'}}>{children}</button>;
 }
 const editTextareaStyle = {
   width:'100%', boxSizing:'border-box',
-  background:'rgba(0,0,0,.35)', border:'1px solid rgba(249,240,240,.15)',
-  borderRadius:10, padding:'10px 12px', color:'#F9F0F0', fontSize:14,
+  background: UI.inputBg, border:`1px solid ${UI.inputBorder}`,
+  borderRadius:10, padding:'10px 12px', color: UI.text, fontSize:14,
   fontFamily:'inherit', resize:'vertical', outline:'none', lineHeight:1.5,
   marginBottom:10,
 };
@@ -564,11 +609,8 @@ function BroadcastForm() {
   }
 
   return (
-    <div style={{
-      background: 'rgba(249,240,240,.04)', borderRadius: 14,
-      border: '1px solid rgba(249,240,240,.08)', padding: 20,
-    }}>
-      <div style={{ color: 'rgba(249,240,240,.7)', fontSize: 13, marginBottom: 8 }}>
+    <div style={panelStyle}>
+      <div style={{ color: UI.muted, fontSize: 13, marginBottom: 8, fontWeight: 600 }}>
         Текст сообщения (придёт всем юзерам в чат с HEY-заведующим):
       </div>
       <textarea
@@ -578,14 +620,14 @@ function BroadcastForm() {
         placeholder="Привет! С сегодня в HEY доступна новая функция…"
         style={{
           width: '100%', boxSizing: 'border-box',
-          background: 'rgba(0,0,0,.3)', border: '1px solid rgba(249,240,240,.14)',
-          borderRadius: 12, padding: '12px 14px', color:'#F9F0F0', fontSize: 14,
+          background: UI.inputBg, border: `1px solid ${UI.inputBorder}`,
+          borderRadius: 12, padding: '12px 14px', color: UI.text, fontSize: 14,
           fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5,
           minHeight: 120,
         }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4,
-        fontSize: 11, color: 'rgba(249,240,240,.5)' }}>
+        fontSize: 11, color: UI.sub }}>
         <span>Можно добавить картинки (до {MAX_IMGS})</span>
         <span>{text.length} / 2000</span>
       </div>
@@ -600,7 +642,7 @@ function BroadcastForm() {
                   style={{
                     width:64, height:64, objectFit:'cover', borderRadius:10,
                     opacity: p.uploading ? .5 : 1,
-                    border:'1px solid rgba(249,240,240,.15)',
+                    border:`1px solid ${UI.border}`,
                   }}/>
                 {!p.uploading && (
                   <button onClick={() => removeImg(idx)}
@@ -619,12 +661,8 @@ function BroadcastForm() {
         <button onClick={() => fileRef.current?.click()}
           disabled={imgs.length >= MAX_IMGS || sending}
           style={{
-            padding:'8px 14px', borderRadius:10, fontSize:13, fontWeight:600,
+            ...attachBtnStyle,
             cursor: imgs.length >= MAX_IMGS ? 'not-allowed' : 'pointer',
-            border:'1px dashed rgba(180,140,220,.4)',
-            background:'rgba(95, 64, 128,.08)',
-            color:'rgba(220,200,255,.85)',
-            fontFamily:'inherit',
             opacity: imgs.length >= MAX_IMGS ? .5 : 1,
           }}>
           📎 {imgs.length === 0 ? 'Прикрепить картинки' : `+ ещё (${MAX_IMGS - imgs.length} осталось)`}
@@ -636,14 +674,14 @@ function BroadcastForm() {
 
       {error && (
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10,
-          background: 'rgba(255,80,80,.15)', color: 'rgba(255,170,170,.98)', fontSize: 13 }}>
+          background: 'rgba(255,80,80,.24)', color: 'rgba(255,200,200,.98)', fontSize: 13, fontWeight: 500 }}>
           {error}
         </div>
       )}
 
       {result && (
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10,
-          background: 'rgba(46,204,113,.18)', color: 'rgba(190,255,210,.98)', fontSize: 13 }}>
+          background: 'rgba(46,204,113,.28)', color: 'rgba(210,255,225,.98)', fontSize: 13, fontWeight: 500 }}>
           ✓ Доставлено {result.delivered} из {result.total}
         </div>
       )}
@@ -652,7 +690,7 @@ function BroadcastForm() {
         {confirming ? (
           <>
             <button onClick={() => setConfirming(false)} disabled={sending}
-              style={btnStyle('rgba(249,240,240,.08)', 'rgba(249,240,240,.85)')}>
+              style={btnStyle('rgba(249,240,240,.14)', UI.text)}>
               Отмена
             </button>
             <button onClick={send} disabled={sending}
@@ -853,7 +891,7 @@ function OnboardingTab() {
     const ok = await customConfirm(
       <>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>Удалить правило?</div>
-        <div style={{ color: 'rgba(249,240,240,.6)', fontSize: 13 }}>
+        <div style={{ color: UI.sub, fontSize: 13 }}>
           «{r.title || (r.text || '').slice(0, 60)}» — уже отправлено {r.sent_count} раз.
         </div>
       </>,
@@ -868,26 +906,23 @@ function OnboardingTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{
-        background: 'rgba(249,240,240,.04)', borderRadius: 14,
-        border: '1px solid rgba(249,240,240,.08)', padding: 20,
-      }}>
-        <div style={{ color: 'rgba(249,240,240,.75)', fontSize: 13, marginBottom: 14, lineHeight: 1.55 }}>
+      <div style={panelStyle}>
+        <div style={{ color: UI.muted, fontSize: 13, marginBottom: 14, lineHeight: 1.55 }}>
           Сообщение уйдёт в чат с HEY-заведующим через указанное время после регистрации.
           Каждому пользователю — один раз. Уже зарегистрированным, у кого срок прошёл, отправится при ближайшей проверке (раз в минуту).
         </div>
 
-        <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, marginBottom: 6 }}>Название (для себя)</div>
+        <div style={{ color: UI.sub, fontSize: 12, marginBottom: 6, fontWeight: 600 }}>Название (для себя)</div>
         <input value={title} onChange={e => setTitle(e.target.value.slice(0, 120))}
           placeholder="Приветствие через 5 минут"
           style={{
             width: '100%', boxSizing: 'border-box', marginBottom: 14,
-            background: 'rgba(0,0,0,.3)', border: '1px solid rgba(249,240,240,.14)',
-            borderRadius: 10, padding: '10px 12px', color: '#F9F0F0', fontSize: 14,
+            background: UI.inputBg, border: `1px solid ${UI.inputBorder}`,
+            borderRadius: 10, padding: '10px 12px', color: UI.text, fontSize: 14,
             fontFamily: 'inherit', outline: 'none',
           }}/>
 
-        <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, marginBottom: 8 }}>Через сколько после регистрации</div>
+        <div style={{ color: UI.sub, fontSize: 12, marginBottom: 8, fontWeight: 600 }}>Через сколько после регистрации</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
           {[
             { label: 'Дней', val: delayDays, set: setDelayDays, max: 365 },
@@ -895,18 +930,18 @@ function OnboardingTab() {
             { label: 'Минут', val: delayMinutes, set: setDelayMinutes, max: 59 },
           ].map(f => (
             <label key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 72 }}>
-              <span style={{ fontSize: 11, color: 'rgba(249,240,240,.45)' }}>{f.label}</span>
+              <span style={{ fontSize: 11, color: UI.faint, fontWeight: 600 }}>{f.label}</span>
               <input type="number" min={0} max={f.max} value={f.val}
                 onChange={e => f.set(Math.max(0, Math.min(f.max, parseInt(e.target.value, 10) || 0)))}
                 style={{
-                  width: 80, background: 'rgba(0,0,0,.3)', border: '1px solid rgba(249,240,240,.14)',
-                  borderRadius: 10, padding: '8px 10px', color: '#F9F0F0', fontSize: 14, fontFamily: 'inherit',
+                  width: 80, background: UI.inputBg, border: `1px solid ${UI.inputBorder}`,
+                  borderRadius: 10, padding: '8px 10px', color: UI.text, fontSize: 14, fontFamily: 'inherit',
                 }}/>
             </label>
           ))}
         </div>
 
-        <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, marginBottom: 6 }}>Текст сообщения</div>
+        <div style={{ color: UI.sub, fontSize: 12, marginBottom: 6, fontWeight: 600 }}>Текст сообщения</div>
         <textarea ref={textRef} value={text} onChange={e => setText(e.target.value.slice(0, 2000))}
           rows={5} placeholder="Привет! 👋 Рады видеть тебя в HEY…"
           style={editTextareaStyle}/>
@@ -914,12 +949,12 @@ function OnboardingTab() {
           {QUICK_EMOJIS.map(ch => (
             <button key={ch} type="button" onClick={() => insertEmoji(ch)}
               style={{
-                width: 34, height: 34, borderRadius: 8, border: '1px solid rgba(249,240,240,.12)',
-                background: 'rgba(249,240,240,.06)', fontSize: 18, cursor: 'pointer', padding: 0,
+                width: 34, height: 34, borderRadius: 8, border: `1px solid ${UI.borderSoft}`,
+                background: 'rgba(249,240,240,.12)', fontSize: 18, cursor: 'pointer', padding: 0,
               }}>{ch}</button>
           ))}
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(249,240,240,.4)', marginBottom: 10 }}>{text.length} / 2000</div>
+        <div style={{ fontSize: 11, color: UI.faint, marginBottom: 10 }}>{text.length} / 2000</div>
 
         {imgs.length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -927,7 +962,7 @@ function OnboardingTab() {
               <div key={idx} style={{ position: 'relative' }}>
                 <img src={p.dataUrl} alt="" style={{
                   width: 64, height: 64, objectFit: 'cover', borderRadius: 10,
-                  opacity: p.uploading ? .5 : 1, border: '1px solid rgba(249,240,240,.15)',
+                  opacity: p.uploading ? .5 : 1, border: `1px solid ${UI.border}`,
                 }}/>
                 {!p.uploading && (
                   <button onClick={() => removeImg(idx)} style={{
@@ -941,24 +976,20 @@ function OnboardingTab() {
           </div>
         )}
         <button onClick={() => fileRef.current?.click()} disabled={imgs.length >= MAX_IMGS || saving}
-          style={{
-            padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            border: '1px dashed rgba(180,140,220,.4)', background: 'rgba(95, 64, 128,.08)',
-            color: 'rgba(220,200,255,.85)', fontFamily: 'inherit', marginBottom: 14,
-          }}>
+          style={{ ...attachBtnStyle, marginBottom: 14 }}>
           📎 Прикрепить картинки (до {MAX_IMGS})
         </button>
         <input ref={fileRef} type="file" multiple accept="image/*" onChange={handleFiles} style={{ display: 'none' }}/>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, cursor: 'pointer',
-          color: 'rgba(249,240,240,.75)', fontSize: 13 }}>
+          color: UI.muted, fontSize: 13, fontWeight: 500 }}>
           <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)}/>
           Правило активно
         </label>
 
         {error && (
           <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 10,
-            background: 'rgba(255,80,80,.15)', color: 'rgba(255,170,170,.98)', fontSize: 13 }}>
+            background: 'rgba(255,80,80,.24)', color: 'rgba(255,200,200,.98)', fontSize: 13, fontWeight: 500 }}>
             {error}
           </div>
         )}
@@ -978,14 +1009,14 @@ function OnboardingTab() {
           <Card key={r.id}>
             <Meta>
               <span style={{
-                background: r.enabled ? 'rgba(60,180,100,.15)' : 'rgba(180,80,80,.15)',
-                color: r.enabled ? 'rgba(120,230,160,.95)' : 'rgba(255,140,140,.95)',
+                background: r.enabled ? 'rgba(60,180,100,.28)' : 'rgba(180,80,80,.28)',
+                color: r.enabled ? 'rgba(150,255,190,.98)' : 'rgba(255,160,160,.98)',
                 borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700,
               }}>{r.enabled ? 'вкл' : 'выкл'}</span>
               <Badge>⏱ {fmtOnboardingDelay(r)}</Badge>
               <Badge>📨 {r.sent_count} отправлено</Badge>
             </Meta>
-            {r.title && <div style={{ color: 'rgba(220,200,255,.9)', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{r.title}</div>}
+            {r.title && <div style={{ color: 'rgba(235,220,255,.98)', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{r.title}</div>}
             <Text>{r.text || (r.attachment ? '🖼 с картинкой' : '—')}</Text>
             <Actions>
               <BtnSecondary onClick={() => startEdit(r)}>✏ Изменить</BtnSecondary>
@@ -1001,7 +1032,7 @@ function OnboardingTab() {
           position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)',
           background: 'rgba(22,15,50,.97)', borderRadius: 50, padding: '10px 20px',
           color: '#F9F0F0', fontSize: 14, fontWeight: 600, zIndex: 1000,
-          border: '1px solid rgba(249,240,240,.15)',
+          border: `1px solid ${UI.border}`,
         }}>{toast}</div>
       )}
       {confirmModal}
@@ -1075,11 +1106,8 @@ function MomentForm() {
   }
 
   return (
-    <div style={{
-      background: 'rgba(249,240,240,.04)', borderRadius: 14,
-      border: '1px solid rgba(249,240,240,.08)', padding: 20,
-    }}>
-      <div style={{ color: 'rgba(249,240,240,.7)', fontSize: 13, marginBottom: 8 }}>
+    <div style={panelStyle}>
+      <div style={{ color: UI.muted, fontSize: 13, marginBottom: 8, fontWeight: 600 }}>
         Текст момента:
       </div>
       <textarea
@@ -1089,42 +1117,42 @@ function MomentForm() {
         placeholder="Анонс / новость / приглашение…"
         style={{
           width: '100%', boxSizing: 'border-box',
-          background: 'rgba(0,0,0,.3)', border: '1px solid rgba(249,240,240,.14)',
-          borderRadius: 12, padding: '12px 14px', color:'#F9F0F0', fontSize: 14,
+          background: UI.inputBg, border: `1px solid ${UI.inputBorder}`,
+          borderRadius: 12, padding: '12px 14px', color: UI.text, fontSize: 14,
           fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5,
           minHeight: 100,
         }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4,
-        fontSize: 11, color: 'rgba(249,240,240,.5)', marginBottom: 16 }}>
+        fontSize: 11, color: UI.sub, marginBottom: 16 }}>
         <span>Поддерживаются YouTube/Vimeo/RuTube/Kinescope ссылки в тексте</span>
         <span>{text.length} / 2000</span>
       </div>
 
       {/* Media uploader */}
-      <div style={{ color: 'rgba(249,240,240,.7)', fontSize: 13, marginBottom: 8 }}>
+      <div style={{ color: UI.muted, fontSize: 13, marginBottom: 8, fontWeight: 600 }}>
         Медиа (картинка или аудио) — необязательно:
       </div>
       {!media ? (
         <button onClick={() => fileRef.current?.click()}
           style={{
             width: '100%', padding: '20px', borderRadius: 12, cursor: 'pointer',
-            border: '2px dashed rgba(180,140,220,.35)',
-            background: 'rgba(95, 64, 128,.06)',
-            color: 'rgba(249,240,240,.7)', fontSize: 14, fontFamily: 'inherit',
+            border: '2px dashed rgba(180,140,220,.5)',
+            background: 'rgba(95, 64, 128,.12)',
+            color: UI.muted, fontSize: 14, fontFamily: 'inherit',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
             transition: 'all .15s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(95, 64, 128,.12)'; e.currentTarget.style.borderColor = 'rgba(180,140,220,.55)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(95, 64, 128,.06)'; e.currentTarget.style.borderColor = 'rgba(180,140,220,.35)'; }}>
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(95, 64, 128,.2)'; e.currentTarget.style.borderColor = 'rgba(180,140,220,.7)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(95, 64, 128,.12)'; e.currentTarget.style.borderColor = 'rgba(180,140,220,.5)'; }}>
           <span style={{ fontSize: 28 }}>📎</span>
           <span>Прикрепить файл</span>
-          <span style={{ fontSize: 12, opacity: .65 }}>JPG / PNG / WebP / GIF · MP3 / OGG · до 20 МБ</span>
+          <span style={{ fontSize: 12, color: UI.sub }}>JPG / PNG / WebP / GIF · MP3 / OGG · до 20 МБ</span>
         </button>
       ) : (
         <div style={{
           position: 'relative', borderRadius: 12, overflow: 'hidden',
-          background: '#0a0518', border: '1px solid rgba(249,240,240,.1)',
+          background: '#0a0518', border: `1px solid ${UI.border}`,
           maxHeight: 240,
         }}>
           {media.type === 'image' ? (
@@ -1164,14 +1192,14 @@ function MomentForm() {
 
       {error && (
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10,
-          background: 'rgba(255,80,80,.15)', color: 'rgba(255,170,170,.98)', fontSize: 13 }}>
+          background: 'rgba(255,80,80,.24)', color: 'rgba(255,200,200,.98)', fontSize: 13, fontWeight: 500 }}>
           {error}
         </div>
       )}
 
       {result && (
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 10,
-          background: 'rgba(46,204,113,.18)', color: 'rgba(190,255,210,.98)', fontSize: 13 }}>
+          background: 'rgba(46,204,113,.28)', color: 'rgba(210,255,225,.98)', fontSize: 13, fontWeight: 500 }}>
           ✓ Момент опубликован: <code style={{fontSize:11}}>{result.moment.id}</code>
         </div>
       )}
