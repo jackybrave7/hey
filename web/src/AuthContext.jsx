@@ -1,6 +1,7 @@
 // web/src/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react';
 import { api, socket } from './api';
+import { reportInstalledAppIfNeeded } from './lib/appClient';
 
 const AuthCtx = createContext(null);
 
@@ -19,6 +20,12 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   }, []);
+
+  // Сообщаем серверу, если HEY открыт как установленное приложение (PWA / Android).
+  useEffect(() => {
+    if (!user?.id) return;
+    reportInstalledAppIfNeeded(api);
+  }, [user?.id]);
 
   // Force logout when server confirms account deletion
   useEffect(() => {

@@ -11,6 +11,12 @@ function fmtDate(ts) {
   return new Date(ts * 1000).toLocaleDateString('ru', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+const APP_KIND_LABELS = {
+  android: { label: 'Android', color: 'rgba(140,220,255,.95)' },
+  pwa:     { label: 'PWA',     color: 'rgba(200,180,255,.95)' },
+  ios:     { label: 'iOS',     color: 'rgba(180,220,255,.95)' },
+};
+
 export default function AdminUsers() {
   const nav = useNavigate();
   // ?filter=active3d приходит c карточки дашборда «Активные за 3 дня».
@@ -193,12 +199,17 @@ export default function AdminUsers() {
                   title="Браузерные push-уведомления (Web Push)">
                   Push{sortIcon('push_devices')}
                 </th>
+                <th style={{...hcell, cursor:'pointer', userSelect:'none', textAlign:'center'}}
+                  onClick={() => toggleSort('app_kind')}
+                  title="Установлено приложение HEY (PWA или Android)">
+                  Приложение{sortIcon('app_kind')}
+                </th>
                 <th style={hcell}>Статус</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 && (
-                <tr><td colSpan={8} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
+                <tr><td colSpan={9} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
                   Пусто
                 </td></tr>
               )}
@@ -278,6 +289,17 @@ export default function AdminUsers() {
                           color:'rgba(249,240,240,.25)', fontSize:12 }}>
                         <Icon name="bell-off" size={14}/> —
                       </span>
+                    )}
+                  </td>
+                  <td style={{ ...cell, textAlign: 'center' }}>
+                    {u.app_installed && APP_KIND_LABELS[u.app_kind] ? (
+                      <span title={`Установлено: ${APP_KIND_LABELS[u.app_kind].label}`}
+                        style={{ color: APP_KIND_LABELS[u.app_kind].color, fontSize: 12, fontWeight: 600 }}>
+                        {APP_KIND_LABELS[u.app_kind].label}
+                      </span>
+                    ) : (
+                      <span title="Приложение не установлено (только браузер)"
+                        style={{ color: 'rgba(249,240,240,.25)', fontSize: 12 }}>—</span>
                     )}
                   </td>
                   <td style={cell}>

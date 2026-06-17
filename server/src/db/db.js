@@ -211,6 +211,17 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at  INTEGER NOT NULL
 )`); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id)'); } catch {}
+
+// Установленное приложение (PWA / Android TWA / iOS «На экран Домой»)
+try { db.exec(`CREATE TABLE IF NOT EXISTS user_app_clients (
+  user_id       TEXT NOT NULL,
+  kind          TEXT NOT NULL,
+  user_agent    TEXT,
+  first_seen_at INTEGER NOT NULL,
+  last_seen_at  INTEGER NOT NULL,
+  PRIMARY KEY (user_id, kind)
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_user_app_clients_user ON user_app_clients(user_id)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id)'); } catch {}
 
 // Отложенные сообщения. Лежат до момента send_at, потом фоновый
@@ -1225,6 +1236,7 @@ function hardDeleteUserAccount(userId) {
     // 7. Закреплённые чаты / push-подписки / presence
     try { db.prepare('DELETE FROM pinned_conversations WHERE user_id=?').run(userId); } catch {}
     try { db.prepare('DELETE FROM push_subscriptions WHERE user_id=?').run(userId); } catch {}
+    try { db.prepare('DELETE FROM user_app_clients WHERE user_id=?').run(userId); } catch {}
     try { db.prepare('DELETE FROM presence WHERE user_id=?').run(userId); } catch {}
     // 8. Сообщения: анонимизируем (NOT NULL FK на conversations, не рвём
     //    переписку для других участников; ставим sender NULL, текст
@@ -2389,6 +2401,28 @@ function removePushSubscriptions(endpoints) {
   if (!endpoints || !endpoints.length) return;
   const ph = endpoints.map(() => '?').join(',');
   db.prepare(`DELETE FROM push_subscriptions WHERE endpoint IN (${ph})`).run(...endpoints);
+}
+
+const APP_CLIENT_KINDS = new Set(['android', 'pwa', 'ios']);
+
+function recordAppClient(userId, kind, userAgent) {
+  if (!APP_CLIENT_KINDS.has(kind)) throw new Error('Неизвестный тип клиента');
+  const t = now();
+  db.prepare(
+    `INSERT INTO user_app_clients (user_id, kind, user_agent, first_seen_at, last_seen_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, kind) DO UPDATE SET
+       user_agent = excluded.user_agent,
+       last_seen_at = excluded.last_seen_at`
+  ).run(userId, kind, userAgent || null, t, t);
+}
+
+function getUserAppClients(userId) {
+  return db.prepare(
+    `SELECT kind, user_agent, first_seen_at, last_seen_at
+     FROM user_app_clients WHERE user_id = ?
+     ORDER BY last_seen_at DESC`
+  ).all(userId);
 }
 
 // Пин сообщений с разной семантикой для типов чатов:
@@ -3718,7 +3752,11 @@ function getAdminUsers({ search, filter } = {}) {
                ${sqlInvitedIdsForAdminUser()}
              ) x
              WHERE ${sqlInviteeIsConfirmed('x.id')})                                                                                      AS invited_confirmed,
-            (SELECT COUNT(*) FROM push_subscriptions ps WHERE ps.user_id = u.id)                          AS push_devices
+            (SELECT COUNT(*) FROM push_subscriptions ps WHERE ps.user_id = u.id)                          AS push_devices,
+            (SELECT kind FROM user_app_clients uac
+             WHERE uac.user_id = u.id
+             ORDER BY CASE uac.kind WHEN 'android' THEN 0 WHEN 'pwa' THEN 1 ELSE 2 END, uac.last_seen_at DESC
+             LIMIT 1)                                                                                    AS app_kind
      FROM users u
      LEFT JOIN presence p  ON p.user_id=u.id
      LEFT JOIN moments  m  ON m.user_id=u.id
@@ -3736,6 +3774,8 @@ function getAdminUsers({ search, filter } = {}) {
     must_change_password: !!r.must_change_password,
     push_devices: Number(r.push_devices) || 0,
     push_enabled: (Number(r.push_devices) || 0) > 0,
+    app_kind: r.app_kind || null,
+    app_installed: !!r.app_kind,
   }));
 }
 
@@ -3755,7 +3795,11 @@ function getAdminUserById(id) {
              ) x
              WHERE ${sqlInviteeIsConfirmed('x.id')})                                                                                AS invited_confirmed,
             (SELECT inv.name FROM users inv WHERE inv.id = u.referral_by)                             AS invited_by_name,
-            (SELECT COUNT(*) FROM push_subscriptions ps WHERE ps.user_id = u.id)                      AS push_devices
+            (SELECT COUNT(*) FROM push_subscriptions ps WHERE ps.user_id = u.id)                      AS push_devices,
+            (SELECT kind FROM user_app_clients uac
+             WHERE uac.user_id = u.id
+             ORDER BY CASE uac.kind WHEN 'android' THEN 0 WHEN 'pwa' THEN 1 ELSE 2 END, uac.last_seen_at DESC
+             LIMIT 1)                                                                                AS app_kind
      FROM users u
      LEFT JOIN presence p ON p.user_id=u.id
      WHERE u.id=?`
@@ -3770,6 +3814,9 @@ function getAdminUserById(id) {
     is_super: !!safe.is_super,
     push_devices: Number(safe.push_devices) || 0,
     push_enabled: (Number(safe.push_devices) || 0) > 0,
+    app_kind: safe.app_kind || null,
+    app_installed: !!safe.app_kind,
+    app_clients: getUserAppClients(id),
     is_blocked: !!safe.is_blocked, must_change_password: !!safe.must_change_password,
     invitees: getAdminInviteesList(id),
   };
@@ -4516,6 +4563,7 @@ module.exports = {
   getLinkPreviewCached, setLinkPreviewCached, updateMessageLinkPreview,
   pinMessage, unpinMessage, getPinnedMessage, forwardMessageToChats,
   pushSubscribe, pushUnsubscribe, getPushSubscriptions, removePushSubscriptions,
+  recordAppClient, getUserAppClients,
   clearConversationMessages, editMessage, deleteMessage, hardDeleteMessage,
   getMediaMessages, searchMessages, searchAllMessages,
   getCalls, createCall,

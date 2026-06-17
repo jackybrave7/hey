@@ -635,6 +635,17 @@ module.exports = function makeRouter(db, broadcast) {
     });
   });
 
+  r.post('/me/app-client', requireAuth, (req, res) => {
+    const kind = req.body?.kind;
+    if (!kind) return res.status(400).json({ error: 'kind required' });
+    try {
+      db.recordAppClient(req.user.id, kind, req.get('User-Agent') || null);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
   r.get('/me', requireAuth, (req, res) => {
     db.checkAndExpireSuper(req.user.id);
     const user = db.findUserById(req.user.id);

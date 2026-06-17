@@ -143,6 +143,7 @@ export const api = {
   // Web Push
   getPushPublicKey:  ()                    => req('GET',  '/push/public-key'),
   pushSubscribe:     (subscription)        => req('POST', '/push/subscribe', subscription),
+  reportAppClient:   (kind)                => req('POST', '/me/app-client', { kind }),
   pushUnsubscribe:   (endpoint)            => req('POST', '/push/unsubscribe', { endpoint }),
   pushTest:          ()                    => req('POST', '/push/test'),
   pinConversation:   (convId)             => req('POST',   `/conversations/${convId}/pin`),
