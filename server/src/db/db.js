@@ -42,7 +42,10 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS blocks (
 try { db.exec('ALTER TABLE contacts ADD COLUMN notes TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN invite_code TEXT'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN invite_rotated_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE users ADD COLUMN invite_link_uses INTEGER NOT NULL DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN referral_by TEXT'); } catch {}
+
+const INVITE_LINK_MAX_USES = 100;
 try { db.exec(`CREATE TABLE IF NOT EXISTS referrals (
   inviter_id  TEXT NOT NULL,
   invitee_id  TEXT NOT NULL,
@@ -494,6 +497,28 @@ db.prepare(`
   ) WHERE invited_count = 0
 `).run();
 
+// Одноразово: invite_link_uses = регистрации по ссылке с момента последней ротации.
+(function backfillInviteLinkUses() {
+  try {
+    const rows = db.prepare(
+      `SELECT u.id, u.created_at, u.invite_rotated_at, u.invite_link_uses,
+              (SELECT COUNT(*) FROM referrals r
+               WHERE r.inviter_id = u.id
+                 AND r.created_at >= COALESCE(u.invite_rotated_at, u.created_at)) AS n
+       FROM users u
+       WHERE u.invite_link_uses = 0`
+    ).all();
+    for (const row of rows) {
+      const n = Number(row.n) || 0;
+      if (n > 0) {
+        db.prepare('UPDATE users SET invite_link_uses=? WHERE id=?').run(n, row.id);
+      }
+    }
+  } catch (e) {
+    console.warn('[invite] link uses backfill failed:', e.message);
+  }
+})();
+
 // ── System user: «HEY-заведующий» ──────────────────────────────────────────
 // Создаётся один раз, если ещё нет в БД. Используется для сервисных уведомлений.
 // Юзеры не могут отправлять ему сообщения, но могут получать.
@@ -662,26 +687,59 @@ function generateUniqueInviteCode() {
 }
 
 // Обновляет персональный invite_code. После ротации старый код и
-// ссылки вида /register?invite=UUID перестают работать.
+// ссылки вида /register?invite=UUID перестают работать; счётчик сбрасывается.
 function rotateInviteCode(userId) {
   const code = generateUniqueInviteCode();
-  db.prepare('UPDATE users SET invite_code=?, invite_rotated_at=? WHERE id=?')
-    .run(code, now(), userId);
+  db.prepare(
+    'UPDATE users SET invite_code=?, invite_rotated_at=?, invite_link_uses=0 WHERE id=?'
+  ).run(code, now(), userId);
   return code;
 }
 
-function resolveInviterByInviteRef(ref) {
+function getInviteLinkUses(userId) {
+  return Number(db.prepare('SELECT invite_link_uses FROM users WHERE id=?').get(userId)?.invite_link_uses) || 0;
+}
+
+function isInviteLinkExhausted(userId) {
+  return getInviteLinkUses(userId) >= INVITE_LINK_MAX_USES;
+}
+
+function getInviteLinkStatus(userId) {
+  const uses = getInviteLinkUses(userId);
+  const limit = INVITE_LINK_MAX_USES;
+  return {
+    uses,
+    limit,
+    remaining: Math.max(0, limit - uses),
+    exhausted: uses >= limit,
+  };
+}
+
+function incrementInviteLinkUse(userId) {
+  db.prepare('UPDATE users SET invite_link_uses = invite_link_uses + 1 WHERE id=?').run(userId);
+}
+
+function findInviterByInviteRef(ref) {
   if (!ref || typeof ref !== 'string') return null;
   const trimmed = ref.trim();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
   if (isUuid) {
     const user = findUserById(trimmed);
     if (!user || user.is_blocked || user.is_deleted) return null;
-    if (user.invite_rotated_at) return null;
     return user;
   }
   const user = findUserByInviteCode(trimmed.toUpperCase());
   if (!user || user.is_blocked || user.is_deleted) return null;
+  return user;
+}
+
+function resolveInviterByInviteRef(ref) {
+  const user = findInviterByInviteRef(ref);
+  if (!user) return null;
+  const trimmed = ref.trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+  if (isUuid && user.invite_rotated_at) return null;
+  if (isInviteLinkExhausted(user.id)) return null;
   return user;
 }
 
@@ -716,7 +774,7 @@ function markReferralFromInviter(inviterId, inviteeId) {
   db.transaction(() => {
     db.prepare('INSERT OR IGNORE INTO referrals (inviter_id,invitee_id,created_at) VALUES (?,?,?)')
       .run(inviterId, inviteeId, now());
-    db.prepare('UPDATE users SET referral_by=? WHERE id=? AND (referral_by IS NULL OR referral_by="")')
+    db.prepare("UPDATE users SET referral_by=? WHERE id=? AND (referral_by IS NULL OR referral_by='')")
       .run(inviterId, inviteeId);
   })();
 }
@@ -4573,7 +4631,8 @@ module.exports = {
   getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter,
   attributeReferralIfUnassigned, backfillInviterReferrals,
   creditSchoolReferral, creditGroupInviterReferral,
-  rotateInviteCode, resolveInviterByInviteRef,
+  rotateInviteCode, resolveInviterByInviteRef, findInviterByInviteRef,
+  getInviteLinkStatus, isInviteLinkExhausted, incrementInviteLinkUse, INVITE_LINK_MAX_USES,
   findUserByEmail, findUserByEmailOrPhone, getSchoolAccount, getSchoolUserId,
   getTotalUnreadFor,
   // AWO integration

@@ -259,6 +259,15 @@ module.exports = function makeRouter(db, broadcast) {
     }
     // inviteUserId в теле — UUID или буквенный invite_code из ссылки.
     const inviterFromLink = inviteUserId ? db.resolveInviterByInviteRef(inviteUserId) : null;
+    if (inviteUserId && !inviterFromLink && !groupInvite) {
+      const peek = db.findInviterByInviteRef(inviteUserId);
+      if (peek && db.isInviteLinkExhausted(peek.id)) {
+        return res.status(400).json({
+          error: 'По этой ссылке уже зарегистрировалось 100 человек. Попроси друга нажать «Обновить ссылку» в приложении.',
+          code: 'INVITE_EXHAUSTED',
+        });
+      }
+    }
     const effectiveInviteUserId = inviterFromLink?.id || (groupInvite ? groupInvite.inviterId : null);
     if (!phone || !name || !password)
       return res.status(400).json({ error: 'phone, name, password required' });
@@ -311,6 +320,12 @@ module.exports = function makeRouter(db, broadcast) {
       termsVersion: CURRENT_TERMS_VERSION,
       inviteCode: inviterFromLink?.invite_code || undefined,
     });
+
+    if (inviterFromLink) {
+      try { db.incrementInviteLinkUse(inviterFromLink.id); } catch (e) {
+        console.warn('[invite] link use increment failed:', e.message);
+      }
+    }
 
     // Email из АВО-инвайта мы считаем уже подтверждённым (его привязал
     // школьный бизнес-процесс, не самостоятельный пользователь).
@@ -529,8 +544,17 @@ module.exports = function makeRouter(db, broadcast) {
 
   // Public invite info endpoint (no auth required)
   r.get('/users/:id/invite-info', (req, res) => {
-    const user = db.resolveInviterByInviteRef(req.params.id);
+    const user = db.findInviterByInviteRef(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
+    const trimmed = String(req.params.id).trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+    if (isUuid && user.invite_rotated_at) return res.status(404).json({ error: 'Not found' });
+    if (db.isInviteLinkExhausted(user.id)) {
+      return res.status(410).json({
+        error: 'По этой ссылке уже зарегистрировалось 100 человек. Попроси друга обновить ссылку в приложении.',
+        code: 'INVITE_EXHAUSTED',
+      });
+    }
     res.json({ id: user.id, name: user.name, avatar_url: user.avatar || null });
   });
 
@@ -1770,14 +1794,30 @@ module.exports = function makeRouter(db, broadcast) {
   r.get('/invite', requireAuth, (req, res) => {
     const user  = db.findUserById(req.user.id);
     const count = db.getReferralCount(req.user.id);
-    res.json({ code: user.invite_code, referral_count: count });
+    const link  = db.getInviteLinkStatus(req.user.id);
+    res.json({
+      code: user.invite_code,
+      referral_count: count,
+      invite_uses: link.uses,
+      invite_limit: link.limit,
+      invite_remaining: link.remaining,
+      invite_exhausted: link.exhausted,
+    });
   });
 
   r.post('/invite/rotate', requireAuth, rateLimit(10, 60 * 60 * 1000), (req, res) => {
     try {
       const code = db.rotateInviteCode(req.user.id);
       const count = db.getReferralCount(req.user.id);
-      res.json({ code, referral_count: count });
+      const link  = db.getInviteLinkStatus(req.user.id);
+      res.json({
+        code,
+        referral_count: count,
+        invite_uses: link.uses,
+        invite_limit: link.limit,
+        invite_remaining: link.remaining,
+        invite_exhausted: link.exhausted,
+      });
     } catch (e) {
       res.status(500).json({ error: e.message || 'Не удалось обновить ссылку' });
     }
@@ -1786,6 +1826,12 @@ module.exports = function makeRouter(db, broadcast) {
   r.get('/invite/:code', (req, res) => {
     const user = db.findUserByInviteCode(req.params.code.toUpperCase());
     if (!user) return res.status(404).json({ error: 'Не найдено' });
+    if (db.isInviteLinkExhausted(user.id)) {
+      return res.status(410).json({
+        error: 'По этой ссылке уже зарегистрировалось 100 человек. Попроси друга обновить ссылку.',
+        code: 'INVITE_EXHAUSTED',
+      });
+    }
     res.json({ name: user.name, avatar: user.avatar });
   });
 

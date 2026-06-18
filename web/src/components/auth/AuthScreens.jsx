@@ -374,6 +374,7 @@ export function RegisterScreen() {
   const [loading, setLoading]   = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
   const [inviter, setInviter]   = useState(null);
+  const [inviteExhausted, setInviteExhausted] = useState(false);
   // Шаг подтверждения номера: SMS у нас нет, поэтому перед фактической
   // регистрацией показываем крупный поп-ап с номером и просим
   // подтвердить — поменять потом будет нельзя.
@@ -410,14 +411,21 @@ export function RegisterScreen() {
   // Load inviter info if invite code present
   useEffect(() => {
     if (!inviteCode) return;
+    setInviteExhausted(false);
     api.getUserInviteInfo(inviteCode)
       .then(setInviter)
-      .catch(() => {});
+      .catch((e) => {
+        if ((e.message || '').includes('100 человек')) setInviteExhausted(true);
+      });
   }, [inviteCode]);
 
   // Первый шаг — валидация формы и открытие модалки с большим номером.
   function startRegister() {
     setErr('');
+    if (inviteExhausted && inviteCode && !schoolInvite && !groupInvite) {
+      setErr('Ссылка-приглашение исчерпана. Попроси друга обновить ссылку в приложении.');
+      return;
+    }
     if (!name.trim()) { setErr('Введите имя'); return; }
     const pv = validatePhone(phone);
     if (!pv.ok) { setErr(pv.msg); return; }
@@ -460,6 +468,16 @@ export function RegisterScreen() {
     }}>
       <div style={{ width: '100%', maxWidth: 380 }}>
         <AuthBrand />
+
+        {inviteExhausted && (
+          <div style={{
+            background: 'rgba(200,60,60,.15)', border: '1px solid rgba(255,120,120,.28)',
+            borderRadius: 14, padding: '12px 16px', marginBottom: 18,
+            color: 'rgba(255,190,190,.95)', fontSize: 13, lineHeight: 1.5,
+          }}>
+            По этой ссылке уже зарегистрировалось 100 человек. Попроси друга нажать «Обновить ссылку» в приложении HEY.
+          </div>
+        )}
 
         {inviter && <InviteBadge name={inviter.name} avatar={inviter.avatar_url} />}
 

@@ -28,7 +28,7 @@ function InviteModal({ onClose }) {
   async function rotateLink() {
     if (rotating || !info) return;
     const ok = window.confirm(
-      'Обновить пригласительную ссылку?\n\nСтарая перестанет работать — даже если вы уже отправили её кому-то. Уже приглашённые друзья останутся в статистике.',
+      'Обновить пригласительную ссылку?\n\nСтарая перестанет работать. Счётчик сбросится — ссылка снова примет до 100 регистраций. Уже приглашённые друзья останутся в статистике.',
     );
     if (!ok) return;
     setRotating(true);
@@ -49,6 +49,11 @@ function InviteModal({ onClose }) {
   const referralCount = info?.referral_count ?? 0;
   const goal = 3;
   const pct  = Math.min(referralCount / goal * 100, 100);
+  const inviteLimit = info?.invite_limit ?? 100;
+  const inviteUses = info?.invite_uses ?? 0;
+  const inviteRemaining = info?.invite_remaining ?? Math.max(0, inviteLimit - inviteUses);
+  const inviteExhausted = info?.invite_exhausted ?? inviteUses >= inviteLimit;
+  const invitePct = Math.min((inviteUses / inviteLimit) * 100, 100);
 
   const overlay = { position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,.6)',
     backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center' };
@@ -108,7 +113,40 @@ function InviteModal({ onClose }) {
               {rotating ? 'Обновляем…' : 'Обновить ссылку'}
             </button>
             <div style={{ color: 'rgba(249,240,240,.42)', fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
-              Если ссылка ушла не туда — обновите её. Старая перестанет открывать регистрацию.
+              {inviteExhausted
+                ? 'Ссылка перестала работать — лимит 100 регистраций исчерпан. Нажмите «Обновить ссылку».'
+                : `Действует ещё на ${inviteRemaining} ${inviteRemaining === 1 ? 'регистрацию' : inviteRemaining < 5 ? 'регистрации' : 'регистраций'}. Если ссылка ушла не туда — обновите её.`}
+            </div>
+            {inviteExhausted && (
+              <div style={{
+                marginTop: 10, padding: '10px 12px', borderRadius: 12,
+                background: 'rgba(200,60,60,.15)', border: '1px solid rgba(255,120,120,.25)',
+                color: 'rgba(255,180,180,.95)', fontSize: 12, lineHeight: 1.45,
+              }}>
+                По этой ссылке уже зарегистрировались {inviteLimit} человек. Обновите ссылку, чтобы приглашать дальше.
+              </div>
+            )}
+            <div style={{
+              marginTop: 14, background: 'rgba(249,240,240,.05)', borderRadius: 12, padding: '12px 14px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+                <span style={{ color: 'rgba(249,240,240,.55)' }}>Регистрации по текущей ссылке</span>
+                <span style={{
+                  color: inviteExhausted ? 'rgba(255,160,160,.95)' : 'rgba(200,180,255,.9)',
+                  fontWeight: 700,
+                }}>
+                  {inviteUses} / {inviteLimit}
+                </span>
+              </div>
+              <div style={{ height: 6, background: 'rgba(249,240,240,.1)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', width: `${invitePct}%`, borderRadius: 4,
+                  background: inviteExhausted
+                    ? 'rgba(220,80,80,.85)'
+                    : 'linear-gradient(90deg, rgba(95,64,128,.8), rgba(160,120,220,.9))',
+                  transition: 'width .4s ease',
+                }}/>
+              </div>
             </div>
           </div>
 
