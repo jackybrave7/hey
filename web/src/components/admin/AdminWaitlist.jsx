@@ -1,9 +1,10 @@
 // AdminWaitlist.jsx — заявки «открыть регистрацию без приглашения».
-// Юзеры оставляют email на InviteOnlyBlock-экране. Админ их прорабатывает:
-// помечает «уведомлён» когда написал, или удаляет неактуальное.
+// Юзеры оставляют email на InviteOnlyBlock-экране. Админ отправляет
+// персональный инвайт от своего аккаунта или помечает «уведомлён» вручную.
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../../api';
 import { useConfirm } from '../shared/Confirm';
+import { useAuth } from '../../AuthContext';
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -13,13 +14,20 @@ function fmtDate(ts) {
 }
 
 export default function AdminWaitlist() {
+  const { user: me } = useAuth();
   const [items, setItems]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('pending'); // pending | notified | all
   const [busy, setBusy]     = useState({}); // {id: bool}
+  const [toast, setToast]   = useState('');
   const [customConfirm, confirmModal] = useConfirm();
+
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 4500);
+  }
 
   async function load() {
     setLoading(true); setError('');
@@ -45,6 +53,41 @@ export default function AdminWaitlist() {
     pending: items.filter(x => !x.notified_at).length,
     notified: items.filter(x => x.notified_at).length,
   }), [items]);
+
+  async function sendInvite(item) {
+    const inviter = me?.name || 'вы';
+    const ok = await customConfirm(
+      <>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Отправить приглашение?</div>
+        <div style={{ fontSize: 13, lineHeight: 1.5, color: 'rgba(249,240,240,.75)' }}>
+          На <strong style={{ color: '#F9F0F0' }}>{item.email}</strong> уйдёт письмо с
+          персональной ссылкой от имени <strong style={{ color: '#F9F0F0' }}>{inviter}</strong>.
+          Заявка будет помечена как обработанная.
+        </div>
+      </>,
+      { confirmLabel: '📨 Отправить инвайт' },
+    );
+    if (!ok) return;
+    setBusy(b => ({ ...b, [item.id]: true }));
+    try {
+      const r = await api.adminWaitlistSendInvite(item.id);
+      setItems(prev => prev.map(x => x.id === item.id ? {
+        ...x,
+        notified_at: x.notified_at || Math.floor(Date.now() / 1000),
+        invite_sent_at: Math.floor(Date.now() / 1000),
+        invite_sent_by: me?.id,
+        invite_sent_by_name: r.inviterName || inviter,
+      } : x));
+      if (r.emailSent) {
+        showToast(`✓ Письмо отправлено на ${r.email}`);
+      } else {
+        showToast(`SMTP недоступен — ссылка в feedback.log. ${r.inviteLink}`);
+      }
+    } catch (e) {
+      alert(e.message || 'Не удалось отправить');
+    }
+    setBusy(b => ({ ...b, [item.id]: false }));
+  }
 
   async function toggleNotified(item) {
     setBusy(b => ({ ...b, [item.id]: true }));
@@ -101,8 +144,9 @@ export default function AdminWaitlist() {
 
       <p style={{ color: 'rgba(249,240,240,.7)', fontSize: 13, marginTop: 0, marginBottom: 18,
         lineHeight: 1.5 }}>
-        Юзеры, оставившие email на экране «Только по приглашению». Когда
-        напишешь им — нажми «✓ Уведомлён», чтобы убрать из счётчика.
+        Юзеры, оставившие email на экране «Только по приглашению».
+        Нажмите <strong>«Отправить инвайт»</strong> — на email уйдёт персональная ссылка
+        от вашего аккаунта ({me?.name || 'админ'}). Или отметьте «Уведомлён» вручную.
       </p>
 
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom: 14, alignItems:'center' }}>
@@ -148,6 +192,7 @@ export default function AdminWaitlist() {
                 <th style={th}>Источник</th>
                 <th style={th}>Когда</th>
                 <th style={th}>Уведомлён</th>
+                <th style={th}>Инвайт</th>
                 <th style={{ ...th, textAlign:'right' }}>Действия</th>
               </tr>
             </thead>
@@ -196,7 +241,32 @@ export default function AdminWaitlist() {
                           letterSpacing:.3,
                         }}>НЕТ</span>}
                   </td>
+                  <td style={td}>
+                    {it.invite_sent_at ? (
+                      <span title={it.invite_sent_by_name ? `От ${it.invite_sent_by_name}` : ''}
+                        style={{
+                          display:'inline-flex', alignItems:'center', gap:6,
+                          padding:'2px 10px', borderRadius:6,
+                          background:'rgba(95,64,128,.28)',
+                          border:'1px solid rgba(180,140,255,.35)',
+                          color:'rgba(220,200,255,1)', fontWeight:600, fontSize:12,
+                        }}>
+                        📨 {fmtDate(it.invite_sent_at)}
+                      </span>
+                    ) : (
+                      <span style={{ color:'rgba(249,240,240,.35)', fontSize:12 }}>—</span>
+                    )}
+                  </td>
                   <td style={{ ...td, textAlign:'right', whiteSpace:'nowrap' }}>
+                    <button
+                      disabled={busy[it.id]}
+                      onClick={() => sendInvite(it)}
+                      style={smallBtn('primary')}
+                      title="Отправить персональный инвайт на email"
+                    >
+                      📨 Инвайт
+                    </button>
+                    {' '}
                     <button disabled={busy[it.id]} onClick={() => toggleNotified(it)} style={smallBtn()}>
                       {it.notified_at ? '↺ Сбросить' : '✓ Уведомлён'}
                     </button>
@@ -209,6 +279,17 @@ export default function AdminWaitlist() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {toast && (
+        <div style={{
+          position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
+          background:'rgba(38,28,68,.97)', border:'1px solid rgba(180,140,255,.35)',
+          borderRadius:12, padding:'12px 20px', color:'#F9F0F0', fontSize:13,
+          fontWeight:600, zIndex:8000, maxWidth:'min(92vw,520px)', textAlign:'center',
+          boxShadow:'0 8px 32px rgba(0,0,0,.45)',
+        }}>
+          {toast}
         </div>
       )}
       {confirmModal}
@@ -226,10 +307,15 @@ function btn() {
   };
 }
 function smallBtn(variant) {
+  const bg = variant === 'danger'
+    ? 'rgba(220,80,80,.45)'
+    : variant === 'primary'
+      ? 'rgba(95, 64, 128,.65)'
+      : 'rgba(249,240,240,.08)';
   return {
     padding:'5px 10px', borderRadius:7, fontSize:12, fontWeight:600,
     cursor:'pointer', border:'none', color:'#F9F0F0',
-    background: variant === 'danger' ? 'rgba(220,80,80,.45)' : 'rgba(249,240,240,.08)',
+    background: bg,
   };
 }
 function tab(active) {

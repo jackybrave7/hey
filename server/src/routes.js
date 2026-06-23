@@ -467,6 +467,94 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  function personalInviteUrl(code) {
+    const origin = process.env.PUBLIC_ORIGIN || 'https://hey-messenger.ru';
+    return `${origin}/register?invite=${encodeURIComponent(code)}`;
+  }
+
+  async function sendWaitlistInviteEmail({ to, inviteLink, inviterName }) {
+    const t = createTransporter();
+    const subject = 'Приглашение попробовать HEY Messenger';
+    const text =
+      `Привет!\n\n` +
+      `${inviterName} приглашает тебя попробовать HEY — мессенджер для приватного круга без рекламы.\n\n` +
+      `Перейди по ссылке и зарегистрируйся:\n${inviteLink}\n\n` +
+      `Ссылка персональная. Если письмо пришло по ошибке — просто проигнорируй его.`;
+    const html =
+      `<p>Привет!</p>` +
+      `<p><strong>${inviterName}</strong> приглашает тебя попробовать <strong>HEY</strong> — мессенджер для приватного круга без рекламы.</p>` +
+      `<p><a href="${inviteLink}" style="background:#5F4080;color:#F9F0F0;padding:12px 22px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:600">Принять приглашение</a></p>` +
+      `<p style="color:#888;font-size:12px">Если кнопка не работает — открой в браузере:<br><a href="${inviteLink}">${inviteLink}</a></p>` +
+      `<p style="color:#888;font-size:12px">Ссылка персональная. Если письмо пришло по ошибке — просто проигнорируй его.</p>`;
+    if (!t) {
+      try {
+        fs.appendFileSync(FEEDBACK_LOG,
+          `\n[${new Date().toISOString()}] WAITLIST-INVITE fallback to=${to} from=${inviterName}\n  ${inviteLink}\n`);
+      } catch {}
+      console.warn('[waitlist-invite] SMTP не настроен — ссылка для', to, ':', inviteLink);
+      return { emailSent: false, inviteLink };
+    }
+    await t.sendMail({
+      from: `"HEY Messenger" <${process.env.SMTP_USER}>`,
+      to,
+      subject,
+      text,
+      html,
+    });
+    return { emailSent: true, inviteLink };
+  }
+
+  // Отправить персональный инвайт waitlist-заявке от имени текущего админа.
+  r.post('/admin/waitlist/:id/send-invite', requireAdmin, rateLimit(30, 60 * 60 * 1000), async (req, res) => {
+    try {
+      const entry = db.getWaitlistEntryById(req.params.id);
+      if (!entry) return res.status(404).json({ error: 'Заявка не найдена' });
+
+      const email = String(entry.email || '').trim().toLowerCase();
+      if (!awo.isValidEmail(email)) {
+        return res.status(400).json({ error: 'Некорректный email в заявке' });
+      }
+      if (db.findUserByEmail(email)) {
+        return res.status(409).json({ error: 'На этот email уже зарегистрирован аккаунт HEY' });
+      }
+
+      const admin = db.findUserById(req.user.id);
+      if (!admin?.invite_code) {
+        return res.status(400).json({ error: 'У вашего аккаунта нет пригласительного кода' });
+      }
+      if (db.isInviteLinkExhausted(admin.id)) {
+        return res.status(400).json({
+          error: 'Ваша пригласительная ссылка исчерпана (100 регистраций). Обновите ссылку в профиле HEY.',
+          code: 'INVITE_EXHAUSTED',
+        });
+      }
+
+      const inviteLink = personalInviteUrl(admin.invite_code);
+      const inviterName = admin.name || 'Команда HEY';
+      const mailResult = await sendWaitlistInviteEmail({ to: email, inviteLink, inviterName });
+
+      db.markWaitlistInviteSent(entry.id, admin.id);
+      db.logAdminAction?.({
+        adminId: admin.id,
+        action: 'waitlist_send_invite',
+        reason: email,
+      });
+
+      const linkStatus = db.getInviteLinkStatus(admin.id);
+      res.json({
+        ok: true,
+        email,
+        emailSent: mailResult.emailSent,
+        inviteLink: mailResult.inviteLink,
+        inviterName,
+        invite_remaining: linkStatus.remaining,
+      });
+    } catch (e) {
+      console.error('[waitlist-invite]', e);
+      res.status(500).json({ error: e.message || 'Не удалось отправить приглашение' });
+    }
+  });
+
   r.post('/login', rateLimit(10, 15 * 60 * 1000), (req, res) => {
     const { phone, password } = req.body;
     let user = db.findUserByPhone(phone);

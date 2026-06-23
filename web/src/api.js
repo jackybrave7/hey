@@ -278,6 +278,7 @@ export const api = {
   adminS3Sweep:            (minAgeHours)   => req('POST',   `/admin/system/s3-sweep${minAgeHours != null ? '?minAgeHours=' + minAgeHours : ''}`),
   adminGetWaitlist:        ()              => req('GET',    '/admin/waitlist'),
   adminWaitlistNotified:   (id, notified)  => req('POST',   `/admin/waitlist/${id}/notified`, { notified }),
+  adminWaitlistSendInvite: (id)            => req('POST',   `/admin/waitlist/${id}/send-invite`),
   adminWaitlistDelete:     (id)            => req('DELETE', `/admin/waitlist/${id}`),
 
   // AWO / Школьная интеграция

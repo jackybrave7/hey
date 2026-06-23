@@ -368,6 +368,8 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS waitlist (
   created_at   INTEGER NOT NULL,
   notified_at  INTEGER
 )`); } catch {}
+try { db.exec('ALTER TABLE waitlist ADD COLUMN invite_sent_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE waitlist ADD COLUMN invite_sent_by TEXT'); } catch {}
 
 // ── Referral / Super bonus migrations ─────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN invited_count INTEGER DEFAULT 0'); } catch {}
@@ -3757,8 +3759,25 @@ function addToWaitlist(email, source) {
 
 function getWaitlist({ limit = 500 } = {}) {
   return db.prepare(
-    'SELECT id, email, source, created_at, notified_at FROM waitlist ORDER BY created_at DESC LIMIT ?'
+    `SELECT w.id, w.email, w.source, w.created_at, w.notified_at,
+            w.invite_sent_at, w.invite_sent_by,
+            u.name AS invite_sent_by_name
+     FROM waitlist w
+     LEFT JOIN users u ON u.id = w.invite_sent_by
+     ORDER BY w.created_at DESC
+     LIMIT ?`
   ).all(limit);
+}
+
+function getWaitlistEntryById(id) {
+  return db.prepare(
+    `SELECT w.id, w.email, w.source, w.created_at, w.notified_at,
+            w.invite_sent_at, w.invite_sent_by,
+            u.name AS invite_sent_by_name
+     FROM waitlist w
+     LEFT JOIN users u ON u.id = w.invite_sent_by
+     WHERE w.id = ?`
+  ).get(id) || null;
 }
 
 // Бейдж в админ-сайдбаре — сколько ещё не уведомлённых заявок осталось.
@@ -3770,6 +3789,15 @@ function countPendingWaitlist() {
 
 function markWaitlistNotified(id) {
   db.prepare('UPDATE waitlist SET notified_at=? WHERE id=?').run(now(), id);
+}
+
+function markWaitlistInviteSent(id, adminId) {
+  const t = now();
+  db.prepare(
+    `UPDATE waitlist
+     SET invite_sent_at=?, invite_sent_by=?, notified_at=COALESCE(notified_at, ?)
+     WHERE id=?`
+  ).run(t, adminId, t, id);
 }
 
 function unmarkWaitlistNotified(id) {
@@ -4664,8 +4692,8 @@ module.exports = {
   createReport, getReports, resolveReport,
   createFeedback, getFeedbacks, resolveFeedback, countOpenFeedbacks,
   // Waitlist
-  addToWaitlist, getWaitlist, countPendingWaitlist,
-  markWaitlistNotified, unmarkWaitlistNotified, deleteWaitlistEntry,
+  addToWaitlist, getWaitlist, getWaitlistEntryById, countPendingWaitlist,
+  markWaitlistNotified, unmarkWaitlistNotified, markWaitlistInviteSent, deleteWaitlistEntry,
   // System (HEY-заведующий)
   getSystemMoments, getSystemBroadcasts, deleteBroadcast, editBroadcast,
   listOrphanSystemMessages, deleteSystemMessage,
