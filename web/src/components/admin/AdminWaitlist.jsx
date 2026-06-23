@@ -22,6 +22,11 @@ export default function AdminWaitlist() {
   const [filter, setFilter] = useState('pending'); // pending | notified | all
   const [busy, setBusy]     = useState({}); // {id: bool}
   const [toast, setToast]   = useState('');
+  const [tplOpen, setTplOpen] = useState(false);
+  const [emailTpl, setEmailTpl] = useState(null);
+  const [tplSubject, setTplSubject] = useState('');
+  const [tplBody, setTplBody] = useState('');
+  const [tplSaving, setTplSaving] = useState(false);
   const [customConfirm, confirmModal] = useConfirm();
 
   function showToast(msg) {
@@ -35,7 +40,19 @@ export default function AdminWaitlist() {
     catch (e) { setError(e.message || 'Не удалось'); }
     setLoading(false);
   }
-  useEffect(() => { load(); }, []);
+
+  async function loadTemplate() {
+    try {
+      const tpl = await api.adminGetWaitlistEmailTemplate();
+      setEmailTpl(tpl);
+      setTplSubject(tpl.subject || '');
+      setTplBody(tpl.body || '');
+    } catch (e) {
+      showToast('Шаблон: ' + (e.message || 'ошибка загрузки'));
+    }
+  }
+
+  useEffect(() => { load(); loadTemplate(); }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -118,6 +135,42 @@ export default function AdminWaitlist() {
     alert(`Скопировано ${filtered.length} email`);
   }
 
+  async function saveTemplate() {
+    setTplSaving(true);
+    try {
+      const r = await api.adminSaveWaitlistEmailTemplate({
+        subject: tplSubject,
+        body: tplBody,
+      });
+      setEmailTpl(prev => ({ ...prev, subject: r.subject, body: r.body }));
+      showToast('✓ Шаблон письма сохранён');
+    } catch (e) {
+      alert(e.message || 'Не удалось сохранить шаблон');
+    }
+    setTplSaving(false);
+  }
+
+  async function resetTemplate() {
+    if (!await customConfirm('Сбросить шаблон письма к стандартному тексту?',
+      { confirmLabel: 'Сбросить' })) return;
+    setTplSaving(true);
+    try {
+      const r = await api.adminResetWaitlistEmailTemplate();
+      setTplSubject(r.subject);
+      setTplBody(r.body);
+      showToast('Шаблон сброшен');
+    } catch (e) {
+      alert(e.message || 'Не удалось сбросить');
+    }
+    setTplSaving(false);
+  }
+
+  const previewName = me?.name || 'Администратор HEY';
+  const previewLink = 'https://hey-messenger.ru/register?invite=XXXXXXXXXX';
+  const previewText = (tplBody || '')
+    .replace(/\{\{inviterName\}\}/g, previewName)
+    .replace(/\{\{inviteLink\}\}/g, previewLink);
+
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100 }}>
       <div style={{ display:'flex', alignItems:'baseline', gap:14, flexWrap:'wrap', marginBottom: 8 }}>
@@ -148,6 +201,79 @@ export default function AdminWaitlist() {
         Нажмите <strong>«Отправить инвайт»</strong> — на email уйдёт персональная ссылка
         от вашего аккаунта ({me?.name || 'админ'}). Или отметьте «Уведомлён» вручную.
       </p>
+
+      <div style={{
+        marginBottom: 18, borderRadius: 14,
+        border: '1px solid rgba(249,240,240,.14)',
+        background: 'rgba(20,12,40,.55)', overflow: 'hidden',
+      }}>
+        <button
+          type="button"
+          onClick={() => setTplOpen(o => !o)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 18px', border: 'none', background: 'transparent',
+            color: '#F9F0F0', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+            fontFamily: 'inherit', textAlign: 'left',
+          }}
+        >
+          <span>✉️ Шаблон письма с инвайтом</span>
+          <span style={{ color: 'rgba(249,240,240,.45)', fontSize: 12 }}>{tplOpen ? '▲' : '▼'}</span>
+        </button>
+        {tplOpen && emailTpl && (
+          <div style={{ padding: '0 18px 18px', borderTop: '1px solid rgba(249,240,240,.08)' }}>
+            <p style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, lineHeight: 1.5, margin: '12px 0' }}>
+              Переменные: <code style={{ color: 'rgba(200,180,255,.9)' }}>{'{{inviterName}}'}</code> — имя
+              админа, <code style={{ color: 'rgba(200,180,255,.9)' }}>{'{{inviteLink}}'}</code> — ссылка
+              (обязательна). Абзацы — через пустую строку.
+            </p>
+            <label style={{ display: 'block', marginBottom: 12 }}>
+              <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 11, marginBottom: 6,
+                textTransform: 'uppercase', letterSpacing: .4 }}>Тема</div>
+              <input
+                value={tplSubject}
+                onChange={e => setTplSubject(e.target.value)}
+                disabled={tplSaving}
+                style={tplInput}
+              />
+            </label>
+            <label style={{ display: 'block', marginBottom: 12 }}>
+              <div style={{ color: 'rgba(249,240,240,.5)', fontSize: 11, marginBottom: 6,
+                textTransform: 'uppercase', letterSpacing: .4 }}>Текст письма</div>
+              <textarea
+                value={tplBody}
+                onChange={e => setTplBody(e.target.value)}
+                disabled={tplSaving}
+                rows={14}
+                style={{ ...tplInput, resize: 'vertical', lineHeight: 1.5, fontFamily: 'inherit' }}
+              />
+            </label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              <button type="button" onClick={saveTemplate} disabled={tplSaving} style={btn()}>
+                {tplSaving ? '…' : '💾 Сохранить шаблон'}
+              </button>
+              <button type="button" onClick={resetTemplate} disabled={tplSaving} style={btn('muted')}>
+                ↺ Сбросить к стандартному
+              </button>
+            </div>
+            <div style={{
+              padding: '12px 14px', borderRadius: 10,
+              background: 'rgba(249,240,240,.04)', border: '1px solid rgba(249,240,240,.1)',
+            }}>
+              <div style={{ color: 'rgba(249,240,240,.45)', fontSize: 11, marginBottom: 8,
+                textTransform: 'uppercase' }}>Превью (пример)</div>
+              <div style={{ color: 'rgba(249,240,240,.85)', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
+                {tplSubject.replace(/\{\{inviterName\}\}/g, previewName)}
+              </div>
+              <pre style={{
+                margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                color: 'rgba(249,240,240,.75)', fontSize: 12, lineHeight: 1.55,
+                fontFamily: 'inherit',
+              }}>{previewText}</pre>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom: 14, alignItems:'center' }}>
         {[
@@ -299,13 +425,20 @@ export default function AdminWaitlist() {
 
 const th = { textAlign:'left', padding:'10px 12px', fontWeight:600, fontSize:13 };
 const td = { padding:'10px 12px' };
-function btn() {
+function btn(variant) {
   return {
     padding:'8px 14px', borderRadius:9, fontSize:13, fontWeight:600,
     cursor:'pointer', border:'none', color:'#F9F0F0',
-    background:'rgba(95, 64, 128,.55)',
+    background: variant === 'muted' ? 'rgba(249,240,240,.08)' : 'rgba(95, 64, 128,.55)',
   };
 }
+const tplInput = {
+  width: '100%', boxSizing: 'border-box',
+  padding: '10px 12px', borderRadius: 10,
+  background: 'rgba(249,240,240,.06)',
+  border: '1px solid rgba(249,240,240,.14)',
+  color: '#F9F0F0', fontSize: 13, outline: 'none',
+};
 function smallBtn(variant) {
   const bg = variant === 'danger'
     ? 'rgba(220,80,80,.45)'

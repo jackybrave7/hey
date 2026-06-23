@@ -13,6 +13,14 @@ const storage = require('./storage');
 const awo = require('./awo');
 const push = require('./push');
 const { showVpnNoteFromRequest } = require('./geoHint');
+const {
+  getWaitlistInviteTemplate,
+  saveWaitlistInviteTemplate,
+  resetWaitlistInviteTemplate,
+  renderWaitlistInviteEmail,
+  DEFAULT_SUBJECT,
+  DEFAULT_BODY,
+} = require('./waitlistInviteTemplate');
 const { CURRENT_TERMS_VERSION } = require('./legal');
 
 // ── requireAdmin middleware ────────────────────────────────────────────────────
@@ -474,22 +482,12 @@ module.exports = function makeRouter(db, broadcast) {
 
   async function sendWaitlistInviteEmail({ to, inviteLink, inviterName }) {
     const t = createTransporter();
-    const subject = 'Приглашение попробовать HEY Messenger';
-    const text =
-      `Привет!\n\n` +
-      `${inviterName} приглашает тебя попробовать HEY — мессенджер для приватного круга без рекламы.\n\n` +
-      `Перейди по ссылке и зарегистрируйся:\n${inviteLink}\n\n` +
-      `Ссылка персональная. Если письмо пришло по ошибке — просто проигнорируй его.`;
-    const html =
-      `<p>Привет!</p>` +
-      `<p><strong>${inviterName}</strong> приглашает тебя попробовать <strong>HEY</strong> — мессенджер для приватного круга без рекламы.</p>` +
-      `<p><a href="${inviteLink}" style="background:#5F4080;color:#F9F0F0;padding:12px 22px;border-radius:10px;text-decoration:none;display:inline-block;font-weight:600">Принять приглашение</a></p>` +
-      `<p style="color:#888;font-size:12px">Если кнопка не работает — открой в браузере:<br><a href="${inviteLink}">${inviteLink}</a></p>` +
-      `<p style="color:#888;font-size:12px">Ссылка персональная. Если письмо пришло по ошибке — просто проигнорируй его.</p>`;
+    const { subject, text, html } = renderWaitlistInviteEmail(db, { inviterName, inviteLink });
     if (!t) {
       try {
         fs.appendFileSync(FEEDBACK_LOG,
-          `\n[${new Date().toISOString()}] WAITLIST-INVITE fallback to=${to} from=${inviterName}\n  ${inviteLink}\n`);
+          `\n[${new Date().toISOString()}] WAITLIST-INVITE fallback to=${to} from=${inviterName}\n` +
+          `  subject: ${subject}\n  ${inviteLink}\n  ---\n${text}\n`);
       } catch {}
       console.warn('[waitlist-invite] SMTP не настроен — ссылка для', to, ':', inviteLink);
       return { emailSent: false, inviteLink };
@@ -503,6 +501,32 @@ module.exports = function makeRouter(db, broadcast) {
     });
     return { emailSent: true, inviteLink };
   }
+
+  r.get('/admin/waitlist/email-template', requireAdmin, (_req, res) => {
+    const tpl = getWaitlistInviteTemplate(db);
+    res.json({
+      ...tpl,
+      defaults: { subject: DEFAULT_SUBJECT, body: DEFAULT_BODY },
+      placeholders: ['{{inviterName}}', '{{inviteLink}}'],
+    });
+  });
+
+  r.patch('/admin/waitlist/email-template', requireAdmin, (req, res) => {
+    try {
+      saveWaitlistInviteTemplate(db, {
+        subject: req.body?.subject,
+        body: req.body?.body,
+      });
+      res.json({ ok: true, ...getWaitlistInviteTemplate(db) });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  r.post('/admin/waitlist/email-template/reset', requireAdmin, (_req, res) => {
+    const tpl = resetWaitlistInviteTemplate(db);
+    res.json({ ok: true, ...tpl });
+  });
 
   // Отправить персональный инвайт waitlist-заявке от имени текущего админа.
   r.post('/admin/waitlist/:id/send-invite', requireAdmin, rateLimit(30, 60 * 60 * 1000), async (req, res) => {
