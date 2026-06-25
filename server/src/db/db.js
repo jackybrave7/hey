@@ -895,18 +895,16 @@ function creditGroupInviterReferral(convId, userId) {
   if (row?.invited_by) markReferralFromInviter(row.invited_by, userId);
 }
 
-/** Удалить ложные referrals (backfill контактов/групп, «привёл» старше приглашающего). */
+/** Удалить только хронологически невозможные referrals. */
 function purgeInvalidReferrals() {
-  const w = REFERRAL_REGISTRATION_WINDOW_SEC;
   let n = db.prepare(
     `DELETE FROM referrals WHERE rowid IN (
        SELECT r.rowid FROM referrals r
        JOIN users inv ON inv.id = r.invitee_id
        JOIN users invr ON invr.id = r.inviter_id
        WHERE inv.created_at < invr.created_at
-          OR r.created_at > inv.created_at + ?
      )`
-  ).run(w).changes;
+  ).run().changes;
   n += db.prepare(
     `UPDATE users SET referral_by = NULL WHERE id IN (
        SELECT inv.id FROM users inv
@@ -914,15 +912,6 @@ function purgeInvalidReferrals() {
        WHERE inv.created_at < invr.created_at
      )`
   ).run().changes;
-  n += db.prepare(
-    `UPDATE users SET referral_by = NULL
-     WHERE referral_by IS NOT NULL AND referral_by != ''
-       AND NOT EXISTS (
-         SELECT 1 FROM referrals r
-         WHERE r.invitee_id = users.id AND r.inviter_id = users.referral_by
-           AND r.created_at <= users.created_at + ?
-       )`
-  ).run(w).changes;
   if (n > 0) console.log(`[referral] purged ${n} invalid attribution(s)`);
   return n;
 }
@@ -970,33 +959,39 @@ function getReferralCount(userId) {
   return getInvitedCounts(userId).total;
 }
 
-// Регистрации по персональной ссылке (не контакты / группы / AWO).
-function sqlInvitedIdsForUser(param = '?') {
-  const w = REFERRAL_REGISTRATION_WINDOW_SEC;
+// Персональная ссылка — для Super-бонуса и модалки «Пригласить».
+function sqlPersonalInvitedIdsForUser(param = '?') {
   return `
-    SELECT r.invitee_id AS id
-    FROM referrals r
-    INNER JOIN users inv ON inv.id = r.invitee_id
-    INNER JOIN users invr ON invr.id = r.inviter_id
-    WHERE r.inviter_id = ${param}
+    SELECT inv.id
+    FROM users inv
+    INNER JOIN users invr ON invr.id = ${param}
+    WHERE inv.referral_by = ${param}
       AND inv.is_deleted = 0
       AND inv.created_at >= invr.created_at
-      AND r.created_at <= inv.created_at + ${w}
   `;
 }
 
+// Админка: ссылка или приглашение в группу (но не тех, кто в HEY раньше приглашающего).
 function sqlInvitedIdsForAdminUser() {
-  const w = REFERRAL_REGISTRATION_WINDOW_SEC;
   return `
-    SELECT r.invitee_id AS id
-    FROM referrals r
-    INNER JOIN users inv ON inv.id = r.invitee_id
-    INNER JOIN users invr ON invr.id = r.inviter_id
-    WHERE r.inviter_id = u.id
-      AND inv.is_deleted = 0
+    SELECT DISTINCT inv.id
+    FROM users inv
+    INNER JOIN users invr ON invr.id = u.id
+    WHERE inv.is_deleted = 0
       AND inv.created_at >= invr.created_at
-      AND r.created_at <= inv.created_at + ${w}
+      AND (
+        inv.referral_by = u.id
+        OR EXISTS (
+          SELECT 1 FROM members m
+          WHERE m.user_id = inv.id AND m.invited_by = u.id
+            AND m.status IN ('active','pending')
+        )
+      )
   `;
+}
+
+function sqlInvitedIdsForUser(param = '?') {
+  return sqlPersonalInvitedIdsForUser(param);
 }
 
 const _invitedCountParams = (userId) => [userId];
@@ -1015,7 +1010,7 @@ const INVITEE_CONFIRMED_AT_SQL = `
     (SELECT MIN(m.created_at) FROM messages m WHERE m.sender_id = inv.id)
   )`;
 
-// Возвращает { total, confirmed } — все каналы приглашения.
+// Возвращает { total, confirmed } — только регистрации по персональной ссылке.
 function getInvitedCounts(userId) {
   const idsSql = sqlInvitedIdsForUser('?');
   const total = db.prepare(`SELECT COUNT(*) AS c FROM (${idsSql})`).get(..._invitedCountParams(userId))?.c ?? 0;
@@ -1026,20 +1021,24 @@ function getInvitedCounts(userId) {
 }
 
 function getAdminInviteesList(userId) {
-  const w = REFERRAL_REGISTRATION_WINDOW_SEC;
   return db.prepare(
-    `SELECT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
+    `SELECT DISTINCT inv.id, inv.name, inv.avatar, inv.phone, inv.is_blocked,
             inv.created_at AS invited_at,
             ${INVITEE_CONFIRMED_AT_SQL} AS confirmed_at
-     FROM referrals r
-     JOIN users inv ON inv.id = r.invitee_id
-     JOIN users invr ON invr.id = r.inviter_id
-     WHERE r.inviter_id = ?
-       AND inv.is_deleted = 0
+     FROM users inv
+     INNER JOIN users invr ON invr.id = ?
+     WHERE inv.is_deleted = 0
        AND inv.created_at >= invr.created_at
-       AND r.created_at <= inv.created_at + ?
+       AND (
+         inv.referral_by = ?
+         OR EXISTS (
+           SELECT 1 FROM members m
+           WHERE m.user_id = inv.id AND m.invited_by = ?
+             AND m.status IN ('active','pending')
+         )
+       )
      ORDER BY inv.created_at DESC`
-  ).all(userId, w).map(r => ({ ...r, is_blocked: !!r.is_blocked }));
+  ).all(userId, userId, userId).map(r => ({ ...r, is_blocked: !!r.is_blocked }));
 }
 
 function findUserByInviteCode(code) {
