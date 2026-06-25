@@ -287,7 +287,7 @@ export default function AdminUserDetail() {
         <div style={{ marginBottom: 24 }}>
           <div style={{ color: 'rgba(249,240,240,.55)', fontSize: 12, fontWeight: 700,
             textTransform: 'uppercase', letterSpacing: .6, marginBottom: 10 }}>
-            Привёл в HEY ({user.invitees.length})
+            Привёл по ссылке ({user.invitees.length})
           </div>
           <div style={{ background: 'rgba(249,240,240,.04)', borderRadius: 14,
             border: '1px solid rgba(249,240,240,.08)', overflow: 'hidden' }}>

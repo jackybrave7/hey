@@ -1129,7 +1129,6 @@ module.exports = function makeRouter(db, broadcast) {
         return res.status(409).json({ error: e.message });
       }
     }
-    try { db.attributeReferralIfUnassigned(req.user.id, target.id); } catch {}
     const { password, ...safe } = target;
     res.json({ ...safe, nickname });
   });
