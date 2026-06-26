@@ -5,20 +5,53 @@ import { reportInstalledAppIfNeeded } from './lib/appClient';
 
 const AuthCtx = createContext(null);
 
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function isAuthError(err) {
+  return err?.status === 401 || err?.status === 403 || err?.code === 'BLOCKED';
+}
+
+async function bootstrapSession(setUser) {
+  const stored = localStorage.getItem('hey_token');
+
+  if (stored) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const u = await api.getMe();
+        setUser(u);
+        socket.connect(stored);
+        return;
+      } catch (e) {
+        if (isAuthError(e)) {
+          localStorage.removeItem('hey_token');
+          break;
+        }
+        if (attempt < 2) await sleep(400 * (attempt + 1));
+      }
+    }
+  }
+
+  try {
+    const session = await api.restoreSession();
+    if (session?.token && session?.user) {
+      localStorage.setItem('hey_token', session.token);
+      setUser(session.user);
+      socket.connect(session.token);
+      return;
+    }
+  } catch (e) {
+    if (isAuthError(e)) localStorage.removeItem('hey_token');
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('hey_token');
-    if (token) {
-      api.getMe()
-        .then(u => { setUser(u); socket.connect(token); })
-        .catch(() => localStorage.removeItem('hey_token'))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    bootstrapSession(setUser).finally(() => setLoading(false));
   }, []);
 
   // Сообщаем серверу, если HEY открыт как установленное приложение (PWA / Android).

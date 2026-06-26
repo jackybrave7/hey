@@ -5,7 +5,7 @@ const path = require('path');
 const { v4: uuid } = require('uuid');
 const nodemailer = require('nodemailer');
 const authModule = require('./auth');
-const { signToken, requireAuth, optionalAuth, setSessionCookie, clearSessionCookie, getSessionFromCookie } = authModule;
+const { signToken, requireAuth, optionalAuth, setSessionCookie, clearSessionCookie, getSessionFromCookie, getSessionTokenFromCookie } = authModule;
 const db = require('./db/db');
 const { detectTags, detectMoodEmoji } = require('./auto-tags');
 const { parseEmbeddedVideo } = require('./video-embed');
@@ -630,6 +630,35 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  // Восстановление сессии из HttpOnly-cookie (если localStorage сбросился — TWA/Android).
+  r.get('/session', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const token = getSessionTokenFromCookie(req);
+    if (!token) return res.status(401).json({ error: 'No session' });
+    let decoded;
+    try { decoded = authModule.verifyToken(token); }
+    catch { return res.status(401).json({ error: 'Invalid session' }); }
+    const user = db.findUserById(decoded.id);
+    if (!user) return res.status(401).json({ error: 'User not found' });
+    if (user.is_blocked) {
+      return res.status(403).json({
+        error: 'Аккаунт заблокирован администрацией',
+        code: 'BLOCKED',
+      });
+    }
+    setSessionCookie(res, token);
+    const { password: _, ...safe } = user;
+    res.json({
+      token,
+      user: {
+        ...safe,
+        is_admin: !!safe.is_admin,
+        is_super_admin: !!safe.is_super_admin,
+        is_super: !!safe.is_super,
+      },
+    });
+  });
+
   // ── Widget для виджета HEY в личном кабинете АВО ─────────────────────────
   // Возвращает счётчик непрочитанных, но ТОЛЬКО если:
   //   1) у браузера есть валидная cookie-сессия HEY
@@ -783,6 +812,8 @@ module.exports = function makeRouter(db, broadcast) {
   });
 
   r.get('/me', requireAuth, (req, res) => {
+    const hdr = req.headers.authorization;
+    if (hdr?.startsWith('Bearer ')) setSessionCookie(res, hdr.slice(7));
     db.checkAndExpireSuper(req.user.id);
     const user = db.findUserById(req.user.id);
     if (!user) return res.status(404).json({ error: 'Not found' });

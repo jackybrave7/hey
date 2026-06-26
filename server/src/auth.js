@@ -103,17 +103,26 @@ function clearSessionCookie(res) {
 }
 
 function getSessionFromCookie(req) {
+  const token = getSessionTokenFromCookie(req);
+  if (!token) return null;
+  try {
+    return verifyToken(token);
+  } catch { return null; }
+}
+
+function getSessionTokenFromCookie(req) {
   const raw = req.headers.cookie;
   if (!raw) return null;
   const m = raw.split(/;\s*/).map(s => s.split('='))
     .find(([k]) => k === SESSION_COOKIE);
   if (!m || !m[1]) return null;
   try {
-    return verifyToken(m[1]);
+    verifyToken(m[1]);
+    return m[1];
   } catch { return null; }
 }
 
 module.exports = {
   init, signToken, verifyToken, requireAuth, optionalAuth, wsAuth,
-  setSessionCookie, clearSessionCookie, getSessionFromCookie,
+  setSessionCookie, clearSessionCookie, getSessionFromCookie, getSessionTokenFromCookie,
 };

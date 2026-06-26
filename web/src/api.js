@@ -10,6 +10,19 @@ function getToken() {
   return localStorage.getItem('hey_token');
 }
 
+export class ApiError extends Error {
+  constructor(message, status, code) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function isAuthError(err) {
+  return err?.status === 401 || err?.status === 403 || err?.code === 'BLOCKED';
+}
+
 async function serverReachable() {
   try {
     const ctrl = new AbortController();
@@ -42,6 +55,8 @@ async function req(method, path, body, attempt = 0) {
   try {
     res = await fetch(BASE + path, {
       method,
+      credentials: 'same-origin',
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
         ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
@@ -84,17 +99,43 @@ async function req(method, path, body, attempt = 0) {
     } else {
       notifyServerOk();
     }
-    throw new Error(err.error || `HTTP ${res.status}`);
+    throw new ApiError(err.error || `HTTP ${res.status}`, res.status, err.code);
   }
   notifyServerOk();
   const data = await res.json();
   return rewriteMediaDeep(data);
 }
 
+async function restoreSession() {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort('timeout'), REQUEST_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(`${BASE}/session`, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    const isTimeout = e?.name === 'AbortError';
+    throw new Error(isTimeout ? 'Сервер не отвечает' : 'Нет связи с сервером');
+  }
+  clearTimeout(timer);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || `HTTP ${res.status}`, res.status, err.code);
+  }
+  notifyServerOk();
+  return rewriteMediaDeep(await res.json());
+}
+
 export const api = {
   // Auth
   register: (data) => req('POST', '/register', data),
   login:    (data) => req('POST', '/login', data),
+  restoreSession: () => restoreSession(),
   logout:   ()     => req('POST', '/logout'),
   getUserInviteInfo: (id) => req('GET', `/users/${id}/invite-info`),
   getUserProfile:   (id) => req('GET', `/users/${id}/profile`),
