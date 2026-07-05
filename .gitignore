@@ -16,6 +16,7 @@ server/data/feedback.log
 server/data/vapid.json
 server/data/media-cache/
 .pkglock.md5
+.last_good_commit
 
 # TWA подписной keystore — не коммитим
 twa/android.keystore

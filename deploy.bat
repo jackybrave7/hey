@@ -32,7 +32,7 @@ if errorlevel 1 (
 
 echo.
 echo [2/4] Save rollback commit on server...
-ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git rev-parse HEAD > .last_good_commit && echo last_good_commit: $(cat .last_good_commit)"
+ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git rev-parse HEAD > server/data/.last_good_commit && echo last_good_commit: $(cat server/data/.last_good_commit)"
 if errorlevel 1 (
     echo ERROR: could not save rollback commit
     pause
@@ -42,10 +42,10 @@ echo OK
 
 echo.
 echo [3/4] Update server (git pull)...
-ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git checkout -- package-lock.json 2>/dev/null; git -c http.sslVerify=false pull"
+ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && rm -f .last_good_commit && git checkout -- package-lock.json 2>/dev/null; git -c http.sslVerify=false pull"
 if errorlevel 1 (
     echo Retrying...
-    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && git checkout -- package-lock.json 2>/dev/null; git -c http.sslVerify=false pull"
+    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && rm -f .last_good_commit && git checkout -- package-lock.json 2>/dev/null; git -c http.sslVerify=false pull"
     if errorlevel 1 (
         echo ERROR: server update failed
         pause

@@ -24,11 +24,11 @@ echo.
 
 echo [1/4] Читаем точку отката с сервера...
 
-for /f "delims=" %%i in ('ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "test -f %APP_DIR%/.last_good_commit && cat %APP_DIR%/.last_good_commit || echo __MISSING__"') do set TARGET=%%i
+for /f "delims=" %%i in ('ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "test -f %APP_DIR%/server/data/.last_good_commit && cat %APP_DIR%/server/data/.last_good_commit || (test -f %APP_DIR%/.last_good_commit && cat %APP_DIR%/.last_good_commit) || echo __MISSING__"') do set TARGET=%%i
 
 if "%TARGET%"=="__MISSING__" (
 
-    echo ERROR: файл %APP_DIR%/.last_good_commit не найден.
+    echo ERROR: файл %APP_DIR%/server/data/.last_good_commit не найден.
 
     echo Сначала сделайте деплой через deploy.bat — он сохраняет коммит перед обновлением.
 
