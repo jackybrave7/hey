@@ -4,7 +4,6 @@ cd /d "%~dp0"
 
 set SERVER=root@45.153.71.162
 set SSH_KEY=%USERPROFILE%\.ssh\id_ed25519
-set SSH_OPTS=-o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes
 set APP_DIR=/opt/hey
 set HEALTH_URL=http://127.0.0.1:3002/api/health
 
@@ -33,7 +32,8 @@ if errorlevel 1 (
 
 echo.
 echo [2/4] Save rollback commit on server...
-ssh -i "%SSH_KEY%" %SSH_OPTS% %SERVER% "cd %APP_DIR% && printf 'last_good_commit: ' && git rev-parse HEAD | tee server/data/.last_good_commit"
+echo Connecting to %SERVER%...
+ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=3 %SERVER% "cd %APP_DIR% && git rev-parse HEAD > server/data/.last_good_commit && echo last_good_commit: && cat server/data/.last_good_commit"
 if errorlevel 1 (
     echo ERROR: could not save rollback commit
     pause
@@ -43,10 +43,10 @@ echo OK
 
 echo.
 echo [3/4] Update server (git pull)...
-ssh -i "%SSH_KEY%" %SSH_OPTS% %SERVER% "cd %APP_DIR% && rm -f .last_good_commit && git checkout -- package-lock.json 2>/dev/null; git -c http.sslVerify=false pull"
+ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=3 %SERVER% "cd %APP_DIR% && rm -f .last_good_commit && git checkout -- package-lock.json 2>/dev/null; git -c http.sslVerify=false pull"
 if errorlevel 1 (
     echo Retrying...
-    ssh -i "%SSH_KEY%" %SSH_OPTS% %SERVER% "cd %APP_DIR% && rm -f .last_good_commit && git checkout -- package-lock.json 2>/dev/null; git -c http.sslVerify=false pull"
+    ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=3 %SERVER% "cd %APP_DIR% && rm -f .last_good_commit && git checkout -- package-lock.json 2>/dev/null; git -c http.sslVerify=false pull"
     if errorlevel 1 (
         echo ERROR: server update failed
         pause
@@ -57,7 +57,7 @@ echo OK
 
 echo.
 echo [4/4] Database snapshot, build in Docker, restart...
-ssh -i "%SSH_KEY%" %SSH_OPTS% %SERVER% "docker start hey 2>/dev/null; cd %APP_DIR% && docker exec hey node server/scripts/predeploy-backup.js && docker exec hey sh -c 'cd /app && (md5sum -c .pkglock.md5 >/dev/null 2>&1 || (npm install --silent && md5sum package-lock.json > .pkglock.md5)) && npm run build' && docker restart hey && sleep 2 && curl -sf %HEALTH_URL%"
+ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=3 %SERVER% "docker start hey 2>/dev/null; cd %APP_DIR% && docker exec hey node server/scripts/predeploy-backup.js && docker exec hey sh -c 'cd /app && (md5sum -c .pkglock.md5 >/dev/null 2>&1 || (npm install --silent && md5sum package-lock.json > .pkglock.md5)) && npm run build' && docker restart hey && sleep 2 && curl -sf %HEALTH_URL%"
 if errorlevel 1 (
     echo ERROR: snapshot, build or restart failed
     pause
