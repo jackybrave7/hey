@@ -1,6 +1,6 @@
 // web/src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { socket, api } from './api';
 import {
@@ -15,27 +15,27 @@ import {
 } from './components/Screens';
 import MomentsFeed from './components/moments/MomentsFeed';
 import BottomNav from './components/BottomNav';
-import AdminLayout from './components/admin/AdminLayout';
-import AdminDashboard from './components/admin/AdminDashboard';
-import AdminUsers from './components/admin/AdminUsers';
-import AdminGroups from './components/admin/AdminGroups';
-import AdminGroupDetail from './components/admin/AdminGroupDetail';
-import AdminUserDetail from './components/admin/AdminUserDetail';
-import AdminMoments from './components/admin/AdminMoments';
-import AdminLogs from './components/admin/AdminLogs';
-import AdminSystem from './components/admin/AdminSystem';
-import AdminS3 from './components/admin/AdminS3';
-import AdminWaitlist from './components/admin/AdminWaitlist';
-import AdminReports from './components/admin/AdminReports';
-import AdminFeedbacks from './components/admin/AdminFeedbacks';
-import AdminSettings from './components/admin/AdminSettings';
-import AdminAwo from './components/admin/AdminAwo';
-import AdminAwoTenants from './components/admin/AdminAwoTenants';
-import AdminBusinessRequests from './components/admin/AdminBusinessRequests';
-import IntegrationsLayout from './components/IntegrationsLayout';
-import BusinessLanding from './components/BusinessLanding';
-import AdminTestUsers from './components/admin/AdminTestUsers';
-import AdminGuide from './components/admin/AdminGuide';
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./components/admin/AdminUsers'));
+const AdminGroups = lazy(() => import('./components/admin/AdminGroups'));
+const AdminGroupDetail = lazy(() => import('./components/admin/AdminGroupDetail'));
+const AdminUserDetail = lazy(() => import('./components/admin/AdminUserDetail'));
+const AdminMoments = lazy(() => import('./components/admin/AdminMoments'));
+const AdminLogs = lazy(() => import('./components/admin/AdminLogs'));
+const AdminSystem = lazy(() => import('./components/admin/AdminSystem'));
+const AdminS3 = lazy(() => import('./components/admin/AdminS3'));
+const AdminWaitlist = lazy(() => import('./components/admin/AdminWaitlist'));
+const AdminReports = lazy(() => import('./components/admin/AdminReports'));
+const AdminFeedbacks = lazy(() => import('./components/admin/AdminFeedbacks'));
+const AdminSettings = lazy(() => import('./components/admin/AdminSettings'));
+const AdminAwo = lazy(() => import('./components/admin/AdminAwo'));
+const AdminAwoTenants = lazy(() => import('./components/admin/AdminAwoTenants'));
+const AdminBusinessRequests = lazy(() => import('./components/admin/AdminBusinessRequests'));
+const IntegrationsLayout = lazy(() => import('./components/IntegrationsLayout'));
+const BusinessLanding = lazy(() => import('./components/BusinessLanding'));
+const AdminTestUsers = lazy(() => import('./components/admin/AdminTestUsers'));
+const AdminGuide = lazy(() => import('./components/admin/AdminGuide'));
 import JoinScreen from './components/JoinScreen';
 import PersonalInviteJoin from './components/contacts/PersonalInviteJoin';
 import GroupJoinScreen from './components/GroupJoinScreen';
@@ -186,6 +186,10 @@ function RequireAdmin({ children }) {
   if (!user) return <Navigate to="/login" replace/>;
   if (!user.is_admin) return <Navigate to="/main" replace/>;
   return children;
+}
+
+function LazyRoute({ children }) {
+  return <Suspense fallback={<BootScreen />}>{children}</Suspense>;
 }
 
 function RequireSuperAdmin({ children }) {
@@ -469,116 +473,120 @@ export default function App() {
           {/* Admin panel */}
           <Route path="/admin" element={
             <RequireAdmin>
-              <AdminLayout><AdminDashboard/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminDashboard/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/users" element={
             <RequireAdmin>
-              <AdminLayout><AdminUsers/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminUsers/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/users/:id" element={
             <RequireAdmin>
-              <AdminLayout><AdminUserDetail/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminUserDetail/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/groups" element={
             <RequireAdmin>
-              <AdminLayout><AdminGroups/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminGroups/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/groups/:id" element={
             <RequireAdmin>
-              <AdminLayout><AdminGroupDetail/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminGroupDetail/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/moments" element={
             <RequireAdmin>
-              <AdminLayout><AdminMoments/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminMoments/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/logs" element={
             <RequireAdmin>
-              <AdminLayout><AdminLogs/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminLogs/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/system" element={
             <RequireAdmin>
-              <AdminLayout><AdminSystem/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminSystem/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/s3" element={
             <RequireSuperAdmin>
-              <AdminLayout><AdminS3/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminS3/></AdminLayout></LazyRoute>
             </RequireSuperAdmin>
           }/>
           <Route path="/admin/waitlist" element={
             <RequireAdmin>
-              <AdminLayout><AdminWaitlist/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminWaitlist/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/reports" element={
             <RequireAdmin>
-              <AdminLayout><AdminReports/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminReports/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/feedbacks" element={
             <RequireAdmin>
-              <AdminLayout><AdminFeedbacks/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminFeedbacks/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/settings" element={
             <RequireAdmin>
-              <AdminLayout><AdminSettings/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminSettings/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/awo" element={
             <RequireAdmin>
-              <AdminLayout><AdminAwoTenants/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminAwoTenants/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/awo/tenants" element={
             <RequireAdmin>
-              <AdminLayout><AdminAwoTenants/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminAwoTenants/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/awo/:tenantId" element={
             <RequireAdmin>
-              <AdminLayout><AdminAwo/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminAwo/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/business-requests" element={
             <RequireAdmin>
-              <AdminLayout><AdminBusinessRequests/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminBusinessRequests/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           {/* Презентация бизнес-возможностей — доступна всем залогиненным */}
           <Route path="/business" element={
-            <Protected><BusinessLanding/></Protected>
+            <Protected><LazyRoute><BusinessLanding/></LazyRoute></Protected>
           }/>
           {/* Бизнес-пользователи (НЕ admin) — свой layout */}
           <Route path="/integrations/awo" element={
             <RequireBusinessOrAdmin>
-              <IntegrationsLayout title="🎓 Мои школы (АВО)">
-                <AdminAwoTenants/>
-              </IntegrationsLayout>
+              <LazyRoute>
+                <IntegrationsLayout title="🎓 Мои школы (АВО)">
+                  <AdminAwoTenants/>
+                </IntegrationsLayout>
+              </LazyRoute>
             </RequireBusinessOrAdmin>
           }/>
           <Route path="/integrations/awo/:tenantId" element={
             <RequireBusinessOrAdmin>
-              <IntegrationsLayout title="🎓 Настройки школы">
-                <AdminAwo/>
-              </IntegrationsLayout>
+              <LazyRoute>
+                <IntegrationsLayout title="🎓 Настройки школы">
+                  <AdminAwo/>
+                </IntegrationsLayout>
+              </LazyRoute>
             </RequireBusinessOrAdmin>
           }/>
           <Route path="/admin/test-users" element={
             <RequireAdmin>
-              <AdminLayout><AdminTestUsers/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminTestUsers/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
           <Route path="/admin/guide" element={
             <RequireAdmin>
-              <AdminLayout><AdminGuide/></AdminLayout>
+              <LazyRoute><AdminLayout><AdminGuide/></AdminLayout></LazyRoute>
             </RequireAdmin>
           }/>
 

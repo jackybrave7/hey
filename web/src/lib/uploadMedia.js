@@ -11,6 +11,9 @@ import { mediaUrl } from './mediaUrl';
 function resizeToBlob(file, maxPx = 1920, targetBytes = 6 * 1024 * 1024) {
   if (file.type === 'image/gif') return Promise.resolve({ blob: file, contentType: file.type });
 
+  const preferJpeg = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+  const outMime = preferJpeg ? 'image/jpeg' : 'image/webp';
+
   return new Promise(resolve => {
     const img    = new Image();
     const objUrl = URL.createObjectURL(file);
@@ -33,9 +36,9 @@ function resizeToBlob(file, maxPx = 1920, targetBytes = 6 * 1024 * 1024) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const blob = await new Promise(r => canvas.toBlob(r, 'image/webp', pass.q));
+        const blob = await new Promise(r => canvas.toBlob(r, outMime, pass.q));
         if (!blob) continue;
-        result = { blob, contentType: 'image/webp' };
+        result = { blob, contentType: outMime };
         if (blob.size <= targetBytes) break;
       }
 

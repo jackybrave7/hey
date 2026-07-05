@@ -7,6 +7,7 @@ import MoodEmoji from './MoodEmoji';
 import { HEY_EMOJI, emojiLabel, emojiUrl } from '../../lib/heyEmoji';
 import EmojiInput from '../EmojiInput';
 import Icon from '../Icon';
+import { MediaImage } from '../shared/MediaImage';
 
 // Набор настроений для ручного выбора (когда нет медиа)
 const MOOD_OPTIONS = [
@@ -258,7 +259,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                           userSelect:'none',touchAction:'none',
                           overflow:'hidden',
                         }}>
-                        <img src={mediaPreview} alt="" draggable={false}
+                        <MediaImage src={mediaPreview} alt="" draggable={false}
                           onLoad={e => {
                             const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
                             if (w && h) setImgRatio(w / h);
@@ -323,7 +324,7 @@ export default function MomentCreateSheet({ existing, onClose, onSaved, onConfli
                           userSelect:'none', touchAction:'none',
                           overflow:'hidden',
                         }}>
-                        <img src={mediaPreview} alt="" draggable={false}
+                        <MediaImage src={mediaPreview} alt="" draggable={false}
                           onLoad={e => {
                             const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
                             if (w && h) setImgRatio(w / h);

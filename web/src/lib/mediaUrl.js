@@ -25,7 +25,7 @@ function s3KeyFromUrl(url) {
 
 export function mediaUrl(url) {
   if (!url || typeof url !== 'string') return url;
-  if (url.startsWith('data:') || url.startsWith('/uploads/') || url.startsWith('/api/avatars/')) return url;
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('/uploads/') || url.startsWith('/api/avatars/')) return url;
   const key = s3KeyFromUrl(url);
   if (url.startsWith(API_MEDIA)) {
     return absolutize(url);
@@ -35,6 +35,14 @@ export function mediaUrl(url) {
   }
   if (key) return absolutize(API_MEDIA + key);
   return url;
+}
+
+/** Для Android/TWA: JPEG через Node-proxy — WebP/HEIC в <img> часто не рисуются. */
+export function androidImageSrc(url) {
+  if (!isAndroidBrowser()) return mediaUrl(url);
+  const key = s3KeyFromUrl(url);
+  if (!key || !isImageKey(key)) return mediaUrl(url);
+  return absolutize(`${LEGACY_MEDIA}${key}?format=jpeg`);
 }
 
 export function mediaFallbackUrl(url) {
@@ -50,18 +58,7 @@ export function mediaFallbackUrls(url) {
   const apiProxy = absolutize(LEGACY_MEDIA + key);
   const directS3 = `https://s3.twcstorage.ru/heymessenger/${key}`;
   return [mediaProxy, apiProxy, directS3].filter((candidate, index, arr) => (
-    candidate && arr.indexOf(candidate) === index && candidate !== mediaUrl(url)
-  ));
-}
-
-export function androidImageFetchUrls(url) {
-  if (!isAndroidBrowser()) return [];
-  const key = s3KeyFromUrl(url);
-  if (!key || !isImageKey(key)) return [];
-  const jpegProxy = absolutize(`${LEGACY_MEDIA}${key}?mobile=1&format=jpeg`);
-  const mediaProxy = absolutize(API_MEDIA + key);
-  return [jpegProxy, mediaProxy].filter((candidate, index, arr) => (
-    candidate && arr.indexOf(candidate) === index
+    candidate && arr.indexOf(candidate) === index && candidate !== androidImageSrc(url)
   ));
 }
 
