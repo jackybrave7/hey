@@ -8,6 +8,8 @@ set SERVER=root@45.153.71.162
 
 set SSH_KEY=%USERPROFILE%\.ssh\id_ed25519
 
+set SSH_OPTS=-o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes
+
 set APP_DIR=/opt/hey
 
 set HEALTH_URL=http://127.0.0.1:3002/api/health
@@ -24,7 +26,7 @@ echo.
 
 echo [1/4] Читаем точку отката с сервера...
 
-for /f "delims=" %%i in ('ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "test -f %APP_DIR%/server/data/.last_good_commit && cat %APP_DIR%/server/data/.last_good_commit || (test -f %APP_DIR%/.last_good_commit && cat %APP_DIR%/.last_good_commit) || echo __MISSING__"') do set TARGET=%%i
+for /f "delims=" %%i in ('ssh -i "%SSH_KEY%" %SSH_OPTS% %SERVER% "test -f %APP_DIR%/server/data/.last_good_commit && cat %APP_DIR%/server/data/.last_good_commit || (test -f %APP_DIR%/.last_good_commit && cat %APP_DIR%/.last_good_commit) || echo __MISSING__"') do set TARGET=%%i
 
 if "%TARGET%"=="__MISSING__" (
 
@@ -46,7 +48,7 @@ echo.
 
 echo [2/4] Текущая версия на сервере...
 
-ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "cd %APP_DIR% && echo HEAD: $(git rev-parse --short HEAD) && git log -1 --oneline && echo. && echo Rollback target: && git log -1 --oneline %TARGET% 2>/dev/null || echo (коммит не найден в локальном git)"
+ssh -i "%SSH_KEY%" %SSH_OPTS% %SERVER% "cd %APP_DIR% && printf 'HEAD: ' && git rev-parse --short HEAD && git log -1 --oneline && echo && echo Rollback target: && git log -1 --oneline %TARGET% 2>/dev/null || echo commit not found"
 
 
 
@@ -76,7 +78,7 @@ echo.
 
 echo [3/4] Откат кода и сборка фронтенда в Docker...
 
-ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "docker start hey 2>/dev/null; cd %APP_DIR% && git fetch -q origin && git checkout -f feat/messaging-extras 2>/dev/null || git checkout -B feat/messaging-extras && git reset --hard %TARGET% && docker exec hey sh -c 'cd /app && npm install --silent && npm run build'"
+ssh -i "%SSH_KEY%" %SSH_OPTS% %SERVER% "docker start hey 2>/dev/null; cd %APP_DIR% && git fetch -q origin && git checkout -f feat/messaging-extras 2>/dev/null || git checkout -B feat/messaging-extras && git reset --hard %TARGET% && docker exec hey sh -c 'cd /app && npm install --silent && npm run build'"
 
 if errorlevel 1 (
 
@@ -96,7 +98,7 @@ echo.
 
 echo [4/4] Перезапуск приложения...
 
-ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "docker restart hey && sleep 2 && curl -sf %HEALTH_URL%"
+ssh -i "%SSH_KEY%" %SSH_OPTS% %SERVER% "docker restart hey && sleep 2 && curl -sf %HEALTH_URL%"
 
 if errorlevel 1 (
 
