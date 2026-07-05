@@ -19,6 +19,7 @@ const ACTION_LABELS = {
   delete_user:          { label: '🗑 Удалён пользователь', color: 'rgba(255,80,80,.95)' },
   system_moment_create: { label: '📢 Момент HEY-зав.',     color: 'rgba(120,200,255,.9)' },
   system_broadcast:     { label: '📢 Рассылка HEY-зав.',   color: 'rgba(120,200,255,.9)' },
+  feedback_reply:       { label: '✉ Ответ на обращение',   color: 'rgba(120,200,255,.85)' },
 };
 
 export default function AdminLogs() {

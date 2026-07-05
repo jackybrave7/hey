@@ -257,6 +257,7 @@ export const api = {
   adminGetCounts:   ()              => req('GET', '/admin/counts'),
   adminGetFeedbacks:    (status='open')  => req('GET', `/admin/feedbacks?status=${status}`),
   adminResolveFeedback: (id, action, note) => req('PATCH', `/admin/feedbacks/${id}`, { action, note }),
+  adminReplyFeedback:   (id, text, markDone=true) => req('POST', `/admin/feedbacks/${id}/reply`, { text, markDone }),
   adminResolveReport: (id, action) => req('PATCH', `/admin/reports/${id}`, { action }),
   viewMoment:       (id)         => req('POST',   `/moments/${id}/view`),
   getDisciplines:   (userId)     => req('GET',    `/moments/disciplines/${userId}`),

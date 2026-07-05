@@ -322,6 +322,9 @@ try { db.exec('CREATE INDEX IF NOT EXISTS idx_feedbacks_status ON feedbacks(stat
 try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_url TEXT'); } catch {}
 try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_name TEXT'); } catch {}
 try { db.exec('ALTER TABLE feedbacks ADD COLUMN attachment_mime TEXT'); } catch {}
+try { db.exec('ALTER TABLE feedbacks ADD COLUMN reply_text TEXT'); } catch {}
+try { db.exec('ALTER TABLE feedbacks ADD COLUMN reply_sent_at INTEGER'); } catch {}
+try { db.exec('ALTER TABLE feedbacks ADD COLUMN reply_sent_by TEXT'); } catch {}
 
 // Плановые сообщения HEY-заведующего — N дней/часов/минут после регистрации.
 try { db.exec(`CREATE TABLE IF NOT EXISTS onboarding_messages (
@@ -3626,6 +3629,19 @@ function createFeedback({ userId, name, phone, type, text, attachmentUrl, attach
   return id;
 }
 
+function getFeedbackById(id) {
+  return db.prepare(
+    `SELECT f.*,
+            u.name  AS current_name,
+            u.phone AS current_phone,
+            u.is_deleted AS user_is_deleted,
+            u.is_blocked AS user_is_blocked
+     FROM feedbacks f
+     LEFT JOIN users u ON u.id = f.user_id
+     WHERE f.id = ?`
+  ).get(id) || null;
+}
+
 function getFeedbacks({ status = 'open', limit = 200 } = {}) {
   const where = status === 'all' ? '1=1' : 'f.status = @status';
   return db.prepare(
@@ -3633,14 +3649,22 @@ function getFeedbacks({ status = 'open', limit = 200 } = {}) {
             u.name  AS current_name,
             u.phone AS current_phone,
             u.is_deleted AS user_is_deleted,
-            a.name  AS handled_by_name
+            a.name  AS handled_by_name,
+            r.name  AS reply_sent_by_name
      FROM feedbacks f
      LEFT JOIN users u ON u.id = f.user_id
      LEFT JOIN users a ON a.id = f.handled_by
+     LEFT JOIN users r ON r.id = f.reply_sent_by
      WHERE ${where}
      ORDER BY f.created_at DESC
      LIMIT @limit`
   ).all({ status, limit });
+}
+
+function setFeedbackReply(id, adminId, replyText) {
+  db.prepare(
+    'UPDATE feedbacks SET reply_text=?, reply_sent_at=?, reply_sent_by=? WHERE id=?'
+  ).run(replyText, now(), adminId, id);
 }
 
 function resolveFeedback(id, adminId, action /* 'done' | 'dismissed' | 'open' */, note) {
@@ -4602,7 +4626,7 @@ module.exports = {
   searchUsers,
   // Reports
   createReport, getReports, resolveReport,
-  createFeedback, getFeedbacks, resolveFeedback, countOpenFeedbacks,
+  createFeedback, getFeedbackById, getFeedbacks, resolveFeedback, setFeedbackReply, countOpenFeedbacks,
   // Waitlist
   addToWaitlist, getWaitlist, getWaitlistEntryById, countPendingWaitlist,
   markWaitlistNotified, unmarkWaitlistNotified, markWaitlistInviteSent, deleteWaitlistEntry,

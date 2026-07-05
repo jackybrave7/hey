@@ -39,6 +39,9 @@ export default function AdminFeedbacks() {
   const [status, setStatus]   = useState('open');
   const [loading, setLoading] = useState(true);
   const [toast, setToast]     = useState('');
+  const [replyDraft, setReplyDraft] = useState({});
+  const [replyOpen, setReplyOpen]   = useState(null);
+  const [sendingReply, setSendingReply] = useState(null);
   const [customConfirm, confirmModal, customPrompt] = useConfirm();
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500); }
@@ -76,6 +79,24 @@ export default function AdminFeedbacks() {
       showToast(isReopen ? '↩ Открыто' : '✓ ' + labelMap[action]);
       load();
     } catch (e) { showToast('Ошибка: ' + e.message); }
+  }
+
+  async function sendReply(f) {
+    const text = (replyDraft[f.id] || '').trim();
+    if (!text) { showToast('Введите текст ответа'); return; }
+    if (!await customConfirm(
+      'Отправить ответ от HEY-заведующего в личный чат пользователя?',
+      { confirmLabel: 'Отправить' }
+    )) return;
+    setSendingReply(f.id);
+    try {
+      await api.adminReplyFeedback(f.id, text, true);
+      showToast('✓ Ответ отправлен');
+      setReplyOpen(null);
+      setReplyDraft(prev => ({ ...prev, [f.id]: '' }));
+      load();
+    } catch (e) { showToast('Ошибка: ' + e.message); }
+    setSendingReply(null);
   }
 
   return (
@@ -208,6 +229,105 @@ export default function AdminFeedbacks() {
                       Заметка администратора
                     </div>
                     {f.admin_note}
+                  </div>
+                )}
+
+                {f.reply_text && (
+                  <div style={{
+                    background:'rgba(60,180,100,.08)', borderRadius:10, padding:'10px 14px',
+                    color:'rgba(200,240,220,.95)', fontSize:13, lineHeight:1.55,
+                    border:'1px solid rgba(100,200,140,.25)',
+                    whiteSpace:'pre-wrap', wordBreak:'break-word', marginBottom:14,
+                  }}>
+                    <div style={{ fontSize:11, fontWeight:700, opacity:.75, marginBottom:4 }}>
+                      Ответ от HEY-заведующего
+                      {f.reply_sent_at ? ` · ${fmtDate(f.reply_sent_at)}` : ''}
+                      {f.reply_sent_by_name ? ` · ${f.reply_sent_by_name}` : ''}
+                    </div>
+                    {f.reply_text}
+                  </div>
+                )}
+
+                {/* Ответ пользователю */}
+                {!isAnonymous && (
+                  <div style={{ marginBottom:14 }}>
+                    {replyOpen === f.id ? (
+                      <div style={{
+                        background:'rgba(0,0,0,.2)', borderRadius:12, padding:12,
+                        border:'1px solid rgba(140,110,220,.3)',
+                      }}>
+                        <div style={{ fontSize:12, fontWeight:700, color:'rgba(220,200,255,.9)', marginBottom:8 }}>
+                          Ответ от HEY-заведующего в личный чат
+                        </div>
+                        <textarea
+                          value={replyDraft[f.id] || ''}
+                          onChange={e => setReplyDraft(prev => ({ ...prev, [f.id]: e.target.value }))}
+                          placeholder="Текст ответа пользователю…"
+                          rows={4}
+                          maxLength={2000}
+                          style={{
+                            width:'100%', boxSizing:'border-box', resize:'vertical',
+                            background:'rgba(20,12,40,.6)', border:'1px solid rgba(249,240,240,.15)',
+                            borderRadius:10, padding:'10px 12px', color:'#F9F0F0',
+                            fontSize:14, lineHeight:1.5, fontFamily:'inherit',
+                          }}
+                        />
+                        <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
+                          <button
+                            onClick={() => sendReply(f)}
+                            disabled={sendingReply === f.id}
+                            style={{
+                              padding:'8px 16px', borderRadius:10, fontSize:13, fontWeight:600,
+                              cursor: sendingReply === f.id ? 'wait' : 'pointer',
+                              border:'none', fontFamily:'inherit',
+                              background:'rgba(140,110,220,.85)', color:'#F9F0F0',
+                              opacity: sendingReply === f.id ? 0.7 : 1,
+                            }}>
+                            {sendingReply === f.id ? 'Отправка…' : '✉ Отправить'}
+                          </button>
+                          <button
+                            onClick={() => setReplyOpen(null)}
+                            style={{
+                              padding:'8px 16px', borderRadius:10, fontSize:13, fontWeight:600,
+                              cursor:'pointer', fontFamily:'inherit',
+                              border:'1px solid rgba(249,240,240,.15)',
+                              background:'transparent', color:'rgba(240,235,255,.9)',
+                            }}>
+                            Отмена
+                          </button>
+                        </div>
+                        <div style={{ fontSize:11, color:'rgba(225,220,245,.55)', marginTop:8 }}>
+                          Сообщение придёт в чат с HEY-заведующим. Обращение будет помечено «Обработано».
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setReplyOpen(f.id);
+                          if (!replyDraft[f.id] && !f.reply_text) {
+                            setReplyDraft(prev => ({
+                              ...prev,
+                              [f.id]: 'Здравствуйте!\n\n',
+                            }));
+                          }
+                        }}
+                        style={{
+                          padding:'8px 16px', borderRadius:10, fontSize:13, fontWeight:600,
+                          cursor:'pointer', fontFamily:'inherit',
+                          border:'1px solid rgba(180,140,255,.35)',
+                          background:'rgba(95, 64, 128,.2)', color:'rgba(220,200,255,.95)',
+                        }}>
+                        💬 Ответить от HEY-заведующего
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {isAnonymous && (
+                  <div style={{
+                    fontSize:12, color:'rgba(225,220,245,.55)', marginBottom:14, fontStyle:'italic',
+                  }}>
+                    Анонимное обращение — ответить в чат нельзя.
                   </div>
                 )}
 

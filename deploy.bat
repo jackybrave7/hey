@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
+cd /d "%~dp0"
 
 set SERVER=root@45.153.71.162
 set SSH_KEY=%USERPROFILE%\.ssh\id_ed25519
@@ -10,16 +11,13 @@ echo.
 echo === HEY Deploy ===
 echo.
 
-REM Локальная сборка убрана: сервер собирает фронт сам (шаг 4), локальный
-REM dist никуда не деплоился — только удваивал время. Если сборка на
-REM сервере упадёт, docker restart не выполнится и продолжит работать
-REM старая версия (плюс есть rollback.bat).
+:: Server builds frontend in Docker; local dist is not deployed.
 
 echo [1/4] Commit and push...
 git add -A
 git diff --cached --quiet
 if errorlevel 1 (
-    git commit -m "deploy: %date% %time%"
+    for /f "delims=" %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HHmmss"') do git commit -m "deploy: %%t"
     call :git_push_retry
     if errorlevel 1 (
         echo ERROR: git push failed after retries
@@ -58,8 +56,6 @@ echo OK
 
 echo.
 echo [4/4] Database snapshot, build in Docker, restart...
-REM npm install гоняем только если package-lock.json изменился с прошлого
-REM деплоя (md5-страж .pkglock.md5) — экономит ~1-2 минуты на каждом деплое.
 ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SERVER% "docker start hey 2>/dev/null; cd %APP_DIR% && docker exec hey node server/scripts/predeploy-backup.js && docker exec hey sh -c 'cd /app && (md5sum -c .pkglock.md5 >/dev/null 2>&1 || (npm install --silent && md5sum package-lock.json > .pkglock.md5)) && npm run build' && docker restart hey && sleep 2 && curl -sf %HEALTH_URL%"
 if errorlevel 1 (
     echo ERROR: snapshot, build or restart failed

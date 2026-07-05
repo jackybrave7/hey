@@ -2379,6 +2379,79 @@ module.exports = function makeRouter(db, broadcast) {
     res.json({ ok: true });
   });
 
+  // Админ: ответ пользователю в чат с HEY-заведующим
+  r.post('/admin/feedbacks/:id/reply', requireAdmin, async (req, res) => {
+    try {
+      const trimmed = (req.body?.text || '').trim();
+      const markDone = req.body?.markDone !== false;
+      if (!trimmed) return res.status(400).json({ error: 'Нужен текст ответа' });
+      if (trimmed.length > 2000) return res.status(400).json({ error: 'Слишком длинно (макс. 2000)' });
+
+      const fb = db.getFeedbackById(req.params.id);
+      if (!fb) return res.status(404).json({ error: 'Обращение не найдено' });
+      if (!fb.user_id) {
+        return res.status(400).json({ error: 'Анонимное обращение — ответить в чат нельзя' });
+      }
+      if (fb.user_is_deleted) {
+        return res.status(400).json({ error: 'Пользователь удалил аккаунт' });
+      }
+
+      const userId = fb.user_id;
+      db.addSystemContactFor(userId);
+      const conv = db.getOrCreateDirectConversation(userId, db.SYSTEM_USER_ID);
+      const saved = db.createMessage({
+        conversationId: conv.id,
+        senderId: db.SYSTEM_USER_ID,
+        text: trimmed,
+      });
+
+      broadcast([userId], {
+        type: 'message:new',
+        message: {
+          ...saved,
+          sender_name: 'HEY-заведующий',
+          conversationId: conv.id,
+        },
+      });
+
+      // Push — как в WS: SW сам подавит дубль, если приложение в фокусе.
+      try {
+        if (!db.isNotificationsMuted(conv.id, userId) && !db.isConversationArchived(conv.id, userId)) {
+          const subs = db.getPushSubscriptions(userId);
+          if (subs.length) {
+            const gone = await push.sendPushToUser(subs, {
+              title: 'HEY-заведующий',
+              body: trimmed.slice(0, 140),
+              url: `/chat/${conv.id}?msg=${saved.id}`,
+              tag: `msg:${conv.id}`,
+              messageId: saved.id,
+              senderId: db.SYSTEM_USER_ID,
+            });
+            if (gone.length) db.removePushSubscriptions(gone);
+          }
+        }
+      } catch (e) { console.warn('[feedback-reply] push failed:', e.message); }
+
+      db.setFeedbackReply(fb.id, req.user.id, trimmed);
+      if (markDone && fb.status === 'open') {
+        db.resolveFeedback(fb.id, req.user.id, 'done', null);
+      }
+      if (db.logAdminAction) {
+        db.logAdminAction({
+          adminId: req.user.id,
+          action: 'feedback_reply',
+          targetUserId: userId,
+          reason: `feedback=${fb.id}; text="${trimmed.slice(0, 80)}"`,
+        });
+      }
+
+      res.json({ ok: true, conversationId: conv.id, messageId: saved.id });
+    } catch (err) {
+      console.error('POST /admin/feedbacks/:id/reply error:', err);
+      res.status(500).json({ error: err.message || 'Internal error' });
+    }
+  });
+
   // Админ: список жалоб
   r.get('/admin/reports', requireAdmin, (req, res) => {
     const status = req.query.status || 'open';

@@ -8,17 +8,18 @@ echo   HEY Messenger - Запуск...
 echo  ================================
 echo.
 
-:: Освобождаем порты от зависших прошлых запусков (иначе EADDRINUSE / Vite уезжает на 5174)
-echo  Проверяем порты 3001 и 5173...
+:: Освобождаем порты 3001/5173/5174 (PowerShell — надёжнее netstat на русской Windows)
+echo  Проверяем порты 3001, 5173, 5174...
 for %%P in (3001 5173 5174) do (
-  for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%%P " ^| findstr LISTENING') do (
-    echo  Завершаем старый процесс PID %%a на порту %%P
-    taskkill /F /PID %%a >nul 2>&1
+  for /f "usebackq delims=" %%a in (`powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort %%P -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`) do (
+    if not "%%a"=="" (
+      echo  Завершаем старый процесс PID %%a на порту %%P
+      taskkill /F /PID %%a >nul 2>&1
+    )
   )
 )
-timeout /t 1 /nobreak >nul
+timeout /t 2 /nobreak >nul
 
-:: Получаем локальный IP
 for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4" ^| findstr /v "127.0.0.1"') do (
     set IP=%%a
     goto :found
@@ -37,3 +38,8 @@ echo  ================================
 echo.
 
 npm run dev
+if errorlevel 1 (
+  echo.
+  echo ERROR: dev-сервер завершился с ошибкой.
+  pause
+)
