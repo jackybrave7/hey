@@ -24,17 +24,27 @@ if (!fs.existsSync(src)) {
 }
 
 const dest = path.join(dataDir, `hey_pre_${stamp()}.db`);
-const db = new Database(src, { readonly: true });
-db.backup(dest);
-db.close();
-console.log('Snapshot:', dest);
 
-const backups = fs.readdirSync(dataDir)
-  .filter((f) => f.startsWith('hey_pre_') && f.endsWith('.db'))
-  .map((f) => ({ f, mtime: fs.statSync(path.join(dataDir, f)).mtimeMs }))
-  .sort((a, b) => b.mtime - a.mtime);
+(async () => {
+  const db = new Database(src, { readonly: true });
+  // db.backup() асинхронный — обязательно ждать до close(), иначе
+  // «The database connection is not open» посреди копирования.
+  await db.backup(dest);
+  db.close();
+  console.log('Snapshot:', dest);
 
-for (const old of backups.slice(KEEP)) {
-  fs.unlinkSync(path.join(dataDir, old.f));
-  console.log('Removed old snapshot:', old.f);
-}
+  const backups = fs.readdirSync(dataDir)
+    .filter((f) => f.startsWith('hey_pre_') && f.endsWith('.db'))
+    .map((f) => ({ f, mtime: fs.statSync(path.join(dataDir, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+
+  for (const old of backups.slice(KEEP)) {
+    fs.unlinkSync(path.join(dataDir, old.f));
+    console.log('Removed old snapshot:', old.f);
+  }
+})().catch((e) => {
+  console.error('Snapshot failed:', e.message);
+  // Недописанный файл убираем, чтобы не притворялся валидным бэкапом.
+  try { fs.unlinkSync(dest); } catch {}
+  process.exit(1);
+});
