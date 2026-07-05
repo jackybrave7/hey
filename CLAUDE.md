@@ -13,20 +13,17 @@
 
 ## Деплой
 
-Прод: `hey-messenger.ru`, сервер `root@72.56.16.44`, app под `pm2 hey`, рабочая директория `/app` (НЕ `/var/www/hey`).
+Прод: `hey-messenger.ru`, сервер `root@45.153.71.162` (Москва), app в Docker `hey`, рабочая директория `/opt/hey`, порт `3002`.
 
 ```bash
-ssh root@72.56.16.44 "cd /app && git pull && cd web && npm run build && pm2 restart hey"
+ssh root@45.153.71.162 "cd /opt/hey && git pull && docker exec hey sh -c 'cd /app && npm run build' && docker restart hey"
 ```
 
-Если правил только сервер — `npm run build` пропускается:
-```bash
-ssh root@72.56.16.44 "cd /app && git pull && pm2 restart hey"
-```
+Деплой с Windows: `deploy.bat` (сборка + push + git pull + Docker restart).
 
 Ветка для разработки: `feat/messaging-extras` (она же deploy-ветка).
 
-База в проде: `/app/server/data/hey.db` (SQLite). Бэкап рядом: `hey_backup.db`.
+База в проде: `/opt/hey/server/data/hey.db` (SQLite). Бэкап рядом: `hey_backup.db`.
 
 ## Ключевые особенности кода (не очевидные)
 
@@ -136,7 +133,7 @@ UI: в чат-листе бейдж приглашения показывает 
 ## Принципы при правках
 
 - Прод-дев в одной ветке (`feat/messaging-extras`). После каждой задачи —
-  `git add -A && git commit && git push && ssh "cd /app && git pull && (cd web && npm run build) && pm2 restart hey"`.
+  `deploy.bat` или вручную: `ssh root@45.153.71.162 "cd /opt/hey && git pull && docker exec hey sh -c 'cd /app && npm run build' && docker restart hey"`.
 - Если в `npm run build` есть `Duplicate key "display"` warning в `Screens.jsx` — это известная esbuild-косметика, билд продолжается, можно игнорировать (но если рядом — поправь).
 - Никнейм/имена/телефоны — **никогда** не пробрасывать через query string логов.
 - Восстановление пользователя из удалённого требует bcrypt — делать через

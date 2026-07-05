@@ -23,7 +23,7 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 // Static uploads
 app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
 
-const { mediaProxyHandler, streamMedia } = require('./mediaProxy');
+const { mediaProxyHandler, streamMedia, sweepMediaCache } = require('./mediaProxy');
 // GET /media/* — canonical media route.
 app.get('/media/*', mediaProxyHandler);
 // Legacy /api/media/* → тот же стрим.
@@ -57,15 +57,40 @@ if (process.env.NODE_ENV === 'production') {
   const dist = path.join(__dirname, '../../web/dist');
   // extensions:['html'] позволяет статически отдавать /for-schools без .html
   // — нужно для SEO-страницы /for-schools.html, которая лежит в web/public/.
-  app.use(express.static(dist, { extensions: ['html'] }));
+  //
+  // Кеш-политика по типу файла. Раньше всё уходило с max-age=0 —
+  // браузер перекачивал 280КБ+ JS-бандла на каждый заход в приложение.
+  app.use(express.static(dist, {
+    extensions: ['html'],
+    setHeaders: (res, filePath) => {
+      const p = filePath.replace(/\\/g, '/');
+      if (p.includes('/assets/')) {
+        // Vite ставит content-hash в имя — файл иммутабелен навсегда.
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (p.endsWith('/sw.js')) {
+        // Service worker обязан перепроверяться на каждой загрузке,
+        // иначе фиксы push-уведомлений не доезжают до устройств сутками.
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else if (p.endsWith('.html') || p.endsWith('.webmanifest')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      } else {
+        // Иконки, эмодзи, фоны — не хешированы, но меняются редко.
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      }
+    },
+  }));
   // Явный alias на случай если extensions-резолв в текущей версии
   // express.static не срабатывает раньше SPA-fallback ниже.
   app.get('/for-schools', (req, res) =>
     res.sendFile(path.join(dist, 'for-schools.html')));
   // SPA-fallback. Если запрошенный путь — известная статика на диске,
   // express.static выше уже отдал её. Сюда попадают только клиентские
-  // роуты React-приложения → отдаём index.html.
-  app.get('*', (req, res) => res.sendFile(path.join(dist, 'index.html')));
+  // роуты React-приложения → отдаём index.html (без кеша — новая сборка
+  // должна подхватываться сразу).
+  app.get('*', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(dist, 'index.html'));
+  });
 }
 
 
@@ -186,6 +211,18 @@ setInterval(runOnboardingDispatcher, 60 * 1000);
 // TG_SUPPORT_BOT_TOKEN не задан в окружении.
 const { startBot } = require('./tgBot');
 startBot({ db }).catch(e => console.error('[tg-bot] fatal:', e.message));
+
+// Вытеснение дискового кеша /media по размеру: на старте + раз в сутки.
+async function runMediaCacheSweep() {
+  try {
+    const r = await sweepMediaCache();
+    if (r.deleted) console.log('[media-cache]', JSON.stringify(r));
+  } catch (e) {
+    console.error('[media-cache] sweep failed:', e.message);
+  }
+}
+setTimeout(runMediaCacheSweep, 2 * 60 * 1000);
+setInterval(runMediaCacheSweep, 24 * 60 * 60 * 1000);
 
 // S3-«сборщик сирот». Потенциально удаляет пользовательские медиа, поэтому
 // автоматический destructive-запуск выключен по умолчанию.

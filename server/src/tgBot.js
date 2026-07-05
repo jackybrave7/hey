@@ -149,18 +149,32 @@ async function startBot({ db }) {
     if (drain.length) offset = drain[drain.length - 1].update_id + 1;
   } catch {}
 
+  // Экспоненциальный backoff: с московского VDS api.telegram.org может
+  // быть недоступен вовсе (connect timeout). Раньше бот ретраил каждые
+  // ~15с и спамил лог «poll fail» тысячами строк в сутки. Теперь пауза
+  // растёт 5с → 10с → … → 15 мин и держится там, пока сеть не оживёт.
+  // Лог — только на первом фейле и при восстановлении.
+  let failStreak = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       const updates = await tg(token, 'getUpdates', { offset, timeout: 25 });
+      if (failStreak) {
+        console.log(`[tg-bot] связь с Telegram восстановлена (после ${failStreak} фейлов)`);
+        failStreak = 0;
+      }
       for (const upd of updates) {
         offset = upd.update_id + 1;
         try { await handleUpdate(upd, { token, db }); }
         catch (e) { console.error('[tg-bot] handle fail:', e.message); }
       }
     } catch (e) {
-      console.error('[tg-bot] poll fail:', e.message);
-      await new Promise(r => setTimeout(r, 5000));
+      failStreak++;
+      if (failStreak === 1 || failStreak % 50 === 0) {
+        console.error(`[tg-bot] poll fail (#${failStreak}):`, e.message);
+      }
+      const delay = Math.min(5000 * 2 ** Math.min(failStreak - 1, 8), 15 * 60 * 1000);
+      await new Promise(r => setTimeout(r, delay));
     }
   }
 }
