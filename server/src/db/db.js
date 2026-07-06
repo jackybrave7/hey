@@ -245,6 +245,15 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS scheduled_messages (
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_scheduled_due ON scheduled_messages(status, send_at)'); } catch {}
 try { db.exec('CREATE INDEX IF NOT EXISTS idx_scheduled_sender ON scheduled_messages(sender_id, conversation_id)'); } catch {}
 
+// Кто прочитал сообщение в группе (детализация для ПКМ «Кто прочитал»).
+try { db.exec(`CREATE TABLE IF NOT EXISTS message_read_receipts (
+  message_id  TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  read_at     INTEGER NOT NULL,
+  PRIMARY KEY (message_id, user_id)
+)`); } catch {}
+try { db.exec('CREATE INDEX IF NOT EXISTS idx_msg_read_user ON message_read_receipts(user_id)'); } catch {}
+
 // ── Admin columns (safe migrations) ──────────────────────────────────────────
 try { db.exec('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE users ADD COLUMN is_super_admin INTEGER DEFAULT 0'); } catch {}
@@ -997,7 +1006,7 @@ function sqlInvitedIdsForUser(param = '?') {
   return sqlPersonalInvitedIdsForUser(param);
 }
 
-const _invitedCountParams = (userId) => [userId];
+const _invitedCountParams = (userId) => [userId, userId];
 
 // Подтверждён = есть confirmed_at в referrals ИЛИ юзер уже отправлял сообщения.
 function sqlInviteeIsConfirmed(idExpr) {
@@ -2532,7 +2541,48 @@ function markMessagesReadUpTo(conversationId, readerId, upToMessageId) {
   if (!toUpdate.length) return [];
   const ph = toUpdate.map(() => '?').join(',');
   db.prepare(`UPDATE messages SET status='read' WHERE id IN (${ph})`).run(...toUpdate.map(m => m.id));
+  const conv = db.prepare('SELECT type FROM conversations WHERE id=?').get(conversationId);
+  if (conv?.type === 'group') {
+    const ts = now();
+    const insertReceipt = db.prepare(
+      `INSERT OR IGNORE INTO message_read_receipts (message_id, user_id, read_at) VALUES (?, ?, ?)`
+    );
+    for (const m of toUpdate) insertReceipt.run(m.id, readerId, ts);
+  }
   return toUpdate;
+}
+
+function getMessageReaders(messageId, conversationId, viewerId) {
+  const conv = db.prepare('SELECT type FROM conversations WHERE id=?').get(conversationId);
+  if (!conv || conv.type !== 'group') return null;
+  if (!isMember(conversationId, viewerId)) return null;
+  const msg = db.prepare(
+    'SELECT id, sender_id, conversation_id, is_deleted FROM messages WHERE id=?'
+  ).get(messageId);
+  if (!msg || msg.conversation_id !== conversationId) return null;
+  if (Number(msg.is_deleted) === 1) return { readers: [], total_members: 0 };
+
+  const members = getConversationMembers(conversationId)
+    .filter(uid => uid !== msg.sender_id);
+  const totalMembers = members.length;
+
+  const rows = db.prepare(
+    `SELECT u.id, u.name, u.avatar, r.read_at
+     FROM message_read_receipts r
+     JOIN users u ON u.id = r.user_id
+     WHERE r.message_id = ? AND u.is_deleted = 0
+     ORDER BY r.read_at ASC`
+  ).all(messageId);
+
+  return {
+    total_members: totalMembers,
+    readers: normalizeAvatars(rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      avatar: r.avatar,
+      read_at: r.read_at,
+    }))),
+  };
 }
 
 function getMessageById(id) {
@@ -3957,6 +4007,10 @@ function setOnline(userId, online) {
     .run(online ? 1 : 0, now(), userId);
 }
 
+function resetStaleOnline() {
+  db.prepare('UPDATE presence SET online=0 WHERE online=1').run();
+}
+
 function getPresence(userId) {
   const p = db.prepare('SELECT * FROM presence WHERE user_id=?').get(userId);
   return p ? { ...p, online: !!p.online } : { online: false, last_seen: null };
@@ -4579,7 +4633,7 @@ module.exports = {
   getOrCreateDirectConversation, getOrCreateSelfChat, acceptRequest, declineRequest, deleteConversation,
   getConversationById, getConversationsForUser, getConversationMembers, isMember,
   getPinnedCount, pinConversation, unpinConversation,
-  getMessages, createMessage, createSystemEventMessage, updateMessageStatus, markMessagesReadUpTo, getMessageById,
+  getMessages, createMessage, createSystemEventMessage, updateMessageStatus, markMessagesReadUpTo, getMessageReaders, getMessageById,
   scheduleMessage, getScheduledMessage, listScheduledMessages, cancelScheduledMessage, updateScheduledMessage,
   popDueScheduledMessages, deleteScheduledMessageById,
   getLinkPreviewCached, setLinkPreviewCached, updateMessageLinkPreview,
@@ -4589,7 +4643,7 @@ module.exports = {
   clearConversationMessages, editMessage, deleteMessage, hardDeleteMessage,
   getMediaMessages, searchMessages, searchAllMessages,
   getCalls, createCall,
-  setOnline, getPresence,
+  setOnline, getPresence, resetStaleOnline,
   toggleReaction, getMessageReactions, getReactionsForMessages,
   blockUser, unblockUser, getBlockedUsers, isBlocked, updateContactNotes, updateContactNickname,
   getReferralCount, getInvitedCounts, findUserByInviteCode, markReferralFromInviter,

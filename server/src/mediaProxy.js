@@ -23,6 +23,45 @@ const CACHE_MAX_BYTES = parseInt(process.env.MEDIA_CACHE_MAX_BYTES || '') || 3 *
 
 const CACHE_HEADER = 'public, max-age=31536000, immutable';
 
+// Один sharp-транскод за раз на ключ — иначе лента моментов на Android
+// запускает десятки параллельных конвертаций и съедает CPU VDS.
+const jpegBuilds = new Map();
+
+let sharpMod = null;
+function getSharp() {
+  if (sharpMod !== null) return sharpMod;
+  try {
+    sharpMod = require('sharp');
+    sharpMod.concurrency(1);
+  } catch {
+    sharpMod = false;
+  }
+  return sharpMod;
+}
+
+async function ensureJpegFile(key, readSource) {
+  const cachedJpeg = cachePathFor(key, '.jpeg');
+  if (fs.existsSync(cachedJpeg)) return cachedJpeg;
+
+  let job = jpegBuilds.get(key);
+  if (!job) {
+    job = (async () => {
+      if (fs.existsSync(cachedJpeg)) return cachedJpeg;
+      const sharp = getSharp();
+      if (!sharp) throw new Error('sharp unavailable');
+      const input = await readSource();
+      const jpg = await sharp(input, { animated: false })
+        .rotate()
+        .jpeg({ quality: 84, mozjpeg: true })
+        .toBuffer();
+      await writeCacheFile(cachedJpeg, jpg);
+      return cachedJpeg;
+    })().finally(() => jpegBuilds.delete(key));
+    jpegBuilds.set(key, job);
+  }
+  return job;
+}
+
 function cachePathFor(key, suffix = '') {
   // Ключи уже валидируются на '..' в streamMedia; зеркалим структуру.
   return path.join(CACHE_DIR, key.replace(/\//g, path.sep)) + suffix;
@@ -78,15 +117,8 @@ async function streamMedia(key, res, opts = {}) {
     }
     // jpeg-вариант ещё не собран — транскодим из кеша, сохраняем.
     try {
-      const sharp = require('sharp');
-      const jpg = await sharp(await fsp.readFile(cached), { animated: false })
-        .rotate()
-        .jpeg({ quality: 84, mozjpeg: true })
-        .toBuffer();
-      writeCacheFile(cachedJpeg, jpg).catch(() => {});
-      res.set('Cache-Control', CACHE_HEADER);
-      res.set('Content-Type', 'image/jpeg');
-      return res.send(jpg);
+      const jpegPath = await ensureJpegFile(key, () => fsp.readFile(cached));
+      return sendCached(res, jpegPath, 'image/jpeg');
     } catch (e) {
       console.warn('[/media] jpeg transcode failed:', key, e.message);
       return sendCached(res, cached, ct);
@@ -121,15 +153,8 @@ async function streamMedia(key, res, opts = {}) {
 
   if (wantJpeg && shouldTranscodeToJpeg(key, ct)) {
     try {
-      const sharp = require('sharp');
-      const jpg = await sharp(buf, { animated: false })
-        .rotate()
-        .jpeg({ quality: 84, mozjpeg: true })
-        .toBuffer();
-      writeCacheFile(cachedJpeg, jpg).catch(() => {});
-      res.set('Cache-Control', CACHE_HEADER);
-      res.set('Content-Type', 'image/jpeg');
-      return res.send(jpg);
+      const jpegPath = await ensureJpegFile(key, async () => buf);
+      return sendCached(res, jpegPath, 'image/jpeg');
     } catch (e) {
       console.warn('[/media] jpeg transcode failed:', key, e.message);
     }
@@ -149,8 +174,9 @@ function mediaProxyHandler(req, res) {
 }
 
 function shouldTranscodeToJpeg(key, contentType) {
-  if (!/\.(avif|heic|heif|jpe?g|png|webp)$/i.test(key)) return false;
   if (/\.gif$/i.test(key)) return false;
+  if (/\.jpe?g$/i.test(key)) return false;
+  if (!/\.(avif|heic|heif|png|webp)$/i.test(key)) return false;
   if (contentType && !/^image\//i.test(contentType)) return false;
   if (contentType && /svg/i.test(contentType)) return false;
   return true;

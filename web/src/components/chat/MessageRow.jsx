@@ -29,7 +29,7 @@ function rxSig(reactions) {
 const MessageRow = memo(function MessageRow({
   m, isOut, isGroup, editingMsgId, reactionPickerMsgId,
   partnerName, currentUserId, isFlashing,
-  onOpenMenu, onLightbox, onToggleReaction, onSetReactionPicker, onOpenMomentRef,
+  onOpenMenu, onLightbox, onVideoOpen, onToggleReaction, onSetReactionPicker, onOpenMomentRef,
   statusIcon, renderText,
 }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -314,6 +314,56 @@ const MessageRow = memo(function MessageRow({
               onPlayingChange={setAudioPlaying}
             />
           )}
+          {m.attachment?.type === 'video' && (() => {
+            const src = mediaUrl(m.attachment.url);
+            if (!src) return (
+              <div style={{padding:'10px 0',fontSize:13,opacity:.5}}>🎬 Видео недоступно</div>
+            );
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  if (reactionPickerMsgId === m.id) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                  }
+                  e.stopPropagation();
+                  onVideoOpen?.(src, m.attachment.name);
+                }}
+                style={{
+                  position: 'relative', display: 'block', padding: 0, margin: 0, border: 'none',
+                  background: 'transparent', cursor: 'pointer', maxWidth: '100%',
+                  marginBottom: m.text ? 6 : 2, borderRadius: 10, overflow: 'hidden',
+                }}
+              >
+                <video
+                  src={src}
+                  preload="metadata"
+                  muted
+                  playsInline
+                  style={{
+                    maxWidth: '100%', maxHeight: 320, display: 'block',
+                    background: '#000', pointerEvents: 'none',
+                  }}
+                />
+                <span style={{
+                  position: 'absolute', inset: 0, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(0,0,0,.28)',
+                }}>
+                  <span style={{
+                    width: 52, height: 52, borderRadius: '50%',
+                    background: 'rgba(0,0,0,.55)', border: '2px solid rgba(249,240,240,.85)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#F9F0F0',
+                  }}>
+                    <Icon name="play" size={24} />
+                  </span>
+                </span>
+              </button>
+            );
+          })()}
           {m.attachment?.type === 'file' && (
             <a href={m.attachment.url} target="_blank" rel="noreferrer" download={m.attachment.name}
               style={{

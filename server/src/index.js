@@ -95,6 +95,12 @@ if (process.env.NODE_ENV === 'production') {
 
 
 server.listen(PORT, () => {
+  try {
+    db.resetStaleOnline();
+    console.log('[presence] stale online flags cleared on startup');
+  } catch (e) {
+    console.warn('[presence] reset failed:', e.message);
+  }
   console.log(`
   ╔══════════════════════════════╗
   ║  HEY Server running          ║

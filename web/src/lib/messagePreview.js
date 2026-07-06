@@ -50,6 +50,7 @@ export function messagePreviewText(message) {
 
   if (!att) return null;
   if (att.type === 'image' || att.type === 'images') return '🖼 Фото';
+  if (att.type === 'video') return '🎬 Видео';
   if (att.type === 'audio') return '🎙 Голосовое сообщение';
   if (att.type === 'file') return `📎 ${att.name || 'Файл'}`;
   if (att.type === 'moment') return '✨ Момент';

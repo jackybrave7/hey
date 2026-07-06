@@ -195,6 +195,7 @@ export const api = {
   declineRequest:   (convId)              => req('DELETE', `/conversations/${convId}/request`),
   editMessage:      (convId, msgId, body) => req('PATCH',  `/conversations/${convId}/messages/${msgId}`, body),
   deleteMessage:    (convId, msgId)       => req('DELETE', `/conversations/${convId}/messages/${msgId}`),
+  getMessageReaders:(convId, msgId)      => req('GET',    `/conversations/${convId}/messages/${msgId}/readers`),
   toggleReaction:   (convId, msgId, emoji) => req('POST', `/conversations/${convId}/messages/${msgId}/reactions`, { emoji }),
   getPresignUrl:    (category, contentType, size) => req('POST', '/upload/presign', { category, contentType, size }),
   uploadImage:      (data)               => req('POST',   '/upload', { data }),

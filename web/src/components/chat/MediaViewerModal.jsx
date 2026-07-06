@@ -5,6 +5,7 @@ import Icon from '../Icon';
 import { ImageLightbox } from '../shared/ImageLightbox';
 import { MediaImage } from '../shared/MediaImage';
 import { fileTypeIcon } from '../../lib/fileTypeIcon';
+import { mediaUrl } from '../../lib/mediaUrl';
 import { AudioPlayer } from './AudioPlayer';
 import { URL_RE } from './chatRender';
 
@@ -42,6 +43,7 @@ function MediaViewerModal({ convId, onClose }) {
   const [tab, setTab] = useState('images');
   const [imageItems, setImageItems] = useState([]); // { url, msgId, created_at }[]
   const [files, setFiles] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [audios, setAudios] = useState([]);
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +59,7 @@ function MediaViewerModal({ convId, onClose }) {
 
   useEffect(() => {
     api.getMedia(convId).then(msgs => {
-      const imgs = [], fls = [], auds = [];
+      const imgs = [], vids = [], fls = [], auds = [];
       for (const m of msgs) {
         const a = m.attachment;
         if (!a) continue;
@@ -67,10 +69,12 @@ function MediaViewerModal({ convId, onClose }) {
           for (const url of a.urls.filter(Boolean)) {
             imgs.push({ url, msgId: m.id, created_at: m.created_at });
           }
-        } else if (a.type === 'file') fls.push({ ...m, attachment: a });
+        } else if (a.type === 'video') vids.push({ ...m, attachment: a });
+        else if (a.type === 'file') fls.push({ ...m, attachment: a });
         else if (a.type === 'audio') auds.push({ ...m, attachment: a });
       }
       setImageItems(imgs);
+      setVideos(vids);
       setFiles(fls);
       setAudios(auds);
       setLoading(false);
@@ -125,6 +129,7 @@ function MediaViewerModal({ convId, onClose }) {
 
   const TABS = [
     ['images', 'image', 'Фото', imageItems.length],
+    ['videos', 'image', 'Видео', videos.length],
     ['files', 'attach', 'Файлы', files.length],
     ['audios', 'mic', 'Аудио', audios.length],
     ['links', 'link', 'Ссылки', links.length],
@@ -230,6 +235,37 @@ function MediaViewerModal({ convId, onClose }) {
                       </div>
                     </div>
                   ))}
+                </div>
+              )
+          )}
+
+          {!loading && tab === 'videos' && (
+            videos.length === 0
+              ? <div style={{ color: 'rgba(225,220,245,.7)', textAlign: 'center', padding: 40 }}>Нет видео</div>
+              : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {videos.map(m => {
+                    const a = m.attachment;
+                    const src = mediaUrl(a.url);
+                    return (
+                      <div key={m.id} style={{ ...listRow, cursor: 'default', flexDirection: 'column', alignItems: 'stretch' }}>
+                        {src ? (
+                          <video src={src} controls playsInline
+                            style={{ width: '100%', maxHeight: 220, borderRadius: 8, background: '#000' }}
+                          />
+                        ) : (
+                          <div style={{ color: 'rgba(225,220,245,.7)', fontSize: 13 }}>🎬 Видео недоступно</div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                          <div style={{ flex: 1, minWidth: 0, color: 'rgba(225,220,245,.75)', fontSize: 11 }}>
+                            {a.name || 'Видео'}
+                            {m.sender_name ? ` · ${m.sender_name}` : ''} · {fmtDateTime(m.created_at)}
+                          </div>
+                          <GoToMsgButton compact onClick={() => goToMessage(m.id)} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )
           )}

@@ -37,11 +37,13 @@ export function mediaUrl(url) {
   return url;
 }
 
-/** Для Android/TWA: JPEG через Node-proxy — WebP/HEIC в <img> часто не рисуются. */
+/** Для Android/TWA: JPEG-proxy только для форматов, которые WebView не рисует. */
 export function androidImageSrc(url) {
   if (!isAndroidBrowser()) return mediaUrl(url);
   const key = s3KeyFromUrl(url);
   if (!key || !isImageKey(key)) return mediaUrl(url);
+  // JPEG/WebP/PNG Chrome Android отображает с /media — без sharp на сервере.
+  if (/\.(jpe?g|webp|png)$/i.test(key)) return mediaUrl(url);
   return absolutize(`${LEGACY_MEDIA}${key}?format=jpeg`);
 }
 

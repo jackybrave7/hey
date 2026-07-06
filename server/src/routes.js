@@ -1276,6 +1276,7 @@ module.exports = function makeRouter(db, broadcast) {
     const contentType = (rawContentType || '').split(';')[0].trim();
     const allowed = {
       'chat-image':    ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+      'chat-video':    ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-matroska'],
       'chat-audio':    ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav'],
       'chat-file':     [
         'application/pdf',
@@ -1316,6 +1317,7 @@ module.exports = function makeRouter(db, broadcast) {
     const isSuper = !!req.user.is_super;
     const limits = {
       'chat-image':    isSuper ? 15 * MB : 8 * MB,
+      'chat-video':    isSuper ? 20 * MB : 10 * MB,
       'chat-audio':    10 * MB,                       // голосовухи — короткие
       'chat-file':     isSuper ? 50 * MB : 25 * MB,   // документы и архивы
       'moment-image':  isSuper ? 15 * MB : 5 * MB,
@@ -1339,6 +1341,7 @@ module.exports = function makeRouter(db, broadcast) {
     // Расширение для chat-file берётся из имени файла на клиенте — здесь не критично
     const keyMap = {
       'chat-image':   `chat/${uuid()}.${ext}`,
+      'chat-video':   `chat/video/${uuid()}.${ext}`,
       'chat-audio':   `chat/audio/${uuid()}.${ext}`,
       'chat-file':    `chat/files/${uuid()}`,
       'moment-image': `moments/${uuid()}/media.${ext}`,
@@ -1417,6 +1420,12 @@ module.exports = function makeRouter(db, broadcast) {
     const msgs = db.getMessages(req.params.id, before, limit, req.user.id);
     const reactionsMap = db.getReactionsForMessages(msgs.map(m => m.id));
     res.json(msgs.map(m => ({ ...m, reactions: reactionsMap[m.id] || {} })));
+  });
+
+  r.get('/conversations/:id/messages/:msgId/readers', requireAuth, (req, res) => {
+    const data = db.getMessageReaders(req.params.msgId, req.params.id, req.user.id);
+    if (!data) return res.status(404).json({ error: 'Not found' });
+    res.json(data);
   });
 
   r.patch('/conversations/:id/messages/:msgId', requireAuth, (req, res) => {
@@ -2594,6 +2603,7 @@ module.exports = function makeRouter(db, broadcast) {
       }
       function categoryFromKey(k) {
         if (k.startsWith('chat/audio/'))   return 'chat-audio';
+        if (k.startsWith('chat/video/'))   return 'chat-video';
         if (k.startsWith('chat/files/'))   return 'chat-file';
         if (k.startsWith('chat/'))         return 'chat-image';
         if (k.startsWith('moments/'))      return 'moment';

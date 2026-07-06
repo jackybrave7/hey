@@ -37,6 +37,7 @@ function pushBodyForMessage(text, attachment) {
   if (ev) return 'Событие в группе';
   const a = attachment;
   if (a?.type === 'image' || a?.type === 'images') return '🖼 Фото';
+  if (a?.type === 'video') return '🎬 Видео';
   if (a?.type === 'audio') return '🎙 Голосовое сообщение';
   if (a?.type === 'file') return `📎 ${a.name || 'Файл'}`;
   if (a?.type === 'moment') return '✨ Момент';

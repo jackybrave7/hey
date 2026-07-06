@@ -10,6 +10,7 @@ const LIMIT_ROWS = [
   { icon: '✦', label: 'Активные моменты', regular: '1', super: '3' },
   { icon: 'mic', label: 'Голосовые', regular: 'до 1 мин', super: 'до 5 мин' },
   { icon: '🖼', label: 'Картинки в чате', regular: 'до 8 МБ', super: 'до 15 МБ' },
+  { icon: '🎬', label: 'Видео в чате', regular: 'до 10 МБ', super: 'до 20 МБ' },
   { icon: '📎', label: 'Файлы в чате', regular: 'до 25 МБ', super: 'до 50 МБ' },
   { icon: '✍️', label: 'Ссылки в био', regular: '1', super: '5' },
   { icon: '📌', label: 'Закреплённые чаты', regular: 'до 5', super: 'до 15' },

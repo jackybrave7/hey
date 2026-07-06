@@ -62,6 +62,7 @@ export function AttachmentPreview({ type, name, size = 12 }) {
   const map = {
     image: ['image', 'Фото'],
     images: ['image', 'Фото'],
+    video: ['image', 'Видео'],
     audio: ['mic', 'Голосовое'],
   };
   if (type === 'file') {

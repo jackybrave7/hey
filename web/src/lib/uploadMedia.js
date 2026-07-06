@@ -139,6 +139,28 @@ export async function uploadAudioBlob(blob, apiFns) {
 }
 
 /**
+ * Upload a video attachment for chat — без транскодинга, как есть.
+ *
+ * @param {File} file
+ * @param {{ getPresignUrl }} apiFns
+ * @returns {Promise<{ url: string, name: string, size: number, mime: string }>}
+ */
+export async function uploadChatVideo(file, apiFns) {
+  const contentType = file.type || 'video/mp4';
+  const presign = await apiFns.getPresignUrl('chat-video', contentType, file.size);
+  if (presign.uploadUrl) {
+    await putToS3(presign.uploadUrl, file, contentType, presign.headers || {});
+    return {
+      url:  mediaUrl(presign.publicUrl),
+      name: file.name,
+      size: file.size,
+      mime: contentType,
+    };
+  }
+  throw new Error('Загрузка видео недоступна в локальной разработке без S3');
+}
+
+/**
  * Upload an arbitrary file (PDF, DOC, ZIP и т.п.) — без ресайза, как есть.
  *
  * @param {File} file

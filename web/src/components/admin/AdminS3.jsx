@@ -27,6 +27,7 @@ function formatAge(ts) {
 const CATEGORIES = [
   { v: 'all',         l: 'Все' },
   { v: 'chat-image',  l: '💬 Чат · изображения' },
+  { v: 'chat-video',  l: '🎬 Чат · видео' },
   { v: 'chat-audio',  l: '🎤 Чат · аудио' },
   { v: 'chat-file',   l: '📎 Чат · файлы' },
   { v: 'moment',      l: '✦ Моменты' },

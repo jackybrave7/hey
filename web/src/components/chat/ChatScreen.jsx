@@ -11,7 +11,8 @@ import { heyToast } from '../shared/Toast';
 import { MediaImage } from '../shared/MediaImage';
 import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { ImageLightbox } from '../shared/ImageLightbox';
-import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile } from '../../lib/uploadMedia';
+import { VideoLightbox } from '../shared/VideoLightbox';
+import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile, uploadChatVideo } from '../../lib/uploadMedia';
 import { getBlobWaveform } from '../../lib/audioWaveform';
 import { messageConversationId, messageDeletedLabel, messageDeletedPreview } from '../../lib/messagePreview';
 import { setConversationArchived } from '../../lib/archivedConversations';
@@ -25,9 +26,10 @@ import SuperLimitPopup from '../super/SuperLimitPopup';
 import MomentDetailPopup from '../moments/MomentDetailPopup';
 import ForwardModal from './ForwardModal';
 import MediaViewerModal from './MediaViewerModal';
+import MessageReadersModal from './MessageReadersModal';
 import MessageRow from './MessageRow';
 import { AudioPlayer } from './AudioPlayer';
-import { chatImgDrafts, chatFileDrafts } from './chatDrafts';
+import { chatImgDrafts, chatFileDrafts, chatVideoDrafts } from './chatDrafts';
 import { ScheduleModal, ScheduledList } from './Schedule';
 import { renderText, renderPreviewWithEmoji } from './chatRender';
 import { fileTypeIcon, AttachmentPreview } from '../../lib/fileTypeIcon';
@@ -116,6 +118,8 @@ export function ChatScreen() {
   const [replyTo,     setReplyTo]     = useState(null); // message object to reply to
   const [imgPreviews, setImgPreviews] = useState(() => convId ? (chatImgDrafts.get(convId)  || []) : []);   // [{dataUrl, file, uploading?}]
   const [filePreview, setFilePreview] = useState(() => convId ? (chatFileDrafts.get(convId) || null) : null); // { file, uploading?: bool }
+  const [videoPreview, setVideoPreview] = useState(() => convId ? (chatVideoDrafts.get(convId) || null) : null);
+  const [readersPopup, setReadersPopup] = useState(null); // { msgId }
   // momentRef — мини-карточка момента, прицепленная к черновику.
   // Прилетает через nav state, когда пользователь жмёт «Написать» в попапе момента.
   const [momentRef,   setMomentRef]   = useState(null);
@@ -123,6 +127,7 @@ export function ChatScreen() {
   const [momentChatPopup, setMomentChatPopup] = useState(null); // null | { moments:[m], idx:0 }
   const [momentChatLoading, setMomentChatLoading] = useState(false);
   const [lightbox,    setLightbox]    = useState(null); // null | { urls: string[], index: number }
+  const [videoLightbox, setVideoLightbox] = useState(null); // null | { src, title? }
   const [showMedia,   setShowMedia]   = useState(false);
   const [searchMode,  setSearchMode]  = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,6 +238,7 @@ export function ChatScreen() {
     setText(saved);
     setImgPreviews(chatImgDrafts.get(convId)  || []);
     setFilePreview(chatFileDrafts.get(convId) || null);
+    setVideoPreview(chatVideoDrafts.get(convId) || null);
     savedDraftRef.current = '';
     // Список запланированных сообщений в этом чате — для индикатора.
     api.listScheduledMessages(convId).then(setScheduled).catch(() => setScheduled([]));
@@ -258,6 +264,12 @@ export function ChatScreen() {
     if (filePreview) chatFileDrafts.set(convId, filePreview);
     else             chatFileDrafts.delete(convId);
   }, [filePreview, convId]);
+
+  useEffect(() => {
+    if (!convId) return;
+    if (videoPreview) chatVideoDrafts.set(convId, videoPreview);
+    else              chatVideoDrafts.delete(convId);
+  }, [videoPreview, convId]);
 
   // Авто-сохранение черновика (debounced). Во время правки чужого
   // сообщения не пишем — у нас уже есть бэкап исходного черновика
@@ -457,8 +469,10 @@ export function ChatScreen() {
       if (e.key !== 'Escape') return;
       // Лайтбокс сам: Esc → уменьшить / закрыть (capture в ImageLightbox).
       if (lightbox) return;
+      if (videoLightbox)         { setVideoLightbox(null);       return; }
       // Приоритет от самого «верхнего» к нижнему
       if (showMedia)             { setShowMedia(false);          return; }
+      if (readersPopup)          { setReadersPopup(null);        return; }
       if (msgMenu)               { setMsgMenu(null);             return; }
       if (reactionPicker)        { setReactionPicker(null);      return; }
       if (showEmoji)             { setShowEmoji(false);          return; }
@@ -469,6 +483,8 @@ export function ChatScreen() {
         setImgPreviews([]);
         return;
       }
+      if (videoPreview)          { setVideoPreview(null);        return; }
+      if (filePreview)           { setFilePreview(null);         return; }
       if (searchMode)            { setSearchMode(false); setSearchQuery(''); setSearchResults(null); return; }
       // Все попапы закрыты — Esc выходит на уровень выше, к списку чатов.
       // Игнорируем когда фокус в инпуте, чтобы не «терять» текст случайным
@@ -481,7 +497,7 @@ export function ChatScreen() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [lightbox, showMedia, msgMenu, reactionPicker, showEmoji, editingMsg, replyTo, imgPreviews, searchMode, nav]);
+  }, [lightbox, videoLightbox, showMedia, readersPopup, msgMenu, reactionPicker, showEmoji, editingMsg, replyTo, imgPreviews, videoPreview, filePreview, searchMode, nav]);
 
   // Scroll to bottom on initial load or after send — Virtuoso's followOutput handles the rest
   useEffect(() => {
@@ -878,13 +894,14 @@ export function ChatScreen() {
   }
 
   // Общий обработчик для input-выбора и drag&drop из Проводника/Finder.
-  // Разделяет: изображения → в preview-бар (галерея до 10), прочие
-  // (видео/аудио/документы) → в filePreview (один файл, одно сообщение).
+  // Разделяет: изображения → preview-бар (галерея до 10), видео → videoPreview,
+  // прочие (аудио/документы) → filePreview (один файл, одно сообщение).
   async function addFilesToComposer(files) {
     if (editingMsg && !isImageAttachment(editingMsg.attachment)) return;
 
     const images = files.filter(f => f.type.startsWith('image/'));
-    const others = files.filter(f => !f.type.startsWith('image/'));
+    const videos = files.filter(f => f.type.startsWith('video/'));
+    const others = files.filter(f => !f.type.startsWith('image/') && !f.type.startsWith('video/'));
 
     if (images.length) {
       const MAX_TOTAL = 10;
@@ -907,12 +924,33 @@ export function ChatScreen() {
       }
     }
 
+    if (videos.length) {
+      if (editingMsg) {
+        heyToast('При редактировании можно добавлять только картинки', 'warning');
+        return;
+      }
+      if (videoPreview || filePreview || imgPreviews.length) {
+        heyToast('Сначала отправь или удали текущее вложение', 'warning');
+        return;
+      }
+      const file = videos[0];
+      const maxMb = user?.is_super ? 20 : 10;
+      if (file.size > maxMb * 1024 * 1024) {
+        heyToast(`«${file.name}» слишком большой (макс. ${maxMb} МБ)`, 'warning');
+        return;
+      }
+      if (videos.length > 1) {
+        heyToast('Можно прикрепить только одно видео за раз', 'warning');
+      }
+      setVideoPreview({ file, uploading: false, dataUrl: previewUrl(file) });
+    }
+
     if (others.length) {
       if (editingMsg) {
         heyToast('При редактировании можно добавлять только картинки', 'warning');
         return;
       }
-      if (filePreview) {
+      if (filePreview || videoPreview) {
         heyToast('Файл уже выбран — отправь или удали его', 'warning');
         return;
       }
@@ -938,7 +976,7 @@ export function ChatScreen() {
   // Загрузить текущие вложения композера (картинки или файл) и собрать
   // объект attachment, как у обычного сообщения. Используется и обычной
   // отправкой, и планированием — переиспользуем единый код заливки.
-  // Возвращает: { attachment | null, kind: 'images'|'file'|null }
+  // Возвращает: { attachment | null, kind: 'images'|'file'|'video'|null }
   async function uploadComposerAttachment() {
     if (imgPreviews.length > 0) {
       if (imgPreviews.some(p => p.uploading)) return { attachment: null, kind: null, busy: true };
@@ -954,6 +992,17 @@ export function ChatScreen() {
         ? { type: 'image',  url:  urls[0] }
         : { type: 'images', urls };
       return { attachment, kind: 'images', captured };
+    }
+    if (videoPreview) {
+      const uploaded = await uploadChatVideo(videoPreview.file, { getPresignUrl: api.getPresignUrl });
+      return {
+        attachment: {
+          type: 'video', url: uploaded.url, name: uploaded.name,
+          size: uploaded.size, mime: uploaded.mime,
+        },
+        kind: 'video',
+        videoDataUrl: videoPreview.dataUrl,
+      };
     }
     if (filePreview) {
       const uploaded = await uploadFile(filePreview.file, { getPresignUrl: api.getPresignUrl });
@@ -1072,6 +1121,43 @@ export function ChatScreen() {
       return;
     }
 
+    // Отправка видео
+    if (videoPreview) {
+      const f = videoPreview.file;
+      const blobUrl = videoPreview.dataUrl;
+      setVideoPreview(p => p ? { ...p, uploading: true } : p);
+      let uploaded;
+      try {
+        uploaded = await uploadChatVideo(f, { getPresignUrl: api.getPresignUrl });
+      } catch (err) {
+        heyToast(err.message || 'Не удалось загрузить видео', 'error');
+        setVideoPreview(p => p ? { ...p, uploading: false } : p);
+        return;
+      }
+      const attachment = {
+        type: 'video',
+        url: uploaded.url,
+        name: uploaded.name,
+        size: uploaded.size,
+        mime: uploaded.mime,
+      };
+      const tempId = 'tmp-' + Date.now();
+      const reply  = replyTo ? makeReplySnippet(replyTo) : null;
+      pendingBottomScroll.current = true;
+      setMessages(prev => [...prev, {
+        id: tempId, text: t || null, attachment, sender_id: user.id,
+        sender_name: user.name, status:'sent',
+        created_at: Math.floor(Date.now()/1000),
+        reply_to_id: replyTo?.id || null, reply_to: reply,
+      }]);
+      socket.sendMessage(convId, t || '', tempId, attachment, replyTo?.id);
+      if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch {} }
+      setVideoPreview(null);
+      setText('');
+      setReplyTo(null);
+      return;
+    }
+
     // Отправка файла (PDF/DOC/архив и т.п.)
     if (filePreview) {
       const f = filePreview.file;
@@ -1171,6 +1257,7 @@ export function ChatScreen() {
     setText(msg.text || '');
     setReplyTo(null);
     setFilePreview(null);
+    setVideoPreview(null);
     if (isImageAttachment(msg.attachment)) {
       setImgPreviews(imgPreviewsFromAttachment(msg.attachment));
     } else {
@@ -1595,6 +1682,10 @@ export function ChatScreen() {
     } else {
       setLightbox({ urls: [src], index: 0 });
     }
+  }, []);
+  const handleVideoOpen = useCallback((src, title) => {
+    if (!src) return;
+    setVideoLightbox({ src, title: title || null });
   }, []);
   const handleToggleRxn = toggleReaction;
   const handleSetRxnPicker = useCallback((fn) => setReactionPicker(fn), []);
@@ -2026,6 +2117,7 @@ export function ChatScreen() {
                   isFlashing={flashMsgId === msg.id}
                   onOpenMenu={handleOpenMenu}
                   onLightbox={handleLightbox}
+                  onVideoOpen={handleVideoOpen}
                   onToggleReaction={handleToggleRxn}
                   onSetReactionPicker={handleSetRxnPicker}
                   onOpenMomentRef={handleOpenMomentRef}
@@ -2100,6 +2192,37 @@ export function ChatScreen() {
               title="Открепить момент"
               style={{background:'rgba(0,0,0,.4)',border:'none',color:'#F9F0F0',
                 fontSize:14,cursor:'pointer',
+                width:28,height:28,borderRadius:'50%',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                flexShrink:0,lineHeight:1}}>✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* Video preview bar */}
+      {videoPreview && (
+        <div style={{background:'rgba(95, 64, 128,.45)',flexShrink:0}}>
+          <div style={{padding:'10px 14px',maxWidth:680,margin:'0 auto',
+            display:'flex',alignItems:'center',gap:12}}>
+            <video src={videoPreview.dataUrl} muted playsInline
+              style={{width:56,height:56,borderRadius:8,objectFit:'cover',flexShrink:0,background:'#000'}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:'#F9F0F0',fontSize:14,fontWeight:600,
+                overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {videoPreview.file.name}
+              </div>
+              <div style={{color:'rgba(249,240,240,.55)',fontSize:12,marginTop:2}}>
+                🎬 {fmtFileSize(videoPreview.file.size)}
+                {videoPreview.uploading && ' · отправка…'}
+              </div>
+            </div>
+            <button onClick={() => {
+                if (videoPreview.dataUrl) { try { URL.revokeObjectURL(videoPreview.dataUrl); } catch {} }
+                setVideoPreview(null);
+              }}
+              disabled={videoPreview.uploading}
+              style={{background:'rgba(0,0,0,.4)',border:'none',color:'#F9F0F0',
+                fontSize:14,cursor: videoPreview.uploading ? 'wait' : 'pointer',
                 width:28,height:28,borderRadius:'50%',
                 display:'flex',alignItems:'center',justifyContent:'center',
                 flexShrink:0,lineHeight:1}}>✕</button>
@@ -2587,7 +2710,7 @@ export function ChatScreen() {
 
         {/* ── Normal text input bar (hidden while recording/preview/system) ── */}
         {!voiceState && !partner.isSystem && (() => {
-          const hasContent = text.trim() || imgPreviews.length > 0 || filePreview;
+          const hasContent = text.trim() || imgPreviews.length > 0 || filePreview || videoPreview;
           return (
         <div style={{padding:'6px 12px 14px',maxWidth:680,margin:'0 auto',
           minWidth:0,boxSizing:'border-box',width:'100%'}}>
@@ -2696,7 +2819,7 @@ export function ChatScreen() {
                 <Icon name="attach" size={26} color="rgba(249,240,240,.9)" />
               </button>
               <input ref={fileInputRef} type="file" multiple
-                accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,video/x-matroska,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,application/zip,application/x-zip-compressed,application/x-rar-compressed,application/vnd.rar,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.mp4,.mov,.webm,.mkv"
                 style={{display:'none'}} onChange={handleFileSelect}/>
               {hasContent ? (
                 <button onClick={send}
@@ -2881,11 +3004,20 @@ export function ChatScreen() {
           try { navigator.clipboard.writeText(msgMenu.msg.text || ''); heyToast('Скопировано', 'success'); }
           catch { heyToast('Не удалось скопировать', 'error'); }
         };
+        const canReaders = partner.isGroup && isOwn && !msgMenu.msg.is_deleted;
         const iconEl = (name) => <Icon name={name} size={15}/>;
         const items = [
           { label:'Ответить', icon: iconEl('reply'), onClick: () => { setReplyTo(msgMenu.msg); textareaRef.current?.focus(); } },
           canCopy && { label:'Копировать', iconName:'copy', onClick: copyText },
           !msgMenu.msg.is_deleted && { label:'Переслать', icon: iconEl('forward'), onClick: () => openForwardModal(msgMenu.msg) },
+          canReaders && {
+            label: 'Кто прочитал',
+            icon: <span style={{ fontSize: 15, lineHeight: 1 }}>👁</span>,
+            onClick: () => {
+              setReadersPopup({ msgId: msgMenu.msg.id });
+              setMsgMenu(null);
+            },
+          },
           canPin && !isPinned && { label:'Закрепить', icon: iconEl('pin'), onClick: () => pinMsg(msgMenu.msg) },
           canPin &&  isPinned && { label:'Открепить', icon: iconEl('unpin'), onClick: () => unpinMsg() },
           canEdit && { label:'Редактировать', icon: iconEl('pencil'), onClick: () => startEdit(msgMenu.msg) },
@@ -2906,6 +3038,15 @@ export function ChatScreen() {
           />
         );
       })()}
+
+      {/* Message readers (groups) */}
+      {readersPopup && (
+        <MessageReadersModal
+          convId={convId}
+          messageId={readersPopup.msgId}
+          onClose={() => setReadersPopup(null)}
+        />
+      )}
 
       {/* Media viewer */}
       {showMedia && (
@@ -2970,22 +3111,27 @@ export function ChatScreen() {
                 // оставляем как есть.
                 let attachment = null;
                 let capturedImgs = null;
-                if (imgPreviews.length > 0 || filePreview) {
+                if (imgPreviews.length > 0 || filePreview || videoPreview) {
                   if (imgPreviews.some(p => p.uploading)) {
                     heyToast('Дождись загрузки', 'warning'); return;
                   }
                   setImgPreviews(prev => prev.map(p => ({ ...p, uploading: true })));
                   setFilePreview(p => p ? { ...p, uploading: true } : p);
+                  setVideoPreview(p => p ? { ...p, uploading: true } : p);
                   let up;
                   try { up = await uploadComposerAttachment(); }
                   catch (err) {
                     heyToast(err.message || 'Не удалось загрузить вложение', 'error');
                     setImgPreviews(prev => prev.map(p => ({ ...p, uploading: false })));
                     setFilePreview(p => p ? { ...p, uploading: false } : p);
+                    setVideoPreview(p => p ? { ...p, uploading: false } : p);
                     return;
                   }
                   attachment   = up.attachment;
                   capturedImgs = up.captured;
+                  if (up.kind === 'video' && up.videoDataUrl) {
+                    try { URL.revokeObjectURL(up.videoDataUrl); } catch {}
+                  }
                 }
                 if (!t && !attachment) { heyToast('Пустое сообщение', 'warning'); return; }
                 const sched = await api.scheduleMessage(convId, {
@@ -2999,6 +3145,7 @@ export function ChatScreen() {
                 setReplyTo(null);
                 setImgPreviews([]);
                 setFilePreview(null);
+                setVideoPreview(null);
                 if (capturedImgs) {
                   capturedImgs.forEach(p => { try { URL.revokeObjectURL(p.dataUrl); } catch {} });
                 }
@@ -3011,6 +3158,36 @@ export function ChatScreen() {
           />
         );
       })()}
+
+      {videoLightbox && (
+        <VideoLightbox
+          src={videoLightbox.src}
+          onClose={() => setVideoLightbox(null)}
+        >
+          <a
+            href={videoLightbox.src}
+            download={videoLightbox.title || true}
+            style={{
+              background: 'rgba(249,240,240,.15)', backdropFilter: 'blur(6px)',
+              borderRadius: 12, padding: '10px 24px', color: '#F9F0F0', fontSize: 14,
+              textDecoration: 'none', border: '1px solid rgba(249,240,240,.2)',
+            }}
+          >
+            ⬇ Скачать
+          </a>
+          <button
+            type="button"
+            onClick={() => setVideoLightbox(null)}
+            style={{
+              background: 'rgba(249,240,240,.1)', border: '1px solid rgba(249,240,240,.2)',
+              borderRadius: 12, padding: '10px 24px', color: '#F9F0F0', fontSize: 14,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Закрыть
+          </button>
+        </VideoLightbox>
+      )}
 
       {lightbox && (
         <ImageLightbox
