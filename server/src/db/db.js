@@ -8,7 +8,8 @@ const crypto = require('crypto');
 const DATA_DIR = path.join(__dirname, '../../data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new Database(path.join(DATA_DIR, 'hey.db'));
+const dbPath = process.env.HEY_DB_PATH || path.join(DATA_DIR, 'hey.db');
+const db = new Database(dbPath);
 
 // WAL mode + performance PRAGMAs
 db.pragma('journal_mode = WAL');
@@ -160,6 +161,16 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
 `);
+
+// На чистой БД ALTER выше (до CREATE TABLE) мог не сработать — повторяем.
+for (const sql of [
+  'ALTER TABLE users ADD COLUMN invite_code TEXT',
+  'ALTER TABLE users ADD COLUMN invite_rotated_at INTEGER',
+  'ALTER TABLE users ADD COLUMN invite_link_uses INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE users ADD COLUMN referral_by TEXT',
+  'ALTER TABLE conversations ADD COLUMN admin_id TEXT',
+  'ALTER TABLE conversations ADD COLUMN icon TEXT',
+]) { try { db.exec(sql); } catch {} }
 
 try { db.exec('ALTER TABLE moments ADD COLUMN moment_order INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE moments ADD COLUMN embedded_video TEXT'); } catch {}
@@ -499,17 +510,20 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS system_settings (
 )`); } catch {}
 
 // Back-fill invite codes for existing users without one (safe — users table now exists)
-db.prepare("SELECT id FROM users WHERE invite_code IS NULL").all().forEach(u => {
-  const code = u.id.replace(/-/g,'').slice(0,10).toUpperCase();
-  db.prepare("UPDATE users SET invite_code=? WHERE id=?").run(code, u.id);
-});
+try {
+  db.prepare("SELECT id FROM users WHERE invite_code IS NULL").all().forEach(u => {
+    const code = u.id.replace(/-/g,'').slice(0,10).toUpperCase();
+    db.prepare("UPDATE users SET invite_code=? WHERE id=?").run(code, u.id);
+  });
 
-// Back-fill invited_count from referrals table (one-time, safe)
-db.prepare(`
-  UPDATE users SET invited_count = (
-    SELECT COUNT(*) FROM referrals WHERE inviter_id = users.id
-  ) WHERE invited_count = 0
-`).run();
+  db.prepare(`
+    UPDATE users SET invited_count = (
+      SELECT COUNT(*) FROM referrals WHERE inviter_id = users.id
+    ) WHERE invited_count = 0
+  `).run();
+} catch (e) {
+  console.warn('[db] users backfill skipped:', e.message);
+}
 
 // Одноразово: invite_link_uses = регистрации по ссылке с момента последней ротации.
 (function backfillInviteLinkUses() {
@@ -3801,8 +3815,8 @@ function getAdminUsers({ search, filter } = {}) {
   let where = '1=1';
   const params = [];
   if (search) {
-    where += ' AND (u.name LIKE ? OR u.phone LIKE ?)';
-    params.push(`%${search}%`, `%${search}%`);
+    where += ' AND (u.name LIKE ? OR u.phone LIKE ? OR u.email LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (filter === 'blocked')  { where += ' AND u.is_blocked=1'; }
   if (filter === 'admins')   { where += ' AND u.is_admin=1'; }
@@ -3814,7 +3828,7 @@ function getAdminUsers({ search, filter } = {}) {
     params.push(now() - 3 * 24 * 60 * 60);
   }
   const rows = db.prepare(
-    `SELECT u.id, u.name, u.phone, u.avatar, u.created_at, u.is_admin, u.is_super_admin, u.is_super, u.is_blocked,
+    `SELECT u.id, u.name, u.phone, u.email, u.avatar, u.created_at, u.is_admin, u.is_super_admin, u.is_super, u.is_blocked,
             u.super_expires_at,
             u.blocked_at, u.blocked_by, u.must_change_password,
             p.online, p.last_seen,

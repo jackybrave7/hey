@@ -11,6 +11,7 @@ import { heyToast } from '../shared/Toast';
 import { MediaImage } from '../shared/MediaImage';
 import { SquareImageGallery } from '../shared/SquareImageGallery';
 import { ImageLightbox } from '../shared/ImageLightbox';
+import { ImageCropperModal } from '../shared/ImageCropperModal';
 import { VideoLightbox } from '../shared/VideoLightbox';
 import { uploadMedia, previewUrl, uploadAudioBlob, uploadFile, uploadChatVideo } from '../../lib/uploadMedia';
 import { getBlobWaveform } from '../../lib/audioWaveform';
@@ -120,6 +121,7 @@ export function ChatScreen() {
   const [filePreview, setFilePreview] = useState(() => convId ? (chatFileDrafts.get(convId) || null) : null); // { file, uploading?: bool }
   const [videoPreview, setVideoPreview] = useState(() => convId ? (chatVideoDrafts.get(convId) || null) : null);
   const [readersPopup, setReadersPopup] = useState(null); // { msgId }
+  const [imgCrop, setImgCrop] = useState(null); // { index, file }
   // momentRef — мини-карточка момента, прицепленная к черновику.
   // Прилетает через nav state, когда пользователь жмёт «Написать» в попапе момента.
   const [momentRef,   setMomentRef]   = useState(null);
@@ -473,6 +475,7 @@ export function ChatScreen() {
       // Приоритет от самого «верхнего» к нижнему
       if (showMedia)             { setShowMedia(false);          return; }
       if (readersPopup)          { setReadersPopup(null);        return; }
+      if (imgCrop)               { setImgCrop(null);             return; }
       if (msgMenu)               { setMsgMenu(null);             return; }
       if (reactionPicker)        { setReactionPicker(null);      return; }
       if (showEmoji)             { setShowEmoji(false);          return; }
@@ -497,7 +500,7 @@ export function ChatScreen() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [lightbox, videoLightbox, showMedia, readersPopup, msgMenu, reactionPicker, showEmoji, editingMsg, replyTo, imgPreviews, videoPreview, filePreview, searchMode, nav]);
+  }, [lightbox, videoLightbox, showMedia, readersPopup, imgCrop, msgMenu, reactionPicker, showEmoji, editingMsg, replyTo, imgPreviews, videoPreview, filePreview, searchMode, nav]);
 
   // Scroll to bottom on initial load or after send — Virtuoso's followOutput handles the rest
   useEffect(() => {
@@ -1029,6 +1032,15 @@ export function ChatScreen() {
       }
       return p.dataUrl;
     }));
+  }
+
+  function applyCroppedPreview(index, dataUrl, croppedFile) {
+    setImgPreviews(prev => prev.map((p, i) => {
+      if (i !== index) return p;
+      try { URL.revokeObjectURL(p.dataUrl); } catch {}
+      return { ...p, dataUrl, file: croppedFile };
+    }));
+    setImgCrop(null);
   }
 
   function reorderImgPreviews(from, to) {
@@ -2292,20 +2304,44 @@ export function ChatScreen() {
               cellReorderable={idx => !imgPreviews[idx]?.uploading}
               imageOpacity={idx => (imgPreviews[idx]?.uploading ? .5 : 1)}
               renderCellExtra={idx => !imgPreviews[idx]?.uploading ? (
-                <button
-                  data-no-reorder
-                  onClick={() => {
-                    try { URL.revokeObjectURL(imgPreviews[idx].dataUrl); } catch {}
-                    setImgPreviews(prev => prev.filter((_, i) => i !== idx));
-                  }}
-                  style={{
-                    position: 'absolute', top: 4, right: 4, width: 20, height: 20,
-                    borderRadius: '50%', background: 'rgba(0,0,0,.78)',
-                    border: 'none', color: '#F9F0F0', fontSize: 12, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: 0, lineHeight: 1, zIndex: 2,
-                  }}
-                >✕</button>
+                <>
+                  {imgPreviews[idx]?.file?.type !== 'image/gif' && (
+                    <button
+                      type="button"
+                      data-no-reorder
+                      title="Редактировать"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImgCrop({ index: idx, file: imgPreviews[idx].file });
+                      }}
+                      style={{
+                        position: 'absolute', bottom: 4, right: 4, width: 22, height: 22,
+                        borderRadius: '50%', background: 'rgba(0,0,0,.78)',
+                        border: 'none', color: '#F9F0F0', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: 0, lineHeight: 1, zIndex: 2,
+                      }}
+                    >
+                      <Icon name="pencil" size={12} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    data-no-reorder
+                    title="Удалить"
+                    onClick={() => {
+                      try { URL.revokeObjectURL(imgPreviews[idx].dataUrl); } catch {}
+                      setImgPreviews(prev => prev.filter((_, i) => i !== idx));
+                    }}
+                    style={{
+                      position: 'absolute', top: 4, right: 4, width: 20, height: 20,
+                      borderRadius: '50%', background: 'rgba(0,0,0,.78)',
+                      border: 'none', color: '#F9F0F0', fontSize: 12, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: 0, lineHeight: 1, zIndex: 2,
+                    }}
+                  >✕</button>
+                </>
               ) : null}
             />
           </div>
@@ -3158,6 +3194,17 @@ export function ChatScreen() {
           />
         );
       })()}
+
+      {imgCrop && (
+        <ImageCropperModal
+          file={imgCrop.file}
+          shape="square"
+          outputSize={1920}
+          title="Редактировать фото"
+          onCancel={() => setImgCrop(null)}
+          onDone={(dataUrl, croppedFile) => applyCroppedPreview(imgCrop.index, dataUrl, croppedFile)}
+        />
+      )}
 
       {videoLightbox && (
         <VideoLightbox

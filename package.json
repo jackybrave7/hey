@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=web\"",
     "build": "npm run build --workspace=web",
+    "test": "node scripts/test.js",
     "start": "node server/src/index.js",
     "install:all": "npm install && npm install --workspace=server && npm install --workspace=web"
   },

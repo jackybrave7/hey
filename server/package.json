@@ -4,7 +4,8 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "node --test test/core.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

@@ -140,7 +140,7 @@ export default function AdminUsers() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Поиск по имени или телефону…"
+          placeholder="Поиск по имени, телефону или email…"
           style={{
             flex: 1, minWidth: 220,
             background: 'rgba(249,240,240,.08)', border: '1px solid rgba(249,240,240,.14)',
@@ -187,6 +187,7 @@ export default function AdminUsers() {
                 </th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('name')}>Имя{sortIcon('name')}</th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('phone')}>Телефон{sortIcon('phone')}</th>
+                <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('email')}>Email{sortIcon('email')}</th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}} onClick={() => toggleSort('total_moments')}>Моменты{sortIcon('total_moments')}</th>
                 <th style={{...hcell, cursor:'pointer', userSelect:'none'}}
                   onClick={() => toggleSort('invited_total')}
@@ -209,7 +210,7 @@ export default function AdminUsers() {
             </thead>
             <tbody>
               {users.length === 0 && (
-                <tr><td colSpan={9} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
+                <tr><td colSpan={10} style={{ ...cell, textAlign: 'center', color: 'rgba(249,240,240,.3)' }}>
                   Пусто
                 </td></tr>
               )}
@@ -266,6 +267,16 @@ export default function AdminUsers() {
                     </div>
                   </td>
                   <td style={cell}>{u.phone}</td>
+                  <td style={{ ...cell, maxWidth: 220 }}>
+                    {u.email ? (
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
+                        title={u.email}>
+                        {u.email}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'rgba(249,240,240,.25)' }}>—</span>
+                    )}
+                  </td>
                   <td style={cell}>{u.active_moments}/{u.total_moments}</td>
                   <td style={cell}>
                     {(u.invited_total || 0) > 0 ? (
