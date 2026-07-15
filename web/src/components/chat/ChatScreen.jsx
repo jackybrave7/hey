@@ -59,6 +59,50 @@ function imgPreviewsFromAttachment(att) {
   return [];
 }
 
+function isGifPreview(p) {
+  if (p?.file?.type === 'image/gif') return true;
+  const u = (p?.dataUrl || p?.url || '').toLowerCase();
+  return u.includes('.gif') || u.startsWith('data:image/gif');
+}
+
+async function previewToEditableFile(preview) {
+  if (preview?.file instanceof Blob) return preview.file;
+  const url = preview?.dataUrl || preview?.url;
+  if (!url) throw new Error('no image');
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('fetch failed');
+    const blob = await res.blob();
+    if (blob.type === 'image/gif') throw new Error('gif');
+    const type = blob.type || 'image/jpeg';
+    const ext = type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : 'jpg';
+    return new File([blob], `image.${ext}`, { type });
+  } catch (e) {
+    if (e?.message === 'gif') throw e;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          canvas.toBlob(blob => {
+            if (!blob) { reject(new Error('canvas failed')); return; }
+            const type = blob.type || 'image/jpeg';
+            const ext = type.includes('png') ? 'png' : 'jpg';
+            resolve(new File([blob], `image.${ext}`, { type }));
+          }, 'image/jpeg', 0.92);
+        } catch (err) { reject(err); }
+      };
+      img.onerror = () => reject(new Error('load failed'));
+      img.src = url;
+    });
+  }
+}
+
 function releaseBlobPreviews(previews) {
   (previews || []).forEach(p => {
     if (p.file) { try { URL.revokeObjectURL(p.dataUrl); } catch {} }
@@ -122,6 +166,7 @@ export function ChatScreen() {
   const [videoPreview, setVideoPreview] = useState(() => convId ? (chatVideoDrafts.get(convId) || null) : null);
   const [readersPopup, setReadersPopup] = useState(null); // { msgId }
   const [imgCrop, setImgCrop] = useState(null); // { index, file }
+  const [imgCropLoading, setImgCropLoading] = useState(false);
   // momentRef — мини-карточка момента, прицепленная к черновику.
   // Прилетает через nav state, когда пользователь жмёт «Написать» в попапе момента.
   const [momentRef,   setMomentRef]   = useState(null);
@@ -1037,10 +1082,25 @@ export function ChatScreen() {
   function applyCroppedPreview(index, dataUrl, croppedFile) {
     setImgPreviews(prev => prev.map((p, i) => {
       if (i !== index) return p;
-      try { URL.revokeObjectURL(p.dataUrl); } catch {}
-      return { ...p, dataUrl, file: croppedFile };
+      try { if (p.file) URL.revokeObjectURL(p.dataUrl); } catch {}
+      return { ...p, dataUrl, file: croppedFile, existing: false, url: undefined };
     }));
     setImgCrop(null);
+  }
+
+  async function openImageCropper(idx) {
+    const preview = imgPreviews[idx];
+    if (!preview || preview.uploading || imgCropLoading) return;
+    if (isGifPreview(preview)) return;
+    setImgCropLoading(true);
+    try {
+      const file = await previewToEditableFile(preview);
+      setImgCrop({ index: idx, file });
+    } catch {
+      heyToast('Не удалось открыть редактор', 'error');
+    } finally {
+      setImgCropLoading(false);
+    }
   }
 
   function reorderImgPreviews(from, to) {
@@ -2305,14 +2365,15 @@ export function ChatScreen() {
               imageOpacity={idx => (imgPreviews[idx]?.uploading ? .5 : 1)}
               renderCellExtra={idx => !imgPreviews[idx]?.uploading ? (
                 <>
-                  {imgPreviews[idx]?.file?.type !== 'image/gif' && (
+                  {!isGifPreview(imgPreviews[idx]) && (
                     <button
                       type="button"
                       data-no-reorder
                       title="Редактировать"
+                      disabled={imgCropLoading}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setImgCrop({ index: idx, file: imgPreviews[idx].file });
+                        openImageCropper(idx);
                       }}
                       style={{
                         position: 'absolute', bottom: 4, right: 4, width: 22, height: 22,
@@ -3195,10 +3256,10 @@ export function ChatScreen() {
         );
       })()}
 
-      {imgCrop && (
+      {imgCrop?.file instanceof Blob && (
         <ImageCropperModal
           file={imgCrop.file}
-          shape="square"
+          shape="free"
           outputSize={1920}
           title="Редактировать фото"
           onCancel={() => setImgCrop(null)}
