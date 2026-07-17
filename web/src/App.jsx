@@ -1,5 +1,5 @@
 // web/src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './AuthContext';
 import { socket, api } from './api';
@@ -257,12 +257,37 @@ function useUnreadCount() {
   return unread;
 }
 
-function WithBottomNav({ children }) {
+function tabFromPath(pathname) {
+  if (pathname === '/chats') return 'chats';
+  if (pathname === '/contacts') return 'contacts';
+  if (pathname === '/me') return 'me';
+  return 'main';
+}
+
+/** Общий layout нижних вкладок: один BottomNav, keep-alive экранов. */
+function MainTabsLayout() {
   const { user } = useAuth();
-  const unread   = useUnreadCount();
+  const unread = useUnreadCount();
+  const tab = tabFromPath(useLocation().pathname);
+  const [visited, setVisited] = useState(() => new Set([tab]));
+
+  useEffect(() => {
+    setVisited(prev => (prev.has(tab) ? prev : new Set(prev).add(tab)));
+  }, [tab]);
+
+  const pane = (name, child) => visited.has(name) ? (
+    <div key={name} style={{ display: tab === name ? 'block' : 'none' }} aria-hidden={tab !== name}>
+      {child}
+    </div>
+  ) : null;
+
   return (
     <>
-      {children}
+      {pane('main', <MomentsScreen />)}
+      {pane('chats', <ConversationsScreen />)}
+      {pane('contacts', <ContactsScreen />)}
+      {pane('me', <MyProfileScreen />)}
+      <Outlet />
       <BottomNav user={user} unread={unread} />
     </>
   );
@@ -420,41 +445,16 @@ export default function App() {
           <Route path="/success"  element={<SuccessScreen/>}/>
           <Route path="/welcome"  element={<WelcomeScreen/>}/>
 
-          {/* Protected — with bottom nav */}
-          <Route path="/main" element={
-            <Protected>
-              <WithBottomNav>
-                <MomentsScreen/>
-              </WithBottomNav>
-            </Protected>
-          }/>
+          {/* Protected — bottom tabs (shared layout, keep-alive) */}
+          <Route element={<Protected><MainTabsLayout /></Protected>}>
+            <Route path="main" element={null} />
+            <Route path="chats" element={null} />
+            <Route path="contacts" element={null} />
+            <Route path="me" element={null} />
+          </Route>
           <Route path="/moments" element={<Navigate to="/main" replace/>}/>
-
-          <Route path="/chats" element={
-            <Protected>
-              <WithBottomNav>
-                <ConversationsScreen/>
-              </WithBottomNav>
-            </Protected>
-          }/>
           {/* Старый URL — редирект для совместимости */}
           <Route path="/conversations" element={<Navigate to="/chats" replace/>}/>
-
-          <Route path="/contacts" element={
-            <Protected>
-              <WithBottomNav>
-                <ContactsScreen/>
-              </WithBottomNav>
-            </Protected>
-          }/>
-
-          <Route path="/me" element={
-            <Protected>
-              <WithBottomNav>
-                <MyProfileScreen/>
-              </WithBottomNav>
-            </Protected>
-          }/>
           {/* Старый URL — редирект для обратной совместимости */}
           <Route path="/profile/me" element={<Navigate to="/me" replace/>}/>
 

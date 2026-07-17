@@ -1,5 +1,5 @@
 // MomentsFeed.jsx — главный экран Моментов
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, socket } from '../../api';
 import MomentCard from './MomentCard';
@@ -316,18 +316,20 @@ export default function MomentsFeed({ currentUser }) {
   }
 
   // ─── Feed grouping ─────────────────────────────────────────────────────────
-  // Group feed moments by user. Super users with multiple moments → gallery card.
-  const otherMoments = feed.filter(m => m.user_id !== currentUser?.id);
-  const feedGroups = [];
-  const seenUsers = new Set();
-  for (const m of otherMoments) {
-    if (seenUsers.has(m.user_id)) continue;
-    seenUsers.add(m.user_id);
-    const userMoments = otherMoments
-      .filter(x => x.user_id === m.user_id)
-      .sort((a, b) => (b.moment_order || 0) - (a.moment_order || 0) || b.created_at - a.created_at);
-    feedGroups.push({ userId: m.user_id, moments: userMoments, isSuper: !!m.author_is_super });
-  }
+  const feedGroups = useMemo(() => {
+    const otherMoments = feed.filter(m => m.user_id !== currentUser?.id);
+    const groups = [];
+    const seenUsers = new Set();
+    for (const m of otherMoments) {
+      if (seenUsers.has(m.user_id)) continue;
+      seenUsers.add(m.user_id);
+      const userMoments = otherMoments
+        .filter(x => x.user_id === m.user_id)
+        .sort((a, b) => (b.moment_order || 0) - (a.moment_order || 0) || b.created_at - a.created_at);
+      groups.push({ userId: m.user_id, moments: userMoments, isSuper: !!m.author_is_super });
+    }
+    return groups;
+  }, [feed, currentUser?.id]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
