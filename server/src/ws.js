@@ -79,7 +79,10 @@ module.exports = function setupWS(server) {
     clients.get(user.id).add(ws);
 
     db.setOnline(user.id, true);
-    broadcastOnlineContacts(user.id, { type: 'presence:change', userId: user.id, online: true });
+    const presOn = db.getPresence(user.id);
+    broadcastOnlineContacts(user.id, {
+      type: 'presence:change', userId: user.id, online: true, lastSeen: presOn.last_seen,
+    });
 
     ws.on('message', raw => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
@@ -327,7 +330,10 @@ module.exports = function setupWS(server) {
       if (!clients.get(user.id)?.size) {
         clients.delete(user.id);
         db.setOnline(user.id, false);
-        broadcastOnlineContacts(user.id, { type: 'presence:change', userId: user.id, online: false });
+        const presOff = db.getPresence(user.id);
+        broadcastOnlineContacts(user.id, {
+          type: 'presence:change', userId: user.id, online: false, lastSeen: presOff.last_seen,
+        });
       }
     });
   });

@@ -578,6 +578,12 @@ export function ChatScreen() {
   useEffect(() => {
     const u1 = socket.on('message:new', ({ message }) => {
       if (messageConversationId(message) !== convId) return;
+      if (message.sender_id && message.sender_id !== user?.id) {
+        const ts = message.created_at || Math.floor(Date.now() / 1000);
+        setPartner(p => (p.id === message.sender_id
+          ? { ...p, lastSeen: Math.max(p.lastSeen || 0, ts) }
+          : p));
+      }
       setMessages(prev => {
         // Replace optimistic temp message with real one
         if (message.tempId) {
@@ -608,9 +614,11 @@ export function ChatScreen() {
       setMessages(prev => prev.map(m => idSet.has(m.id) ? { ...m, status } : m));
     });
     const u5 = socket.on('presence:change', ({ userId, online, lastSeen }) => {
-      setPartner(p => p.id === userId
-        ? { ...p, online: !!online, lastSeen: lastSeen ?? p.lastSeen ?? Math.floor(Date.now()/1000) }
-        : p);
+      setPartner(p => {
+        if (p.id !== userId) return p;
+        const seen = lastSeen ?? (!online ? Math.floor(Date.now() / 1000) : p.lastSeen);
+        return { ...p, online: !!online, lastSeen: seen ?? p.lastSeen };
+      });
     });
     const u6 = socket.on('chat:cleared', ({ conversationId }) => {
       if (conversationId === convId) { setMessages([]); setPinnedMessage(null); }
