@@ -41,6 +41,7 @@ import PersonalInviteJoin from './components/contacts/PersonalInviteJoin';
 import GroupJoinScreen from './components/GroupJoinScreen';
 import UserGuide from './components/UserGuide';
 import ServerStatusBanner from './components/ServerStatusBanner';
+import VpnRuBanner from './components/VpnRuBanner';
 import { ensurePushIfGranted } from './lib/push';
 import { installAndroidExternalLinkHandler } from './lib/openExternalUrl';
 import { isConversationMuted, setConversationMuted, syncMutedConversations } from './lib/mutedConversations';
@@ -428,6 +429,7 @@ export default function App() {
         <NotificationBridge />
         <GlobalHandlers />
         <ServerStatusBanner />
+        <VpnRuBanner />
         <ToastContainer />
         <GlobalUserCardMount />
         <Routes>
