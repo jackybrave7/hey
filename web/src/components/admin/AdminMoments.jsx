@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../screens/shared';
 
 function fmtDate(ts) {
   if (!ts) return '—';

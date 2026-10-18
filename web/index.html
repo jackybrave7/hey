@@ -59,11 +59,7 @@
   <meta name="googlebot" content="index, follow"/>
   <meta name="yandex" content="index, follow"/>
 
-  <!-- Шрифт не блокирует старт: при недоступности fonts.googleapis.com (РФ) остаётся system-ui -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" media="print" onload="this.media='all'"/>
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap"/></noscript>
+  <!-- Comfortaa: self-hosted woff2 (web/src/fonts.css), без сторонних доменов -->
 
   <!-- ── Structured data (JSON-LD) ─────────────────────────────────────── -->
   <script type="application/ld+json">
@@ -89,7 +85,7 @@
   <!-- ── Initial loading paint (избегаем белого экрана) ────────────────── -->
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #1a0a30; color: #fff; }
-    body { font-family: 'Comfortaa', system-ui, -apple-system, sans-serif; }
+    body { font-family: system-ui, -apple-system, sans-serif; }
     #root { min-height: 100vh; }
     .boot-splash {
       position: fixed; inset: 0;

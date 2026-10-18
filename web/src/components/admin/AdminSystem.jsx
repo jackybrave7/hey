@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../api';
 import { uploadMedia, previewUrl } from '../../lib/uploadMedia';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../screens/shared';
 
 export default function AdminSystem() {
   const [tab, setTab] = useState('broadcast'); // 'broadcast' | 'moment'

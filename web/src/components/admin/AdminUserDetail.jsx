@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../AuthContext';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../screens/shared';
 
 function fmtDate(ts) {
   if (!ts) return '—';

@@ -6,25 +6,38 @@ import { socket, api } from './api';
 import {
   SplashScreen, HeyScreen, LoginScreen, RegisterScreen, SuccessScreen,
   WelcomeScreen,
-  MyProfileScreen, ContactsScreen, ConversationsScreen,
-  ChatScreen, CallsScreen, CallDetailScreen, SettingsScreen,
-  GroupCreateScreen, GroupSettingsScreen,
-  ForcePasswordModal, PublicProfileScreen, MomentPage,
-  ToastContainer,
-} from './components/Screens';
-import MomentsFeed from './components/moments/MomentsFeed';
+} from './components/screens/authScreens';
+import { ToastContainer } from './components/screens/shared';
+import { lazyScreen, lazyDefault } from './lazyScreen';
+import LazyRoute from './components/LazyRoute';
 import BottomNav from './components/BottomNav';
-import AdminLayout from './components/admin/AdminLayout';
-import AdminDashboard from './components/admin/AdminDashboard';
-import AdminUsers from './components/admin/AdminUsers';
-import AdminUserDetail from './components/admin/AdminUserDetail';
-import AdminMoments from './components/admin/AdminMoments';
-import AdminLogs from './components/admin/AdminLogs';
-import AdminSystem from './components/admin/AdminSystem';
-import AdminReports from './components/admin/AdminReports';
-import AdminAwo from './components/admin/AdminAwo';
-import JoinScreen from './components/JoinScreen';
-import UserGuide from './components/UserGuide';
+
+const MyProfileScreen = lazyScreen('MyProfileScreen');
+const ContactsScreen = lazyScreen('ContactsScreen');
+const ConversationsScreen = lazyScreen('ConversationsScreen');
+const ChatScreen = lazyScreen('ChatScreen');
+const CallsScreen = lazyScreen('CallsScreen');
+const CallDetailScreen = lazyScreen('CallDetailScreen');
+const SettingsScreen = lazyScreen('SettingsScreen');
+const GroupCreateScreen = lazyScreen('GroupCreateScreen');
+const GroupSettingsScreen = lazyScreen('GroupSettingsScreen');
+const ForcePasswordModal = lazyScreen('ForcePasswordModal');
+const PublicProfileScreen = lazyScreen('PublicProfileScreen');
+const MomentPage = lazyScreen('MomentPage');
+
+const MomentsFeed = lazyDefault(() => import('./components/moments/MomentsFeed'));
+const JoinScreen = lazyDefault(() => import('./components/JoinScreen'));
+const UserGuide = lazyDefault(() => import('./components/UserGuide'));
+
+const AdminLayout = lazyDefault(() => import('./components/admin/AdminLayout'));
+const AdminDashboard = lazyDefault(() => import('./components/admin/AdminDashboard'));
+const AdminUsers = lazyDefault(() => import('./components/admin/AdminUsers'));
+const AdminUserDetail = lazyDefault(() => import('./components/admin/AdminUserDetail'));
+const AdminMoments = lazyDefault(() => import('./components/admin/AdminMoments'));
+const AdminLogs = lazyDefault(() => import('./components/admin/AdminLogs'));
+const AdminSystem = lazyDefault(() => import('./components/admin/AdminSystem'));
+const AdminReports = lazyDefault(() => import('./components/admin/AdminReports'));
+const AdminAwo = lazyDefault(() => import('./components/admin/AdminAwo'));
 
 function useNotifications() {
   useEffect(() => {
@@ -73,7 +86,6 @@ function RequireAdmin({ children }) {
   return children;
 }
 
-// Global unread counter — counts across all conversations
 function useUnreadCount() {
   const { user } = useAuth();
   const location = useLocation();
@@ -117,24 +129,19 @@ function MomentsScreen() {
   return <MomentsFeed currentUser={user} />;
 }
 
-// ── Global security event handlers ───────────────────────────────────────────
 function GlobalHandlers() {
   const { logout, user, setUser } = useAuth();
   const [showMustChangePwd, setShowMustChangePwd] = useState(false);
   const [blockedOverlay, setBlockedOverlay] = useState(false);
   const [sysToast, setSysToast] = useState('');
 
-  // Check on load — if user already has must_change_password flag
   useEffect(() => {
     if (user?.must_change_password) setShowMustChangePwd(true);
   }, [user?.must_change_password]);
 
-  // Listen for runtime events from api.js
   useEffect(() => {
     const onBlocked = () => {
       setBlockedOverlay(true);
-      // Если был залогинен — выкидываем; на /login (когда токена нет) — оставляем
-      // оверлей, пока пользователь сам не нажмёт «Понятно».
       if (localStorage.getItem('hey_token')) {
         setTimeout(() => { logout(); }, 2800);
       }
@@ -148,12 +155,10 @@ function GlobalHandlers() {
     };
   }, [logout]);
 
-  // System notifications: Super granted, badge awarded
   useEffect(() => {
     return socket.on('system:notification', ({ text, kind }) => {
       setSysToast(text);
       setTimeout(() => setSysToast(''), 5000);
-      // Refresh user data so SuperStatusCard updates immediately
       if (kind === 'super_granted' || kind === 'badge_granted') {
         api.getMe().then(u => setUser && setUser(u)).catch(() => {});
       }
@@ -191,7 +196,9 @@ function GlobalHandlers() {
         </div>
       )}
       {showMustChangePwd && user && (
-        <ForcePasswordModal onDone={() => setShowMustChangePwd(false)} />
+        <LazyRoute>
+          <ForcePasswordModal onDone={() => setShowMustChangePwd(false)} />
+        </LazyRoute>
       )}
       {sysToast && (
         <div style={{
@@ -211,6 +218,10 @@ function GlobalHandlers() {
   );
 }
 
+function L({ children }) {
+  return <LazyRoute>{children}</LazyRoute>;
+}
+
 export default function App() {
   useNotifications();
   return (
@@ -219,20 +230,18 @@ export default function App() {
         <GlobalHandlers />
         <ToastContainer />
         <Routes>
-          {/* Public */}
           <Route path="/"         element={<SplashScreen/>}/>
           <Route path="/hey"      element={<HeyScreen/>}/>
           <Route path="/login"    element={<GuestOnly><LoginScreen/></GuestOnly>}/>
           <Route path="/register" element={<GuestOnly><RegisterScreen/></GuestOnly>}/>
-          <Route path="/join"     element={<GuestOnly><JoinScreen/></GuestOnly>}/>
+          <Route path="/join"     element={<GuestOnly><L><JoinScreen/></L></GuestOnly>}/>
           <Route path="/success"  element={<SuccessScreen/>}/>
           <Route path="/welcome"  element={<WelcomeScreen/>}/>
 
-          {/* Protected — with bottom nav */}
           <Route path="/main" element={
             <Protected>
               <WithBottomNav>
-                <MomentsScreen/>
+                <L><MomentsScreen/></L>
               </WithBottomNav>
             </Protected>
           }/>
@@ -241,17 +250,16 @@ export default function App() {
           <Route path="/chats" element={
             <Protected>
               <WithBottomNav>
-                <ConversationsScreen/>
+                <L><ConversationsScreen/></L>
               </WithBottomNav>
             </Protected>
           }/>
-          {/* Старый URL — редирект для совместимости */}
           <Route path="/conversations" element={<Navigate to="/chats" replace/>}/>
 
           <Route path="/contacts" element={
             <Protected>
               <WithBottomNav>
-                <ContactsScreen/>
+                <L><ContactsScreen/></L>
               </WithBottomNav>
             </Protected>
           }/>
@@ -259,68 +267,63 @@ export default function App() {
           <Route path="/me" element={
             <Protected>
               <WithBottomNav>
-                <MyProfileScreen/>
+                <L><MyProfileScreen/></L>
               </WithBottomNav>
             </Protected>
           }/>
-          {/* Старый URL — редирект для обратной совместимости */}
           <Route path="/profile/me" element={<Navigate to="/me" replace/>}/>
 
-          {/* Protected — without bottom nav */}
-          {/* Публичный шар-линк момента — доступен без логина */}
-          <Route path="/moments/:id"             element={<MomentPage/>}/>
-          <Route path="/profile/:id"             element={<Protected><PublicProfileScreen/></Protected>}/>
-          <Route path="/chat/:convId"            element={<Protected><ChatScreen/></Protected>}/>
-          <Route path="/groups/new"              element={<Protected><GroupCreateScreen/></Protected>}/>
-          <Route path="/groups/:convId/settings" element={<Protected><GroupSettingsScreen/></Protected>}/>
-          <Route path="/calls"                   element={<Protected><CallsScreen/></Protected>}/>
-          <Route path="/calls/:callId"           element={<Protected><CallDetailScreen/></Protected>}/>
-          <Route path="/settings"                element={<Protected><SettingsScreen/></Protected>}/>
-          <Route path="/help"                    element={<Protected><UserGuide/></Protected>}/>
+          <Route path="/moments/:id" element={<L><MomentPage/></L>}/>
+          <Route path="/profile/:id" element={<Protected><L><PublicProfileScreen/></L></Protected>}/>
+          <Route path="/chat/:convId" element={<Protected><L><ChatScreen/></L></Protected>}/>
+          <Route path="/groups/new" element={<Protected><L><GroupCreateScreen/></L></Protected>}/>
+          <Route path="/groups/:convId/settings" element={<Protected><L><GroupSettingsScreen/></L></Protected>}/>
+          <Route path="/calls" element={<Protected><L><CallsScreen/></L></Protected>}/>
+          <Route path="/calls/:callId" element={<Protected><L><CallDetailScreen/></L></Protected>}/>
+          <Route path="/settings" element={<Protected><L><SettingsScreen/></L></Protected>}/>
+          <Route path="/help" element={<Protected><L><UserGuide/></L></Protected>}/>
 
-          {/* Admin panel */}
           <Route path="/admin" element={
             <RequireAdmin>
-              <AdminLayout><AdminDashboard/></AdminLayout>
+              <L><AdminLayout><AdminDashboard/></AdminLayout></L>
             </RequireAdmin>
           }/>
           <Route path="/admin/users" element={
             <RequireAdmin>
-              <AdminLayout><AdminUsers/></AdminLayout>
+              <L><AdminLayout><AdminUsers/></AdminLayout></L>
             </RequireAdmin>
           }/>
           <Route path="/admin/users/:id" element={
             <RequireAdmin>
-              <AdminLayout><AdminUserDetail/></AdminLayout>
+              <L><AdminLayout><AdminUserDetail/></AdminLayout></L>
             </RequireAdmin>
           }/>
           <Route path="/admin/moments" element={
             <RequireAdmin>
-              <AdminLayout><AdminMoments/></AdminLayout>
+              <L><AdminLayout><AdminMoments/></AdminLayout></L>
             </RequireAdmin>
           }/>
           <Route path="/admin/logs" element={
             <RequireAdmin>
-              <AdminLayout><AdminLogs/></AdminLayout>
+              <L><AdminLayout><AdminLogs/></AdminLayout></L>
             </RequireAdmin>
           }/>
           <Route path="/admin/system" element={
             <RequireAdmin>
-              <AdminLayout><AdminSystem/></AdminLayout>
+              <L><AdminLayout><AdminSystem/></AdminLayout></L>
             </RequireAdmin>
           }/>
           <Route path="/admin/reports" element={
             <RequireAdmin>
-              <AdminLayout><AdminReports/></AdminLayout>
+              <L><AdminLayout><AdminReports/></AdminLayout></L>
             </RequireAdmin>
           }/>
           <Route path="/admin/awo" element={
             <RequireAdmin>
-              <AdminLayout><AdminAwo/></AdminLayout>
+              <L><AdminLayout><AdminAwo/></AdminLayout></L>
             </RequireAdmin>
           }/>
 
-          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace/>}/>
         </Routes>
       </BrowserRouter>

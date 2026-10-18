@@ -1,7 +1,7 @@
 // AdminAwo.jsx — управление интеграцией с АвтоВебОфис (АВО)
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../screens/shared';
 
 const cardStyle = {
   background: 'rgba(255,255,255,.04)',

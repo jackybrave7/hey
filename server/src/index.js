@@ -38,8 +38,37 @@ app.use('/api', makeRouter(db, broadcast));
 // Serve built frontend in production (after API routes)
 if (process.env.NODE_ENV === 'production') {
   const dist = path.join(__dirname, '../../web/dist');
-  app.use(express.static(dist));
-  app.get('*', (req, res) => res.sendFile(path.join(dist, 'index.html')));
+  const assetsDir = path.join(dist, 'assets');
+  const ONE_YEAR = 31536000;
+
+  // Hashed JS/CSS — длинный кеш (immutable)
+  app.use('/assets', express.static(assetsDir, {
+    maxAge: ONE_YEAR,
+    immutable: true,
+    etag: true,
+    setHeaders(res) {
+      res.setHeader('Cache-Control', `public, max-age=${ONE_YEAR}, immutable`);
+    },
+  }));
+
+  // Остальная статика (fonts, icons, manifest); index.html — без кеша
+  app.use(express.static(dist, {
+    etag: true,
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+      } else if (filePath.includes(`${path.sep}fonts${path.sep}`)) {
+        res.setHeader('Cache-Control', `public, max-age=${ONE_YEAR}, immutable`);
+      }
+    },
+  }));
+
+  app.get('*', (req, res) => {
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.sendFile(path.join(dist, 'index.html'));
+  });
 }
 
 
