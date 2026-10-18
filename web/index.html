@@ -59,11 +59,7 @@
   <meta name="googlebot" content="index, follow"/>
   <meta name="yandex" content="index, follow"/>
 
-  <!-- ── Performance hints ─────────────────────────────────────────────── -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" media="print" onload="this.media='all'"/>
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap"/></noscript>
+  <!-- Comfortaa: self-hosted woff2 (web/src/fonts.css) -->
 
   <!-- ── Structured data (JSON-LD) ─────────────────────────────────────── -->
   <script type="application/ld+json">
@@ -125,6 +121,13 @@
     </div>
   </div>
   <script type="module" src="/src/main.jsx"></script>
+  <script>
+    setTimeout(function () {
+      var root = document.getElementById('root');
+      if (!root || !root.querySelector('.boot-splash')) return;
+      root.innerHTML = '<div style="min-height:100vh;padding:32px 20px;box-sizing:border-box;background:linear-gradient(180deg,#5F4080 0%,#D0A8A8 66%,#5F4080 100%);color:#F9F0F0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center"><div style="max-width:400px"><div style="font-size:42px;margin-bottom:16px">✦</div><h1 style="font-size:18px;font-weight:700;margin:0 0 12px">Не удалось загрузить приложение</h1><p style="font-size:14px;line-height:1.55;color:rgba(249,240,240,.65);margin:0 0 20px">Проверьте интернет или отключите VPN. На мобильной сети иногда помогает переключиться на Wi‑Fi.</p><button type="button" onclick="location.reload()" style="padding:12px 28px;border-radius:50px;border:none;background:rgba(95,64,128,.9);color:#F9F0F0;font-size:14px;font-weight:700;cursor:pointer">Обновить</button></div></div>';
+    }, 45000);
+  </script>
 
   <!-- noscript fallback -->
   <noscript>

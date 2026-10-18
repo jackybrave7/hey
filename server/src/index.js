@@ -67,12 +67,15 @@ if (process.env.NODE_ENV === 'production') {
       if (p.includes('/assets/')) {
         // Vite ставит content-hash в имя — файл иммутабелен навсегда.
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (p.includes('/fonts/')) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       } else if (p.endsWith('/sw.js')) {
         // Service worker обязан перепроверяться на каждой загрузке,
         // иначе фиксы push-уведомлений не доезжают до устройств сутками.
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       } else if (p.endsWith('.html') || p.endsWith('.webmanifest')) {
-        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
       } else {
         // Иконки, эмодзи, фоны — не хешированы, но меняются редко.
         res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -88,7 +91,8 @@ if (process.env.NODE_ENV === 'production') {
   // роуты React-приложения → отдаём index.html (без кеша — новая сборка
   // должна подхватываться сразу).
   app.get('*', (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     res.sendFile(path.join(dist, 'index.html'));
   });
 }

@@ -2,7 +2,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './fonts.css';
 import './index.css';
+
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  console.warn('[HEY] vite:preloadError — рекомендуется перезагрузка');
+});
 
 // Error boundary — показывает ошибку прямо на странице, чтобы не гадать
 class ErrorBoundary extends React.Component {

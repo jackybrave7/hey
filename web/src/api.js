@@ -380,6 +380,15 @@ class HeySocket {
     this.queue = [];        // pending outbound messages while disconnected
     this.intentionalClose = false;
     this.reconnectDelay = 1000; // exponential backoff: 1s → 2s → 4s … 30s
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        if (this.token && !this.connected) {
+          clearTimeout(this.reconnectTimer);
+          this.reconnectDelay = 1000;
+          this.connect(this.token);
+        }
+      });
+    }
   }
 
   connect(token) {

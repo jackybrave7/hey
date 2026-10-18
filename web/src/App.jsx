@@ -6,15 +6,32 @@ import { socket, api } from './api';
 import {
   SplashScreen, HeyScreen, LoginScreen, RegisterScreen, SuccessScreen,
   WelcomeScreen, PasswordResetScreen,
-  TermsScreen, PrivacyScreen,
-  MyProfileScreen, ContactsScreen, ConversationsScreen,
-  ChatScreen, CallsScreen, CallDetailScreen, SettingsScreen,
-  GroupCreateScreen, GroupSettingsScreen,
-  ForcePasswordModal, PublicProfileScreen, MomentPage,
-  ToastContainer, GlobalUserCardMount,
-} from './components/Screens';
-import MomentsFeed from './components/moments/MomentsFeed';
+} from './components/auth/AuthScreens';
+import { ToastContainer } from './components/shared/Toast';
+import { lazyNamed, lazyDefault } from './lazyScreen';
+import LazyErrorBoundary from './components/LazyErrorBoundary';
 import BottomNav from './components/BottomNav';
+
+const TermsScreen = lazyNamed(() => import('./components/LegalDocs'), 'TermsScreen');
+const PrivacyScreen = lazyNamed(() => import('./components/LegalDocs'), 'PrivacyScreen');
+const MomentsFeed = lazyDefault(() => import('./components/moments/MomentsFeed'));
+const ConversationsScreen = lazyNamed(() => import('./components/chats/ConversationsScreen'), 'ConversationsScreen');
+const ContactsScreen = lazyNamed(() => import('./components/contacts/ContactsScreen'), 'ContactsScreen');
+const MyProfileScreen = lazyNamed(() => import('./components/profile/MyProfileScreen'), 'MyProfileScreen');
+const ChatScreen = lazyNamed(() => import('./components/chat/ChatScreen'), 'ChatScreen');
+const PublicProfileScreen = lazyNamed(() => import('./components/profile/PublicProfileScreen'), 'PublicProfileScreen');
+const GroupCreateScreen = lazyNamed(() => import('./components/groups/GroupCreateScreen'), 'GroupCreateScreen');
+const GroupSettingsScreen = lazyNamed(() => import('./components/groups/GroupSettingsScreen'), 'GroupSettingsScreen');
+const CallsScreen = lazyNamed(() => import('./components/settings/CallsScreen'), 'CallsScreen');
+const CallDetailScreen = lazyNamed(() => import('./components/settings/CallDetailScreen'), 'CallDetailScreen');
+const SettingsScreen = lazyNamed(() => import('./components/settings/SettingsScreen'), 'SettingsScreen');
+const MomentPage = lazyNamed(() => import('./components/moments/MomentPage'), 'MomentPage');
+const ForcePasswordModal = lazyNamed(() => import('./components/auth/ForcePasswordModal'), 'ForcePasswordModal');
+const GlobalUserCardMount = lazyNamed(() => import('./components/contacts/GlobalUserCardMount'), 'GlobalUserCardMount');
+const JoinScreen = lazyDefault(() => import('./components/JoinScreen'));
+const PersonalInviteJoin = lazyDefault(() => import('./components/contacts/PersonalInviteJoin'));
+const GroupJoinScreen = lazyDefault(() => import('./components/GroupJoinScreen'));
+const UserGuide = lazyDefault(() => import('./components/UserGuide'));
 const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
 const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
 const AdminUsers = lazy(() => import('./components/admin/AdminUsers'));
@@ -36,10 +53,6 @@ const IntegrationsLayout = lazy(() => import('./components/IntegrationsLayout'))
 const BusinessLanding = lazy(() => import('./components/BusinessLanding'));
 const AdminTestUsers = lazy(() => import('./components/admin/AdminTestUsers'));
 const AdminGuide = lazy(() => import('./components/admin/AdminGuide'));
-import JoinScreen from './components/JoinScreen';
-import PersonalInviteJoin from './components/contacts/PersonalInviteJoin';
-import GroupJoinScreen from './components/GroupJoinScreen';
-import UserGuide from './components/UserGuide';
 import ServerStatusBanner from './components/ServerStatusBanner';
 import VpnRuBanner from './components/VpnRuBanner';
 import { ensurePushIfGranted } from './lib/push';
@@ -177,7 +190,7 @@ function Protected({ children }) {
 
 function GuestOnly({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <BootScreen />;
   return user ? <Navigate to="/main" replace/> : children;
 }
 
@@ -190,7 +203,11 @@ function RequireAdmin({ children }) {
 }
 
 function LazyRoute({ children }) {
-  return <Suspense fallback={<BootScreen />}>{children}</Suspense>;
+  return (
+    <LazyErrorBoundary>
+      <Suspense fallback={<BootScreen />}>{children}</Suspense>
+    </LazyErrorBoundary>
+  );
 }
 
 function RequireSuperAdmin({ children }) {
@@ -284,10 +301,10 @@ function MainTabsLayout() {
 
   return (
     <>
-      {pane('main', <MomentsScreen />)}
-      {pane('chats', <ConversationsScreen />)}
-      {pane('contacts', <ContactsScreen />)}
-      {pane('me', <MyProfileScreen />)}
+      {pane('main', <LazyRoute><MomentsScreen /></LazyRoute>)}
+      {pane('chats', <LazyRoute><ConversationsScreen /></LazyRoute>)}
+      {pane('contacts', <LazyRoute><ContactsScreen /></LazyRoute>)}
+      {pane('me', <LazyRoute><MyProfileScreen /></LazyRoute>)}
       <Outlet />
       <BottomNav user={user} unread={unread} />
     </>
@@ -394,7 +411,9 @@ function GlobalHandlers() {
         </div>
       )}
       {showMustChangePwd && user && (
-        <ForcePasswordModal onDone={() => setShowMustChangePwd(false)} />
+        <LazyRoute>
+          <ForcePasswordModal onDone={() => setShowMustChangePwd(false)} />
+        </LazyRoute>
       )}
       {sysToast && (
         <div style={{
@@ -431,7 +450,7 @@ export default function App() {
         <ServerStatusBanner />
         <VpnRuBanner />
         <ToastContainer />
-        <GlobalUserCardMount />
+        <LazyRoute><GlobalUserCardMount /></LazyRoute>
         <Routes>
           {/* Public */}
           <Route path="/"         element={<SplashScreen/>}/>
@@ -439,11 +458,11 @@ export default function App() {
           <Route path="/login"    element={<GuestOnly><LoginScreen/></GuestOnly>}/>
           <Route path="/register" element={<GuestOnly><RegisterScreen/></GuestOnly>}/>
           <Route path="/password-reset" element={<PasswordResetScreen/>}/>
-          <Route path="/terms"    element={<TermsScreen/>}/>
-          <Route path="/privacy"  element={<PrivacyScreen/>}/>
-          <Route path="/join/:code" element={<GuestOnly><PersonalInviteJoin/></GuestOnly>}/>
-          <Route path="/join"     element={<GuestOnly><JoinScreen/></GuestOnly>}/>
-          <Route path="/gjoin/:token" element={<GroupJoinScreen/>}/>
+          <Route path="/terms"    element={<LazyRoute><TermsScreen/></LazyRoute>}/>
+          <Route path="/privacy"  element={<LazyRoute><PrivacyScreen/></LazyRoute>}/>
+          <Route path="/join/:code" element={<GuestOnly><LazyRoute><PersonalInviteJoin/></LazyRoute></GuestOnly>}/>
+          <Route path="/join"     element={<GuestOnly><LazyRoute><JoinScreen/></LazyRoute></GuestOnly>}/>
+          <Route path="/gjoin/:token" element={<LazyRoute><GroupJoinScreen/></LazyRoute>}/>
           <Route path="/success"  element={<SuccessScreen/>}/>
           <Route path="/welcome"  element={<WelcomeScreen/>}/>
 
@@ -462,15 +481,15 @@ export default function App() {
 
           {/* Protected — without bottom nav */}
           {/* Публичный шар-линк момента — доступен без логина */}
-          <Route path="/moments/:id"             element={<MomentPage/>}/>
-          <Route path="/profile/:id"             element={<Protected><PublicProfileScreen/></Protected>}/>
-          <Route path="/chat/:convId"            element={<Protected><ChatScreen/></Protected>}/>
-          <Route path="/groups/new"              element={<Protected><GroupCreateScreen/></Protected>}/>
-          <Route path="/groups/:convId/settings" element={<Protected><GroupSettingsScreen/></Protected>}/>
-          <Route path="/calls"                   element={<Protected><CallsScreen/></Protected>}/>
-          <Route path="/calls/:callId"           element={<Protected><CallDetailScreen/></Protected>}/>
-          <Route path="/settings"                element={<Protected><SettingsScreen/></Protected>}/>
-          <Route path="/help"                    element={<Protected><UserGuide/></Protected>}/>
+          <Route path="/moments/:id"             element={<LazyRoute><MomentPage/></LazyRoute>}/>
+          <Route path="/profile/:id"             element={<Protected><LazyRoute><PublicProfileScreen/></LazyRoute></Protected>}/>
+          <Route path="/chat/:convId"            element={<Protected><LazyRoute><ChatScreen/></LazyRoute></Protected>}/>
+          <Route path="/groups/new"              element={<Protected><LazyRoute><GroupCreateScreen/></LazyRoute></Protected>}/>
+          <Route path="/groups/:convId/settings" element={<Protected><LazyRoute><GroupSettingsScreen/></LazyRoute></Protected>}/>
+          <Route path="/calls"                   element={<Protected><LazyRoute><CallsScreen/></LazyRoute></Protected>}/>
+          <Route path="/calls/:callId"           element={<Protected><LazyRoute><CallDetailScreen/></LazyRoute></Protected>}/>
+          <Route path="/settings"                element={<Protected><LazyRoute><SettingsScreen/></LazyRoute></Protected>}/>
+          <Route path="/help"                    element={<Protected><LazyRoute><UserGuide/></LazyRoute></Protected>}/>
 
           {/* Admin panel */}
           <Route path="/admin" element={
