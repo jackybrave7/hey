@@ -1,13 +1,30 @@
 // web/src/api.js
 
 const BASE = '/api';
+/** Таймаут HTTP — без него «висящий» TCP на мобильной сети блокирует весь старт (AuthContext). */
+export const API_TIMEOUT_MS = 20_000;
 
 function getToken() {
   return localStorage.getItem('hey_token');
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Превышено время ожидания ответа сервера. Проверьте интернет и попробуйте снова.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function req(method, path, body) {
-  const res = await fetch(BASE + path, {
+  const res = await fetchWithTimeout(BASE + path, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -178,6 +195,15 @@ class HeySocket {
     this.queue = [];        // pending outbound messages while disconnected
     this.intentionalClose = false;
     this.reconnectDelay = 1000; // exponential backoff: 1s → 2s → 4s … 30s
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        if (this.token && !this.connected) {
+          clearTimeout(this.reconnectTimer);
+          this.reconnectDelay = 1000;
+          this.connect(this.token);
+        }
+      });
+    }
   }
 
   connect(token) {

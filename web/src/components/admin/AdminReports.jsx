@@ -1,7 +1,7 @@
 // AdminReports.jsx — список жалоб от пользователей
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
-import { useConfirm } from '../Screens';
+import { useConfirm } from '../screens/shared';
 
 function fmtDate(ts) {
   if (!ts) return '—';

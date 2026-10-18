@@ -59,10 +59,7 @@
   <meta name="googlebot" content="index, follow"/>
   <meta name="yandex" content="index, follow"/>
 
-  <!-- ── Performance hints ─────────────────────────────────────────────── -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet"/>
+  <!-- Comfortaa: self-hosted woff2 (web/src/fonts.css), без сторонних доменов -->
 
   <!-- ── Structured data (JSON-LD) ─────────────────────────────────────── -->
   <script type="application/ld+json">
@@ -88,7 +85,7 @@
   <!-- ── Initial loading paint (избегаем белого экрана) ────────────────── -->
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: #1a0a30; color: #fff; }
-    body { font-family: 'Comfortaa', system-ui, -apple-system, sans-serif; }
+    body { font-family: system-ui, -apple-system, sans-serif; }
     #root { min-height: 100vh; }
     .boot-splash {
       position: fixed; inset: 0;
@@ -105,6 +102,14 @@
     <div class="boot-splash">✦</div>
   </div>
   <script type="module" src="/src/main.jsx"></script>
+  <script>
+    // Если JS-бандл не загрузился (обрыв сети), пользователь иначе видит вечный ✦
+    setTimeout(function () {
+      var root = document.getElementById('root');
+      if (!root || !root.querySelector('.boot-splash')) return;
+      root.innerHTML = '<div style="min-height:100vh;padding:32px 20px;box-sizing:border-box;background:linear-gradient(135deg,#2a1058,#5a2d96);color:#fff;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center"><div style="max-width:400px"><div style="font-size:42px;margin-bottom:16px">✦</div><h1 style="font-size:18px;font-weight:700;margin:0 0 12px">Не удалось загрузить приложение</h1><p style="font-size:14px;line-height:1.55;color:rgba(255,255,255,.65);margin:0 0 20px">Проверьте интернет или отключите VPN. На мобильной сети иногда помогает переключиться на Wi‑Fi.</p><button type="button" onclick="location.reload()" style="padding:12px 28px;border-radius:50px;border:none;background:rgba(120,90,200,.9);color:#fff;font-size:14px;font-weight:700;cursor:pointer">Обновить</button></div></div>';
+    }, 45000);
+  </script>
 
   <!-- noscript fallback -->
   <noscript>
