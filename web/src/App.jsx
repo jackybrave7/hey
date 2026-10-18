@@ -51,7 +51,12 @@ function Protected({ children }) {
 
 function GuestOnly({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return (
+    <div style={{minHeight:'100vh',background:'var(--grad)',display:'flex',
+      alignItems:'center',justifyContent:'center'}}>
+      <div style={{color:'rgba(255,255,255,.5)',fontSize:16}}>Загрузка…</div>
+    </div>
+  );
   return user ? <Navigate to="/main" replace/> : children;
 }
 
